@@ -33,53 +33,25 @@ Thumbs.db
 .claude/settings.local.json
 CLAUDE.local.md
 
-# AI 작업 지침과 인수인계는 로컬에서만 유지한다.
-!.agents/
-!.agents/skills/
-!.agents/skills/**
-!.claude/
-!.claude/rules/
-!.claude/rules/**
-!.claude/skills/
-!.claude/skills/**
+# AI 작업 지침, 스킬 및 인수인계는 로컬 전용
+AGENTS.md
+CLAUDE.md
+GOAL.md
+HANDOFF.md
+.agents/
+.claude/
+.codex/
+codex/
+goal.md
 
 # 로컬 화면 확인 부산물
 .playwright-mcp/
 
-# 개인 AI 도구 설정과 작업 문서는 공개 저장소에서 제외한다.
-.codex/*
-!.codex/README.md
-codex/
-goal.md
-docs/WORKFLOW.md
-
-# 설계, 조사, 검토와 AI 작업 산출물은 전부 로컬에서만 유지한다.
-docs/
+# 작업 계획, 조사, 기록과 문서는 로컬 전용
+/docs/
 *.md
 *.mdx
 *.MD
 !/README.md
 !/PRIVACY.md
 !/SECURITY.md
-!/AGENTS.md
-!/CLAUDE.md
-!/GOAL.md
-!/HANDOFF.md
-!/.claude/README.md
-!/.codex/README.md
-!/.claude/rules/*.md
-!/.agents/skills/**/SKILL.md
-!/.agents/skills/**/*.md
-!docs/
-docs/*
-!docs/CODEX_IMPLEMENTATION_PLAN.md
-!docs/시작하기.md
-!docs/현황과-작업계획.md
-!docs/MIGRATION_MATRIX.md
-!docs/ARCHITECTURE.md
-!docs/BLOCKERS.md
-!docs/OPERATIONS.md
-!docs/plans/
-!docs/plans/*.md
-!docs/daily-log/
-!docs/daily-log/*.md
