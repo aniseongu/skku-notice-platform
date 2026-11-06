@@ -3,11 +3,8 @@
 import { LitElement, html, nothing, type TemplateResult } from 'lit';
 import {
   type IconName, type Judgement, type MatchedFile, type Notice, type NoticeBody, type NoticesFile, type Source,
-  VERDICT_LABEL, boardName, cleanTitle, deadlineDetail, deadlineGroup, deadlinePassed, deadlineText,
-  daysLeft, fetchBody, fetchJson, keywordMatches, koreanDate, postedGroup, safeUrl, todayKst,
+  boardName, cleanTitle, deadlineGroup, deadlinePassed, fetchBody, fetchJson, keywordMatches, postedGroup, safeUrl, todayKst,
 } from './data';
-import { unsafeHTML } from 'lit/directives/unsafe-html.js';
-import { cleanHtml, fileType } from './rich';
 import { type SavedNotice, loadSaved, orderSaved, storeSaved, toggleSaved } from './saved-notices';
 import { isNoticeRead, loadReadState, mergeReadStates, parseReadState, readIds, setReadState, storeReadState } from './read-notices';
 import { keywordCounts } from './keyword-counts';
@@ -17,6 +14,7 @@ import { authClient } from './auth';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import './platform-settings';
 import './notice-rows';
+import './notice-detail';
 import { localKey, setLocalOwner } from './local-scope.ts';
 import type { Subscription } from '@supabase/supabase-js';
 import { orderNotices, type Sort } from './notice-order';
@@ -32,7 +30,6 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
 const STALE_MS = 2 * 3600_000;
 // 화면을 켜 둔 채로 있어도 1시간 주기의 새 공지와 D-day가 바뀌도록 5분마다 다시 받는다.
 const REFRESH_MS = 5 * 60_000;
-const SOON_DAYS = 3;
 const isTab = (value: string | null): value is Tab => TABS.some((t) => t.id === value);
 const normalizeTab = (value: string | null) => value === 'mine' || value === 'deadline' ? 'all' : value;
 const INTERACTIVE = 'a, button, input, textarea, select, [contenteditable]';
@@ -733,47 +730,6 @@ export class NoticeApp extends LitElement {
     `;
   }
 
-  // 영어 공지는 옮긴 글을 먼저, 그 아래에 영어 원문을 함께 보인다(원문이 정확하다).
-  private translatedView(loaded: NoticeBody | null) {
-    const translation = loaded?.translation;
-    if (!translation?.body) return this.bodyView(loaded);
-    return html`<section class="detail-section body-text" aria-label="한국어로 옮긴 본문">
-        <h3>본문 (한국어로 옮긴 글)</h3>
-        <p class="detail-note first">Gemini 번역이에요. 정확한 내용은 아래 영어 원문을 확인해 주세요</p>
-        ${translation.body.split(/\n+/).filter(Boolean).map((para) => html`<p>${para}</p>`)}
-      </section>
-      <div class="original-body" lang="en">${this.bodyView(loaded, '영어 원문')}</div>`;
-  }
-
-  private bodyView(loaded: NoticeBody | null, heading = '본문') {
-    if (!loaded) return html`<p class="detail-note" role="status">본문을 불러오지 못했어요. 원문에서 확인해 주세요</p>`;
-    if (!loaded.body && !loaded.body_html && !loaded.images?.length && loaded.body_status !== 'ready') {
-      const status = loaded.body_status ?? (loaded.fetched_at ? 'ready' : 'pending');
-      const message = {
-        pending: '본문을 준비하고 있어요. 먼저 원문을 볼 수 있어요',
-        retrying: '본문을 다시 가져올 예정이에요. 먼저 원문을 볼 수 있어요',
-        unavailable: '본문을 가져오지 못했어요. 나중에 다시 확인할게요. 먼저 원문을 볼 수 있어요',
-        ready: '본문에 내용이 없어요. 원문에서 확인해 주세요',
-      }[status];
-      return html`<p class="detail-note" role="status">${message}</p>`;
-    }
-    const paragraphs = (loaded.body ?? '').split(/\n+/).filter(Boolean);
-    // 정제한 본문 HTML이 있으면 표, 굵게, 링크, 목록을 살려 그린다(D-016). 그림도 그 안에 들어 있다.
-    if (loaded.body_html && !loaded.body_from_image) {
-      return html`<section class="detail-section body-text" aria-label=${heading}><h3>${heading}</h3>
-        <div class="rich">${unsafeHTML(cleanHtml(loaded.body_html))}</div></section>`;
-    }
-    // 그림은 사용자가 볼 때만 학교 서버에서 받는다(수집 실행은 주소만 저장).
-    const images = (loaded.images ?? []).map(safeUrl).filter((url) => url !== '#');
-    if (!paragraphs.length && !images.length) return html`<p class="detail-note">본문에 글자가 없어요. 원문 열기로 볼 수 있어요</p>`;
-    return html`<section class="detail-section body-text" aria-label="본문">
-      <h3>${loaded.body_from_image ? `${heading} (그림에서 읽은 글)` : heading}</h3>
-      ${loaded.body_from_image && paragraphs.length ? html`<p class="detail-note first">그림 속 글자를 기계가 옮겨 적어서 틀린 곳이 있을 수 있어요. 아래 그림과 원문이 정확해요</p>` : nothing}
-      ${paragraphs.map((para) => html`<p>${para}</p>`)}
-      ${images.map((src, index) => html`<img src=${src} alt="본문 그림 ${index + 1}" loading="lazy" referrerpolicy="no-referrer">`)}
-    </section>`;
-  }
-
   /** 휴대폰 앱 안 상세 화면: 뒤로 가기, 상세, 바닥의 원문 열기 */
   private readingView(notice: Notice) {
     return html`
@@ -995,57 +951,14 @@ export class NoticeApp extends LitElement {
       ${action ? html`<button type="button" class="ghost-button" @click=${onAction}>${action}</button>` : nothing}</div>`;
   }
 
-  private reasonLine(notice: Notice) {
-    const ai = this.judgement(notice)?.ai;
-    const interests = this.interests(notice);
-    if (interests.length) {
-      return html`<span class="reason"><b class="interest">관심 ${interests.join(', ')}</b>${ai && ai.verdict !== 'not_relevant' ? ai.reason : ''}</span>`;
-    }
-    if (ai) return html`<span class="reason ${ai.verdict}"><b>${VERDICT_LABEL[ai.verdict]}</b>${ai.reason}</span>`;
-    const rule = this.judgement(notice)?.rule_name;
-    return rule ? html`<span class="reason rule"><b>기준</b>${rule}</span>` : nothing;
-  }
-
-  private dday(notice: Notice, today: string) {
-    if (!notice.deadline) return nothing;
-    const passed = deadlinePassed(notice.deadline);
-    const urgent = !passed && daysLeft(notice.deadline, today) <= SOON_DAYS;
-    return html`<span class="dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''}">${deadlineText(notice.deadline, today)}</span>`;
-  }
-
   private detail(notice: Notice) {
     const judgement = this.judgement(notice);
-    const source = this.sources.find((s) => s.id === notice.source_id);
-    const interests = this.interests(notice);
-    const today = todayKst();
-    const body = this.body(notice);
-    const loaded = body !== 'loading' ? body : null;
-    const reason = this.reasonLine(notice);
-    // 순서: 내용이 먼저, 관리 정보(게시일, 알림 여부)는 맨 아래(사용자 요청 2026-11-02, ux-rules 1절).
-    return html`
-      <div class="detail">
-        <p class="meta"><span>${boardName(source, notice.source_id)}</span>${notice.category ? html`<span>${notice.category}</span>` : nothing}</p>
-        <h2 class="detail-title" title=${cleanTitle(notice.title_ko || notice.title)}>${cleanTitle(notice.title_ko || notice.title)}</h2>
-        ${notice.title_ko ? html`<p class="detail-original" lang="en">${cleanTitle(notice.title)}</p>` : nothing}
-        ${reason === nothing ? nothing : html`<p class="detail-reason">${reason}</p>`}
-        ${notice.deadline ? html`<p class="detail-deadline">${notice.deadline_kind ?? '마감'} ${deadlineDetail(notice.deadline)} ${this.dday(notice, today)}</p>` : nothing}
-        ${notice.changed_at ? html`<p class="detail-change">${koreanDate(notice.changed_at.slice(0, 10))}에 원문 ${notice.change_kind === '제목' ? '제목이' : '본문이'} 바뀌었어요</p>` : nothing}
-        ${loaded?.summary ? html`<section class="detail-section summary" aria-label="요약">
-          <h3>요약</h3>${loaded.summary.split('\n').filter(Boolean).map((line) => html`<p>${line}</p>`)}</section>` : nothing}
-        ${!loaded?.summary && loaded?.summary_status === 'failed' ? html`<section class="detail-section" aria-label="요약">
-          <h3>요약</h3><p class="detail-note first" role="status">요약을 만들지 못했어요. 나중에 다시 시도해요</p></section>` : nothing}
-        ${body === 'loading' ? html`<p class="detail-note">본문을 불러오는 중</p>`
-          : !loaded ? html`<p class="detail-note" role="status">본문을 불러오지 못했어요. 다시 불러오거나 원문을 확인해 주세요</p>
-              <button type="button" class="text-button" @click=${() => { this.bodies.delete(notice.id); this.requestUpdate(); }}>본문 다시 불러오기</button>`
-          : this.translatedView(loaded)}
-        ${loaded?.attachments?.length ? this.attachmentsView(loaded) : nothing}
-        <dl class="facts" aria-label="글 정보">
-          <div><dt>게시일</dt><dd>${koreanDate(notice.posted_on)}</dd></div>
-          ${notice.previous_title ? html`<div><dt>이전 제목</dt><dd>${cleanTitle(notice.previous_title)}</dd></div>` : nothing}
-          ${interests.length ? html`<div><dt>관심</dt><dd><b class="interest">${interests.join(', ')}</b></dd></div>` : nothing}
-          ${judgement?.notified ? html`<div><dt>알림</dt><dd>알림을 보냈어요</dd></div>` : nothing}
-        </dl>
-      </div>`;
+    return html`<notice-detail-screen .model=${{
+      notice, source: boardName(this.sources.find((source) => source.id === notice.source_id), notice.source_id),
+      today: todayKst(), body: this.body(notice), interests: this.interests(notice),
+      ai: judgement?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
+      retry: () => { this.bodies.delete(notice.id); this.requestUpdate(); },
+    }}></notice-detail-screen>`;
   }
 
   private saveButton(notice: Notice) {
@@ -1055,15 +968,7 @@ export class NoticeApp extends LitElement {
       @click=${() => this.toggleSave(notice)}>${icon(saved ? 'bookmark-on' : 'bookmark')}</button>`;
   }
 
-  private attachmentsView(loaded: NoticeBody) {
-    return html`<section class="detail-section" aria-label="첨부">
-      <h3>첨부 ${loaded.attachments.length}개</h3>
-      <ul class="attachments">${loaded.attachments.map((file) => html`<li>
-        <a class="file" href=${safeUrl(file.url)} target="_blank" rel="noopener">
-          <span class="file-type">${fileType(file.name, file.type)}</span>
-          <span class="file-name">${file.name}</span>${file.size ? html`<span class="file-size">${file.size}</span>` : nothing}</a></li>`)}</ul>
-      <p class="detail-note first">누르면 학교 공지 사이트의 원본 파일을 받아요</p></section>`;
-  }
+
 }
 
 customElements.define('notice-app', NoticeApp);
