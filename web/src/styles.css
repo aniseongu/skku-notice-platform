@@ -591,3 +591,9 @@
     body { padding-top: env(titlebar-area-height, 0px); }
   }
 }
+
+@layer platform {
+  .platform-preview { padding: 10px 16px; background: var(--sunken); color: var(--text-2); font-size: 13px; }
+  .platform-settings { display: grid; gap: 12px; padding: 24px 16px; color: var(--text-2); }
+  .platform-settings h2 { color: var(--text); font-size: 18px; }
+}

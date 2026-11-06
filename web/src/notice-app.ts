@@ -8,16 +8,12 @@ import {
 } from './data';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { cleanHtml, fileType } from './rich';
-import './settings-view';
-import { GitHubError, collectionWorkflowUrl, readVariable, saveVariable, requestCollection } from './github';
-import { loadToken } from './settings-storage';
-import { SAVED_VARIABLE, type SavedNotice, loadSaved, orderSaved, parseSaved, storeSaved, toggleSaved } from './saved-notices';
-import { READ_STATE_VARIABLE, READ_VARIABLE, isNoticeRead, loadReadState, mergeReadStates, parseReadState, readIds, serializeReadState, setReadState, storeReadState } from './read-notices';
+import { type SavedNotice, loadSaved, orderSaved, storeSaved, toggleSaved } from './saved-notices';
+import { isNoticeRead, loadReadState, mergeReadStates, parseReadState, readIds, setReadState, storeReadState } from './read-notices';
 import { keywordCounts } from './keyword-counts';
 import type { Theme } from './settings-view';
 import { APP_NAME } from './brand';
 import { orderNotices, type Sort } from './notice-order';
-import { syncCurrentDeviceName } from './device-name-sync';
 
 type Tab = 'all' | 'intern' | 'saved';
 type View = Tab | 'settings';
@@ -138,11 +134,6 @@ export class NoticeApp extends LitElement {
   private readState = loadReadState();
   private needsReadBaseline = this.readState === null;
   read: string[] | null = this.readState ? readIds(this.readState) : null;
-  private readTimer = 0;
-  private readWrite: Promise<void> = Promise.resolve();
-  // GitHub 연결(설정에서 한 번 넣은 토큰). 있으면 저장 목록과 키워드를 모든 기기와 맞춘다.
-  private github: { repo: string; token: string } | null = null;
-  private savedWrite: Promise<void> = Promise.resolve();
   query = '';
   loading = true;
   failed = false;
@@ -176,7 +167,6 @@ export class NoticeApp extends LitElement {
     remember('intern-sort', this.internSort);
     applyTheme(this.theme);
     this.refresh();
-    this.syncFromGitHub();
     wide.addEventListener('change', () => { this.isWide = wide.matches; });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.refresh(); });
     window.setInterval(() => { if (document.visibilityState === 'visible') this.refresh(); }, REFRESH_MS);
@@ -200,16 +190,14 @@ export class NoticeApp extends LitElement {
   async refresh() {
     this.loading = true;
     try {
-      const load = () => Promise.all([fetchJson<NoticesFile>('notices.json'), fetchJson<MatchedFile>('matched.json', true)]);
-      let [notices, matched] = await load();
-      // 두 파일은 같은 실행에서 함께 만들어진다. 한쪽만 저장본이면 한 번 더 받는다.
-      if (matched && matched.generated_at !== notices!.generated_at) [notices, matched] = await load();
+      const notices = await fetchJson<NoticesFile>('notices.json');
       // 뒤늦게 채운 본문도 새 수집 결과와 함께 다시 받는다.
       if (this.generatedAt !== notices!.generated_at) this.bodies.clear();
       this.notices = notices!.notices;
       this.sources = notices!.sources;
       this.generatedAt = notices!.generated_at;
-      this.matched = matched;
+      // 개인용 서비스의 판정 결과는 플랫폼에서 읽지 않는다.
+      this.matched = null;
       this.failed = false;
       // 처음 열면 이미 있던 글이 모두 굵게 보이지 않게, 그때 있던 글은 읽은 것으로 시작한다.
       if (this.needsReadBaseline) {
@@ -218,7 +206,6 @@ export class NoticeApp extends LitElement {
         this.read = readIds(this.readState);
         storeReadState(this.readState);
         this.needsReadBaseline = false;
-        this.pushRead();
       }
       if (this.board !== 'all' && !this.sources.some((s) => s.id === this.board)) this.board = 'all';
     } catch (error) {
@@ -232,82 +219,6 @@ export class NoticeApp extends LitElement {
 
   private async collectNow() {
     await this.refresh();
-    const repo = remember('github-repo');
-    const token = await loadToken();
-    if (!repo || !token) { this.showToast('기기를 연결하면 공지를 직접 확인할 수 있어요', '?view=settings&section=connection', '기기 연결하기'); return; }
-    if (this.generatedAt && Date.now() - Date.parse(this.generatedAt) < 14 * 60_000) {
-      this.showToast('최근에 공지를 확인했어요. 잠시 뒤 다시 시도해 주세요'); return;
-    }
-    try {
-      await requestCollection(repo, token);
-      this.showToast('공지 확인을 요청했어요. 진행 중인 확인이 끝나면 반영돼요');
-    } catch (error) {
-      if (error instanceof GitHubError && error.status === 401) {
-        this.showToast('GitHub 연결을 확인하지 못했어요. 기기에서 다시 연결해 주세요', '?view=settings&section=connection', '기기 연결하기');
-      } else if (error instanceof GitHubError && (error.status === 403 || error.status === 404)) {
-        this.showToast('GitHub 토큰의 저장소 접근과 Actions 권한을 확인해 주세요',
-          'https://github.com/settings/personal-access-tokens', '토큰 권한 확인하기');
-      } else {
-        this.showToast('요청하지 못했어요. 잠시 뒤 다시 시도해 주세요', collectionWorkflowUrl(repo), 'GitHub에서 실행하기');
-      }
-    }
-  }
-
-  // GitHub 값이 있으면 그것을 따른다(다른 기기에서 바꾼 것). 없으면 이 기기 것을 올린다.
-  private async syncFromGitHub() {
-    const repo = remember('github-repo');
-    const token = await loadToken();
-    if (!repo || !token) return;
-    this.github = { repo, token };
-    void syncCurrentDeviceName(repo, token).catch(() => { /* 설정 화면에서 다시 시도한다 */ });
-    try {
-      const [saved, keywords, read, readState] = await Promise.all([
-        readVariable(repo, token, SAVED_VARIABLE), readVariable(repo, token, 'INTEREST_KEYWORDS'),
-        readVariable(repo, token, READ_VARIABLE), readVariable(repo, token, READ_STATE_VARIABLE),
-      ]);
-      // 명시적으로 읽지 않음으로 바꾼 시각도 함께 병합한다.
-      if (read !== null || readState !== null || this.readState) {
-        const remote = mergeReadStates(parseReadState(read), parseReadState(readState));
-        const merged = mergeReadStates(remote, this.readState ?? parseReadState(null));
-        this.readState = merged;
-        this.read = readIds(merged);
-        storeReadState(merged);
-        if (serializeReadState(merged) !== readState || JSON.stringify(readIds(merged)) !== read) this.pushRead();
-      }
-      if (saved !== null) { this.saved = parseSaved(saved); storeSaved(this.saved); }
-      else if (this.saved.length) this.pushSaved();
-      const words = (keywords ?? '').split(/[,\n]/).map((w) => w.trim()).filter(Boolean);
-      if (words.length) this.setKeywords(words);
-    } catch { /* 인터넷 오류면 이 기기 것을 그대로 보여 준다 */ }
-  }
-
-  private pushSaved() {
-    const github = this.github;
-    if (!github) return;
-    const value = JSON.stringify(this.saved);
-    // 빠르게 여러 번 눌러도 마지막 상태가 남도록 차례로 보낸다.
-    this.savedWrite = this.savedWrite.then(() => saveVariable(github.repo, github.token, SAVED_VARIABLE, value))
-      .catch(() => this.showToast('이 기기에만 저장했어요. 다른 기기에는 다음에 열 때 맞춰요'));
-  }
-
-  private pushRead() {
-    const github = this.github;
-    if (!github) return;
-    clearTimeout(this.readTimer);
-    this.readTimer = window.setTimeout(() => {
-      this.readWrite = this.readWrite.then(async () => {
-        const [legacy, versioned] = await Promise.all([
-          readVariable(github.repo, github.token, READ_VARIABLE), readVariable(github.repo, github.token, READ_STATE_VARIABLE),
-        ]);
-        const remote = mergeReadStates(parseReadState(legacy), parseReadState(versioned));
-        const merged = mergeReadStates(remote, this.readState ?? parseReadState(null));
-        this.readState = merged;
-        this.read = readIds(merged);
-        storeReadState(merged);
-        await saveVariable(github.repo, github.token, READ_STATE_VARIABLE, serializeReadState(merged));
-        await saveVariable(github.repo, github.token, READ_VARIABLE, JSON.stringify(readIds(merged)));
-      }).catch(() => this.showToast('이 기기에만 저장했어요. 다른 기기에는 다음에 열 때 맞춰요'));
-    }, 3000);
   }
 
   private updateRead(ids: string[], read: boolean) {
@@ -317,7 +228,6 @@ export class NoticeApp extends LitElement {
     this.readState = setReadState(this.readState ?? parseReadState(null), ids, read, Math.max(Date.now(), latestChange));
     this.read = readIds(this.readState);
     storeReadState(this.readState);
-    this.pushRead();
   }
 
   private markRead(notice: Notice) {
@@ -355,7 +265,6 @@ export class NoticeApp extends LitElement {
     const added = next.length > this.saved.length;
     this.saved = next;
     storeSaved(next);
-    this.pushSaved();
     this.showToast(added ? '저장했어요' : '저장을 지웠어요');
   }
 
@@ -650,6 +559,7 @@ export class NoticeApp extends LitElement {
         </aside>
 
         <main class="list-pane">
+          <p class="platform-preview" role="status">개발 중인 미리보기예요. 공지와 개인 설정은 아직 연결되지 않았어요.</p>
           ${reading ? this.readingView(reading) : html`
           <div class="navigation-head">
           <header class="pane-head topbar glass ${settings ? '' : 'feed-topbar'}">
@@ -675,11 +585,11 @@ export class NoticeApp extends LitElement {
           </header>
           </div>
 
-          ${settings ? html`<settings-view .keywords=${this.keywords} .theme=${this.theme} .canInstall=${Boolean(this.install && browserTab.matches)}
-              .categories=${[...new Set(this.notices.map((n) => n.category).filter((c): c is string => Boolean(c)))].sort()}
-              @keywords-change=${(e: CustomEvent<string[]>) => this.setKeywords(e.detail)}
-              @theme-change=${(e: CustomEvent<Theme>) => this.setTheme(e.detail)} @install-request=${this.runInstall}
-              @shortcuts-request=${() => { this.shortcutsOpen = true; }}></settings-view>` : html`
+          ${settings ? html`<section class="platform-settings" aria-label="설정">
+              <h2>계정과 설정 준비 중</h2>
+              <p>Google 로그인과 개인 설정을 준비하고 있어요.</p>
+              <p>저장과 읽음 표시는 현재 이 브라우저에만 남아요.</p>
+            </section>` : html`
             <div class="tools narrow-only">
               <label class="search">${icon('search')}
                 <input type="search" placeholder="제목, 분류, 판정 이유로 찾기" autocomplete="off" aria-label="공지 검색" .value=${this.query}
@@ -827,7 +737,7 @@ export class NoticeApp extends LitElement {
         <li class="row skeleton" aria-hidden="true"><span></span><span></span><span></span></li>`)}</ol>`;
     }
     if (this.failed && !this.notices.length) {
-      return this.empty('목록을 불러오지 못했어요', '인터넷 연결을 확인하고 다시 시도해 주세요', '다시 불러오기', () => this.refresh());
+      return this.empty('목록을 불러오지 못했어요', '공지 데이터를 연결하는 중이에요. 잠시 뒤 다시 확인해 주세요', '다시 불러오기', () => this.refresh());
     }
     if (!list.length) {
       const boardPicker = html`<div class="group-head empty-head"><span></span>${this.boardSelect()}</div>`;
