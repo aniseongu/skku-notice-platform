@@ -132,3 +132,31 @@ def test_detail_failure_keeps_old_text_and_retries_next_run(monkeypatch):
     assert job.run_collection(SETTINGS, store, NOW) == (1, 0)
     assert store.rows["school/123"]["body"] == "새 본문"
     assert store.rows["school/123"]["first_seen"] == "2026-11-01T00:00:00+09:00"
+
+
+def test_one_failed_board_does_not_stop_other_boards(monkeypatch):
+    from dataclasses import replace
+
+    store = MemoryStore()
+    second = {**SOURCES[0], "id": "school2", "url": "https://www.skku.edu/other"}
+    settings = {**SETTINGS, "sources": [SOURCES[0], second]}
+    monkeypatch.setattr(job.time, "sleep", lambda _: None)
+
+    def fetch(url, *_):
+        if url == SOURCES[0]["url"]:
+            raise FetchError("first board unavailable")
+        return "list"
+
+    monkeypatch.setattr(job, "fetch_list", fetch)
+    monkeypatch.setattr(
+        job, "parse_list", lambda _html, source_id, _url: [replace(NOTICE, source_id=source_id)]
+    )
+    monkeypatch.setattr(job, "fetch_detail", lambda *_: "detail")
+    monkeypatch.setattr(
+        job,
+        "parse_detail",
+        lambda *_: SimpleNamespace(body_text="본문", body_html="<p>본문</p>", attachments=(), images=()),
+    )
+    assert job.run_collection(settings, store, NOW) == (1, 1)
+    assert "school/123" not in store.rows
+    assert store.rows["school2/123"]["body"] == "본문"
