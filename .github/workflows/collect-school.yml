@@ -1,7 +1,9 @@
 name: Collect school notices
 
-# Enable the hourly schedule only after the manual run has been verified.
 on:
+  schedule:
+    # Once per hour, off the busy start of the hour.
+    - cron: '17 * * * *'
   workflow_dispatch:
 
 permissions:
