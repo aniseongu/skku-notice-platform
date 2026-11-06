@@ -46,6 +46,8 @@ goal.md
 
 # 로컬 화면 확인 부산물
 .playwright-mcp/
+web/test-results/
+web/playwright-report/
 
 # 작업 계획, 조사, 기록과 문서는 로컬 전용
 /docs/
