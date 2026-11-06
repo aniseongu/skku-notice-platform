@@ -13,6 +13,9 @@ import { isNoticeRead, loadReadState, mergeReadStates, parseReadState, readIds, 
 import { keywordCounts } from './keyword-counts';
 import type { Theme } from './settings-view';
 import { APP_NAME } from './brand';
+import { authClient } from './auth';
+import { localKey, setLocalOwner } from './local-scope.ts';
+import type { Subscription } from '@supabase/supabase-js';
 import { orderNotices, type Sort } from './notice-order';
 
 type Tab = 'all' | 'intern' | 'saved';
@@ -43,8 +46,9 @@ interface InstallPrompt extends Event { prompt(): Promise<void> }
 
 function remember(key: string, value?: string): string | null {
   try {
-    if (value === undefined) return localStorage.getItem(key);
-    localStorage.setItem(key, value);
+    const storageKey = key === 'keywords' ? localKey(key) : key;
+    if (value === undefined) return localStorage.getItem(storageKey);
+    localStorage.setItem(storageKey, value);
   } catch { /* 사생활 보호 모드에서는 기억하지 않는다 */ }
   return value ?? null;
 }
@@ -110,9 +114,16 @@ export class NoticeApp extends LitElement {
     toast: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
+    authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true },
     unreadOnly: { state: true }, selecting: { state: true }, selectedReads: { state: true },
   };
 
+  authReady = !authClient;
+  authEmail: string | null = null;
+  authError = '';
+  authBusy = false;
+  authUserId: string | null = null;
+  private authSubscription: Subscription | null = null;
   notices: Notice[] = [];
   sources: Source[] = [];
   matched: MatchedFile | null = null;
@@ -166,7 +177,23 @@ export class NoticeApp extends LitElement {
     remember('notice-sort', this.sort);
     remember('intern-sort', this.internSort);
     applyTheme(this.theme);
-    this.refresh();
+    if (authClient) {
+      this.authSubscription = authClient.auth.onAuthStateChange((_event, session) => {
+        const userId = session?.user.id ?? null;
+        if (!this.authReady || userId !== this.authUserId) {
+          this.authUserId = userId;
+          setLocalOwner(userId);
+          this.saved = loadSaved();
+          this.keywords = loadKeywords();
+          this.readState = loadReadState();
+          this.needsReadBaseline = this.readState === null;
+          this.read = this.readState ? readIds(this.readState) : null;
+          this.keyword = null;
+        }
+        this.authEmail = session?.user.email ?? null;
+        if (!this.authReady) { this.authReady = true; void this.refresh(); }
+      }).data.subscription;
+    } else { void this.refresh(); }
     wide.addEventListener('change', () => { this.isWide = wide.matches; });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.refresh(); });
     window.setInterval(() => { if (document.visibilityState === 'visible') this.refresh(); }, REFRESH_MS);
@@ -178,6 +205,8 @@ export class NoticeApp extends LitElement {
   }
 
   disconnectedCallback() {
+    this.authSubscription?.unsubscribe();
+    this.authSubscription = null;
     document.removeEventListener('pointerdown', this.closeBoardMenuOutside);
     super.disconnectedCallback();
   }
@@ -215,6 +244,29 @@ export class NoticeApp extends LitElement {
     } finally {
       this.loading = false;
     }
+  }
+
+  private async signIn() {
+    if (!authClient || this.authBusy) return;
+    this.authBusy = true; this.authError = '';
+    try {
+      const { error } = await authClient.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: new URL('./', location.href).href } });
+      if (error) throw error;
+    } catch {
+      this.authError = '로그인을 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.';
+      this.authBusy = false;
+    }
+  }
+
+  private async signOut() {
+    if (!authClient || this.authBusy) return;
+    this.authBusy = true; this.authError = '';
+    try {
+      const { error } = await authClient.auth.signOut({ scope: 'local' });
+      if (error) throw error;
+    } catch {
+      this.authError = '로그아웃을 완료하지 못했어요. 다시 확인해 주세요.';
+    } finally { this.authBusy = false; }
   }
 
   private async collectNow() {
@@ -512,6 +564,7 @@ export class NoticeApp extends LitElement {
   }
 
   render() {
+    if (!this.authReady) return html`<p role="status" class="platform-preview">로그인 상태를 확인하고 있어요.</p>`;
     const filtered = this.filtered();
     const tabs = TABS;
     const counts = Object.fromEntries(tabs.map((t) => [t.id, t.id === 'saved'
@@ -586,8 +639,12 @@ export class NoticeApp extends LitElement {
           </div>
 
           ${settings ? html`<section class="platform-settings" aria-label="설정">
-              <h2>계정과 설정 준비 중</h2>
-              <p>Google 로그인과 개인 설정을 준비하고 있어요.</p>
+              <h2>계정</h2>
+              ${!authClient ? html`<p>로그인 연결을 준비하고 있어요.</p>` : this.authUserId
+                ? html`<p>${this.authEmail ?? '로그인됨'}</p><button class="ghost-button" ?disabled=${this.authBusy} @click=${this.signOut}>이 기기에서 로그아웃</button>`
+                : html`<button class="solid-button" ?disabled=${this.authBusy} @click=${this.signIn}>Google 계정으로 계속하기</button>`}
+              ${this.authError ? html`<p role="alert">${this.authError}</p>` : nothing}
+              <p>개인 설정 동기화는 준비 중이에요.</p>
               <p>저장과 읽음 표시는 현재 이 브라우저에만 남아요.</p>
             </section>` : html`
             <div class="tools narrow-only">

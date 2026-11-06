@@ -1,3 +1,4 @@
+import { localKey } from './local-scope.ts';
 // 저장한 공지. 목록에서 밀려나도 남도록 글 정보를 통째로 둔다(kw-notice-v1의 FavNotice 방식).
 // 출처: https://github.com/kw-service/kw-notice-v1/blob/main/kw-notice-android/app/src/main/java/dev/yjyoon/kwnotice/repository/favorite/FavRepository.kt
 // 이 기기에 먼저 저장하고, GitHub에 연결돼 있으면 Actions 변수 SAVED_NOTICES로 모든 기기와 맞춘다.
@@ -32,11 +33,11 @@ export function parseSaved(raw: string | null): SavedNotice[] {
 }
 
 export function loadSaved(): SavedNotice[] {
-  try { return parseSaved(localStorage.getItem(KEY)); } catch { return []; }
+  try { return parseSaved(localStorage.getItem(localKey(KEY))); } catch { return []; }
 }
 
 export function storeSaved(items: SavedNotice[]): void {
-  try { localStorage.setItem(KEY, JSON.stringify(items)); } catch { /* 저장하지 못해도 화면은 돈다 */ }
+  try { localStorage.setItem(localKey(KEY), JSON.stringify(items)); } catch { /* 저장하지 못해도 화면은 돈다 */ }
 }
 
 export function snapshot(notice: Notice, now = new Date()): SavedNotice {

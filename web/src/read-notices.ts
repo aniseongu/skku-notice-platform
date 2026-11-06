@@ -1,3 +1,4 @@
+import { localKey } from './local-scope.ts';
 // 읽은 공지 id. 이 기기에 두고, GitHub에 연결돼 있으면 Actions 변수 READ_NOTICES로 기기 간에 맞춘다.
 export const READ_VARIABLE = 'READ_NOTICES';
 export const READ_STATE_VARIABLE = 'READ_NOTICES_V2';
@@ -81,13 +82,13 @@ export function serializeReadState(state: ReadState): string { return JSON.strin
 
 export function loadReadState(): ReadState | null {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(localKey(KEY));
     return raw === null ? null : parseReadState(raw);
   } catch { return emptyState(); }
 }
 
 export function storeReadState(state: ReadState): void {
-  try { localStorage.setItem(KEY, serializeReadState(state)); } catch { /* keep in memory */ }
+  try { localStorage.setItem(localKey(KEY), serializeReadState(state)); } catch { /* keep in memory */ }
 }
 
 export function parseRead(raw: string | null): string[] {
@@ -96,13 +97,13 @@ export function parseRead(raw: string | null): string[] {
 
 export function loadRead(): string[] | null {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(localKey(KEY));
     return raw === null ? null : parseRead(raw);
   } catch { return []; }
 }
 
 export function storeRead(ids: string[]): void {
-  try { localStorage.setItem(KEY, JSON.stringify(ids)); } catch { /* 기억하지 못해도 화면은 돈다 */ }
+  try { localStorage.setItem(localKey(KEY), JSON.stringify(ids)); } catch { /* 기억하지 못해도 화면은 돈다 */ }
 }
 
 export function addRead(ids: string[], id: string): string[] {
