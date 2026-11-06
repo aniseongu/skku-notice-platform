@@ -16,6 +16,7 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+node_modules/
 
 # 로컬 실행 부산물 (Actions가 쓰는 state/는 커밋한다)
 logs/
@@ -33,23 +34,24 @@ Thumbs.db
 CLAUDE.local.md
 
 # AI 작업 지침과 인수인계는 로컬에서만 유지한다.
-AGENTS.md
-CLAUDE.md
-HANDOFF.md
-.agents/
-.claude/
+!.agents/
+!.agents/skills/
+!.agents/skills/**
+!.claude/
+!.claude/rules/
+!.claude/rules/**
+!.claude/skills/
+!.claude/skills/**
 
 # 로컬 화면 확인 부산물
 .playwright-mcp/
 
 # 개인 AI 도구 설정과 작업 문서는 공개 저장소에서 제외한다.
-.codex/
+.codex/*
+!.codex/README.md
 codex/
-GOAL.md
 goal.md
 docs/WORKFLOW.md
-docs/plans/
-docs/daily-log/
 
 # 설계, 조사, 검토와 AI 작업 산출물은 전부 로컬에서만 유지한다.
 docs/
@@ -59,3 +61,25 @@ docs/
 !/README.md
 !/PRIVACY.md
 !/SECURITY.md
+!/AGENTS.md
+!/CLAUDE.md
+!/GOAL.md
+!/HANDOFF.md
+!/.claude/README.md
+!/.codex/README.md
+!/.claude/rules/*.md
+!/.agents/skills/**/SKILL.md
+!/.agents/skills/**/*.md
+!docs/
+docs/*
+!docs/CODEX_IMPLEMENTATION_PLAN.md
+!docs/시작하기.md
+!docs/현황과-작업계획.md
+!docs/MIGRATION_MATRIX.md
+!docs/ARCHITECTURE.md
+!docs/BLOCKERS.md
+!docs/OPERATIONS.md
+!docs/plans/
+!docs/plans/*.md
+!docs/daily-log/
+!docs/daily-log/*.md
