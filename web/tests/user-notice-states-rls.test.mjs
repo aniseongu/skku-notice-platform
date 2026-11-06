@@ -14,7 +14,7 @@ test('saved and read state cannot be accessed or changed across users', async ()
         select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
       grant usage on schema auth to authenticated;
       insert into auth.users values ('${a}'), ('${b}');`);
-    for (const name of ['20261107030000_public_notices.sql', '20261107050000_user_notice_states.sql']) {
+    for (const name of ['20261107030000_public_notices.sql', '20261107050000_user_notice_states.sql', '20261107051000_notice_state_operations.sql']) {
       await db.exec(await readFile(new URL(`../../supabase/migrations/${name}`, import.meta.url), 'utf8'));
     }
     await db.exec(`insert into platform_sources(id,name,url) values ('school','학교','https://www.skku.edu/notice');
@@ -28,8 +28,16 @@ test('saved and read state cannot be accessed or changed across users', async ()
     await assert.rejects(db.exec(`insert into user_notice_states(user_id,notice_id) values ('${b}','school/1')`), /row-level security/);
     await db.exec(`insert into user_notice_states(user_id,notice_id,read_at) values ('${a}','school/1',now())`);
     assert.equal((await db.query('select * from user_notice_states')).rows.length, 1);
+    await db.exec("select public.set_notice_saved('school/1', true)");
+    await db.exec("select public.set_notice_read('school/1', false)");
+    const state = (await db.query('select is_saved, read_at from user_notice_states')).rows[0];
+    assert.equal(state.is_saved, true);
+    assert.equal(state.read_at, null);
+    await db.exec("select public.set_notice_read('school/1', true)");
+    assert.equal((await db.query('select is_saved from user_notice_states')).rows[0].is_saved, true);
     await assert.rejects(db.exec(`update user_notice_states set user_id='${b}' where user_id='${a}'`), /row-level security/);
     await db.exec('reset role; set role anon');
     await assert.rejects(db.exec('select * from user_notice_states'), /permission denied/);
+    await assert.rejects(db.exec("select public.set_notice_saved('school/1', true)"), /permission denied/);
   } finally { await db.close(); }
 });
