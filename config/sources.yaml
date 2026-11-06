@@ -1,7 +1,7 @@
 # 감시할 게시판 목록. 추가 절차는 스킬 add-board.
 # id는 state 키의 일부라 한 번 정하면 바꾸지 않는다.
 
-user_agent: "skku-notice-alert/0.1 (+personal notice alert)"   # 저장소 URL이 생기면 넣는다
+user_agent: "skku-notice-platform/0.1 (+https://github.com/aniseongu/skku-notice-platform)"
 request_gap_seconds: 1.5    # 게시판 사이 쉬는 시간
 timeout_seconds: 10
 

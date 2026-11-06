@@ -14,7 +14,7 @@ npm run build
 npm run dev -- --host 127.0.0.1
 ```
 
-샘플 공지는 개발 서버 URL에 `?api=sample/api/v1`을 붙여 볼 수 있습니다. 샘플은 실제 사용자별 데이터가 아닙니다. 빌드된 `web/dist`에는 공지 API 데이터가 포함되지 않으므로 정식 서비스로 배포하면 안 됩니다.
+샘플 공지는 개발 서버 URL에 `?api=sample/api/v1`을 붙여 볼 수 있습니다. 샘플은 실제 사용자별 데이터가 아닙니다. 빌드에는 최근 수동 수집한 학교 공지 스냅샷이 포함됩니다. 수집 시각 이후의 공지를 자동으로 갱신하지 않으며 정식 서비스가 아닙니다.
 
 Python 테스트는 프로젝트 루트에서 `uv run pytest -q`로 실행합니다. 기존 개인용 예약 워크플로는 이 저장소에 포함하지 않습니다.
 
@@ -25,3 +25,7 @@ Python 테스트는 프로젝트 루트에서 `uv run pytest -q`로 실행합니
 `web/.env.example`을 `web/.env.local`로 복사하고 Supabase 프로젝트 URL과 **publishable** 키를 입력합니다. 이 값은 빌드 결과에 공개되므로 secret 또는 service-role 키를 사용하지 않습니다. OAuth 복귀 주소를 Supabase 허용 목록에 추가해야 실제 로그인이 가능합니다. Google 로그인과 Calendar 권한은 별개입니다. 현재 개인 설정은 서버에 동기화되지 않습니다.
 
 인증 구현은 [Supabase JavaScript SDK](https://github.com/supabase/supabase-js)의 OAuth와 인증 상태 이벤트를 사용합니다. 향후 데이터베이스 격리는 [Supabase RLS 테스트 가이드](https://supabase.com/docs/guides/database/postgres/testing-row-level-security)에 따라 다른 사용자로 읽기·수정·삭제가 차단되는지 검증합니다.
+
+## 학교 공지 수동 수집
+
+프로젝트 루트에서 `uv run python -m skku_notice.public_snapshot`을 실행하면 `config/sources.yaml`의 학교 게시판 목록과 본문을 `web/public/api/v1`에 수집합니다. 공통으로 공개된 공지만 저장하며 개인 판정 및 인턴 출처는 포함하지 않습니다. 모든 게시판의 목록 수집이 성공해야 목록 파일을 갱신합니다. 이 명령은 예약 실행이나 푸시 발송을 설정하지 않습니다.

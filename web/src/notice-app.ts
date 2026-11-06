@@ -616,7 +616,7 @@ export class NoticeApp extends LitElement {
         </aside>
 
         <main class="list-pane">
-          <p class="platform-preview" role="status">개발 중인 미리보기예요. 공지와 개인 설정은 아직 연결되지 않았어요.</p>
+          <p class="platform-preview" role="status">미리보기예요. 공지는 마지막 수집 시점의 자료이며 자동 수집과 알림을 준비하고 있어요.</p>
           ${reading ? this.readingView(reading) : html`
           <div class="navigation-head">
           <header class="pane-head topbar glass ${settings ? '' : 'feed-topbar'}">
