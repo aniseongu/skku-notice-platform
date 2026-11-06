@@ -50,7 +50,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        importScripts: ['push-handler.js'],
+        importScripts: ['push-handler.js', 'purge-legacy-cache.js'],
         globPatterns: ['**/*.{html,js,css,svg,png}'],
         // 암호화 라이브러리(약 420KB)는 설정에서 키를 저장할 때만 불러오므로 미리 저장하지 않는다.
         globIgnores: ['**/libsodium*.js', '**/*-dark.png', '**/icons/notify/**', '**/screenshots/**'],
@@ -59,10 +59,10 @@ export default defineConfig({
         navigateFallbackDenylist: [/\/api\//, /oauth-callback/],
         runtimeCaching: [
           {
-            // 공지 목록은 네트워크 우선: 오래된 목록을 최신처럼 보이지 않게 한다.
-            urlPattern: ({ url }) => url.pathname.endsWith('.json'),
+            // 공개 공지만 캐시한다. 인증·개인 JSON과 다른 출처의 응답은 보관하지 않는다.
+            urlPattern: ({ url }) => url.origin === self.location.origin && /\/api\/v1\/notices(?:\.json|\/[\w-]+\/\d+\.json)$/.test(url.pathname),
             handler: 'NetworkFirst',
-            options: { cacheName: 'api', expiration: { maxEntries: 10 } },
+            options: { cacheName: 'public-notices-v1', expiration: { maxEntries: 10 } },
           },
           {
             // Pretendard 글꼴 조각은 파일 이름이 바뀌지 않으므로 캐시 우선.
