@@ -1,0 +1,33 @@
+name: School notice relay
+
+on:
+  workflow_dispatch:
+    inputs:
+      delay_seconds:
+        description: 'Delay in seconds (default 3300; shorter values are for verification)'
+        type: string
+        required: false
+        default: '3300'
+
+permissions: {}
+
+concurrency:
+  group: school-notice-relay
+  cancel-in-progress: false
+
+jobs:
+  relay:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Wait and request the next collection
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELAY_DELAY_SECONDS: ${{ inputs.delay_seconds }}
+        run: bash scripts/relay_school.sh

@@ -238,3 +238,17 @@ def test_rechecks_only_oldest_body_per_board(monkeypatch):
     assert requested == [NOTICE.url]
     assert store.rows["school/123"]["change_kind"] is None
     assert store.rows["school/124"]["fetched_at"] == "2026-11-02T00:00:00+09:00"
+
+
+def test_freshness_gate_skips_only_when_all_school_boards_were_recently_collected():
+    from datetime import timedelta
+
+    store = MemoryStore()
+    store.sources["school"] = {"id": "school", "last_success_at": (NOW - timedelta(minutes=20)).isoformat()}
+    assert job.recently_collected(SETTINGS, store, NOW)
+    store.sources["school"]["last_success_at"] = (NOW - timedelta(minutes=51)).isoformat()
+    assert not job.recently_collected(SETTINGS, store, NOW)
+    store.sources["school"]["last_success_at"] = (NOW + timedelta(minutes=1)).isoformat()
+    assert not job.recently_collected(SETTINGS, store, NOW)
+    store.sources.clear()
+    assert not job.recently_collected(SETTINGS, store, NOW)

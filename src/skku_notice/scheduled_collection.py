@@ -202,13 +202,34 @@ def run_collection(settings: dict, store: NoticeStore, now: datetime) -> tuple[i
     return total, failed
 
 
+def recently_collected(settings: dict, store: NoticeStore, now: datetime, minimum_minutes: int = 50) -> bool:
+    """Skip duplicate relay/schedule runs only if every school source was checked recently."""
+    sources = [s for s in settings["sources"] if s.get("kind") == "skku-cms" and not s.get("external")]
+    if not sources:
+        return False
+    for source in sources:
+        row = store.source(source["id"]) or {}
+        try:
+            last = datetime.fromisoformat(row.get("last_success_at") or "")
+            age = now - last
+            if not last.tzinfo or age < timedelta(0) or age >= timedelta(minutes=minimum_minutes):
+                return False
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
 def main() -> int:
     url, key = os.environ.get("SUPABASE_URL", ""), os.environ.get("SUPABASE_SECRET_KEY", "")
     try:
         settings = yaml.safe_load(Path("config/sources.yaml").read_text(encoding="utf-8"))
         store = NoticeStore(url, key)
         try:
-            count, failed = run_collection(settings, store, datetime.now(KST))
+            now = datetime.now(KST)
+            if recently_collected(settings, store, now):
+                print("최근에 모든 게시판을 확인해 이번 중복 요청을 건너뛰어요.", flush=True)
+                return 0
+            count, failed = run_collection(settings, store, now)
         finally:
             store.close()
     except (OSError, ValueError, yaml.YAMLError, StoreError) as exc:
