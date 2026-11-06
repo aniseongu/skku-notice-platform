@@ -7,6 +7,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client", "vite-plugin-pwa/client"],
     "strict": true,
+    "jsx": "react-jsx",
     "noEmit": true,
     "useDefineForClassFields": false,
     "skipLibCheck": true

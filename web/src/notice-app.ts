@@ -14,6 +14,8 @@ import { keywordCounts } from './keyword-counts';
 import type { Theme } from './settings-view';
 import { APP_NAME } from './brand';
 import { authClient } from './auth';
+import { loadSubscriptions, setSubscription } from './source-subscriptions';
+import './platform-settings';
 import { localKey, setLocalOwner } from './local-scope.ts';
 import type { Subscription } from '@supabase/supabase-js';
 import { orderNotices, type Sort } from './notice-order';
@@ -115,9 +117,14 @@ export class NoticeApp extends LitElement {
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true },
+    subscriptions: { state: true }, subscriptionsLoading: { state: true }, subscriptionsError: { state: true },
     unreadOnly: { state: true }, selecting: { state: true }, selectedReads: { state: true },
   };
 
+  subscriptions: string[] = [];
+  subscriptionsLoading = false;
+  subscriptionsError = '';
+  private subscriptionsEpoch = 0;
   authReady = !authClient;
   authEmail: string | null = null;
   authError = '';
@@ -182,6 +189,11 @@ export class NoticeApp extends LitElement {
         const userId = session?.user.id ?? null;
         if (!this.authReady || userId !== this.authUserId) {
           this.authUserId = userId;
+          const epoch = ++this.subscriptionsEpoch;
+          this.subscriptions = [];
+          this.subscriptionsError = '';
+          this.subscriptionsLoading = !!userId;
+          if (userId) setTimeout(() => { void this.refreshSubscriptions(userId, epoch); }, 0);
           setLocalOwner(userId);
           this.saved = loadSaved();
           this.keywords = loadKeywords();
@@ -355,6 +367,36 @@ export class NoticeApp extends LitElement {
   }
 
   // 지금 탭에 맞는 게시판들. 인턴 공고 탭은 외부 게시판, 그 밖은 학교 게시판.
+  private async refreshSubscriptions(userId: string, epoch: number): Promise<void> {
+    if (!authClient) return;
+    try {
+      const sources = await loadSubscriptions(authClient, userId);
+      if (epoch === this.subscriptionsEpoch) this.subscriptions = sources;
+    } catch {
+      if (epoch === this.subscriptionsEpoch) this.subscriptionsError = '구독을 불러오지 못했어요. 다시 시도해 주세요.';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.subscriptionsLoading = false;
+    }
+  }
+
+  private async toggleSubscription(sourceId: string, enabled: boolean): Promise<void> {
+    const userId = this.authUserId;
+    const epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.subscriptionsLoading) return;
+    this.subscriptionsLoading = true;
+    this.subscriptionsError = '';
+    try {
+      await setSubscription(authClient, userId, sourceId, enabled);
+      if (epoch === this.subscriptionsEpoch) {
+        this.subscriptions = enabled ? [...this.subscriptions, sourceId] : this.subscriptions.filter((id) => id !== sourceId);
+      }
+    } catch {
+      if (epoch === this.subscriptionsEpoch) this.subscriptionsError = '구독을 저장하지 못했어요. 다시 시도해 주세요.';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.subscriptionsLoading = false;
+    }
+  }
+
   private tabSources(): Source[] { return this.sources.filter((s) => Boolean(s.external) === (this.tab() === 'intern')); }
 
   // 고른 게시판이 지금 탭에 없으면 모든 게시판으로 본다(탭을 오가도 빈 목록이 되지 않게).
@@ -642,15 +684,17 @@ export class NoticeApp extends LitElement {
           </header>
           </div>
 
-          ${settings ? html`<section class="platform-settings" aria-label="설정">
-              <h2>계정</h2>
-              ${!authClient ? html`<p>로그인 연결을 준비하고 있어요.</p>` : this.authUserId
-                ? html`<p>${this.authEmail ?? '로그인됨'}</p><button class="ghost-button" ?disabled=${this.authBusy} @click=${this.signOut}>이 기기에서 로그아웃</button>`
-                : html`<button class="solid-button" ?disabled=${this.authBusy} @click=${this.signIn}>Google 계정으로 계속하기</button>`}
-              ${this.authError ? html`<p role="alert">${this.authError}</p>` : nothing}
-              <p>개인 설정 동기화는 준비 중이에요.</p>
-              <p>저장과 읽음 표시는 현재 이 브라우저에만 남아요.</p>
-            </section>` : html`
+          ${settings ? html`<platform-settings-screen .model=${{
+            configured: !!authClient, userId: this.authUserId, email: this.authEmail,
+            authBusy: this.authBusy, authError: this.authError,
+            sources: this.sources.filter((source) => !source.external).map((source) => ({ id: source.id, label: boardName(source, source.id) })),
+            subscriptions: this.subscriptions, loading: this.subscriptionsLoading, error: this.subscriptionsError,
+            signIn: () => { void this.signIn(); }, signOut: () => { void this.signOut(); },
+            toggle: (id: string, enabled: boolean) => { void this.toggleSubscription(id, enabled); },
+            retry: () => {
+              if (this.authUserId) { this.subscriptionsLoading = true; this.subscriptionsError = ''; void this.refreshSubscriptions(this.authUserId, this.subscriptionsEpoch); }
+            },
+          }}></platform-settings-screen>` : html`
             <div class="tools narrow-only">
               <label class="search">${icon('search')}
                 <input type="search" placeholder="제목, 분류, 판정 이유로 찾기" autocomplete="off" aria-label="공지 검색" .value=${this.query}
