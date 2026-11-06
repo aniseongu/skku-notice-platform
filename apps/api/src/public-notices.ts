@@ -51,6 +51,10 @@ export class PublicNoticesService {
 @Controller()
 export class PublicNoticesController {
   constructor(private readonly service: PublicNoticesService) {}
+  @Get('ready') async ready(): Promise<{ status: string }> {
+    await this.service.sources();
+    return { status: 'ok' };
+  }
   @Get('sources') sources(): Promise<unknown> { return this.service.sources(); }
   @Get('notices') notices(@Query() query: NoticeQuery): Promise<unknown> { return this.service.notices(query); }
 }

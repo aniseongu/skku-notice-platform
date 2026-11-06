@@ -28,6 +28,9 @@ test('public API validates filters and uses only the public Supabase key', async
     assert.equal(requests[0].url.searchParams.get('source_id'), 'eq.school');
     assert.equal(requests[0].url.searchParams.get('limit'), '5');
     assert.equal(requests[0].options.headers.apikey, 'sb_publishable_test');
+    response = await realFetch(`${base}/ready`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { status: 'ok' });
     response = await realFetch(`${base}/notices?limit=101`);
     assert.equal(response.status, 400);
     response = await realFetch(`${base}/notices?source=school%2Cother`);
@@ -37,7 +40,7 @@ test('public API validates filters and uses only the public Supabase key', async
     process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_secret_never-use';
     response = await realFetch(`${base}/sources`);
     assert.equal(response.status, 503);
-    assert.equal(requests.length, 1);
+    assert.equal(requests.length, 2);
   } finally {
     global.fetch = realFetch;
     if (oldUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = oldUrl;
