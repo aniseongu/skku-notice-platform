@@ -46,7 +46,7 @@ interface InstallPrompt extends Event { prompt(): Promise<void> }
 
 function remember(key: string, value?: string): string | null {
   try {
-    const storageKey = key === 'keywords' ? localKey(key) : key;
+    const storageKey = ['keywords', 'board', 'view-unread'].includes(key) ? localKey(key) : key;
     if (value === undefined) return localStorage.getItem(storageKey);
     localStorage.setItem(storageKey, value);
   } catch { /* 사생활 보호 모드에서는 기억하지 않는다 */ }
@@ -189,6 +189,10 @@ export class NoticeApp extends LitElement {
           this.needsReadBaseline = this.readState === null;
           this.read = this.readState ? readIds(this.readState) : null;
           this.keyword = null;
+          this.query = '';
+          this.board = remember('board') ?? 'all';
+          this.unreadOnly = remember('view-unread') === '1';
+          this.selecting = false; this.selectedReads = [];
         }
         this.authEmail = session?.user.email ?? null;
         if (!this.authReady) { this.authReady = true; void this.refresh(); }
