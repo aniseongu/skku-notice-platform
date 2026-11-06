@@ -7,8 +7,11 @@ After=network-online.target
 Type=oneshot
 User=skku
 WorkingDirectory=/opt/skku-notice-platform
+Environment=PYTHONPATH=/opt/skku-notice-platform/src
 EnvironmentFile=/etc/skku-notice/worker.env
-ExecStart=/usr/bin/flock -n /tmp/skku-notice-crawl.lock /opt/skku-notice-platform/.venv/bin/python -m skku_notice.scheduled_collection
+RuntimeDirectory=skku-notice
+RuntimeDirectoryMode=0755
+ExecStart=/usr/bin/flock -n /run/skku-notice/crawl.lock /opt/skku-notice-platform/.venv/bin/python -m skku_notice.scheduled_collection
 TimeoutStartSec=1200
 NoNewPrivileges=true
-PrivateTmp=false
+PrivateTmp=true

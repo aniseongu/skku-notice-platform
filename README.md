@@ -36,4 +36,4 @@ Python 테스트는 프로젝트 루트에서 `uv run pytest -q`로 실행합니
 
 테이블과 변경 기록 정의는 `supabase/migrations/`에 있습니다. 현재 프로젝트에서는 SQL Editor로 수동 적용했으므로 Supabase CLI 마이그레이션 이력에 자동 등록되지는 않았습니다. 추후 CLI를 연결할 때는 기존 테이블을 다시 만들지 않도록 이력을 먼저 정리해야 합니다. 수집 작업의 `SUPABASE_SECRET_KEY`는 서버의 제한된 환경 파일에만 보관하고, 프론트 환경 변수나 로그에 넣지 않습니다.
 
-기존 GitHub Actions 예약과 릴레이는 비활성화했습니다. OCI 30분 타이머는 아직 배포되지 않아 자동 수집이 중단된 상태입니다. 설치 전 템플릿과 확인 방법은 `infra/oracle/`과 `docs/OPERATIONS.md`를 참조하세요.
+기존 GitHub Actions 예약과 릴레이는 비활성화했습니다. OCI 무료 Micro 서버에 30분 타이머를 설치하고 수동 수집을 확인했습니다. 첫 예약 실행과 재부팅 후 복구는 아직 확인하지 않았습니다. 설치 전 템플릿과 확인 방법은 `infra/oracle/`과 `docs/OPERATIONS.md`를 참조하세요.
