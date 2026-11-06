@@ -1,0 +1,30 @@
+name: Collect school notices
+
+# Enable the hourly schedule only after the manual run has been verified.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: collect-school-notices
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: Collect shared school notices
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          PYTHONPATH: src
+        run: >-
+          uv run --no-project --python 3.13
+          --with httpx==0.28.1 --with nh3==0.3.7
+          --with pyyaml==6.0.3 --with selectolax==1.0.2
+          python -m skku_notice.scheduled_collection

@@ -29,3 +29,9 @@ Python 테스트는 프로젝트 루트에서 `uv run pytest -q`로 실행합니
 ## 학교 공지 수동 수집
 
 프로젝트 루트에서 `uv run python -m skku_notice.public_snapshot`을 실행하면 `config/sources.yaml`의 학교 게시판 목록과 본문을 `web/public/api/v1`에 수집합니다. 공통으로 공개된 공지만 저장하며 개인 판정 및 인턴 출처는 포함하지 않습니다. 모든 게시판의 목록 수집이 성공해야 목록 파일을 갱신합니다. 이 명령은 예약 실행이나 푸시 발송을 설정하지 않습니다.
+
+## 공통 공지 데이터
+
+공개 공지는 Supabase의 `platform_sources`, `platform_notices`에 따로 보관합니다. 브라우저는 읽기만 할 수 있고 수집 작업만 서버 측 비밀키로 기록합니다. 각 게시판의 마지막 성공 시각을 보관하며, 새 글이나 제목이 바뀐 글의 본문만 다시 받습니다. DB를 읽을 수 없을 때 프론트는 마지막 수동 스냅샷을 보여 줍니다. 계정별 구독과 푸시 알림은 아직 연결되지 않았습니다.
+
+테이블 정의는 `supabase/migrations/20261107030000_public_notices.sql`에 있습니다. 현재 프로젝트에서는 SQL Editor로 수동 적용했으므로 Supabase CLI 마이그레이션 이력에 자동 등록되지는 않았습니다. 추후 CLI를 연결할 때는 기존 테이블을 다시 만들지 않도록 이력을 먼저 정리해야 합니다. 수집 작업의 `SUPABASE_SECRET_KEY`는 서버용 GitHub Actions secret으로만 보관하고, 프론트 환경 변수나 로그에 넣지 않습니다.

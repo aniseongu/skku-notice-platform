@@ -1,4 +1,6 @@
-// 정적 API v1(D-010) 형식과, 화면에서 쓰는 날짜와 분류 계산. 네트워크는 fetchJson에만 있다.
+// 공통 공지 형식과 화면에서 쓰는 날짜와 분류 계산.
+import { authClient } from './auth';
+import { loadPublicBody, loadPublicFeed } from './platform-data';
 
 // external: 외부 인턴 공고(링커리어, 자소설닷컴, D-026). 성대 공지 탭에는 넣지 않는다.
 export interface Source { id: string; name: string; url: string; external?: boolean }
@@ -89,6 +91,14 @@ export function safeUrl(url: string): string {
 }
 
 export async function fetchJson<T>(name: string, optional = false): Promise<T | null> {
+  if (authClient && !(import.meta.env.DEV && requested)) {
+    try {
+      const match = /^notices\/([\w-]+)\/(\d+)\.json$/.exec(name);
+      const live = name === 'notices.json' ? await loadPublicFeed(authClient)
+        : match ? await loadPublicBody(authClient, match[1], match[2]) : null;
+      if (live) return live as T;
+    } catch { /* 읽기에 실패하면 마지막 공개 스냅샷을 보여 준다. */ }
+  }
   const response = await fetch(`${API}/${name}`, { cache: 'no-cache' });
   if (optional && response.status === 404) return null;
   if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
