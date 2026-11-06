@@ -160,3 +160,40 @@ def test_one_failed_board_does_not_stop_other_boards(monkeypatch):
     assert job.run_collection(settings, store, NOW) == (1, 1)
     assert "school/123" not in store.rows
     assert store.rows["school2/123"]["body"] == "본문"
+
+
+def test_old_body_is_rechecked_and_changes_are_recorded(monkeypatch):
+    store = MemoryStore()
+    store.rows["school/123"] = {
+        "id": "school/123",
+        "source_id": "school",
+        "article_no": "123",
+        "title": NOTICE.title,
+        "category": NOTICE.category,
+        "url": NOTICE.url,
+        "posted_on": NOTICE.posted_on.isoformat(),
+        "pinned": False,
+        "deadline": None,
+        "first_seen": "2026-11-01T00:00:00+09:00",
+        "fetched_at": "2026-11-01T00:00:00+09:00",
+        "body": "이전 본문",
+        "body_html": "<p>이전 본문</p>",
+        "attachments": [],
+        "images": [],
+    }
+    monkeypatch.setattr(job.time, "sleep", lambda _: None)
+    monkeypatch.setattr(job, "fetch_list", lambda *_: "list")
+    monkeypatch.setattr(job, "parse_list", lambda *_: [NOTICE])
+    monkeypatch.setattr(job, "fetch_detail", lambda *_: "detail")
+    monkeypatch.setattr(
+        job,
+        "parse_detail",
+        lambda *_: SimpleNamespace(
+            body_text="새 본문", body_html="<p>새 본문</p>", attachments=(), images=()
+        ),
+    )
+    assert job.run_collection(SETTINGS, store, NOW) == (1, 0)
+    assert store.rows["school/123"]["body"] == "새 본문"
+    assert store.rows["school/123"]["change_kind"] == "본문"
+    assert store.rows["school/123"]["changed_at"] == NOW.isoformat()
+    assert store.rows["school/123"]["first_seen"] == "2026-11-01T00:00:00+09:00"

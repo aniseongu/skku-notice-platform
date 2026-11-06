@@ -8,6 +8,7 @@ test('public notice data is readable, but only the worker can write it', async (
   try {
     await db.exec('create role anon; create role authenticated; create role service_role bypassrls');
     await db.exec(await readFile(new URL('../../supabase/migrations/20261107030000_public_notices.sql', import.meta.url), 'utf8'));
+    await db.exec(await readFile(new URL('../../supabase/migrations/20261107031000_notice_changes.sql', import.meta.url), 'utf8'));
     await db.exec("insert into platform_sources (id,name,url) values ('school','학교','https://www.skku.edu/notice')");
     await db.exec("insert into platform_notices (id,source_id,article_no,title,url,posted_on,first_seen) values ('school/1','school','1','공지','https://www.skku.edu/notice?articleNo=1','2026-11-01',now())");
     for (const role of ['anon', 'authenticated']) {

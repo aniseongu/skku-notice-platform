@@ -3,7 +3,7 @@
 import os
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -113,6 +113,17 @@ def run_collection(settings: dict, store: NoticeStore, now: datetime) -> tuple[i
             }
             store.upsert("platform_sources", [source_row])
             updates = []
+            # Recheck at most one old body per board per run, including edits with unchanged titles.
+            due = []
+            for notice in notices:
+                old = previous.get(f"{source['id']}/{notice.article_no}", {})
+                try:
+                    checked = datetime.fromisoformat(old.get("fetched_at") or "")
+                    if checked.tzinfo and now - checked >= timedelta(hours=24):
+                        due.append((checked, notice.article_no))
+                except (TypeError, ValueError):
+                    pass
+            recheck_number = min(due)[1] if due else None
             for notice in notices:
                 notice_id = f"{source['id']}/{notice.article_no}"
                 old = previous.get(notice_id, {})
@@ -131,7 +142,10 @@ def run_collection(settings: dict, store: NoticeStore, now: datetime) -> tuple[i
                 changed = not old or any(
                     old.get(key) != value for key, value in metadata.items() if key != "deadline"
                 )
-                needs_detail = not old.get("fetched_at") or (old and old.get("title") != notice.title)
+                title_changed = bool(old) and old.get("title") != notice.title
+                needs_detail = (
+                    not old.get("fetched_at") or title_changed or notice.article_no == recheck_number
+                )
                 if not changed and not needs_detail:
                     continue
                 row = {
@@ -142,19 +156,33 @@ def run_collection(settings: dict, store: NoticeStore, now: datetime) -> tuple[i
                     "body_html": old.get("body_html"),
                     "attachments": old.get("attachments", []),
                     "images": old.get("images", []),
+                    "changed_at": stamp if title_changed else old.get("changed_at"),
+                    "change_kind": "제목" if title_changed else old.get("change_kind"),
+                    "previous_title": old.get("title") if title_changed else old.get("previous_title"),
                 }
                 if needs_detail:
                     try:
                         pace()
                         detail = parse_detail(fetch_detail(notice.url, agent, timeout), notice.url)
+                        new_attachments = [
+                            {"name": n, "url": u, "type": t, "size": s} for n, u, t, s in detail.attachments
+                        ]
+                        if (
+                            old.get("fetched_at")
+                            and not title_changed
+                            and (
+                                old.get("body") != detail.body_text
+                                or old.get("body_html") != detail.body_html
+                                or old.get("attachments", []) != new_attachments
+                                or old.get("images", []) != list(detail.images)
+                            )
+                        ):
+                            row.update({"changed_at": stamp, "change_kind": "본문", "previous_title": None})
                         row.update(
                             {
                                 "body": detail.body_text,
                                 "body_html": detail.body_html,
-                                "attachments": [
-                                    {"name": n, "url": u, "type": t, "size": s}
-                                    for n, u, t, s in detail.attachments
-                                ],
+                                "attachments": new_attachments,
                                 "images": list(detail.images),
                                 "fetched_at": stamp,
                             }
