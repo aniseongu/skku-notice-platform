@@ -16,6 +16,7 @@ import { APP_NAME } from './brand';
 import { authClient } from './auth';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import './platform-settings';
+import './notice-rows';
 import { localKey, setLocalOwner } from './local-scope.ts';
 import type { Subscription } from '@supabase/supabase-js';
 import { orderNotices, type Sort } from './notice-order';
@@ -869,7 +870,19 @@ export class NoticeApp extends LitElement {
     return [...groups].map(([title, items], index) => html`
       <section class="group" aria-label=${title}>
         <div class="group-head"><h2>${title}</h2>${index === 0 ? this.boardSelect() : nothing}</div>
-        <ol class="rows">${items.map((n) => this.row(n, today))}</ol>
+        <notice-rows-screen .model=${{
+          rows: items.map((notice) => {
+            const ai = this.judgement(notice)?.ai ?? null;
+            const interests = this.interests(notice);
+            return { notice, source: boardName(this.sources.find((source) => source.id === notice.source_id), notice.source_id),
+              read: this.isRead(notice), saved: this.isSaved(notice), current: this.isWide && this.detailOpen && this.shownId === notice.id,
+              selected: this.selectedReads.includes(notice.id), dim: ai?.verdict === 'not_relevant' && !interests.length,
+              interests, ai, rule: this.judgement(notice)?.rule_name ?? null };
+          }),
+          today, selecting: this.selecting, savedView: this.view === 'saved',
+          open: (event: MouseEvent, notice: Notice) => this.onRow(event, notice),
+          toggleSelection: (id: string) => this.toggleReadSelection(id),
+        }}></notice-rows-screen>
       </section>`);
   }
 
@@ -998,29 +1011,6 @@ export class NoticeApp extends LitElement {
     const passed = deadlinePassed(notice.deadline);
     const urgent = !passed && daysLeft(notice.deadline, today) <= SOON_DAYS;
     return html`<span class="dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''}">${deadlineText(notice.deadline, today)}</span>`;
-  }
-
-  private row(notice: Notice, today: string) {
-    const ai = this.judgement(notice)?.ai;
-    const source = this.sources.find((s) => s.id === notice.source_id);
-    const dim = ai?.verdict === 'not_relevant' && !this.interests(notice).length;
-    return html`<li class=${this.selecting ? 'batch-row' : ''}>
-      ${this.selecting ? html`<label class="selection-check"><input type="checkbox"
-        aria-label=${`${cleanTitle(notice.title_ko || notice.title)} 선택`}
-        .checked=${this.selectedReads.includes(notice.id)} @change=${() => this.toggleReadSelection(notice.id)}></label>` : nothing}
-      <a class="row ${dim ? 'dim' : ''} ${this.isRead(notice) ? 'read' : 'unread'}" href=${safeUrl(notice.url)} target="_blank" rel="noopener"
-        data-id=${notice.id} aria-current=${this.isWide && this.detailOpen && this.shownId === notice.id ? 'true' : 'false'}
-        @click=${(e: MouseEvent) => this.onRow(e, notice)}>
-        <span class="visually-hidden">${this.isRead(notice) ? '읽은 공지' : '읽지 않은 공지'}</span>
-        <span class="meta"><span class="board">${boardName(source, notice.source_id)}</span>${(() => {
-          const tags = [notice.category, notice.pinned ? '고정' : '', notice.changed_at ? '수정됨' : '',
-            this.view !== 'saved' && this.isSaved(notice) ? '저장함' : ''].filter(Boolean);
-          return tags.length ? html`<span class="cat" title=${tags.join(', ')}>${tags.join(', ')}</span>` : nothing;
-        })()}</span>
-        <span class="title">${cleanTitle(notice.title_ko || notice.title)}</span>
-        <span class="sub">${this.reasonLine(notice)}</span>
-        ${this.dday(notice, today)}
-      </a></li>`;
   }
 
   private detail(notice: Notice) {
