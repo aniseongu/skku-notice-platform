@@ -1,0 +1,50 @@
+# 감시할 게시판 목록. 추가 절차는 스킬 add-board.
+# id는 state 키의 일부라 한 번 정하면 바꾸지 않는다.
+
+user_agent: "skku-notice-alert/0.1 (+personal notice alert)"   # 저장소 URL이 생기면 넣는다
+request_gap_seconds: 1.5    # 게시판 사이 쉬는 시간
+timeout_seconds: 10
+
+sources:
+  - id: skku-notice01
+    name: 성균관대 공지
+    kind: skku-cms          # 학교 CMS 공통 파서 (docs/research/skku-board-structure.md)
+    url: https://www.skku.edu/skku/campus/skk_comm/notice01.do
+
+  - id: cse-notice
+    name: 소프트웨어학과 공지
+    kind: skku-cms
+    url: https://cse.skku.edu/cse/notice.do
+
+  # 2026-11-03 추가(사용자 요청, 다른 성대 공지 프로젝트 hg111911190/skku-notice의 게시판 목록 참고).
+  # 학교 본부 공지는 skku-notice01 하나에 모든 분류가 모여 있어 단과대와 사업단 게시판을 더한다.
+  - id: sw-notice
+    name: 소프트웨어융합대학 공지
+    kind: skku-cms
+    url: https://sw.skku.edu/sw/notice.do
+
+  - id: futurecar-notice
+    name: 미래차 부트캠프 공지
+    kind: skku-cms
+    url: https://swb.skku.edu/futurecar/notice.do
+
+  # 외부 인턴 공고. 목록은 사이트마다 실행당 한 번, 상세는 게시판별 최대 5건(D-028).
+  # 학생인재개발팀은 사용자가 robots.txt 예외 수집을 명시 요청했다(2026-11-06).
+  - id: skku-career-intern
+    name: 성대 학생인재개발팀
+    kind: skku-career-intern
+    url: https://job.skku.edu/Recruit/RecruitInternList.aspx?rp=1
+    external: true
+
+  # robots.txt 확인(2026-11-03): linkareer.com은 / 허용, api.linkareer.com은 robots.txt 없음, jasoseol.com은 / 허용.
+  - id: linkareer-intern
+    name: 링커리어
+    kind: linkareer
+    url: https://linkareer.com/list/intern
+    external: true
+
+  - id: jasoseol-intern
+    name: 자소설닷컴
+    kind: jasoseol
+    url: https://jasoseol.com/recruit
+    external: true

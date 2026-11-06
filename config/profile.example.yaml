@@ -1,0 +1,20 @@
+# 이 파일을 profile.yaml로 복사해 본인 상황에 맞게 고칩니다.
+# 이름, 학번, 연락처, 상세 주소는 넣지 마세요.
+# 학교 공지의 지원 자격을 판단하는 데 필요한 범위만 적습니다.
+department: 소프트웨어학과       # 소속 학과
+year: 3                         # 학년
+enrollment_status: 재학          # 재학, 휴학, 졸업 등
+campus: 자연과학캠퍼스           # 인문사회과학캠퍼스 또는 자연과학캠퍼스
+double_major: 경영학             # 없으면 null
+interests:                     # 관심 분야
+  - 인공지능
+  - 백엔드 개발
+wants:                         # 받고 싶은 공지 유형
+  - 학부생 지원 가능한 인턴
+  - 장학금
+  - 해커톤
+does_not_want:                 # 원하지 않는 공지 유형
+  - 대학원생 전용 모집
+  - 졸업생 대상 채용
+international_student: false    # 외국인 학생 여부
+military_service: 해당 없음       # 복무 전, 복무 완료, 해당 없음 등

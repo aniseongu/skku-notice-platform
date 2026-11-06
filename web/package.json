@@ -1,0 +1,29 @@
+{
+  "name": "skku-notice-web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "성공, 성균관대 공지와 인턴 공고 화면 (pwa-builder/pwa-starter 구성을 따름)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "dompurify": "3.4.17",
+    "jsqr": "1.4.0",
+    "libsodium-wrappers": "0.8.4",
+    "lit": "3.3.3",
+    "pretendard": "1.3.9",
+    "ua-parser-js": "^2.0.10",
+    "uqr": "0.1.2",
+    "workbox-window": "7.4.1"
+  },
+  "devDependencies": {
+    "@types/libsodium-wrappers": "0.8.2",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vite-plugin-pwa": "1.3.0"
+  }
+}

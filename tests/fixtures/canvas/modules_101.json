@@ -1,0 +1,4 @@
+[{"module_items": [
+  {"id": 31, "module_item_id": 31, "content_id": 301, "title": "그래프 강의", "content_data": {"use_attendance": true, "due_at": "2026-11-02T23:00:00+09:00"}, "attendance_status": "none", "completed": false},
+  {"id": 32, "title": "시청한 강의", "content_data": {"use_attendance": true, "due_at": "2026-11-03T23:00:00+09:00"}, "attendance_status": "attendance", "completed": true}
+]}]

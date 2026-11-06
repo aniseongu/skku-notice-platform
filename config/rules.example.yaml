@@ -1,0 +1,29 @@
+# 알림 기준 예시. config/rules.yaml로 복사해서 고친다(스킬 tune-rules).
+#
+# 동작 방식 (M1에서 이대로 구현한다. 바꾸려면 계획부터):
+# - 새 글 하나마다 rules를 위에서부터 보고, 처음 맞는 규칙의 priority로 한 번만 알린다.
+# - 한 규칙 안의 조건은 모두 맞아야 한다(그리고). 목록 안의 단어는 하나만 맞으면 된다(또는).
+# - 비교는 대소문자와 앞뒤 공백을 무시한 "포함" 검사다. 정규식이 필요하면 title_regex를 쓴다.
+# - exclude_title은 모든 규칙보다 먼저 적용되는 공통 제외어다.
+
+notify_all: true  # 기준, 관심, Gemini 해당에 안 맞은 새 글도 소리 없이 알림
+
+exclude_title:
+  - 대학원생 대상
+  - 졸업예정자 한정
+  - 고등학생
+
+rules:
+  - name: 장학
+    categories: [장학]               # 게시판의 [분류] 글자 그대로 (대괄호 없이)
+    priority: high                   # high: 휴대폰이 울림, default, low: 조용히
+
+  - name: 인턴과 현장실습
+    categories: [채용/모집, 취업]
+    title_any: [인턴, 현장실습, 채용연계형]
+    priority: default
+
+  - name: 대회와 프로그램
+    title_any: [해커톤, 공모전, 경진대회, 교환학생, 연구실 인턴, 학부연구생]
+    title_none: [수상자 발표, 결과 안내]
+    priority: default

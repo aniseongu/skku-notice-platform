@@ -1,0 +1,4 @@
+[
+  {"id": 11, "name": "트리 과제", "due_at": "2026-11-03T18:00:00+09:00", "submission_types": ["online_upload"], "submission": {"workflow_state": "unsubmitted"}, "html_url": "https://canvas.skku.edu/courses/101/assignments/11"},
+  {"id": 12, "name": "제출한 과제", "due_at": "2026-11-03T18:00:00+09:00", "submission": {"workflow_state": "submitted"}}
+]

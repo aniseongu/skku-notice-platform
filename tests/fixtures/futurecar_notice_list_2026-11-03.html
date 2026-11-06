@@ -1,0 +1,1739 @@
+
+
+
+<!doctype html>
+<html lang="ko" class="no-js">
+<head>
+<title>공지사항 게시판목록 | 미래차 부트캠프 사업단</title>
+<link rel="shortcut icon" href="https://www.skku.edu/_res/skku/img/common/favicon.png">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta http-equiv="Content-Script-Type" content="text/javascript" />
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="공지사항 게시판목록 | 미래차 부트캠프 사업단">
+<meta property="og:description" content="공지사항 게시판목록 | 미래차 부트캠프 사업단">
+<meta property="og:image" content="https://swb.skku.edu/_res/temp_a/img/common/logo_thumb.png"> 
+
+<meta name="robots" content="index,follow"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="공지사항 게시판목록 | 미래차 부트캠프 사업단"/>
+<meta property="og:title" content="공지사항 게시판목록 | 미래차 부트캠프 사업단"/>
+<meta property="og:url" content="http://swb.skku.edu/futurecar/notice.do?mode=list"/>
+<link rel="canonical" href="http://swb.skku.edu/futurecar/notice.do" />
+
+<link rel="stylesheet" type="text/css" href="/_common/cms.css" />
+<link rel="stylesheet" type="text/css" href="/_res/futurecar/_css/layout.css" />
+<!--[if IE 8]>
+	<link rel="stylesheet" type="text/css" href="/_common/ie8.css" />
+<![endif]-->
+<link rel="stylesheet" type="text/css" href="/_res/futurecar/_css/m_gnb.css" />
+<link rel="stylesheet" type="text/css" href="/_common/css/toastr.css" />
+<link rel="stylesheet" type="text/css" href="/_custom/shb/resource/css/board.css" />
+<link rel="stylesheet" type="text/css" href="/_res/board_new/_css/board.css" />
+<link rel="stylesheet" type="text/css" href="/_common/css/ui.datepicker.css" />
+<link rel="stylesheet" type="text/css" href="/_common/css/jquery.ui-selectBox.css" />
+
+<link rel="stylesheet" type="text/css" href="/_res/futurecar/_css/user.css" /> 
+<script type="text/javascript" src="/_common/js/jquery/jquery-1.9.1.js"></script>
+<script type="text/javascript" src="/_common/js/jquery/jquery-ui-1.11.4.min.js"></script>
+
+<script type="text/javascript">
+//<![CDATA[
+	var _thisHost = location.protocol+'//'+location.host, _thisUrl = document.location.href,_so_ = false,_cur_menu_cd = '18831',_edit_content = false,front_page_edit = true,zooInOutMode = 'font',_reouscePath = '/_res/futurecar/',editorVendor = 'froala',sslYN = 'Y',sslPort = '443',servicePort = '',developMode = false,device='pc',isMobile=false,_cfgUseDevMode = false,_siteId = 'futurecar',printSelector = '#jwxe_main_content',ctx = '',rootPath = '',locale= 'ko',localeScriptPath='/_custom/shb/resource/js/';
+//]]>
+</script>
+
+<script type="text/javascript" src="/_common/cms.js"></script>
+<script type="text/javascript" src="/_res/futurecar/_js/user.js"></script>
+<script type="text/javascript" src="/_res/futurecar/_js/user/m_mn.js"></script>
+<script type="text/javascript" src="/_common/js/toastr.js" ></script>
+<script type="text/javascript" src="/_common/js/jquery-plugin/selectBox.min.js" ></script>
+<script type="text/javascript" src="/_custom/shb/resource/js/board.common.js" ></script>
+<script type="text/javascript" src="/_res/board_new/_js/user/board.js" ></script>
+<script type="text/javascript" src="/_common/js/datepicker/ui.datepicker.all.js" ></script>
+
+
+</head>
+<body id="item_body" class="pc">
+<ul id="go_main">
+	<li><a href="#jwxe_main_content" >본문 바로가기</a></li>
+	<li><a href="#jwxe_main_menu" >주메뉴 바로가기</a></li>
+	<li><a href="#jwxe_sub_menu" >서브메뉴 바로가기</a></li>
+</ul>
+
+
+
+
+
+
+<header>
+<div class="top-header-wrap">
+    <div class="top-header-box">
+        <div class="top-right-header-box">
+            <ul class="header-link-box">
+                <li><a href="/futurecar/index.do" title="HOME">HOME</a></li>
+               
+                <li><a href="http://www.skku.edu/" target="_blank" title="성균관대학교 홈페이지 바로가기">SKKU</a></li>  
+                <li>
+                 
+                
+                    <!--<a class="login-btn" href="/futurecar/login.do" title="LOGIN">LOGIN</a>-->
+                  <a class="login-btn" href="/_custom/shb/_common/login/sso/login/login.do?siteId=futurecar" title="LOGIN">LOGIN</a>
+                
+                </li>
+            </ul>
+       
+            <!--ul class="header-sns-box">
+                <li><a href="https://www.facebook.com/SKKU.Kor/" target="_blank" title="페이스북 바로가기"><img src="/_res/futurecar/img/common/ico_facebook.png" alt="facebook" /></a></li>
+            </ul-->
+          <form action="/futurecar/search_result.do" method="get" class="search-wrap">
+                <input type="hidden" name="srSearchField"    value="all" />
+                <input type="hidden" name="srSearchTerm"     value="all" />
+                <input type="hidden" name="srSearchOperator" value="or"/>
+                <input type="hidden" name="mode"             value="list" />
+                <fieldset>
+                    <legend title="통합검색" class="hide">통합검색</legend>
+                    <label class="hide" for="m_total_search_value">
+                        통합검색 단어 입력
+                        </label>
+                        <input id="m_total_search_value" type="text" name="srSearchVal" value="" placeholder="검색어를 입력하세요" class="top-search-input">
+                        <button type="button" value="검색" class="m-search-btn"><span class="hide">검색</span></button>
+                </fieldset>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="bottom-header-wrap">
+    <div class="bottom-header-box">
+        <div class="bottom-top-header-box">
+            <a href="#" class="btn_menu" title="메뉴 열기"><img src="/_res/futurecar/img/common/btn_m_menu.gif" alt="메뉴" /></a>
+            <a class="logo mobile-hide" href="/futurecar/index.do" title="미래형자동차 기술융합 혁신인재양성 사업단 바로가기"> 
+                  <h1>
+                    <span><img src="/_res/futurecar/img/common/logo_.png" alt="성균관대학교" /></span></h1>      <!--여기l!! 미래형자동차 기술융합 혁신인재양성 사업단-->             
+            </a>   
+            <a class="logo pc-hide" href="/futurecar/index.do" title="미래형자동차 기술융합 혁신인재양성 사업단 바로가기"> 
+                  <h1>
+                    <span><img src="/_res/futurecar/img/common/logo_.png" alt="성균관대학교" /></span></h1>       <!--미래형자동차 기술융합 혁신인재양성 사업단-->               
+            </a>   
+            <!-- 통합검색 header -->
+            <form action="/futurecar/search_result.do" method="get" class="search-result-area search-result-header-content">
+                <input type="hidden" name="srSearchField"    value="all" />
+                <input type="hidden" name="srSearchTerm"     value="all" />
+                <input type="hidden" name="srSearchOperator" value="or"/>
+                <input type="hidden" name="mode"             value="list" />
+                <fieldset>
+                    <legend title="통합검색" class="hide">통합검색</legend>
+                    <label class="hide" for="m_total_search_value">
+                        통합검색 단어 입력
+                    </label>
+                    <input type="text" name="srSearchVal" id="m_total_search_value" class="top-search-input" value="" placeholder="검색어를 입력하세요">
+                    <button type="submit" value="검색" class="m-search-btn"><span class="hide">검색</span></button>
+                </fieldset>
+            </form>
+            <!-- //통합검색 header -->
+            <a href="#" class="btn_right_menu" title="메뉴 열기"><img src="/_res/futurecar/img/common/btn_m_right_menu.gif" alt="메뉴" /></a>
+        </div>
+        <div class="bottom-bottom-header-box">
+            <div class="gnb-wrap">
+                <div class="gnb">
+                   
+                        
+                          
+                      
+
+
+
+<ul class="gnb-ul">
+	
+		
+			<li>
+	          <a href="/futurecar/greetings.do" >사업단</a> 
+				
+					<dl class="gnb-inner">
+						<dt><a href="/futurecar/greetings.do" >사업단</a></dt>
+						<dd>
+						<ul class="sub-mn">
+							
+								
+									<li>
+										<a href="/futurecar/greetings.do" >인사말</a>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/futurecar/professor.do" >참여 교수</a>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/futurecar/company_final.do" >참여기업</a>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/futurecar/staff.do" >운영지원실</a>
+									</li>
+								
+							
+						</ul>
+						</dd>
+					</dl>
+				
+			</li>
+		
+	
+		
+			<li>
+	          <a href="/futurecar/organization.do" >사업 소개</a> 
+				
+					<dl class="gnb-inner">
+						<dt><a href="/futurecar/organization.do" >사업 소개</a></dt>
+						<dd>
+						<ul class="sub-mn">
+							
+								
+									<li>
+										<a href="/futurecar/organization.do" >사업 목표 및 추진체계</a>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/futurecar/edu.do" >교육 과정</a>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/futurecar/exercise.do" >산학협력</a>
+									</li>
+								
+							
+						</ul>
+						</dd>
+					</dl>
+				
+			</li>
+		
+	
+		
+			<li>
+	          <a href="/futurecar/2022.do" >사업 내용</a> 
+				
+					<dl class="gnb-inner">
+						<dt><a href="/futurecar/2022.do" >사업 내용</a></dt>
+						<dd>
+						<ul class="sub-mn">
+							
+								
+									<li>
+										<a href="/futurecar/2022.do" >단기교육/경진대회</a>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/futurecar/2023.do" >인프라</a>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/futurecar/2024.do" >산학 프로젝트</a>
+									</li>
+								
+							
+						</ul>
+						</dd>
+					</dl>
+				
+			</li>
+		
+	
+		
+			<li>
+	          <a href="/futurecar/hyundai_intro.do" >현대모비스 채용연계</a> 
+				
+					<dl class="gnb-inner">
+						<dt><a href="/futurecar/hyundai_intro.do" >현대모비스 채용연계</a></dt>
+						<dd>
+						<ul class="sub-mn">
+							
+								
+									<li>
+										<a href="#noMenu" >소개 및 선발 안내</a>
+									</li>
+								
+							
+								
+									<li>
+										<a href="#noMenu" >포지션 안내</a>
+									</li>
+								
+							
+								
+									<li>
+										<a href="#noMenu" >소식</a>
+									</li>
+								
+							
+						</ul>
+						</dd>
+					</dl>
+				
+			</li>
+		
+	
+		
+			<li>
+	          <a href="/futurecar/hyundai_select.do" >LG전자 VS본부 채용연계</a> 
+				
+					<dl class="gnb-inner">
+						<dt><a href="/futurecar/hyundai_select.do" >LG전자 VS본부 채용연계</a></dt>
+						<dd>
+						<ul class="sub-mn">
+							
+								
+									<li>
+										<a href="/futurecar/hyundai_select.do" >소개 및 선발 안내</a>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/futurecar/hyundai_education.do" >포지션안내</a>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/futurecar/hyundai_inform.do" >소식</a>
+									</li>
+								
+							
+						</ul>
+						</dd>
+					</dl>
+				
+			</li>
+		
+	
+		
+			<li>
+	          <a href="/futurecar/notice.do" class="active" >게시판</a> 
+				
+					<dl class="gnb-inner">
+						<dt><a href="/futurecar/notice.do" class="active" >게시판</a></dt>
+						<dd>
+						<ul class="sub-mn">
+							
+								
+									<li>
+										<a href="/futurecar/notice.do" class="active" >공지사항</a>
+									</li>
+								
+							
+								
+									<li>
+										<a href="/futurecar/inform.do" >소식</a>
+									</li>
+								
+							
+								
+									<li>
+										<a href="https://padlet.com/skkuautolab/padlet-hl7l4xx0dem5ysrq" >QnA</a>
+									</li>
+								
+							
+						</ul>
+						</dd>
+					</dl>
+				
+			</li>
+		
+	
+</ul>			
+
+
+
+
+
+                    
+                </div>
+                <!--ul class="header-right-menu">
+                    
+
+
+
+
+
+
+<li>
+	<a href="#a" title="입학안내 자세히보기">입학안내</a>
+	<div class="gnb-lnk-wrap">
+		<dl>
+			<dt>
+				<a href="https://admission.skku.edu" target="_blank" title="입학안내 바로가기"><span>입학안내</span></a>
+			</dt>
+			<dd>
+				<ul>
+					<li><a href="https://admission.skku.edu" target="_blank" title="대학 입학안내 바로가기">대학</a></li>
+					<li><a href="https://gradschool.skku.edu/grad/index.htm" target="_blank" title="대학원 입학안내 바로가기">대학원</a></li>
+					<li><a href="https://admission-global.skku.edu/eng/index.html" target="_blank" title="외국인 입학안내 바로가기">외국인</a></li>
+				</ul>
+			</dd>
+		</dl>
+	</div>
+</li>
+<li>
+	<a href="#a" title="학사안내 자세히보기">학사안내</a>
+	<div class="gnb-lnk-wrap">
+		<dl>
+			<dt>
+				<a href="http://www.skku.edu/skku/edu/bachelor/ca_de_schedule01.do" target="_blank" title="학사제도 바로가기"><span>학사제도</span></a>
+			</dt>
+			<dd>
+				<ul>
+					<li><a href="http://www.skku.edu/skku/edu/bachelor/ca_de_schedule.do" target="_blank" title="학사일정 바로가기">학사일정</a></li>
+					<li><a href="http://www.skku.edu/skku/edu/bachelor/de_thesis.do" target="_blank" title="학위논문 바로가기">학위논문</a></li>
+					<li><a href="http://www.skku.edu/skku/campus/support/scholarship.do" target="_blank" title="장학안내 바로가기">장학안내</a></li>
+					<li><a href="http://www.skku.edu/skku/about/status/state_02_2012.do" target="_blank" title="교육과정 바로가기">교육과정</a></li>
+					<li><a href="http://coe.skku.edu/coe/index.jsp" target="_blank" title="교직안내 바로가기">교직안내</a></li>
+					<li><a href="https://icert.skku.edu/member/doSsoLogin" target="_blank" title="증명발급 바로가기">증명발급</a></li>
+					<li><a href="https://www.skku.edu/skku/campus/support/welfare_07.do" target="_blank" title="다기능학생증 바로가기">다기능학생증</a></li>
+					<li><a href="http://www.skku.edu/skku/edu/bachelor/ca_de_schedule01.do" target="_blank" title="학사제도(등록/휴,복학/수강신청) 바로가기">학사제도(등록/휴&middot;복학/수강신청)</a></li>
+				</ul>
+			</dd>
+		</dl>
+	</div>
+</li>
+
+                </ul-->
+            </div>
+        </div>
+    </div>
+<div class="gnb-bg">&nbsp;</div>  
+</div>
+<nav class="slideMenu">
+    <div class="m_gnb">
+        <a href="#a" class="slide_close" title="닫기"><span class="hide">닫기</span></a>
+          
+            
+        	
+	
+	
+	
+	
+	<ul class="dep1">
+		
+			
+				<li>
+		          <a href="/futurecar/greetings.do" >사업단</a> 
+					
+						<ul class="dep2">
+							
+								
+									<li>
+									
+										
+											<a href="/futurecar/greetings.do" >인사말</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+								
+									<li>
+									
+										
+											<a href="/futurecar/professor.do" >참여 교수</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+								
+									<li>
+									
+										
+											<a href="/futurecar/company_final.do" >참여기업</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+								
+									<li>
+									
+										
+											<a href="/futurecar/staff.do" >운영지원실</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+						</ul>
+					
+				</li>
+			
+		
+			
+				<li>
+		          <a href="/futurecar/organization.do" >사업 소개</a> 
+					
+						<ul class="dep2">
+							
+								
+									<li>
+									
+										
+											<a href="/futurecar/organization.do" >사업 목표 및 추진체계</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+								
+									<li>
+									
+										
+											<a href="/futurecar/edu.do" >교육 과정</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+								
+									<li>
+									
+										
+										 
+										
+											
+											<a href="/futurecar/exercise.do" >산학협력</a>
+											
+											<ul class="dep3">					
+												
+													
+														<li>
+															<a href="/futurecar/exercise.do" >현장실습</a>
+														</li>
+													
+												
+													
+														<li>
+															<a href="/futurecar/project.do" >산학 프로젝트</a>
+														</li>
+													
+												
+											</ul>
+										
+										
+									</li>
+								
+							
+						</ul>
+					
+				</li>
+			
+		
+			
+				<li>
+		          <a href="/futurecar/2022.do" >사업 내용</a> 
+					
+						<ul class="dep2">
+							
+								
+									<li>
+									
+										
+											<a href="/futurecar/2022.do" >단기교육/경진대회</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+								
+									<li>
+									
+										
+											<a href="/futurecar/2023.do" >인프라</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+								
+									<li>
+									
+										
+											<a href="/futurecar/2024.do" >산학 프로젝트</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+						</ul>
+					
+				</li>
+			
+		
+			
+				<li>
+		          <a href="/futurecar/hyundai_intro.do" >현대모비스 채용연계</a> 
+					
+						<ul class="dep2">
+							
+								
+									<li>
+									
+										
+											<a href="#noMenu" >소개 및 선발 안내</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+								
+									<li>
+									
+										
+											<a href="#noMenu" >포지션 안내</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+								
+									<li>
+									
+										
+											<a href="#noMenu" >소식</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+						</ul>
+					
+				</li>
+			
+		
+			
+				<li>
+		          <a href="/futurecar/hyundai_select.do" >LG전자 VS본부 채용연계</a> 
+					
+						<ul class="dep2">
+							
+								
+									<li>
+									
+										
+											<a href="/futurecar/hyundai_select.do" >소개 및 선발 안내</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+								
+									<li>
+									
+										
+											<a href="/futurecar/hyundai_education.do" >포지션안내</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+								
+									<li>
+									
+										
+											<a href="/futurecar/hyundai_inform.do" >소식</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+						</ul>
+					
+				</li>
+			
+		
+			
+				<li>
+		          <a href="/futurecar/notice.do" class="active" >게시판</a> 
+					
+						<ul class="dep2">
+							
+								
+									<li>
+									
+										
+											<a href="/futurecar/notice.do" class="active" >공지사항</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+								
+									<li>
+									
+										
+											<a href="/futurecar/inform.do" >소식</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+								
+									<li>
+									
+										
+											<a href="https://padlet.com/skkuautolab/padlet-hl7l4xx0dem5ysrq" >QnA</a>
+										
+										 
+										
+										
+									</li>
+								
+							
+						</ul>
+					
+				</li>
+			
+		
+	</ul>			
+	
+
+    </div>
+	<!--
+    <ul class="m-link-box dep1">
+        
+
+
+
+
+
+
+<li>
+	<a href="#" title="입학안내 자세히보기" class="selected">입학안내</a>
+	<ul class="dep2">
+		<li><a href="http://admission.skku.edu/main.html" target="_blank" title="대학 입학안내 바로가기">대학</a></li>
+		<li><a href="https://gradschool.skku.edu/grad/index.htm" target="_blank" title="대학원 입학안내 바로가기">대학원</a></li>
+		<li><a href="https://admission-global.skku.edu/eng/index.html" target="_blank" title="외국인 입학안내 바로가기">외국인</a></li>
+	</ul>
+</li>
+<li>
+	<a href="#" title="학사안내 자세히보기">학사안내</a>
+	<ul class="dep2">
+		<li><a href="http://www.skku.edu/skku/edu/bachelor/ca_de_schedule.do" target="_blank" title="학사일정 바로가기">학사일정</a></li>
+		<li><a href="http://www.skku.edu/skku/edu/bachelor/de_thesis.do" target="_blank" title="학위논문 바로가기">학위논문</a></li>
+		<li><a href="http://www.skku.edu/skku/campus/support/scholarship.do" target="_blank" title="장학안내 바로가기">장학안내</a></li>
+		<li><a href="http://www.skku.edu/skku/about/status/state_02_2012.do" target="_blank" title="교육과정 바로가기">교육과정</a></li>
+		<li><a href="http://coe.skku.edu/coe/index.jsp" target="_blank" title="교직안내 바로가기">교직안내</a></li>
+		<li><a href="https://icert.skku.edu/member/doSsoLogin" target="_blank" title="증명발급 바로가기">증명발급</a></li>
+		<li><a href="https://www.skku.edu/skku/campus/support/welfare_07.do" target="_blank" title="다기능학생증 바로가기">다기능학생증</a></li>
+		<li><a href="http://www.skku.edu/skku/edu/bachelor/ca_de_schedule01.do" target="_blank" title="학사제도(등록/휴,복학/수강신청) 바로가기">학사제도(등록/휴&middot;복학/수강신청)</a></li>
+	</ul>
+</li>
+
+    </ul>
+-->
+</nav>
+<div class="m-srch-menu">
+    <a href="#a" class="m-srch-close" title="닫기"><span class="hide">닫기</span></a>
+    <div class="set_group">
+        <form action="/futurecar/search_result.do" method="get" class="m-search-wrap">
+            <input type="hidden" name="srSearchField"    value="all" />
+            <input type="hidden" name="srSearchTerm"     value="all" />
+            <input type="hidden" name="srSearchOperator" value="or"/>
+            <input type="hidden" name="mode"             value="list" />
+            <fieldset>
+                <legend title="통합검색" class="hide">통합검색</legend>
+                <label class="hide" for="m_total_search_value">
+                    통합검색 단어 입력
+                </label>
+                <input id="m_total_search_value" type="text" name="srSearchVal" value="" placeholder="검색어를 입력하세요" class="top-search-input" />
+                <button type="submit" value="검색" class="m-search-btn"><span class="hide">검색</span></button>
+            </fieldset>
+        </form>
+    </div>
+    <ul class="m-util-box">
+        <li><a href="/futurecar/index.do" title="메인 바로가기">HOME</a></li>
+        <li><a href="#" target="_blank" title="영문페이지 바로가기">ENG</a></li>
+        <li><a href="http://www.skku.edu/" target="_blank" title="성균관대학교 바로가기">SKKU</a></li>
+        <li>
+                 
+                
+                    <!--<a class="login-btn" href="/futurecar/login.do" title="LOGIN">LOGIN</a>-->
+                  <a class="login-btn" href="/_custom/shb/_common/login/sso/login/login.do?siteId=futurecar" title="LOGIN">LOGIN</a>
+                
+        </li>
+    </ul>
+  <!--ul class="m-sns-box">
+        <li><a href="https://www.facebook.com/SKKU.Kor/" target="_blank" title="페이스북 바로가기"><img src="/_res/futurecar/img/common/ico_facebook.png" alt="facebook" /></a></li>
+    </ul-->
+</div>
+<div class="m-gnb-bg">&nbsp;</div>
+</header>
+<div class="sub-visual-intro-wrap">
+<div class="path-group">		
+  <div class="jwxe_navigator jw-relative jw-fl-left" style="margin:0 10px 0 0;"><ul class="path-box">
+<li><img src='/_res/futurecar/img/common/ico_path_home.gif' alt='home' /></li>
+    <li>게시판</li><li>공지사항</li>
+  </div>
+  <ul class="tool-box">
+    <li><a class="jwxe_a_print jw-relative jwnossl" id="jwxe_print" title="" href="/_common/template/print.jsp" ></a></li>
+    <li><a class="jwxe_a_zoom_in jw-relative jwnossl" id="jwxe_zoomIn" title="" href="#zoom-in" ></a></li>
+    <li><a class="jwxe_a_zoom_out jw-relative jwnossl" id="jwxe_zoomOut" title="" href="#zoom-out" ></a></li>
+  </ul>
+</div>
+
+</div>
+<div class="sub-container">
+	<div class="lnb">
+<dl>
+    <dt>
+       <span class='lnb-sub-title'></span><h2>게시판</h2>
+
+    </dt>
+    <dd>  
+             
+          
+        
+
+
+
+<ul class="lnb-menu"> 
+	
+		
+			<li class="active">
+              <a href="/futurecar/notice.do" class="jwxe_18831  active" >공지사항</a>
+				
+				<!-- 하위메뉴가 있고 메뉴depth가 1보다 크면(=2depth) 3depth나오도록 -->
+				
+			</li>
+		
+	
+		
+			<li class="">
+              <a href="/futurecar/inform.do" class="jwxe_19077  " >소식</a>
+				
+				<!-- 하위메뉴가 있고 메뉴depth가 1보다 크면(=2depth) 3depth나오도록 -->
+				
+			</li>
+		
+	
+		
+			<li class="">
+              <a href="https://padlet.com/skkuautolab/padlet-hl7l4xx0dem5ysrq" class="jwxe_19285  " >QnA</a>
+				
+				<!-- 하위메뉴가 있고 메뉴depth가 1보다 크면(=2depth) 3depth나오도록 -->
+				
+			</li>
+		
+	
+</ul>			
+
+      
+     </dd>
+</dl>
+</div>
+	<div class="content-wrap">
+		<div class="title">
+			<div class="path-wrap">
+			<h3 class='page-title-txt'>공지사항</h3>
+
+
+</div>
+			<div class="page-title"></div>
+		</div>
+		<div class="tab-wrap"></div>
+		<div class="content" id="jwxe_main_content">
+
+
+
+
+
+
+
+
+
+
+
+<script type="text/javascript">
+//<![CDATA[
+  var resPath = '/_custom/shb/resource/', isEditorImageUpload = 'true' == 'false'? false: true, clientId = 'shb', boardTy = 'common', boardNo = '4728', siteId = 'futurecar';
+//]]>
+</script>
+<div class="ko board list">
+	
+		<input type="hidden" name="board_mode" value="list">
+		
+
+
+
+
+
+
+<div class="common common-board">
+	
+
+
+<form id="searchForm" method="get" action="?">
+
+	<input type="hidden" name="mode" value="list" />
+	
+	<input type="hidden" name="srCategoryId1" value=""/>
+
+	<legend class="hide">게시글 검색</legend>
+	<fieldset class="content-search-wrap">
+	
+		
+		
+			<div class="board-selectbox category-wrap state">
+				<label for="state" class="hide">상태선택</label>
+				<input type="hidden" name="srState" id="state" />
+				<a href="#state" class="board-selectbox-title">
+					
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+					
+						상태선택
+					
+				</a>	
+				<ul>
+					<li><a href="#state" title="상태선택">상태선택</a></li>
+					
+						<li><a href="#state" class="searchOption" title="접수" data-value="접수" >접수</a></li>
+					
+						<li><a href="#state" class="searchOption" title="취소" data-value="취소" >취소</a></li>
+					
+						<li><a href="#state" class="searchOption" title="처리중" data-value="처리중" >처리중</a></li>
+					
+						<li><a href="#state" class="searchOption" title="반려" data-value="반려" >반려</a></li>
+					
+						<li><a href="#state" class="searchOption" title="처리완료" data-value="처리완료" >처리완료</a></li>
+					
+				</ul>
+			</div>
+		
+	
+		<div class="board-selectbox">
+			<label for="search_key" class="hide">검색분류선택</label>
+			<a href="#search" class="board-selectbox-title">
+				
+				
+				
+					
+				
+					
+				
+					
+				
+				
+					전체
+				
+			</a>
+			<input type="hidden" name="srSearchKey" id="search_key" />
+			<ul>
+				
+					<li><a href="#search" class="searchOption" title="제목 + 내용" data-value="" >제목 + 내용</a></li>
+				
+					<li><a href="#search" class="searchOption" title="제목" data-value="article_title" >제목</a></li>
+				
+					<li><a href="#search" class="searchOption" title="내용" data-value="article_text" >내용</a></li>
+				
+			</ul>
+		</div>
+		
+		
+			
+		<label for="search_val" class="hide">검색어</label>
+		<input type="text" id="search_val" name="srSearchVal" value="" placeholder="검색어를 입력해 주세요" class="board-search-input" />
+
+		
+		<button type="submit" class="board-search-btn"><span class="hide">검색</span></button>
+		
+	</fieldset>
+</form>
+
+ 
+	
+
+
+
+	
+
+
+	
+
+
+
+
+
+
+
+	
+<div class="board-name-list board-wrap">
+				
+		<ul class="board-list-wrap">	
+				
+				
+				
+				
+				
+				
+				<li class=" ">
+						
+					
+					
+					
+					 
+					
+                    
+					
+					<dl class="board-list-content-wrap ">
+                    	<dt class="board-list-content-title ">
+                    	
+                    		
+							
+                    		
+							
+                    		<a href="?mode=view&amp;articleNo=67564&amp;article.offset=0&amp;articleLimit=7" title="자세히 보기">
+                    			
+                    			
+                    			
+                    			2026학년도 겨울학기 비교과 프로그램 신청 안내(11/4  09:00 ~ 11/10  23:00)
+                            	
+								
+								
+								
+                    			
+									
+										[접수]
+										
+									
+								
+								
+								
+								
+								
+								
+                    		</a>
+                            
+                    		
+	                        	<span class="c-board-list-new">NEW</span>
+	                        	
+                    	</dt>
+                    	<dd class="board-list-content-info">
+	                        <ul>
+	                        	<li>
+	                        		
+									
+										
+										
+										No.129
+									
+									
+	                        	</li>
+	                            <li>미래차부트캠프사업단</li>
+	                            <li>
+									
+										
+										2026-10-30
+									
+								</li>
+	                            <li>조회수<span class="board-mg-l10">175</span></li>
+	                            
+	                        </ul>
+                    	</dd>
+	                </dl>
+	                <div class="board-list-etc-wrap">
+	                    <ul>
+	                        
+	                    </ul>
+	                </div>
+					
+				</li>
+			
+				
+				
+				
+				
+				<li class=" ">
+						
+					
+					
+					
+					 
+					
+                    
+					
+					<dl class="board-list-content-wrap ">
+                    	<dt class="board-list-content-title ">
+                    	
+                    		
+							
+                    		
+							
+                    		<a href="?mode=view&amp;articleNo=67417&amp;article.offset=0&amp;articleLimit=7" title="자세히 보기">
+                    			
+                    			
+                    			
+                    			GLS 마이크로디그리 이수 신청 방법 안내
+                            	
+								
+								
+								
+                    			
+									
+										[접수]
+										
+									
+								
+								
+								
+								
+								
+								
+                    		</a>
+                            
+                    			
+                    	</dt>
+                    	<dd class="board-list-content-info">
+	                        <ul>
+	                        	<li>
+	                        		
+									
+										
+										
+										No.128
+									
+									
+	                        	</li>
+	                            <li>미래차부트캠프사업단</li>
+	                            <li>
+									
+										
+										2026-10-22
+									
+								</li>
+	                            <li>조회수<span class="board-mg-l10">230</span></li>
+	                            
+	                        </ul>
+                    	</dd>
+	                </dl>
+	                <div class="board-list-etc-wrap">
+	                    <ul>
+	                        
+	                        <li class="c-board-file-icon board-list-file"><span class="hide">첨부파일</span></li>
+	                        
+	                    </ul>
+	                </div>
+					
+				</li>
+			
+				
+				
+				
+				
+				<li class=" ">
+						
+					
+					
+					
+					 
+					
+                    
+					
+					<dl class="board-list-content-wrap ">
+                    	<dt class="board-list-content-title ">
+                    	
+                    		
+							
+                    		
+							
+                    		<a href="?mode=view&amp;articleNo=67378&amp;article.offset=0&amp;articleLimit=7" title="자세히 보기">
+                    			
+                    			
+                    			
+                    			아이캠퍼스 신청 절차 변경 및 개인정보동의서 작성 유의사항
+                            	
+								
+								
+								
+                    			
+									
+										[접수]
+										
+									
+								
+								
+								
+								
+								
+								
+                    		</a>
+                            
+                    			
+                    	</dt>
+                    	<dd class="board-list-content-info">
+	                        <ul>
+	                        	<li>
+	                        		
+									
+										
+										
+										No.127
+									
+									
+	                        	</li>
+	                            <li>미래차부트캠프사업단</li>
+	                            <li>
+									
+										
+										2026-10-22
+									
+								</li>
+	                            <li>조회수<span class="board-mg-l10">124</span></li>
+	                            
+	                        </ul>
+                    	</dd>
+	                </dl>
+	                <div class="board-list-etc-wrap">
+	                    <ul>
+	                        
+	                    </ul>
+	                </div>
+					
+				</li>
+			
+				
+				
+				
+				
+				<li class=" ">
+						
+					
+					
+					
+					 
+					
+                    
+					
+					<dl class="board-list-content-wrap ">
+                    	<dt class="board-list-content-title ">
+                    	
+                    		
+							
+                    		
+							
+                    		<a href="?mode=view&amp;articleNo=67200&amp;article.offset=0&amp;articleLimit=7" title="자세히 보기">
+                    			
+                    			
+                    			
+                    			2026학년도 2학기 미래차 SDV/전동화/자율주행 마이크로디그리 신청 안내 - 10/19(월)~10/23(금)
+                            	
+								
+								
+								
+                    			
+									
+										[접수]
+										
+									
+								
+								
+								
+								
+								
+								
+                    		</a>
+                            
+                    			
+                    	</dt>
+                    	<dd class="board-list-content-info">
+	                        <ul>
+	                        	<li>
+	                        		
+									
+										
+										
+										No.126
+									
+									
+	                        	</li>
+	                            <li>미래차부트캠프사업단</li>
+	                            <li>
+									
+										
+										2026-10-13
+									
+								</li>
+	                            <li>조회수<span class="board-mg-l10">737</span></li>
+	                            
+	                        </ul>
+                    	</dd>
+	                </dl>
+	                <div class="board-list-etc-wrap">
+	                    <ul>
+	                        
+	                        <li class="c-board-file-icon board-list-file"><span class="hide">첨부파일</span></li>
+	                        
+	                    </ul>
+	                </div>
+					
+				</li>
+			
+				
+				
+				
+				
+				<li class=" ">
+						
+					
+					
+					
+					 
+					
+                    
+					
+					<dl class="board-list-content-wrap ">
+                    	<dt class="board-list-content-title ">
+                    	
+                    		
+							
+                    		
+							
+                    		<a href="?mode=view&amp;articleNo=67086&amp;article.offset=0&amp;articleLimit=7" title="자세히 보기">
+                    			
+                    			
+                    			
+                    			2026 미래형자동차 인재페스티벌-(미래차 부트캠프 라운드업 연계) 개최 및 사전 신청안내 - ~10/11(일)
+                            	
+								
+								
+								
+                    			
+									
+										[접수]
+										
+									
+								
+								
+								
+								
+								
+								
+                    		</a>
+                            
+                    			
+                    	</dt>
+                    	<dd class="board-list-content-info">
+	                        <ul>
+	                        	<li>
+	                        		
+									
+										
+										
+										No.125
+									
+									
+	                        	</li>
+	                            <li>IT융합연구원</li>
+	                            <li>
+									
+										
+										2026-10-07
+									
+								</li>
+	                            <li>조회수<span class="board-mg-l10">250</span></li>
+	                            
+	                        </ul>
+                    	</dd>
+	                </dl>
+	                <div class="board-list-etc-wrap">
+	                    <ul>
+	                        
+	                        <li class="c-board-file-icon board-list-file"><span class="hide">첨부파일</span></li>
+	                        
+	                    </ul>
+	                </div>
+					
+				</li>
+			
+				
+				
+				
+				
+				<li class=" ">
+						
+					
+					
+					
+					 
+					
+                    
+					
+					<dl class="board-list-content-wrap ">
+                    	<dt class="board-list-content-title ">
+                    	
+                    		
+							
+                    		
+							
+                    		<a href="?mode=view&amp;articleNo=66723&amp;article.offset=0&amp;articleLimit=7" title="자세히 보기">
+                    			
+                    			
+                    			
+                    			『2027 경기도 대학생 자율주행 경진대회』공고 및 신청 안내(~10/5, 17시까지)
+                            	
+								
+								
+								
+                    			
+									
+										[접수]
+										
+									
+								
+								
+								
+								
+								
+								
+                    		</a>
+                            
+                    			
+                    	</dt>
+                    	<dd class="board-list-content-info">
+	                        <ul>
+	                        	<li>
+	                        		
+									
+										
+										
+										No.124
+									
+									
+	                        	</li>
+	                            <li>미래차부트캠프사업단</li>
+	                            <li>
+									
+										
+										2026-09-22
+									
+								</li>
+	                            <li>조회수<span class="board-mg-l10">539</span></li>
+	                            
+	                        </ul>
+                    	</dd>
+	                </dl>
+	                <div class="board-list-etc-wrap">
+	                    <ul>
+	                        
+	                        <li class="c-board-file-icon board-list-file"><span class="hide">첨부파일</span></li>
+	                        
+	                    </ul>
+	                </div>
+					
+				</li>
+			
+				
+				
+				
+				
+				<li class=" ">
+						
+					
+					
+					
+					 
+					
+                    
+					
+					<dl class="board-list-content-wrap ">
+                    	<dt class="board-list-content-title ">
+                    	
+                    		
+							
+                    		
+							
+                    		<a href="?mode=view&amp;articleNo=66559&amp;article.offset=0&amp;articleLimit=7" title="자세히 보기">
+                    			
+                    			
+                    			
+                    			2026 한국자동차공학회 추계학술대회 참가 신청 마감 안내
+                            	
+								
+								
+								
+                    			
+									
+										[접수]
+										
+									
+								
+								
+								
+								
+								
+								
+                    		</a>
+                            
+                    			
+                    	</dt>
+                    	<dd class="board-list-content-info">
+	                        <ul>
+	                        	<li>
+	                        		
+									
+										
+										
+										No.123
+									
+									
+	                        	</li>
+	                            <li>게임기술개발지원센터</li>
+	                            <li>
+									
+										
+										2026-09-14
+									
+								</li>
+	                            <li>조회수<span class="board-mg-l10">296</span></li>
+	                            
+	                        </ul>
+                    	</dd>
+	                </dl>
+	                <div class="board-list-etc-wrap">
+	                    <ul>
+	                        
+	                    </ul>
+	                </div>
+					
+				</li>
+			
+			
+		</ul>		
+</div>
+
+
+
+	
+
+
+
+
+
+
+
+<ul class="paging-wrap">
+
+
+		
+
+				
+
+				
+
+				
+
+				
+
+				
+					
+						<li><a href="#curPage" class="active">1</a></li>
+					
+					
+				
+					
+					
+						<li><a href="?mode=list&amp;&amp;articleLimit=7&amp;article.offset=7">2</a></li>
+					
+				
+					
+					
+						<li><a href="?mode=list&amp;&amp;articleLimit=7&amp;article.offset=14">3</a></li>
+					
+				
+					
+					
+						<li><a href="?mode=list&amp;&amp;articleLimit=7&amp;article.offset=21">4</a></li>
+					
+				
+					
+					
+						<li><a href="?mode=list&amp;&amp;articleLimit=7&amp;article.offset=28">5</a></li>
+					
+				
+					
+					
+						<li><a href="?mode=list&amp;&amp;articleLimit=7&amp;article.offset=35">6</a></li>
+					
+				
+					
+					
+						<li><a href="?mode=list&amp;&amp;articleLimit=7&amp;article.offset=42">7</a></li>
+					
+				
+					
+					
+						<li><a href="?mode=list&amp;&amp;articleLimit=7&amp;article.offset=49">8</a></li>
+					
+				
+					
+					
+						<li><a href="?mode=list&amp;&amp;articleLimit=7&amp;article.offset=56">9</a></li>
+					
+				
+					
+					
+						<li><a href="?mode=list&amp;&amp;articleLimit=7&amp;article.offset=63">10</a></li>
+					
+				
+
+				
+					<li><a href="?mode=list&amp;&amp;articleLimit=7&amp;article.offset=7" class="page-icon page-next" title="다음 페이지로 이동하기"><span class="hide">다음 페이지로 이동하기</span></a></li>
+				
+
+				
+					<li><a href="?mode=list&amp;&amp;articleLimit=7&amp;article.offset=126" class="page-icon page-last" title="마지막 페이지로 이동하기"><span class="hide">마지막 페이지로 이동하기</span></a></li>
+				
+		
+
+</ul>
+	
+
+<ul class="btn-wrap board-text-right">
+	
+	
+		<!-- 버튼 순서: 전체 목록 , 영구삭제, 삭제, 복구, 수정(x), 등록 -->
+		
+
+		
+		
+		
+		
+		
+</ul>
+
+
+<form name="admin-form" method="post" action="?article.offset=0&amp;articleLimit=7">
+	<input type="hidden" name="mode" />
+	<input type="hidden" name="articles" />
+	<input type="hidden" name="confirmMode" />
+</form>
+
+</div>
+
+	
+</div>
+
+
+
+
+
+</div>
+	</div>
+</div>
+<footer>
+<div class="foot-bottom-wrap">
+	<div class="foot-bottom-box">
+		<p>
+			<span style="font-size:24px;">미래차 부트캠프 사업단, Sungkyunkwan University (SKKU)</span></p>
+		<ul class="footer-lnk">
+			<li>
+				<a href="https://lib.skku.edu/#/" target="_blank" title="학술정보관 바로가기">학술정보관</a></li>
+			<li>
+				<a href="https://job.skku.edu/" target="_blank" title="취업지원 바로가기">취업지원</a></li>
+			<li>
+				<a href="http://koreansli.skku.edu/ksli/index.jsp" target="_blank" title="성균어학원 바로가기">성균어학원</a></li>
+			<li>
+				<a href="http://www.icampus.ac.kr/front/login/login.do" target="_blank" title="i-Campus 바로가기">i-Campus</a></li>
+			<li>
+				<a href="https://www.skkuzine.com/" target="_blank" title="성균웹진 바로가기">성균웹진</a></li>
+			<li>
+				<a href="http://www.skku.edu/skku/about/campusInfo/location.do" target="_blank" title="교통안내 바로가기">교통안내</a></li>
+			<li>
+				<a href="https://www.skku.edu/skku/about/campusInfo/campusMap.do" target="_blank" title="캠퍼스맵 바로가기">캠퍼스맵</a></li>
+			<li>
+				<a href="https://www.skku.edu/skku/about/campusInfo/campus_telInfo.do" target="_blank" title="교내전화번호 바로가기">교내전화번호</a></li>
+		</ul>
+		<address>
+			<ul class="footer-contact">
+				<li>
+					경기도 수원시 장안구 천천동 472-21 성균관대학교 반도체관 400529호 / TEL : <a href="tel:02-760-0114" title="전화걸기">031-290-5</a>412</li>
+				<li>
+					COPYRIGHT ⓒ&nbsp; SUNGKYUNKWAN UNIVERSITY ALL RIGHTS RESERVED. <a href="#" title="contact us">Contact us</a></li>
+				<li>
+					<ul class="footer-law">
+						<li>
+							<a class="txt-blue" href="https://www.skku.edu/skku/etc/private.do" target="_blank" title="개인정보처리방침 바로가기">개인정보처리방침</a></li>
+						<li>
+							<a href="https://www.skku.edu/skku/etc/netizen.do" target="_blank" title="네티즌윤리규약 바로가기">네티즌윤리규약</a></li>
+						<li>
+							<a href="#a" onclick="window.open('http://www.skku.edu/skku/etc/pop_email.do', '', 'width=470, height=280, left=300, top=200');" title="이메일무단수집거부 바로가기">이메일무단수집거부</a></li>
+					</ul>
+				</li>
+			</ul>
+		</address>
+		<a class="scroll-top-btn" href="#" title="상단으로 이동"><img alt="top" src="/_res/futurecar/img/common/btn_scroll_top.gif" /></a></div>
+</div>
+<p>
+	&nbsp;</p>
+</footer>
+<noscript><p>이 사이트는 자바스크립트를 지원하지 않으면 정상적으로 보이지 않을수 있습니다.</p></noscript>
+</body>
+</html>

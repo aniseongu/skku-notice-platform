@@ -1,0 +1,61 @@
+# 비밀
+.env
+.env.*
+!.env.example
+config/profile.yaml
+state/canvas.json
+state/canvas.enc
+
+# 파이썬
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.cache/
+dist/
+build/
+*.egg-info/
+
+# 로컬 실행 부산물 (Actions가 쓰는 state/는 커밋한다)
+logs/
+*.local.yaml
+
+# 에디터, OS
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Claude 개인 설정
+.claude/settings.local.json
+CLAUDE.local.md
+
+# AI 작업 지침과 인수인계는 로컬에서만 유지한다.
+AGENTS.md
+CLAUDE.md
+HANDOFF.md
+.agents/
+.claude/
+
+# 로컬 화면 확인 부산물
+.playwright-mcp/
+
+# 개인 AI 도구 설정과 작업 문서는 공개 저장소에서 제외한다.
+.codex/
+codex/
+GOAL.md
+goal.md
+docs/WORKFLOW.md
+docs/plans/
+docs/daily-log/
+
+# 설계, 조사, 검토와 AI 작업 산출물은 전부 로컬에서만 유지한다.
+docs/
+*.md
+*.mdx
+*.MD
+!/README.md
+!/PRIVACY.md
+!/SECURITY.md

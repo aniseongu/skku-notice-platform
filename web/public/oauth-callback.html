@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>구글 연결</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; display: grid; place-items: center; min-height: 100vh; font: 16px/1.5 system-ui, sans-serif; background: Canvas; color: CanvasText; }
+</style>
+</head>
+<body>
+<p>구글 연결을 마치고 있어요. 이 창은 저절로 닫혀요.</p>
+<script>
+  // 구글이 돌려준 승인 코드를 같은 사이트의 설정 화면에 넘기고 바로 주소에서 지운다.
+  // 구글 화면을 거치면 window.opener가 끊길 수 있어 BroadcastChannel로 보낸다.
+  const params = new URLSearchParams(location.search);
+  history.replaceState(null, '', location.pathname);
+  const channel = new BroadcastChannel('google-oauth');
+  channel.postMessage({ code: params.get('code'), state: params.get('state'), error: params.get('error') });
+  channel.close();
+  setTimeout(() => window.close(), 300);
+</script>
+</body>
+</html>
