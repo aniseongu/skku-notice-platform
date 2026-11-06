@@ -246,7 +246,9 @@ def test_freshness_gate_skips_only_when_all_school_boards_were_recently_collecte
     store = MemoryStore()
     store.sources["school"] = {"id": "school", "last_success_at": (NOW - timedelta(minutes=20)).isoformat()}
     assert job.recently_collected(SETTINGS, store, NOW)
-    store.sources["school"]["last_success_at"] = (NOW - timedelta(minutes=51)).isoformat()
+    store.sources["school"]["last_success_at"] = (NOW - timedelta(minutes=25)).isoformat()
+    assert not job.recently_collected(SETTINGS, store, NOW)
+    store.sources["school"]["last_success_at"] = (NOW - timedelta(minutes=30)).isoformat()
     assert not job.recently_collected(SETTINGS, store, NOW)
     store.sources["school"]["last_success_at"] = (NOW + timedelta(minutes=1)).isoformat()
     assert not job.recently_collected(SETTINGS, store, NOW)

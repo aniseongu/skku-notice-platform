@@ -1,0 +1,11 @@
+[Unit]
+Description=Run SKKU notice collection every 30 minutes
+
+[Timer]
+OnCalendar=*:0/30
+Persistent=true
+RandomizedDelaySec=15
+Unit=skku-notice-crawl.service
+
+[Install]
+WantedBy=timers.target

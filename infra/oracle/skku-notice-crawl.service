@@ -1,0 +1,14 @@
+[Unit]
+Description=Collect shared SKKU notices
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=skku
+WorkingDirectory=/opt/skku-notice-platform
+EnvironmentFile=/etc/skku-notice/worker.env
+ExecStart=/usr/bin/flock -n /tmp/skku-notice-crawl.lock /opt/skku-notice-platform/.venv/bin/python -m skku_notice.scheduled_collection
+TimeoutStartSec=1200
+NoNewPrivileges=true
+PrivateTmp=false

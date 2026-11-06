@@ -202,8 +202,8 @@ def run_collection(settings: dict, store: NoticeStore, now: datetime) -> tuple[i
     return total, failed
 
 
-def recently_collected(settings: dict, store: NoticeStore, now: datetime, minimum_minutes: int = 50) -> bool:
-    """Skip duplicate relay/schedule runs only if every school source was checked recently."""
+def recently_collected(settings: dict, store: NoticeStore, now: datetime, minimum_minutes: int = 25) -> bool:
+    """Skip duplicate runs while allowing the 30-minute timer to collect normally."""
     sources = [s for s in settings["sources"] if s.get("kind") == "skku-cms" and not s.get("external")]
     if not sources:
         return False
