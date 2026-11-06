@@ -1,7 +1,15 @@
 import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import './styles.css';
-import './notice-app';
+import * as React from 'react';
+import { createRoot } from 'react-dom/client';
+import { createComponent } from '@lit/react';
+import { NoticeApp } from './notice-app';
 import { registerSW } from 'virtual:pwa-register';
 
-// 새 화면 코드가 배포되면 조용히 바꿔 끼운다(docs/design/platforms.md 오프라인과 갱신).
+// The React root keeps the existing screen available while it is migrated piece by piece.
+const LegacyNoticeApp = createComponent({ react: React, tagName: 'notice-app', elementClass: NoticeApp });
+const root = document.getElementById('app');
+if (!root) throw new Error('Application root is missing');
+createRoot(root).render(React.createElement(LegacyNoticeApp));
+
 registerSW({ immediate: true });
