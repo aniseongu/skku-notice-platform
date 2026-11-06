@@ -1,0 +1,22 @@
+[Unit]
+Description=SKKU notice public API
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=skku
+Group=skku
+WorkingDirectory=/opt/skku-notice-api
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/skku-notice/api.env
+ExecStart=/opt/skku-node/bin/node /opt/skku-notice-api/dist/main.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
