@@ -197,3 +197,44 @@ def test_old_body_is_rechecked_and_changes_are_recorded(monkeypatch):
     assert store.rows["school/123"]["change_kind"] == "본문"
     assert store.rows["school/123"]["changed_at"] == NOW.isoformat()
     assert store.rows["school/123"]["first_seen"] == "2026-11-01T00:00:00+09:00"
+
+
+def test_rechecks_only_oldest_body_per_board(monkeypatch):
+    from dataclasses import replace
+
+    store = MemoryStore()
+    second = replace(
+        NOTICE, article_no="124", title="다른 공지", url="https://www.skku.edu/notice?articleNo=124"
+    )
+    for notice, checked in [(NOTICE, "2026-11-01T00:00:00+09:00"), (second, "2026-11-02T00:00:00+09:00")]:
+        store.rows[f"school/{notice.article_no}"] = {
+            "id": f"school/{notice.article_no}",
+            "source_id": "school",
+            "article_no": notice.article_no,
+            "title": notice.title,
+            "category": notice.category,
+            "url": notice.url,
+            "posted_on": notice.posted_on.isoformat(),
+            "pinned": False,
+            "deadline": None,
+            "first_seen": checked,
+            "fetched_at": checked,
+            "body": "본문",
+            "body_html": "<p>본문</p>",
+            "attachments": [],
+            "images": [],
+        }
+    requested = []
+    monkeypatch.setattr(job.time, "sleep", lambda _: None)
+    monkeypatch.setattr(job, "fetch_list", lambda *_: "list")
+    monkeypatch.setattr(job, "parse_list", lambda *_: [NOTICE, second])
+    monkeypatch.setattr(job, "fetch_detail", lambda url, *_: requested.append(url) or "detail")
+    monkeypatch.setattr(
+        job,
+        "parse_detail",
+        lambda *_: SimpleNamespace(body_text="본문", body_html="<p>본문</p>", attachments=(), images=()),
+    )
+    assert job.run_collection(SETTINGS, store, NOW) == (2, 0)
+    assert requested == [NOTICE.url]
+    assert store.rows["school/123"]["change_kind"] is None
+    assert store.rows["school/124"]["fetched_at"] == "2026-11-02T00:00:00+09:00"
