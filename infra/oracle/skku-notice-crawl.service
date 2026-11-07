@@ -2,6 +2,7 @@
 Description=Collect shared SKKU notices
 Wants=network-online.target
 After=network-online.target
+OnSuccess=skku-notice-ocr.service
 
 [Service]
 Type=oneshot

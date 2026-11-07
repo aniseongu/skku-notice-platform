@@ -7,7 +7,7 @@ test('OCR results are public but only the worker may modify them', async () => {
   const db = new PGlite();
   try {
     await db.exec('create role anon; create role authenticated; create role service_role bypassrls');
-    for (const name of ['20261107030000_public_notices.sql', '20261107070000_public_ocr_cache.sql']) {
+    for (const name of ['20261107030000_public_notices.sql', '20261107070000_public_ocr_cache.sql', '20261107090000_ocr_priority.sql']) {
       await db.exec(await readFile(new URL(`../../supabase/migrations/${name}`, import.meta.url), 'utf8'));
     }
     await db.exec(`insert into platform_sources(id,name,url) values ('school','학교','https://www.skku.edu/notice');

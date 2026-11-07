@@ -117,7 +117,15 @@ def test_discovery_only_enqueues_public_image_strings_without_resetting_status()
         requests.append(request)
         if request.method == "GET":
             return httpx.Response(
-                200, json=[{"id": "school/1", "images": ["https://www.skku.edu/a.png", None]}]
+                200,
+                json=[
+                    {
+                        "id": "school/1",
+                        "images": ["https://www.skku.edu/a.png", None],
+                        "body": "",
+                        "first_seen": "2026-11-07T00:00:00Z",
+                    }
+                ],
             )
         return httpx.Response(201)
 
@@ -125,8 +133,28 @@ def test_discovery_only_enqueues_public_image_strings_without_resetting_status()
     try:
         client.discover()
         assert json.loads(requests[1].content) == [
-            {"notice_id": "school/1", "image_url": "https://www.skku.edu/a.png"}
+            {
+                "notice_id": "school/1",
+                "image_url": "https://www.skku.edu/a.png",
+                "priority": 0,
+                "notice_seen_at": "2026-11-07T00:00:00Z",
+            }
         ]
-        assert "resolution=ignore-duplicates" in requests[1].headers["prefer"]
+        assert "resolution=merge-duplicates" in requests[1].headers["prefer"]
     finally:
         client.close()
+
+
+def test_batch_reuses_worker_and_stops_when_queue_is_empty(monkeypatch):
+    store = MemoryStore()
+    results = iter(["processed", "cached", "failed", "idle"])
+    calls = []
+    monkeypatch.setattr(job.time, "sleep", lambda _seconds: None)
+
+    def run_one(_store, _agent, _now, *, discover):
+        calls.append(discover)
+        return next(results)
+
+    monkeypatch.setattr(job, "run_one", run_one)
+    assert job.run_batch(store, "test", NOW) == {"processed": 1, "cached": 1, "failed": 1, "stale": 0}
+    assert calls == [False, False, False, False]

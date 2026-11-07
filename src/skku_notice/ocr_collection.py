@@ -2,6 +2,7 @@
 
 import hashlib
 import os
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -20,7 +21,7 @@ class OCRStore(NoticeStore):
             "GET",
             "platform_notices",
             params={
-                "select": "id,images",
+                "select": "id,images,body,first_seen",
                 "order": "posted_on.desc,id.desc",
                 "limit": "100",
             },
@@ -32,15 +33,22 @@ class OCRStore(NoticeStore):
                 continue
             for url in images[:3]:
                 if isinstance(url, str) and 0 < len(url) <= 2048:
-                    rows.append({"notice_id": notice["id"], "image_url": url})
+                    rows.append(
+                        {
+                            "notice_id": notice["id"],
+                            "image_url": url,
+                            "priority": 0 if len((notice.get("body") or "").strip()) < 50 else 1,
+                            "notice_seen_at": notice.get("first_seen"),
+                        }
+                    )
         if rows:
-            # Never reset a previously successful or failed row when rediscovering it.
+            # Update priority without resetting status, hashes or attempt timestamps.
             self._request(
                 "POST",
                 "platform_notice_images",
                 params={"on_conflict": "notice_id,image_url"},
                 json=rows,
-                headers={"Prefer": "resolution=ignore-duplicates,return=minimal"},
+                headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
             )
 
     def candidate(self, cutoff: datetime) -> dict | None:
@@ -50,7 +58,7 @@ class OCRStore(NoticeStore):
             params={
                 "select": "notice_id,image_url,status",
                 "or": f"(last_attempt_at.is.null,last_attempt_at.lt.{cutoff.isoformat()})",
-                "order": "last_attempt_at.asc.nullsfirst",
+                "order": "priority.asc,last_attempt_at.asc.nullsfirst,notice_seen_at.desc.nullslast",
                 "limit": "1",
             },
         ).json()
@@ -132,9 +140,10 @@ class OCRStore(NoticeStore):
         )
 
 
-def run_one(store: OCRStore, user_agent: str, now: datetime) -> str:
-    """Discover recent images, then process at most one due image per execution."""
-    store.discover()
+def run_one(store: OCRStore, user_agent: str, now: datetime, *, discover: bool = True) -> str:
+    """Process one due image, optionally discovering recent images first."""
+    if discover:
+        store.discover()
     candidate = store.candidate(now - timedelta(hours=24))
     if not candidate:
         return "idle"
@@ -162,19 +171,33 @@ def run_one(store: OCRStore, user_agent: str, now: datetime) -> str:
     return "processed"
 
 
+def run_batch(store: OCRStore, user_agent: str, now: datetime, *, limit: int = 5) -> dict[str, int]:
+    """Process a bounded batch while reusing the initialized OCR engine."""
+    counts = {"processed": 0, "cached": 0, "failed": 0, "stale": 0}
+    store.discover()
+    for index in range(min(5, max(0, limit))):
+        if index:
+            time.sleep(1.5)
+        result = run_one(store, user_agent, now, discover=False)
+        if result == "idle":
+            break
+        counts[result] += 1
+    return counts
+
+
 def main() -> int:
     try:
         settings = yaml.safe_load(Path("config/sources.yaml").read_text(encoding="utf-8"))
         store = OCRStore(os.environ.get("SUPABASE_URL", ""), os.environ.get("SUPABASE_SECRET_KEY", ""))
         try:
-            result = run_one(store, settings["user_agent"], datetime.now(UTC))
+            counts = run_batch(store, settings["user_agent"], datetime.now(UTC))
         finally:
             store.close()
     except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError, StoreError) as exc:
         print(f"OCR worker failed: {type(exc).__name__}", flush=True)
         return 1
-    print(f"OCR worker: {result}", flush=True)
-    return int(result == "failed")
+    print(f"OCR worker: {counts}", flush=True)
+    return int(counts["failed"] > 0)
 
 
 if __name__ == "__main__":
