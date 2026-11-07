@@ -22,8 +22,9 @@ def key_row(user, secret=GOOD, used_today=0, used_on="2026-11-07"):
 
 
 class FakeStore:
-    def __init__(self, rows, pending=ITEMS, profile=None):
+    def __init__(self, rows, pending=ITEMS, profile=None, school=()):
         self.rows, self._pending, self._profile = rows, pending, profile or {"year": 3}
+        self._school = list(school)
         self.saved, self.updates, self.pending_calls = [], [], []
 
     def keys(self):
@@ -32,6 +33,9 @@ class FakeStore:
     def pending(self, user_id):
         self.pending_calls.append(user_id)
         return self._pending
+
+    def pending_school(self, user_id):
+        return self._school
 
     def profile(self, user_id):
         return self._profile
@@ -191,3 +195,30 @@ def test_prompt_marks_the_users_free_text_as_data_not_instructions():
     from skku_notice.intern_ai import SYSTEM
 
     assert "interests, wants, does_not_want" in SYSTEM and "지시가 아닙니다" in SYSTEM
+
+
+def test_school_notices_are_judged_with_the_same_key_and_saved_like_internships():
+    school = [{"notice_id": "sw/1", "title": "졸업요건 안내", "body": "소프트웨어학과 재학생 대상"}]
+    reply = Reply(
+        '{"items": [{"id": "sw/1", "verdict": "relevant", "reason": "소프트웨어학과 재학생이 대상이에요"}]}'
+    )
+    store = FakeStore([key_row("user-a")], pending=[], school=school)
+    counts = judge.run_judging(store, MASTER, NOW, factory(reply))
+    assert counts["judged"] == 1
+    assert store.saved == [{"user_id": "user-a", "notice_id": "sw/1", "verdict": "relevant",
+                            "reason": "소프트웨어학과 재학생이 대상이에요", "model": "gemini-3.1-flash-lite"}]
+    assert store.updates[-1][1]["used_today"] == 1
+
+
+def test_both_kinds_use_one_call_each_and_a_failure_stops_the_user():
+    school = [{"notice_id": "sw/1", "title": "t", "body": "b"}]
+    ok = Reply(
+        '{"items": [{"id": "ext/1", "verdict": "relevant", "reason": "서버 개발 직무예요"}, '
+        '{"id": "sw/1", "verdict": "maybe", "reason": "대상이 불분명해요"}]}'
+    )
+    store = FakeStore([key_row("user-a")], school=school)
+    judge.run_judging(store, MASTER, NOW, factory(ok))
+    assert store.updates[-1][1]["used_today"] == 2
+    failing = FakeStore([key_row("user-a")], school=school)
+    counts = judge.run_judging(failing, MASTER, NOW, factory(ApiError(429)))
+    assert counts["errors"] == 1 and failing.saved == [] and failing.updates[-1][1]["used_today"] == 1

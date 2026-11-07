@@ -13,8 +13,9 @@ from skku_notice.byok_crypto import ByokCryptoError, decrypt_api_key
 from skku_notice.gemini_client import gemini_client
 from skku_notice.intern_ai import BATCH, judge_internships
 from skku_notice.scheduled_collection import NoticeStore, StoreError
+from skku_notice.school_ai import judge_school_notices
 
-DAILY_CALLS = 30
+DAILY_CALLS = 60
 MAX_USERS_PER_RUN = 20
 # 원본은 학년·학기·재학 상태·병역 5개만 Gemini에 보냈다.
 # 사용자가 직접 적은 관심 분야 설명도 보내되 길이와 문자를 제한한다.
@@ -77,6 +78,10 @@ class JudgeStore(NoticeStore):
         body = {"p_user_id": user_id, "p_limit": BATCH}
         return self._request("POST", "rpc/list_byok_pending", json=body).json()
 
+    def pending_school(self, user_id: str) -> list[dict]:
+        body = {"p_user_id": user_id, "p_limit": BATCH}
+        return self._request("POST", "rpc/list_byok_pending_school", json=body).json()
+
     def save_judgments(self, rows: list[dict]) -> None:
         if rows:
             self._request(
@@ -122,7 +127,8 @@ def run_judging(
             counts["limited"] += 1
             continue
         pending = store.pending(user_id)
-        if not pending:
+        school = store.pending_school(user_id)
+        if not pending and not school:
             continue
         counts["users"] += 1
         try:
@@ -134,42 +140,50 @@ def run_judging(
             counts["errors"] += 1
             continue
         client = _RecordingClient(client_factory(api_key))
-        items = [{"id": p["notice_id"], "title": p["title"], "body": p["body"]} for p in pending]
         profile = store.profile(user_id)
-        found = judge_internships(items, row["model"], api_key, profile=profile, client=client)
-        usage = {"used_on": today, "used_today": used + 1}
-        if client.failed and client.error_code in REJECTED_CODES:
-            stamp = now.isoformat()
-            store.update_key(
-                user_id,
-                {**usage, "disabled_at": stamp, "error_at": stamp,
-                 "last_error": "Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요."},
-            )
-            counts["rejected"] += 1
-            continue
-        if client.failed:
-            message = (
-                "Gemini 사용 한도를 넘었어요. 잠시 뒤 다시 시도해요."
-                if client.error_code == 429
-                else "Gemini 판정을 잠시 못 했어요. 다시 시도해요."
-            )
-            store.update_key(user_id, {**usage, "last_error": message, "error_at": now.isoformat()})
-            counts["errors"] += 1
-            continue
-        store.save_judgments(
-            [
-                {
-                    "user_id": user_id,
-                    "notice_id": key,
-                    "verdict": j.verdict,
-                    "reason": j.reason[:300],
-                    "model": j.model,
-                }
-                for key, j in found.items()
-            ]
+        phases = (
+            (pending, judge_internships),
+            (school, judge_school_notices),
         )
-        store.update_key(user_id, {**usage, "last_error": None, "error_at": None})
-        counts["judged"] += len(found)
+        for batch, judge in phases:
+            if not batch or used >= DAILY_CALLS:
+                continue
+            items = [{"id": p["notice_id"], "title": p["title"], "body": p["body"]} for p in batch]
+            found = judge(items, row["model"], api_key, profile=profile, client=client)
+            used += 1
+            usage = {"used_on": today, "used_today": used}
+            if client.failed and client.error_code in REJECTED_CODES:
+                stamp = now.isoformat()
+                store.update_key(
+                    user_id,
+                    {**usage, "disabled_at": stamp, "error_at": stamp,
+                     "last_error": "Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요."},
+                )
+                counts["rejected"] += 1
+                break
+            if client.failed:
+                message = (
+                    "Gemini 사용 한도를 넘었어요. 잠시 뒤 다시 시도해요."
+                    if client.error_code == 429
+                    else "Gemini 판정을 잠시 못 했어요. 다시 시도해요."
+                )
+                store.update_key(user_id, {**usage, "last_error": message, "error_at": now.isoformat()})
+                counts["errors"] += 1
+                break
+            store.save_judgments(
+                [
+                    {
+                        "user_id": user_id,
+                        "notice_id": key,
+                        "verdict": j.verdict,
+                        "reason": j.reason[:300],
+                        "model": j.model,
+                    }
+                    for key, j in found.items()
+                ]
+            )
+            store.update_key(user_id, {**usage, "last_error": None, "error_at": None})
+            counts["judged"] += len(found)
     return counts
 
 
