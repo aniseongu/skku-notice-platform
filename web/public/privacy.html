@@ -7,13 +7,20 @@
 <meta name="description" content="성공(성균관대 공지 알림 서비스)이 어떤 정보를 어떻게 쓰고 지우는지 알려 드려요.">
 <link rel="icon" href="favicon.svg">
 <style>
-  :root { color-scheme: light dark; --bg: #f6f8f7; --text: #1c2b26; --muted: #4e615a; --line: #d9e1de; --accent: #124532; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #101816; --text: #e8f0ec; --muted: #a9bfb6; --line: #2c3f38; --accent: #7fd1ae; } }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.75 "Pretendard Variable", Pretendard, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  /* 색은 앱(src/styles.css)의 토큰과 같은 값이다. 앱에서 고른 화면 모드도 따른다. */
+  :root { color-scheme: light dark; --h: 163;
+    --bg: light-dark(oklch(0.972 0.004 var(--h)), oklch(0.17 0.006 var(--h)));
+    --text: light-dark(oklch(0.24 0.012 var(--h)), oklch(0.94 0.005 var(--h)));
+    --muted: light-dark(oklch(0.45 0.014 var(--h)), oklch(0.78 0.01 var(--h)));
+    --line: light-dark(oklch(0.912 0.006 var(--h)), oklch(0.3 0.008 var(--h)));
+    --accent: light-dark(oklch(0.4 0.075 var(--h)), oklch(0.8 0.1 var(--h))); }
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
+  body { margin: 0; background: var(--bg); color: var(--text); word-break: keep-all; overflow-wrap: break-word; font: 16px/1.75 "Pretendard Variable", Pretendard, system-ui, -apple-system, "Segoe UI", sans-serif; }
   main { max-width: 720px; margin: 0 auto; padding: 32px 20px 64px; }
   h1 { font-size: 26px; line-height: 1.35; margin: 0 0 4px; }
   h2 { font-size: 18px; margin: 36px 0 8px; padding-top: 20px; border-top: 1px solid var(--line); }
-  p, li { color: var(--text); }
+  p, li { color: var(--text); text-wrap: pretty; }
   .meta, .note { color: var(--muted); font-size: 14px; }
   ul { padding-left: 20px; } li { margin: 4px 0; }
   table { width: 100%; border-collapse: collapse; font-size: 15px; margin: 8px 0; }
@@ -22,6 +29,7 @@
   a { color: var(--accent); }
   .back { display: inline-block; margin-bottom: 20px; font-size: 14px; }
 </style>
+<script>try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
 </head>
 <body>
 <main>

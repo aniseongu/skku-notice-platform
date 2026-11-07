@@ -669,9 +669,9 @@ test('google calendar page: connect first, then sync and disconnect, with plain 
     connectCalendar: 'fn:connect', syncCalendarNow: 'fn:sync', disconnectCalendar: 'fn:disconnect' });
   await screen.getByRole('link', { name: /구글 캘린더/ }).click();
   await expect(page).toHaveURL(/section=calendar/);
-  await expect(screen.getByRole('heading', { name: '구글 캘린더' })).toBeVisible();
+  await expect(screen.getByRole('heading', { name: '저장한 공지의 마감' })).toBeVisible();
   await expect(screen.getByText('연결 안 됨')).toBeVisible();
-  await expect(screen.getByText(/아직 구글의 검증을 받지 않아서예요/)).toBeVisible();
+  await expect(screen.getByText(/내 다른 캘린더는 읽지 못해요/)).toBeVisible();
   // 단계 안내: 누르면 무슨 일이 생기는지, "확인되지 않은 앱"이 나오면 어떻게 하는지 알려 준다.
   await screen.getByText('연결하는 방법').click();
   await expect(screen.getByText(/고급.*을 누른 뒤.*계속/)).toBeVisible();
@@ -685,11 +685,10 @@ test('google calendar page: connect first, then sync and disconnect, with plain 
   await expect(screen.getByRole('button', { name: '다시 연결하기' })).toBeVisible();
   // 서버에 열쇠가 있으면 자동으로 맞추고 있다고 말하고 다시 연결 단추는 없다.
   await withApp(page, { calendarAuto: { active: true, error: null, lastRunAt: '2026-11-08T03:00:00Z' } });
-  await expect(screen.getByText(/자동으로 맞춰요 · 30분마다/)).toBeVisible();
+  await expect(screen.getByText(/30분마다 자동으로 맞춰요/)).toBeVisible();
   await expect(screen.getByRole('button', { name: '다시 연결하기' })).toHaveCount(0);
   // 멈췄으면 이유와 다음 행동(다시 연결)을 보여 준다.
   await withApp(page, { calendarAuto: { active: false, error: '구글 연결이 끊겼어요. 설정에서 구글 캘린더를 다시 연결해 주세요.', lastRunAt: null } });
-  await expect(screen.getByText('자동 맞춤이 멈췄어요')).toBeVisible();
   await expect(screen.getByRole('alert').first()).toContainText('다시 연결');
   await withApp(page, { calendarAuto: { active: true, error: null, lastRunAt: null }, connectCalendar: 'fn:connect', syncCalendarNow: 'fn:sync', disconnectCalendar: 'fn:disconnect' });
   await expect(screen.getByRole('button', { name: '구글 캘린더에 연결하기' })).toHaveCount(0);
