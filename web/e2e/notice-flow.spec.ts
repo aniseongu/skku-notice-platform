@@ -66,6 +66,8 @@ const calls = (page: import('@playwright/test').Page) => page.evaluate(() => (wi
 const settingsAt = async (page: import('@playwright/test').Page, query = '') => {
   await page.goto(`/?view=settings${query}&api=sample/api/v1`);
   await page.locator('platform-settings-screen').waitFor();
+  // 앱이 시작할 때 서버 기능 유무를 네트워크로 확인한다. 그 응답이 늦게 와서 테스트가 넣은 상태를 덮어쓰지 않게 기다린다.
+  await page.waitForLoadState('networkidle');
 };
 
 test('settings hub opens each page in the app, back works and the theme can be changed', async ({ page }) => {
@@ -181,31 +183,68 @@ test('profile page edits year and status in place and can reopen the first-run s
   expect(recorded[2]).toEqual(['open']);
 });
 
-test('Gemini key page registers once, never shows the key again and hides the key box when unavailable', async ({ page }) => {
+test('connection keys page follows the original rows: Gemini key flow, iCampus token not offered yet, no profile fields', async ({ page }) => {
   await settingsAt(page, '&keys=1');
   const screen = page.locator('platform-settings-screen');
-  await withApp(page, { authUserId: 'account-a', byokOn: false, registerKey: 'fn:register', removeKey: 'fn:remove', saveProfile: 'fn:profile', profileStatus: 'ready', onboardingDismissed: true });
-  await expect(screen.getByRole('heading', { name: 'Gemini 키' })).toHaveCount(0);
-  await expect(screen.getByRole('heading', { name: '지원 자격 확인용 정보' })).toBeVisible();
+  await withApp(page, { authUserId: 'account-a', byokOn: false, registerKey: 'fn:register', removeKey: 'fn:remove', profileStatus: 'ready', onboardingDismissed: true });
+  // 서버 기능이 아직 없을 때도 줄은 보이고 이유를 알려 준다.
+  await expect(screen.getByRole('heading', { name: '연결 키' })).toBeVisible();
+  await expect(screen.locator('.setting', { hasText: 'Gemini 키' }).getByText('준비 중')).toBeVisible();
+  await expect(screen.locator('.setting', { hasText: '아이캠퍼스 토큰' }).getByText('준비 중')).toBeVisible();
+  await expect(screen.getByLabel('Gemini 키', { exact: true })).toHaveCount(0);
+  // 학기·병역 같은 프로필은 내 정보에서 바꾼다. 연결 키 쪽에는 두지 않는다.
+  await expect(screen.getByRole('radio', { name: '2학기' })).toHaveCount(0);
+  await expect(screen.getByRole('radio', { name: '복무 전' })).toHaveCount(0);
   await withApp(page, { byokOn: true, byokLoading: false, byokStatus: null });
-  const button = screen.getByRole('button', { name: '키 등록하기' });
-  await expect(button).toBeDisabled();
+  await expect(screen.getByText('미설정')).toBeVisible();
+  await screen.getByRole('button', { name: 'Gemini 키 입력하기' }).click();
+  const save = screen.getByRole('button', { name: '저장하기' });
+  await expect(save).toBeDisabled();
   const key = `AIza${'D'.repeat(35)}`;
-  const input = screen.getByLabel('Gemini API 키');
+  const input = screen.getByLabel('Gemini 키', { exact: true });
   await expect(input).toHaveAttribute('type', 'password');
   await input.fill(key);
-  await button.click();
+  await screen.getByRole('button', { name: '보기' }).click();
+  await expect(input).toHaveAttribute('type', 'text');
+  await screen.getByRole('button', { name: '숨기기' }).click();
+  await screen.getByText('받는 방법').click();
+  await expect(screen.getByRole('link', { name: /Google AI Studio/ })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
+  await save.click();
   expect(await calls(page)).toEqual([['register', key]]);
-  await screen.getByRole('radio', { name: '2학기' }).click();
-  expect((await calls(page)).at(-1)?.[0]).toBe('profile');
   await withApp(page, { byokStatus: { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 } });
-  await expect(screen.getByText('등록된 키 ····DDDD')).toBeVisible();
+  await expect(screen.getByText('저장됨 ····DDDD')).toBeVisible();
   expect(await screen.innerText()).not.toContain(key);
-  await expect(screen.getByLabel('Gemini API 키')).toHaveCount(0);
+  await expect(screen.getByLabel('Gemini 키', { exact: true })).toHaveCount(0);
   await withApp(page, { byokStatus: { keyHint: 'DDDD', model: 'm', disabled: true, lastError: 'Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요.', usedToday: 0 } });
   await expect(screen.getByRole('alert')).toContainText('다시 등록');
-  await screen.getByRole('button', { name: '키 지우기' }).click();
+  await screen.getByRole('button', { name: 'Gemini 키 지우기' }).click();
   expect(await calls(page)).toEqual([['remove']]);
+});
+
+test('settings items live in the right place: list scope under display, profile fields together, shortcuts jump to the page', async ({ page }) => {
+  await settingsAt(page);
+  const screen = page.locator('platform-settings-screen');
+  await expect(screen.getByRole('radiogroup', { name: '목록 보기' })).toHaveCount(0);
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, subscriptionsOnly: false });
+  // 목록 보기는 알림이 아니라 화면 설정이다.
+  const view = screen.locator('section', { has: page.getByRole('heading', { name: '화면' }) });
+  await expect(view.getByRole('radiogroup', { name: '목록 보기' })).toBeVisible();
+  await view.getByRole('radio', { name: '받는 게시판만' }).click();
+  expect(await page.evaluate(() => (document.querySelector('notice-app') as unknown as { subscriptionsOnly: boolean }).subscriptionsOnly)).toBe(true);
+  await screen.getByRole('link', { name: /알림/ }).first().click();
+  await expect(screen.getByRole('radiogroup', { name: '목록 보기' })).toHaveCount(0);
+  // 학년·학기·재학 상태·병역은 내 정보 한 곳에 있다.
+  await screen.getByRole('link', { name: '설정으로' }).click();
+  await screen.getByRole('link', { name: /내 정보/ }).click();
+  for (const name of ['학년', '학기', '재학 상태', '병역']) await expect(screen.getByRole('radiogroup', { name })).toBeVisible();
+  // 사이드바의 "키워드 추가하기"는 설정 첫 쪽이 아니라 키워드 쪽으로 바로 간다.
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.locator('.sidebar .side-item.add:visible, .chip-add:visible').first().click();
+  await expect(page).toHaveURL(/section=keywords/);
+  await expect(page.locator('platform-settings-screen').getByRole('textbox', { name: '새 키워드' })).toBeVisible();
+  await page.goBack();
+  await expect(page).not.toHaveURL(/view=settings/);
 });
 
 test('first-run setup: choices only, department list follows the college, double major is optional and the draft is what gets saved', async ({ page }) => {
@@ -299,4 +338,59 @@ test('first-run setup can be skipped and then stays out of the way; it can be re
   await expect(dialog.getByRole('button', { name: '닫기' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
+});
+
+test('settings close button leaves settings from any page and the back arrow goes up one level', async ({ page }, testInfo) => {
+  const mobile = testInfo.project.name === 'mobile';
+  const screen = page.locator('platform-settings-screen');
+  const list = page.locator('notice-rows-screen a.row').first();
+  const openSettings = () => (mobile ? page.getByRole('button', { name: '설정', exact: true }).click() : page.locator('.side-foot .side-item').click());
+  // 닫기: 데스크톱은 X, 모바일은 첫 쪽에서의 뒤로 가기 화살표. 둘 다 하위 쪽에 깊이 들어갔어도 설정 밖으로 한 번에 나간다.
+  const close = () => page.getByRole('button', { name: mobile ? '설정 닫기' : '설정 닫기', exact: true }).first();
+  await page.goto('/?api=sample/api/v1');
+  await list.waitFor();
+  await openSettings();
+  await screen.getByRole('link', { name: /알림/ }).first().click();
+  await expect(page).toHaveURL(/section=notifications/);
+  if (mobile) {
+    await page.getByRole('button', { name: '설정으로 돌아가기' }).click();     // 한 단계 위
+    await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
+    await page.getByRole('button', { name: '설정 닫기' }).click();            // 첫 쪽에서는 닫기
+  } else {
+    await close().click();                                                     // X는 한 번에 닫는다
+  }
+  await expect(page).not.toHaveURL(/view=settings/);
+  await expect(list).toBeVisible();
+  await expect(screen).toHaveCount(0);
+  // 하위 쪽을 두 번 거쳐도(알림 → 설정으로 → 키워드) 닫으면 설정 밖이다.
+  await openSettings();
+  await screen.getByRole('link', { name: /관심 키워드/ }).click();
+  await screen.getByRole('link', { name: '설정으로' }).click();
+  await screen.getByRole('link', { name: /알림/ }).first().click();
+  if (mobile) {
+    await page.getByRole('button', { name: '설정으로 돌아가기' }).click();
+    await page.getByRole('button', { name: '설정 닫기' }).click();
+  } else {
+    await close().click();
+  }
+  await expect(page).not.toHaveURL(/view=settings/);
+  await expect(list).toBeVisible();
+  // 주소로 바로 들어온 경우에도 닫으면 목록으로 간다.
+  await page.goto('/?view=settings&section=keywords&api=sample/api/v1');
+  await screen.waitFor();
+  if (mobile) {
+    await page.getByRole('button', { name: '설정으로 돌아가기' }).click();
+    await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
+    await page.getByRole('button', { name: '설정 닫기' }).click();
+  } else {
+    await close().click();
+  }
+  await expect(page).not.toHaveURL(/view=settings/);
+  await expect(list).toBeVisible();
+  // Esc도 같다.
+  await openSettings();
+  await screen.getByRole('link', { name: /알림/ }).first().click();
+  await page.keyboard.press('Escape');
+  await expect(page).not.toHaveURL(/view=settings/);
+  await expect(list).toBeVisible();
 });

@@ -5,7 +5,7 @@ import { type IconName, type Notice, boardName, deadlineGroup, deadlinePassed, p
 import { APP_NAME } from './brand';
 import { authClient } from './auth';
 import { keywordCounts } from './keyword-counts';
-import { type AppController, STALE_MS, TABS, remember, settingsTitle } from './app-controller';
+import { type AppController, STALE_MS, TABS, remember, settingsSubtitle, settingsTitle } from './app-controller';
 import type { UserProfile } from './profile';
 import { Onboarding } from './onboarding';
 import './platform-settings';
@@ -80,7 +80,7 @@ export function NoticeShell({ app }: { app: AppController }) {
           {app.keywords.map((word) => <SideItem key={word} label={word} count={keywordTotals.counts[word]}
             active={app.keyword === word && !settings} onClick={() => app.setKeyword(app.keyword === word ? null : word)}
             ariaLabel={`${word}, 공지 ${keywordTotals.counts[word]}개`} />)}
-          <button type="button" className="side-item add" onClick={() => app.setView('settings')}>{app.keywords.length ? '키워드 관리하기' : '키워드 추가하기'}</button>
+          <button type="button" className="side-item add" onClick={() => app.openSettings('keywords')}>{app.keywords.length ? '키워드 관리하기' : '키워드 추가하기'}</button>
         </SideGroup>
         <SideGroup app={app} id="boards" title={app.tab() === 'intern' ? '인턴 공고 사이트' : '게시판'} count={app.tabSources().length}>
           {boardChoices(app).map((b) => <SideItem key={b.id} label={b.label} count={null} active={app.activeBoard() === b.id && !settings}
@@ -96,11 +96,11 @@ export function NoticeShell({ app }: { app: AppController }) {
         {reading ? <ReadingView app={app} notice={reading} /> : <>
           <div className="navigation-head">
             <header className={`pane-head topbar glass ${settings ? '' : 'feed-topbar'}`}>
-              {settings ? <button type="button" className="icon-button narrow-only back" aria-label="설정 닫기" onClick={app.leaveSettings}><Icon name="back" /></button> : null}
+              {settings ? <button type="button" className="icon-button narrow-only back" aria-label={app.settingsSection ? '설정으로 돌아가기' : '설정 닫기'} onClick={app.backSettings}><Icon name="back" /></button> : null}
               {settings ? null : <Brand className="brand-mark narrow-only" />}
               <div className="topbar-text">
                 <h1>{title}</h1>
-                {settings ? <p className="updated">알림과 연결을 정해요</p> : <UpdatedLine app={app} count={list.length} />}
+                {settings ? <p className="updated">{settingsSubtitle()}</p> : <UpdatedLine app={app} count={list.length} />}
               </div>
               {settings ? null : <>
                 <label className="search wide-only"><Icon name="search" />
@@ -114,7 +114,7 @@ export function NoticeShell({ app }: { app: AppController }) {
               </>}
               {settings ? null : <button type="button" className="icon-button narrow-only" aria-label="설정" onClick={() => app.setView('settings')}><GearIcon /></button>}
               {settings ? <button type="button" className="icon-button wide-only" aria-label="설정 닫기" title="설정 닫기 (Esc)"
-                aria-keyshortcuts="Escape" onClick={app.leaveSettings}><Icon name="close" /></button> : null}
+                aria-keyshortcuts="Escape" onClick={app.closeSettings}><Icon name="close" /></button> : null}
             </header>
           </div>
 
@@ -128,7 +128,7 @@ export function NoticeShell({ app }: { app: AppController }) {
                 {app.keywords.map((word) => <button type="button" className="chip" key={word} aria-pressed={app.keyword === word}
                   aria-label={`${word}, 공지 ${keywordTotals.counts[word]}개`}
                   onClick={() => app.setKeyword(app.keyword === word ? null : word)}>{word} {keywordTotals.counts[word]}</button>)}
-                <button type="button" className="chip-add" onClick={() => app.setView('settings')}><Icon name="plus" />키워드 추가하기</button>
+                <button type="button" className="chip-add" onClick={() => app.openSettings('keywords')}><Icon name="plus" />키워드 추가하기</button>
               </div>
             </div>
             <ViewFilters app={app} />
@@ -241,8 +241,8 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
   if (!list.length) {
     const subscribed = app.tab() === 'all' && app.authUserId && app.subscriptionsOnly;
     if (subscribed && app.subscriptionsLoading) return <p className="detail-note" role="status">구독한 게시판을 불러오고 있어요.</p>;
-    if (subscribed && app.subscriptionsError) return <Empty title="구독을 불러오지 못했어요" body="설정에서 다시 불러와 주세요" action="설정 열기" onAction={() => app.setView('settings')} />;
-    if (subscribed && !app.subscriptions.length) return <Empty title="구독한 게시판이 없어요" body="설정에서 게시판을 선택해 주세요" action="설정 열기" onAction={() => app.setView('settings')} />;
+    if (subscribed && app.subscriptionsError) return <Empty title="구독을 불러오지 못했어요" body="설정에서 다시 불러와 주세요" action="설정 열기" onAction={() => app.openSettings('notifications')} />;
+    if (subscribed && !app.subscriptions.length) return <Empty title="구독한 게시판이 없어요" body="설정에서 게시판을 선택해 주세요" action="설정 열기" onAction={() => app.openSettings('notifications')} />;
     const picker = <div className="group-head empty-head"><span></span><BoardSelect app={app} /></div>;
     const note = (() => {
       if (app.query) return <Empty title={`'${app.query}'에 맞는 공지가 없어요`} body="다른 단어로 찾아보세요" action="검색어 지우기" onAction={() => { app.query = ''; }} />;

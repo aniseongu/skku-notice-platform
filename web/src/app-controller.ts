@@ -47,6 +47,17 @@ export function settingsSectionFromUrl(): string | null {
   return section && ['notifications', 'keywords', 'profile'].includes(section) ? section : null;
 }
 
+/** 설정 머리의 부제. 쪽마다 그 쪽에서 하는 일을 말한다. */
+export function settingsSubtitle(): string {
+  switch (settingsSectionFromUrl()) {
+    case 'notifications': return '받을 게시판과 이 기기 알림을 정해요';
+    case 'keywords': return '관심 있는 공지를 골라 봐요';
+    case 'profile': return '전공과 학년을 알려 주세요';
+    case 'keys': return '키와 지원 자격 정보를 관리해요';
+    default: return '알림과 연결을 정해요';
+  }
+}
+
 export function settingsTitle(): string {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return '연결 키';
@@ -837,29 +848,60 @@ export class AppController extends Reactive {
     this.sortMenuOpen = false;
     if (view !== 'settings') remember('tab', view);
     // 주소도 보기와 맞춘다. 설정은 기록에 쌓아 뒤로 가기로 닫히고, 탭은 바꿔 써서 새로고침해도 같은 보기가 열린다.
-    if (entering) history.pushState({ view: 'settings' }, '', `${location.pathname}?view=settings`);
+    if (entering) history.pushState({ view: 'settings', depth: 1 }, '', `${location.pathname}?view=settings`);
     else if (view !== 'settings') history.replaceState(null, '', `${location.pathname}?tab=${view}`);
     this.selectedId = null;
     window.scrollTo({ top: 0 });
     qsel('.list-pane')?.scrollTo({ top: 0 });
   }
 
-  /** 설정의 하위 쪽을 연다. 주소도 원본과 같게 바꿔서 뒤로 가기와 새로고침이 그대로 동작한다. */
-  openSettingsSection(section: string | null) {
+  /** 설정 쪽 이동으로 쌓은 기록의 칸 수. 설정을 한 번에 닫을 때 그만큼 되돌린다. 바로 설정 주소로 들어왔으면 0이다. */
+  private settingsDepth(): number {
+    return history.state?.view === 'settings' ? Number(history.state.depth) || 1 : 0;
+  }
+
+  private settingsUrl(section: string | null): string {
     const query = section === 'keys' ? '?view=settings&keys=1' : section ? `?view=settings&section=${section}` : '?view=settings';
-    history.pushState({ view: 'settings' }, '', `${location.pathname}${query}`);
+    return `${location.pathname}${query}`;
+  }
+
+  /** 설정의 하위 쪽을 연다. 주소도 원본과 같게 바꿔서 뒤로 가기와 새로고침이 그대로 동작한다. null이면 한 단계 위(첫 쪽)로 간다. */
+  openSettingsSection(section: string | null) {
+    if (section === null) { this.backSettings(); return; }
+    history.pushState({ view: 'settings', depth: this.settingsDepth() + 1 }, '', this.settingsUrl(section));
     this.settingsSection = section;
     window.scrollTo({ top: 0 });
   }
 
-  // 설정을 닫으면 들어오기 전에 보던 보기로 돌아간다. 하위 쪽에서는 먼저 설정 첫 쪽으로 돌아간다.
-  leaveSettings = () => {
-    if (this.settingsSection) { this.openSettingsSection(null); return; }
-    // 이 화면에서 설정을 열었으면 기록을 하나 되돌린다(주소에서 view=settings가 빠진다). 바로 설정 주소로 들어왔으면 바꿔 쓴다.
-    if (history.state?.view === 'settings') { history.back(); return; }
+  /** 어느 화면에서든 설정의 해당 쪽으로 바로 간다(키워드 관리하기, 게시판 고르기 같은 단축). */
+  openSettings(section: string | null) {
+    if (this.view === 'settings') { this.openSettingsSection(section); return; }
+    this.setView('settings');
+    if (section) {
+      history.replaceState({ view: 'settings', depth: 1 }, '', this.settingsUrl(section));
+      this.settingsSection = section;
+    }
+  }
+
+  /** 뒤로 가기 화살표와 "설정으로": 하위 쪽에서는 첫 쪽으로 한 단계, 첫 쪽에서는 설정을 닫는다. */
+  backSettings = () => {
+    if (!this.settingsSection) { this.closeSettings(); return; }
+    if (this.settingsDepth() > 1) { history.back(); return; }
+    history.replaceState({ view: 'settings', depth: 1 }, '', this.settingsUrl(null));
+    this.settingsSection = null;
+    window.scrollTo({ top: 0 });
+  };
+
+  /** X와 Esc: 어느 쪽에 있든 설정을 한 번에 닫고 들어오기 전에 보던 보기로 돌아간다. */
+  closeSettings = () => {
+    const depth = this.settingsDepth();
+    if (depth > 0) { history.go(-depth); return; }
     const last = normalizeTab(remember('tab'));
+    this.settingsSection = null;
     this.setView(isTab(last) ? last : 'all');
   };
+
+  leaveSettings = this.closeSettings;
 
   onPopState = () => {
     this.openedId = typeof history.state?.notice === 'string' ? history.state.notice : null;
@@ -933,6 +975,8 @@ export class AppController extends Reactive {
 
   onKey(event: KeyboardEvent) {
     const target = event.target as Element | null;
+    // 첫 로그인 설정 창이 떠 있으면 Esc는 그 창이 처리한다(뒤쪽 화면이 같이 닫히지 않게).
+    if (this.needsOnboarding()) return;
     if (event.key === 'Escape' && this.sortMenuOpen) {
       event.preventDefault();
       this.sortMenuOpen = false;

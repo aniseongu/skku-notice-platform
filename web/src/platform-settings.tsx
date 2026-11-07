@@ -136,12 +136,16 @@ function Overview({ model }: { model: SettingsModel }) {
           : <button type="button" className="solid-button" disabled={model.authBusy} onClick={model.signIn}>Google 계정으로 계속하기</button>}
         {model.authError ? <p className="field-note error" role="alert">{model.authError}</p> : null}
       </Setting>
-      {model.userId ? <SettingsLink model={model} label="연결 키" help="Gemini 키와 지원 자격 정보" section="keys" /> : null}
+      {model.userId ? <SettingsLink model={model} label="연결 키" help="Gemini 키와 아이캠퍼스 토큰" section="keys" /> : null}
     </Section>
     <Section id="s-view" title="화면">
       <Setting name="화면 모드" help="자동은 휴대폰과 PC 설정을 따라요">
         <Choice label="화면 모드" options={THEMES} value={model.theme} onPick={model.setTheme} />
       </Setting>
+      {model.userId ? <Setting name="목록 보기" help="성대 공지 탭에 보일 공지를 정해요">
+        <Choice label="목록 보기" value={model.subscriptionsOnly ? 'mine' : 'all'} disabled={model.loading || !!model.error}
+          options={[['all', '모든 게시판'], ['mine', '받는 게시판만']]} onPick={(value) => model.setSubscriptionsOnly(value === 'mine')} />
+      </Setting> : null}
       {model.canInstall ? <Setting name="앱 설치" help="바탕화면이나 홈 화면에서 바로 열어요">
         <button type="button" className="ghost-button" onClick={model.install}>앱으로 설치하기</button>
       </Setting> : null}
@@ -216,7 +220,12 @@ function Notifications({ model }: { model: SettingsModel }) {
         </>}
       </Setting>
       <Setting name="받을 공지" help="알림을 보내는 기준이에요">
-        <p className="field-note">받는 게시판의 새 공지를 알려요. 관심 키워드와 맞는 공지는 소리로, 나머지는 조용히 알려요. 학교가 고친 중요한 글은 한 번 더 알려요. 인턴 공고는 내 Gemini 키가 지원할 만하다고 판단한 공고만 알려요</p>
+        <ul className="rule-list">
+          <li>받는 게시판의 새 공지를 알려요</li>
+          <li>관심 키워드와 맞는 공지는 소리로, 나머지는 조용히 알려요</li>
+          <li>학교가 고친 중요한 글은 한 번 더 알려요</li>
+          <li>인턴 공고는 내 Gemini 키가 지원할 만하다고 본 것만 알려요</li>
+        </ul>
       </Setting>
     </Section>
     <Section id="s-boards" title="받을 게시판">
@@ -225,10 +234,6 @@ function Notifications({ model }: { model: SettingsModel }) {
           {model.error ? <><p className="field-note error" role="alert">{model.error}</p>
             <button type="button" className="ghost-button" onClick={model.retry}>다시 불러오기</button></> : null}
           <BoardGroups model={model} />
-        </Setting>
-        <Setting name="목록 보기" help="성대 공지 탭에 보일 공지를 정해요">
-          <Choice label="목록 보기" value={model.subscriptionsOnly ? 'mine' : 'all'} disabled={model.loading || !!model.error}
-            options={[['all', '모든 게시판'], ['mine', '받는 게시판만']]} onPick={(value) => model.setSubscriptionsOnly(value === 'mine')} />
         </Setting>
       </>}
     </Section>
@@ -279,6 +284,11 @@ function Profile({ model }: { model: SettingsModel }) {
           options={YEARS.map((year) => [year, year === 5 ? '5학년 이상' : `${year}학년`] as const)} onPick={(year) => save({ year })} /></Setting>
         <Setting name="재학 상태"><Choice label="재학 상태" value={profile.enrollmentStatus} disabled={model.profileStatus !== 'ready'}
           options={ENROLLMENT.map((value) => [value, value] as const)} onPick={(enrollmentStatus) => save({ enrollmentStatus })} /></Setting>
+        <Setting name="학기" help="인턴 공고의 지원 자격을 가릴 때만 써요. 이름이나 학번은 받지 않아요">
+          <Choice label="학기" value={profile.semester} disabled={model.profileStatus !== 'ready'}
+            options={SEMESTERS.map((value) => [value, `${value}학기`] as const)} onPick={(semester) => save({ semester })} /></Setting>
+        <Setting name="병역"><Choice label="병역" value={profile.militaryService} disabled={model.profileStatus !== 'ready'}
+          options={MILITARY.map((value) => [value, value] as const)} onPick={(militaryService) => save({ militaryService })} /></Setting>
         {model.profileMessage ? <p className="field-note ok" role="status">{model.profileMessage}</p> : null}
         {model.profileError ? <p className="field-note error" role="alert">{model.profileError}</p> : null}
         {model.profileStatus === 'unavailable' ? <p className="field-note">지금은 내 정보를 불러올 수 없어요. 잠시 뒤 다시 열어 주세요</p> : null}
@@ -287,38 +297,78 @@ function Profile({ model }: { model: SettingsModel }) {
   </div>;
 }
 
-function Keys({ model }: { model: SettingsModel }) {
-  const { profile, byok } = model;
+function Guide({ label, steps }: { label: string; steps: ReactNode[] }) {
+  return <details className="connection-manual"><summary>{label}</summary><ol className="steps">{steps.map((step, index) => <li key={index}>{step}</li>)}</ol></details>;
+}
+
+const ext = (href: string, text: string) => <a href={href} target="_blank" rel="noopener noreferrer">{text}</a>;
+
+/** 키 한 줄: 저장 상태와 입력하기·수정하기, 눌러서 펼치는 입력칸, 받는 방법 안내(원본의 연결 키 줄과 같은 모양). */
+function KeyRow({ name, help, state, children, guide }: { name: string; help: string; state: string; children?: ReactNode; guide?: ReactNode }) {
+  return <Setting name={name} help={help}>
+    <div className="connection-summary"><span className="setting-state">{state}</span>{children}</div>
+    {guide}
+  </Setting>;
+}
+
+function GeminiRow({ model }: { model: SettingsModel }) {
+  const { byok } = model;
+  const [editing, setEditing] = useState(false);
+  const [shown, setShown] = useState(false);
   const [apiKey, setApiKey] = useState('');
-  useEffect(() => { if (byok?.status) setApiKey(''); }, [byok?.status?.keyHint]);
-  const save = (patch: Partial<UserProfile>) => model.saveProfile({ ...profile, ...patch });
+  // 저장이 끝나 상태가 바뀌면 입력칸을 닫고 비운다. 키는 이 입력칸 밖에 남기지 않는다.
+  useEffect(() => { if (byok?.status) { setApiKey(''); setEditing(false); setShown(false); } }, [byok?.status?.keyHint]);
+  const guide = <Guide label="받는 방법" steps={[
+    <>{ext('https://aistudio.google.com/apikey', 'Google AI Studio의 API 키 화면')}을 열고 Google 계정으로 로그인해요</>,
+    '"API 키 만들기"를 누르고, 프로젝트를 고르라고 하면 새 프로젝트를 만들어요',
+    '만들어진 키를 붙여 넣고 "저장하기"를 눌러요. 저장하면 Gemini에 확인한 뒤 암호화해 서버에만 보관해요',
+    '무료 등급은 보낸 내용이 Google 제품 개선에 쓰일 수 있어요. 키는 나에게 맞는 인턴 공고를 고르는 데만 써요',
+  ]} />;
+  const help = '링커리어와 자소설닷컴의 인턴 공고 중 나에게 맞는 공고만 알려드리는 데 써요';
+  if (!byok?.available) {
+    return <KeyRow name="Gemini 키" help={help} state="준비 중" guide={null}>
+      <span className="field-note">키를 받는 기능을 서버에 설치하는 중이에요. 끝나면 여기에서 입력할 수 있어요</span>
+    </KeyRow>;
+  }
+  const state = byok.loading ? '확인 중' : byok.status ? `저장됨 ····${byok.status.keyHint}${byok.status.disabled ? ' (사용 중지됨)' : ''}` : '미설정';
+  return <Setting name="Gemini 키" help={help}>
+    {editing ? <>
+      <div className="inline">
+        <input className="input" type={shown ? 'text' : 'password'} autoComplete="off" spellCheck={false} aria-label="Gemini 키"
+          placeholder="AIza로 시작하는 키" value={apiKey} disabled={byok.busy} onChange={(event) => setApiKey(event.currentTarget.value.trim())} />
+        <button type="button" className="ghost-button" aria-pressed={shown} disabled={byok.busy} onClick={() => setShown(!shown)}>{shown ? '숨기기' : '보기'}</button>
+      </div>
+      <div className="inline">
+        <button type="button" className="solid-button" disabled={byok.busy || !apiKey} onClick={() => byok.register(apiKey)}>{byok.busy ? '확인하고 있어요' : '저장하기'}</button>
+        <button type="button" className="ghost-button" disabled={byok.busy} onClick={() => { setEditing(false); setApiKey(''); setShown(false); }}>닫기</button>
+      </div>
+      {byok.error ? <p className="field-note error" role="alert">{byok.error}</p> : null}
+      {guide}
+    </> : <>
+      <div className="connection-summary"><span className="setting-state">{state}</span>
+        <button type="button" className="text-button key-action" aria-label={`Gemini 키 ${byok.status ? '수정하기' : '입력하기'}`} disabled={byok.loading} onClick={() => setEditing(true)}>{byok.status ? '수정하기' : '입력하기'}</button>
+        {byok.status ? <button type="button" className="text-button key-action" aria-label="Gemini 키 지우기" disabled={byok.busy} onClick={() => byok.remove()}>지우기</button> : null}
+      </div>
+      {byok.status?.lastError ? <p className="field-note error" role="alert">{byok.status.lastError}</p> : null}
+      {byok.error ? <p className="field-note error" role="alert">{byok.error}</p> : null}
+    </>}
+  </Setting>;
+}
+
+function Keys({ model }: { model: SettingsModel }) {
   if (!model.userId) return <div className="settings"><Back model={model} /><Section id="s-keys" title="연결 키"><LoginNote model={model} what="연결 키" /></Section></div>;
   return <div className="settings">
     <Back model={model} />
-    {byok?.available ? <Section id="s-gemini" title="Gemini 키">
-      <Setting name="인턴 공고 알림 (선택)" help="링커리어와 자소설닷컴의 인턴 공고를 내 Gemini 키로 살펴보고, 나에게 맞는 공고만 알려드려요. 키가 없어도 다른 알림은 그대로예요">
-        {byok.loading ? <p className="field-note" role="status">불러오고 있어요.</p> : byok.status
-          ? <><p className="field-note">등록된 키 ····{byok.status.keyHint}{byok.status.disabled ? ' (사용 중지됨)' : ''}</p>
-            {byok.status.lastError ? <p className="field-note error" role="alert">{byok.status.lastError}</p> : null}
-            <button type="button" className="ghost-button" disabled={byok.busy} onClick={() => byok.remove()}>키 지우기</button></>
-          : <><input className="input" type="password" autoComplete="off" spellCheck={false} aria-label="Gemini API 키" value={apiKey}
-            disabled={byok.busy} onChange={(event) => setApiKey(event.currentTarget.value.trim())} />
-            <p className="field-note">키는 암호화해 서버에만 저장하고, 나에게 맞는 공고를 고르는 데만 써요</p>
-            <button type="button" className="solid-button" disabled={byok.busy || !apiKey} onClick={() => byok.register(apiKey)}>
-              {byok.busy ? '확인하고 있어요' : '키 등록하기'}</button></>}
-        {byok.error ? <p className="field-note error" role="alert">{byok.error}</p> : null}
+    <Section id="s-keys" title="연결 키">
+      <GeminiRow model={model} />
+      <KeyRow name="아이캠퍼스 토큰" help="지금 할 수 있는 강의와 과제 마감을 알려요" state="준비 중">
+        <span className="field-note">아이캠퍼스 알림은 아직 만들고 있어서 토큰을 받지 않아요</span>
+      </KeyRow>
+    </Section>
+    <Section id="s-eligibility" title="내 프로필">
+      <Setting name="지원 자격 정보" help="Gemini가 지원 자격을 판단할 때 쓰는 학년, 학기, 재학 상태, 병역은 내 정보에서 바꿔요">
+        <button type="button" className="ghost-button" onClick={() => model.openSection('profile')}>내 정보 열기</button>
       </Setting>
-    </Section> : null}
-    <Section id="s-eligibility" title="지원 자격 확인용 정보">
-      <Setting name="학기" help="공고의 지원 자격을 가릴 때만 써요. 이름이나 학번은 받지 않아요">
-        <Choice label="학기" value={profile.semester} disabled={model.profileStatus !== 'ready'} options={SEMESTERS.map((value) => [value, `${value}학기`] as const)} onPick={(semester) => save({ semester })} />
-      </Setting>
-      <Setting name="병역">
-        <Choice label="병역" value={profile.militaryService} disabled={model.profileStatus !== 'ready'} options={MILITARY.map((value) => [value, value] as const)} onPick={(militaryService) => save({ militaryService })} />
-      </Setting>
-      {model.profileMessage ? <p className="field-note ok" role="status">{model.profileMessage}</p> : null}
-      {model.profileError ? <p className="field-note error" role="alert">{model.profileError}</p> : null}
-      {model.profileStatus === 'unavailable' ? <p className="field-note">지금은 내 정보를 불러올 수 없어요. 잠시 뒤 다시 열어 주세요</p> : null}
     </Section>
   </div>;
 }
