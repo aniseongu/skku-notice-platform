@@ -124,7 +124,9 @@ def test_discovery_only_enqueues_public_image_strings_without_resetting_status()
                         "images": ["https://www.skku.edu/a.png", None],
                         "body": "",
                         "first_seen": "2026-11-07T00:00:00Z",
-                    }
+                    },
+                    {"id": "school/2", "images": ["https://www.skku.edu/b.png"],
+                     "body": "안내문", "first_seen": None},
                 ],
             )
         return httpx.Response(201)
@@ -141,6 +143,16 @@ def test_discovery_only_enqueues_public_image_strings_without_resetting_status()
             }
         ]
         assert "resolution=merge-duplicates" in requests[1].headers["prefer"]
+    finally:
+        client.close()
+
+
+def test_queued_image_is_skipped_when_notice_now_has_text():
+    client = job.OCRStore("https://example.supabase.co", "sb_secret_test")
+    client.client._transport = httpx.MockTransport(lambda _: httpx.Response(
+        200, json=[{"images": ["https://www.skku.edu/a.png"], "body": "공지 내용"}]))
+    try:
+        assert not client.current_image("school/1", "https://www.skku.edu/a.png")
     finally:
         client.close()
 

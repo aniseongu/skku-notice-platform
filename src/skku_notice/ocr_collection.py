@@ -28,6 +28,8 @@ class OCRStore(NoticeStore):
         ).json()
         rows = []
         for notice in notices:
+            if (notice.get("body") or "").strip():
+                continue
             images = notice.get("images")
             if not isinstance(images, list):
                 continue
@@ -37,7 +39,7 @@ class OCRStore(NoticeStore):
                         {
                             "notice_id": notice["id"],
                             "image_url": url,
-                            "priority": 0 if len((notice.get("body") or "").strip()) < 50 else 1,
+                            "priority": 0,
                             "notice_seen_at": notice.get("first_seen"),
                         }
                     )
@@ -70,11 +72,12 @@ class OCRStore(NoticeStore):
             "platform_notices",
             params={
                 "id": f"eq.{notice_id}",
-                "select": "images",
+                "select": "images,body",
                 "limit": "1",
             },
         ).json()
-        return bool(rows and isinstance(rows[0].get("images"), list) and image_url in rows[0]["images"])
+        return bool(rows and not (rows[0].get("body") or "").strip()
+                    and isinstance(rows[0].get("images"), list) and image_url in rows[0]["images"])
 
     def remove_image(self, notice_id: str, image_url: str) -> None:
         self._request(
