@@ -78,6 +78,14 @@ class OCRStore(NoticeStore):
             },
         )
 
+    def start_attempt(self, notice_id: str, image_url: str, now: datetime) -> None:
+        self._request(
+            "PATCH",
+            "platform_notice_images",
+            params={"notice_id": f"eq.{notice_id}", "image_url": f"eq.{image_url}"},
+            json={"last_attempt_at": now.isoformat()},
+        )
+
     def cached(self, digest: str) -> bool:
         rows = self._request(
             "GET",
@@ -135,6 +143,8 @@ def run_one(store: OCRStore, user_agent: str, now: datetime) -> str:
     if not store.current_image(notice_id, image_url):
         store.remove_image(notice_id, image_url)
         return "stale"
+    # Record the attempt first so an OOM or timeout cannot block the queue forever.
+    store.start_attempt(notice_id, image_url, now)
     image = fetch_image(image_url, user_agent)
     if image is None:
         store.mark(notice_id, image_url, now, None, was_ready=was_ready)

@@ -20,6 +20,7 @@ class MemoryStore:
         self.present = True
         self.removed = False
         self.cutoff = None
+        self.started = []
 
     def discover(self):
         pass
@@ -33,6 +34,9 @@ class MemoryStore:
 
     def remove_image(self, notice_id, image_url):
         self.removed = True
+
+    def start_attempt(self, notice_id, image_url, now):
+        self.started.append((notice_id, image_url, now))
 
     def cached(self, digest):
         return digest in self.cache
@@ -64,6 +68,21 @@ def test_stale_images_are_removed_without_fetching(monkeypatch):
     )
     assert job.run_one(store, "test", NOW) == "stale"
     assert store.removed
+
+
+def test_attempt_is_recorded_before_a_worker_crash(monkeypatch):
+    store = MemoryStore()
+    monkeypatch.setattr(job, "fetch_image", lambda *_: SimpleNamespace(data=b"image"))
+
+    def crash(_images):
+        raise RuntimeError("interrupted")
+
+    monkeypatch.setattr(job, "read_images", crash)
+    import pytest
+
+    with pytest.raises(RuntimeError, match="interrupted"):
+        job.run_one(store, "test", NOW)
+    assert store.started == [("school/1", "https://www.skku.edu/image.png", NOW)]
 
 
 def test_failed_refresh_preserves_last_good_result(monkeypatch):
