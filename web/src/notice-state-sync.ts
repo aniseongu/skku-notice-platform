@@ -55,24 +55,34 @@ export function planStateSync(remote: RemoteNoticeStates, localSaved: SavedNotic
   return { saved, read, uploadSaved, uploadRead };
 }
 
-async function inChunks<T>(items: T[], run: (item: T) => Promise<void>): Promise<boolean> {
+// 업로드 RPC는 사용자 ID 없이 현재 세션으로 쓴다. 청크를 보내기 직전마다 계정이 그대로인지 확인하고, 바뀌었으면 중단한다.
+export type AccountGuard = () => boolean | Promise<boolean>;
+
+async function inChunks<T>(items: T[], guard: AccountGuard, run: (item: T) => Promise<void>): Promise<boolean> {
   let ok = true;
   for (let i = 0; i < items.length; i += CHUNK) {
+    if (!await guard()) throw new Error('계정이 바뀌었어요');
     const results = await Promise.allSettled(items.slice(i, i + CHUNK).map(run));
     if (results.some((result) => result.status === 'rejected')) ok = false;
   }
   return ok;
 }
 
-export async function pushSaved(client: SupabaseClient, items: { id: string; saved: boolean }[]): Promise<boolean> {
-  return inChunks(items, async ({ id, saved }) => {
+/** 현재 세션의 사용자와 기대한 사용자가 같은지 확인한다. 세션이 없어도 같지 않은 것으로 본다. */
+export async function sessionIs(client: SupabaseClient, userId: string): Promise<boolean> {
+  const { data } = await client.auth.getSession();
+  return data.session?.user.id === userId;
+}
+
+export async function pushSaved(client: SupabaseClient, items: { id: string; saved: boolean }[], guard: AccountGuard): Promise<boolean> {
+  return inChunks(items, guard, async ({ id, saved }) => {
     const { error } = await client.rpc('set_notice_saved', { p_notice_id: id, p_saved: saved });
     if (error) throw error;
   });
 }
 
-export async function pushRead(client: SupabaseClient, items: { id: string; read: boolean }[]): Promise<boolean> {
-  return inChunks(items, async ({ id, read }) => {
+export async function pushRead(client: SupabaseClient, items: { id: string; read: boolean }[], guard: AccountGuard): Promise<boolean> {
+  return inChunks(items, guard, async ({ id, read }) => {
     const { error } = await client.rpc('set_notice_read', { p_notice_id: id, p_read: read });
     if (error) throw error;
   });

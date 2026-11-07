@@ -14,7 +14,7 @@ import { authClient } from './auth';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from './preferences';
 import './platform-settings';
-import { loadNoticeStates, planStateSync, pushRead, pushSaved, type StatePlan } from './notice-state-sync';
+import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
 import './notice-rows';
@@ -328,7 +328,7 @@ export class NoticeApp extends LitElement {
     this.read = readIds(this.readState);
     storeReadState(this.readState);
     const syncable = ids.filter((id) => this.isSyncable(id));
-    if (syncable.length) this.uploadStates(() => pushRead(authClient!, syncable.map((id) => ({ id, read }))));
+    if (syncable.length) this.uploadStates((guard) => pushRead(authClient!, syncable.map((id) => ({ id, read })), guard));
   }
 
   private markRead(notice: Notice) {
@@ -367,7 +367,7 @@ export class NoticeApp extends LitElement {
     this.saved = next;
     storeSaved(next);
     this.showToast(added ? '저장했어요' : '저장을 지웠어요');
-    this.uploadStates(() => pushSaved(authClient!, [{ id: notice.id, saved: added }]));
+    this.uploadStates((guard) => pushSaved(authClient!, [{ id: notice.id, saved: added }], guard));
   }
 
   /** 저장한 글. 지금 목록에 있으면 최신 정보로, 밀려났으면 저장할 때 정보로 보여 준다. */
@@ -425,10 +425,11 @@ export class NoticeApp extends LitElement {
     return !!notice && !this.sources.find((source) => source.id === notice.source_id)?.external;
   }
 
-  private uploadStates(run: () => Promise<boolean>): void {
+  private uploadStates(run: (guard: () => Promise<boolean>) => Promise<boolean>): void {
     if (!authClient || !this.authUserId) return;
-    const epoch = this.subscriptionsEpoch;
-    void run().then((ok) => { if (!ok && epoch === this.subscriptionsEpoch) this.showToast('이 기기에는 저장했지만 계정에 올리지 못했어요. 다음에 다시 맞출게요'); });
+    const client = authClient, userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    const guard = async () => epoch === this.subscriptionsEpoch && this.authUserId === userId && await sessionIs(client, userId);
+    void run(guard).catch(() => true).then((ok) => { if (!ok && epoch === this.subscriptionsEpoch) this.showToast('이 기기에는 저장했지만 계정에 올리지 못했어요. 다음에 다시 맞출게요'); });
   }
 
   // 로그인 사용자의 저장·읽음을 서버와 맞춘다. 공지 목록이 있어야 서버에만 있는 저장의 글 정보를 찾을 수 있다.
@@ -440,6 +441,8 @@ export class NoticeApp extends LitElement {
       const client = authClient;
       let plan: StatePlan | null = null;
       const syncable = (id: string) => this.isSyncable(id);
+      // 단계 사이와 청크 사이마다 앱의 계정 상태와 실제 세션이 모두 같은 사용자인지 확인한다.
+      const same = async () => epoch === this.subscriptionsEpoch && this.authUserId === userId && await sessionIs(client, userId);
       const chain = connectionChain([
         async () => {
           const remote = await loadNoticeStates(client, userId);
@@ -448,8 +451,8 @@ export class NoticeApp extends LitElement {
           this.saved = plan.saved; storeSaved(plan.saved);
           this.readState = plan.read; this.read = readIds(plan.read); storeReadState(plan.read);
         },
-        async () => { if (!await pushSaved(client, plan!.uploadSaved.filter((item) => syncable(item.id)))) throw new Error('저장을 올리지 못했어요'); },
-        async () => { if (!await pushRead(client, plan!.uploadRead.filter((item) => syncable(item.id)))) throw new Error('읽음을 올리지 못했어요'); },
+        async () => { if (!await pushSaved(client, plan!.uploadSaved.filter((item) => syncable(item.id)), same)) throw new Error('저장을 올리지 못했어요'); },
+        async () => { if (!await pushRead(client, plan!.uploadRead.filter((item) => syncable(item.id)), same)) throw new Error('읽음을 올리지 못했어요'); },
       ]);
       this.stateChain = { run: () => chain.run(), epoch };
     }

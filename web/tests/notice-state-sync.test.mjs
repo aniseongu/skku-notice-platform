@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadNoticeStates, planStateSync, pushRead, pushSaved } from '../src/notice-state-sync.ts';
+import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs } from '../src/notice-state-sync.ts';
 
 const notice = (id) => ({ id, source_id: 's', article_no: id, title: id, url: 'https://www.skku.edu/x', posted_on: '2026-11-01', first_seen: null });
 const saved = (id) => ({ ...notice(id), first_seen: undefined, saved_at: '2026-11-02T00:00:00Z' });
@@ -42,7 +42,28 @@ test('a newer remote read wins over an older local unread and is not uploaded', 
 test('push reports partial failure instead of hiding it', async () => {
   const seen = [];
   const client = { rpc: async (name, args) => { seen.push([name, args]); return { error: args.p_notice_id === 'bad' ? new Error('x') : null }; } };
-  assert.equal(await pushSaved(client, [{ id: 'a', saved: true }, { id: 'bad', saved: true }]), false);
-  assert.equal(await pushRead(client, [{ id: 'a', read: false }]), true);
+  assert.equal(await pushSaved(client, [{ id: 'a', saved: true }, { id: 'bad', saved: true }], () => true), false);
+  assert.equal(await pushRead(client, [{ id: 'a', read: false }], () => true), true);
   assert.deepEqual(seen.at(-1), ['set_notice_read', { p_notice_id: 'a', p_read: false }]);
+});
+
+test('upload stops before sending anything once the account has changed', async () => {
+  const seen = [];
+  const client = { rpc: async (name, args) => { seen.push([name, args.p_notice_id]); return { error: null }; } };
+  const items = Array.from({ length: 25 }, (_, i) => ({ id: `n${i}`, read: true }));
+  let account = 'a';
+  let chunks = 0;
+  const guard = () => { chunks++; if (chunks === 2) account = 'b'; return account === 'a'; };
+  await assert.rejects(pushRead(client, items, guard), /계정이 바뀌었어요/);
+  assert.equal(seen.length, 10, 'only the first chunk, sent while the account was still the same, goes out');
+  const idle = [];
+  await assert.rejects(pushSaved({ rpc: async (...a) => idle.push(a) }, [{ id: 'x', saved: true }], () => false), /계정이 바뀌었어요/);
+  assert.equal(idle.length, 0);
+});
+
+test('session check compares the live session user and treats a missing session as different', async () => {
+  const withUser = (id) => ({ auth: { getSession: async () => ({ data: { session: id ? { user: { id } } : null } }) } });
+  assert.equal(await sessionIs(withUser('a'), 'a'), true);
+  assert.equal(await sessionIs(withUser('b'), 'a'), false);
+  assert.equal(await sessionIs(withUser(null), 'a'), false);
 });
