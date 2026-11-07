@@ -96,7 +96,6 @@ export function NoticeShell({ app }: { app: AppController }) {
       </aside>
 
       <main className="list-pane">
-        <p className="platform-preview" role="status">미리보기예요. 공지는 30분마다 확인해요.</p>
         {reading ? <ReadingView app={app} notice={reading} /> : <>
           <div className="navigation-head">
             <header className={`pane-head topbar glass ${settings ? '' : 'feed-topbar'}`}>
