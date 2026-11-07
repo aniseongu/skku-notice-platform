@@ -180,11 +180,26 @@ def _html_body(body: LexborNode, base_url: str) -> str:
     return re.sub(r"<p>\s*(?:&nbsp;|<br\s*/?>)*\s*</p>", "", result, flags=re.I).strip()
 
 
+def _unwrap_encoded_editor(body: LexborNode) -> LexborNode:
+    """Some SKKU notices put a serialized Froala document inside an escaped pre element."""
+    def replace_pre(match: re.Match) -> str:
+        content = match.group(1).strip()
+        decoded = unescape(content)
+        if not (re.match(r'''^<div\s+class=["']fr-view["']\s*>''', decoded, re.I)
+                and re.search(r"</div>\s*$", decoded, re.I)):
+            return match.group(0)
+        return decoded
+
+    markup = re.sub(r"<pre\b[^>]*>(.*?)</pre>", replace_pre, body.html, flags=re.I | re.S)
+    return LexborHTMLParser(markup).css_first(body.tag) or body
+
+
 def parse_detail(html: str, base_url: str) -> Detail:
     tree = LexborHTMLParser(html)
     body = next((tree.css_first(selector) for selector in DETAIL_SELECTORS if tree.css_first(selector)), None)
     if body is None:
         raise ParseError("detail body not found")
+    body = _unwrap_encoded_editor(body)
     raw = _body(body).replace("\r\n", "\n").replace("\r", "\n")
     lines = [" ".join(line.split()) for line in raw.split("\n")]
     cleaned = []

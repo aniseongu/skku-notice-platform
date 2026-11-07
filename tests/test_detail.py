@@ -14,6 +14,26 @@ from skku_notice.judge import SCHEMA, judge_notices
 from skku_notice.model import Notice
 from skku_notice.parse import ParseError, parse_detail
 
+
+def test_encoded_froala_html_in_pre_is_parsed_as_notice_body():
+    html = ('<dl class="board-write-box"><dd><pre class="pre">'
+            '&lt;div class="fr-view"&gt;&lt;p&gt;1.&amp;nbsp;채용분야&lt;/p&gt;'
+            '&lt;p&gt;이메일 접수&lt;/p&gt;&lt;script&gt;bad()&lt;/script&gt;&lt;/div&gt;'
+            '</pre></dd></dl>')
+    detail = parse_detail(html, 'https://www.skku.edu/notice')
+    assert '1. 채용분야' in detail.body_text
+    assert '이메일 접수' in detail.body_text
+    assert '<div' not in detail.body_text and 'bad()' not in detail.body_text
+    assert '<p>이메일 접수</p>' in detail.body_html
+    assert '<script' not in detail.body_html and 'bad()' not in detail.body_html
+
+
+def test_plain_pre_preserves_literal_markup():
+    html = '<dl class="board-write-box"><dd><pre>예시: &lt;div&gt;내용&lt;/div&gt;</pre></dd></dl>'
+    detail = parse_detail(html, 'https://www.skku.edu/notice')
+    assert '<div>내용</div>' in detail.body_text
+    assert '&lt;div&gt;' in detail.body_html
+
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
