@@ -1,6 +1,5 @@
 import base64
 import socket
-from types import SimpleNamespace
 
 import requests
 
@@ -47,7 +46,9 @@ def test_push_outcomes_do_not_expose_endpoint_or_send_on_invalid_input(monkeypat
 
     def send(**kwargs):
         calls.append(kwargs)
-        return SimpleNamespace(status_code=201)
+        response = requests.Response()
+        response.status_code = 201
+        return response
 
     monkeypatch.setattr(push, "webpush", send)
     assert (

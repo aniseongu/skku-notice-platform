@@ -76,9 +76,11 @@ def send_one(subscription: dict, private_key: str, subject: str, *, title: str, 
                 timeout=10,
                 requests_session=session,
             )
-        if isinstance(response, requests.Response) and not 200 <= response.status_code < 300:
-            return "expired" if response.status_code in (404, 410) else "retry"
-        return "sent"
+        if not isinstance(response, requests.Response):
+            return "retry"
+        if 200 <= response.status_code < 300:
+            return "sent"
+        return "expired" if response.status_code in (404, 410) else "retry"
     except WebPushException as exc:
         status = getattr(getattr(exc, "response", None), "status_code", None)
         return "expired" if status in (404, 410) else "retry"
