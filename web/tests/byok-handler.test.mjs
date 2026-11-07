@@ -25,7 +25,7 @@ test('stores an encrypted key for the signed-in user and only returns the last f
   const response = await t.call('POST', { apiKey: KEY });
   assert.equal(response.status, 200);
   const body = await response.json();
-  assert.deepEqual(body, { ok: true, keyHint: 'BBBB', model: 'gemini-2.5-flash' });
+  assert.deepEqual(body, { ok: true, keyHint: 'BBBB', model: 'gemini-3.1-flash-lite' });
   assert.equal(JSON.stringify(body).includes(KEY), false);
   assert.equal(t.saved.length, 1);
   assert.equal(t.saved[0].user_id, 'user-a');

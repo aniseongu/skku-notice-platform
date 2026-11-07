@@ -2,7 +2,7 @@ import { encryptApiKey, looksLikeGeminiKey } from './crypto.ts';
 
 export const ALLOWED_ORIGINS = ['https://skku-notice-platform.pages.dev', 'http://localhost:5173', 'http://127.0.0.1:5173'];
 const MODEL_PATTERN = /^[a-z0-9.-]{3,60}$/;
-export const DEFAULT_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
 const MAX_BODY_BYTES = 2048;
 
 export interface ByokDeps {
