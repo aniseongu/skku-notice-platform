@@ -407,7 +407,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
   const judgement = app.judgement(notice);
   return <notice-detail-screen model={{
     notice, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
-    today: todayKst(), body: app.body(notice), interests: app.interests(notice),
+    today: todayKst(), body: app.body(notice), mySummary: app.summary(notice), interests: app.interests(notice),
     ai: judgement?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
     retry: () => { app.bodies.delete(notice.id); app.requestUpdate(); },
   }} />;

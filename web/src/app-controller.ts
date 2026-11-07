@@ -14,7 +14,7 @@ import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from './preferences';
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
-import { byokAvailable, loadByokStatus, loadCanvasStatus, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
+import { byokAvailable, loadByokStatus, loadCanvasStatus, loadNoticeSummary, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import type { Draft } from './onboarding-flow';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
@@ -236,6 +236,8 @@ export class AppController extends Reactive {
   sortMenuOpen = false;
   // 글별 본문(D-013). 'loading'이면 받는 중, null이면 아직 서버가 받지 않은 글.
   bodies = new Map<string, NoticeBody | null | 'loading'>();
+  /** 내 Gemini 요약. 공유 본문 캐시와 따로 두어 계정이 바뀌면 비운다. */
+  summaries = new Map<string, string | null | 'loading'>();
   toastTimer = 0;
   // 상세 칸에 실제로 보이는 글(고른 글이 없으면 첫 글). 목록 행 표시와 맞춘다.
   shownId: string | null = null;
@@ -258,7 +260,7 @@ export class AppController extends Reactive {
           const previousUserId = this.authUserId;
           this.authUserId = userId;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.summaries = new Map(); this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -862,7 +864,7 @@ export class AppController extends Reactive {
 
   /**
    * 사이드바와 게시판 선택에 보일 게시판. 학교 공지 탭에서는 로그인한 사람이 구독한 게시판(처음 설정을 마쳤다면 전공에 맞춰 추천된 것)만 보이고,
-   * 구독이 없거나 로그인 전이면 지금 공지가 있는 기본 게시판만 보인다. 카탈로그의 수십 개 학과 게시판이 한꺼번에 나열되지 않게 한다.
+   * 구독이 없거나 로그인 전이면 지금 공지가 있는 기본 게시판만 보인다. 전체 게시판 목록의 수십 개 학과 게시판이 한꺼번에 나열되지 않게 한다.
    */
   tabSources(): Source[] {
     const external = this.tab() === 'intern';
@@ -1104,6 +1106,22 @@ export class AppController extends Reactive {
     this.detailOpen = open;
     if (!open && this.unreadOnly) this.selectedId = null;
     remember('detail', open ? '1' : '0');
+  }
+
+  /** 로그인한 사용자 본인의 요약. 키를 등록하지 않았거나 아직 판정 전이면 null이다. */
+  summary(notice: Notice): string | null {
+    const userId = this.authUserId;
+    if (!authClient || !userId) return null;
+    const cached = this.summaries.get(notice.id);
+    if (cached !== undefined) return cached === 'loading' ? null : cached;
+    this.summaries.set(notice.id, 'loading');
+    const epoch = this.subscriptionsEpoch;
+    loadNoticeSummary(authClient, userId, notice.id).catch(() => null).then((text) => {
+      if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
+      this.summaries.set(notice.id, text);
+      this.requestUpdate();
+    });
+    return null;
   }
 
   body(notice: Notice): NoticeBody | null | 'loading' {

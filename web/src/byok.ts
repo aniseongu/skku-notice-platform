@@ -39,6 +39,14 @@ export async function removeCanvasToken(client: SupabaseClient): Promise<void> {
   if (error) throw await failure(error, '토큰을 지우지 못했어요. 잠시 뒤 다시 시도해 주세요.');
 }
 
+/** 내 Gemini 키로 만든 공지 요약(본인 행만 읽힌다). 없으면 null. */
+export async function loadNoticeSummary(client: SupabaseClient, userId: string, noticeId: string): Promise<string | null> {
+  const { data, error } = await client.from('user_notice_judgments').select('summary')
+    .eq('user_id', userId).eq('notice_id', noticeId).maybeSingle();
+  if (error) throw error;
+  return typeof data?.summary === 'string' && data.summary.trim() ? data.summary : null;
+}
+
 /** 암호문 열은 브라우저가 읽을 수 없으므로 상태 열만 고른다. */
 export async function loadByokStatus(client: SupabaseClient, userId: string): Promise<ByokStatus | null> {
   const { data, error } = await client.from('user_byok_keys')

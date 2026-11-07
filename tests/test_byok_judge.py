@@ -92,7 +92,7 @@ def test_judges_with_the_users_own_key_and_saves_per_user_results():
     assert counts["judged"] == 1
     assert store.saved == [
         {"user_id": "user-a", "notice_id": "ext/1", "verdict": "relevant",
-         "reason": "서버 개발 직무예요", "model": "gemini-3.1-flash-lite"}
+         "reason": "서버 개발 직무예요", "model": "gemini-3.1-flash-lite", "summary": None}
     ]
     cleared = {"used_on": "2026-11-07", "used_today": 1, "last_error": None, "error_at": None}
     assert store.updates[-1][1] == cleared
@@ -200,13 +200,15 @@ def test_prompt_marks_the_users_free_text_as_data_not_instructions():
 def test_school_notices_are_judged_with_the_same_key_and_saved_like_internships():
     school = [{"notice_id": "sw/1", "title": "졸업요건 안내", "body": "소프트웨어학과 재학생 대상"}]
     reply = Reply(
-        '{"items": [{"id": "sw/1", "verdict": "relevant", "reason": "소프트웨어학과 재학생이 대상이에요"}]}'
+        '{"items": [{"id": "sw/1", "verdict": "relevant", "reason": "소프트웨어학과 재학생이 대상이에요", '
+        '"summary": "소프트웨어학과 재학생이 졸업요건을 확인해요.\\n12월 5일까지 제출해요."}]}'
     )
     store = FakeStore([key_row("user-a")], pending=[], school=school)
     counts = judge.run_judging(store, MASTER, NOW, factory(reply))
     assert counts["judged"] == 1
     assert store.saved == [{"user_id": "user-a", "notice_id": "sw/1", "verdict": "relevant",
-                            "reason": "소프트웨어학과 재학생이 대상이에요", "model": "gemini-3.1-flash-lite"}]
+                            "reason": "소프트웨어학과 재학생이 대상이에요", "model": "gemini-3.1-flash-lite",
+                            "summary": "소프트웨어학과 재학생이 졸업요건을 확인해요.\n12월 5일까지 제출해요."}]
     assert store.updates[-1][1]["used_today"] == 1
 
 

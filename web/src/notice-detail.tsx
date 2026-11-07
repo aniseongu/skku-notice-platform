@@ -7,11 +7,19 @@ export interface NoticeDetailModel {
   source: string;
   today: string;
   body: NoticeBody | null | 'loading';
+  /** 내 Gemini 키로 만든 요약(없으면 null) */
+  mySummary?: string | null;
   interests: string[];
   ai: { verdict: Verdict; reason: string } | null;
   rule: string | null;
   notified: boolean;
   retry: () => void;
+}
+
+/** 그림의 대체 텍스트: 자동으로 읽은 글이 있으면 앞부분을 함께 알려 준다. */
+function imageAlt(index: number, body: NoticeBody): string {
+  const text = (body.ocr_text ?? []).flatMap((chunk) => chunk.split(/\n+/)).map((line) => line.trim()).filter(Boolean).join(' ');
+  return text ? `본문 그림 ${index + 1}. 자동으로 읽은 글: ${text.slice(0, 120)}` : `본문 그림 ${index + 1}`;
 }
 
 function Body({ body, heading = '본문' }: { body: NoticeBody; heading?: string }) {
@@ -30,13 +38,14 @@ function Body({ body, heading = '본문' }: { body: NoticeBody; heading?: string
     <h3>{body.body_from_image ? `${heading} (그림에서 읽은 글)` : heading}</h3>
     {body.body_from_image && paragraphs.length > 0 ? <p className="detail-note first">그림 속 글자를 자동으로 읽어서 틀릴 수 있어요. 아래 그림과 원문이 정확해요</p> : null}
     {paragraphs.map((para, index) => <p key={index}>{para}</p>)}
-    {images.map((src, index) => <img key={`${src}-${index}`} src={src} alt={`본문 그림 ${index + 1}`} loading="lazy" referrerPolicy="no-referrer" />)}
+    {images.map((src, index) => <img key={`${src}-${index}`} src={src} alt={imageAlt(index, body)} loading="lazy" referrerPolicy="no-referrer" />)}
   </section>;
 }
 
 function NoticeDetail({ model }: { model: NoticeDetailModel }) {
   const { notice, body, ai, interests } = model;
   const loaded = body === 'loading' ? null : body;
+  const summary = model.mySummary || loaded?.summary || null;
   const title = cleanTitle(notice.title_ko || notice.title);
   const passed = notice.deadline ? deadlinePassed(notice.deadline) : false;
   const urgent = !!notice.deadline && !passed && daysLeft(notice.deadline, model.today) <= 3;
@@ -50,15 +59,18 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
     {reason ? <p className="detail-reason">{reason}</p> : null}
     {notice.deadline ? <p className="detail-deadline">{notice.deadline_kind ?? '마감'} {deadlineDetail(notice.deadline)} <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''}`}>{deadlineText(notice.deadline, model.today)}</span></p> : null}
     {notice.changed_at ? <p className="detail-change">{koreanDate(notice.changed_at.slice(0, 10))}에 원문 {notice.change_kind === '제목' ? '제목이' : '본문이'} 바뀌었어요</p> : null}
-    {loaded?.summary ? <section className="detail-section summary" aria-label="요약"><h3>요약</h3>{loaded.summary.split('\n').filter(Boolean).map((line, index) => <p key={index}>{line}</p>)}</section>
-      : loaded?.summary_status === 'failed' ? <section className="detail-section" aria-label="요약"><h3>요약</h3><p className="detail-note first" role="status">요약을 만들지 못했어요. 나중에 다시 만들어 볼게요</p></section> : null}
+    {summary ? <section className="detail-section summary callout" aria-labelledby="sec-summary">
+      <h3 id="sec-summary">요약 <span className="tag">{model.mySummary ? '내 Gemini' : 'AI'}</span></h3>
+      {summary.split('\n').filter(Boolean).map((line, index) => <p key={index}>{line}</p>)}</section>
+      : loaded?.summary_status === 'failed' ? <section className="detail-section" aria-labelledby="sec-summary"><h3 id="sec-summary">요약</h3><p className="detail-note first" role="status">요약을 만들지 못했어요. 나중에 다시 만들어 볼게요</p></section> : null}
     {body === 'loading' ? <p className="detail-note">본문을 불러오고 있어요</p> : !loaded ? <><p className="detail-note" role="status">본문을 불러오지 못했어요. 다시 불러오거나 원문을 확인해 주세요</p><button type="button" className="text-button" onClick={model.retry}>본문 다시 불러오기</button></>
       : loaded.translation?.body ? <><section className="detail-section body-text" aria-label="한국어로 옮긴 본문"><h3>본문 (한국어로 옮긴 글)</h3><p className="detail-note first">Gemini 번역이에요. 정확한 내용은 아래 영어 원문을 확인해 주세요</p>{loaded.translation.body.split(/\n+/).filter(Boolean).map((para, index) => <p key={index}>{para}</p>)}</section><div className="original-body" lang="en"><Body body={loaded} heading="영어 원문" /></div></> : <Body body={loaded} />}
-    {loaded?.ocr_text?.length ? <section className="detail-section body-text" aria-label="그림에서 읽은 글">
-      <h3>그림에서 읽은 글</h3><p className="detail-note first">그림 속 글자를 자동으로 읽어서 틀릴 수 있어요. 그림과 원문이 정확해요</p>
+    {loaded?.ocr_text?.length ? <details className="detail-section ocr">
+      <summary>그림에서 읽은 글 보기</summary>
+      <p className="detail-note first">그림 속 글자를 자동으로 읽어서 틀릴 수 있어요. 그림과 원문이 정확해요</p>
       {loaded.ocr_text.flatMap((text) => text.split(/\n+/).filter(Boolean)).map((line, index) => <p key={index}>{line}</p>)}
-    </section> : null}
-    {loaded?.attachments?.length ? <section className="detail-section" aria-label="첨부"><h3>첨부 {loaded.attachments.length}개</h3><ul className="attachments">{loaded.attachments.map((file, index) => <li key={index}><a className="file" href={safeUrl(file.url)} target="_blank" rel="noopener"><span className="file-type">{fileType(file.name, file.type)}</span><span className="file-name">{file.name}</span>{file.size ? <span className="file-size">{file.size}</span> : null}</a></li>)}</ul><p className="detail-note first">누르면 학교 공지 사이트의 원본 파일을 받아요</p></section> : null}
+    </details> : null}
+    {loaded?.attachments?.length ? <section className="detail-section" aria-labelledby="sec-files"><h3 id="sec-files">첨부 {loaded.attachments.length}개</h3><ul className="attachments">{loaded.attachments.map((file, index) => <li key={index}><a className="file" href={safeUrl(file.url)} target="_blank" rel="noopener"><span className="file-type">{fileType(file.name, file.type)}</span><span className="file-name">{file.name}</span>{file.size ? <span className="file-size">{file.size}</span> : null}</a></li>)}</ul><p className="detail-note first">누르면 학교 공지 사이트의 원본 파일을 받아요</p></section> : null}
     <dl className="facts" aria-label="글 정보"><div><dt>게시일</dt><dd>{koreanDate(notice.posted_on)}</dd></div>
       {notice.previous_title ? <div><dt>이전 제목</dt><dd>{cleanTitle(notice.previous_title)}</dd></div> : null}
       {interests.length ? <div><dt>관심</dt><dd><b className="interest">{interests.join(', ')}</b></dd></div> : null}

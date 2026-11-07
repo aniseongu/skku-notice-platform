@@ -25,7 +25,35 @@ test('notice HTML is sanitized in React detail', async ({ page }) => {
   });
   await expect(page.locator('#xss-check .rich')).toBeVisible();
   await expect(page.locator('#xss-check [onerror], #xss-check a[href^="javascript:"], #xss-check script')).toHaveCount(0);
-  await expect(page.locator('#xss-check [aria-label="그림에서 읽은 글"]')).toContainText('<script>악성 내용</script>');
+  // 자동으로 읽은 글은 접힌 상자 안에 있고, 열면 글자 그대로(태그가 아닌 글자로) 보인다.
+  const ocr = page.locator('#xss-check details.ocr');
+  await expect(ocr.locator('summary')).toHaveText('그림에서 읽은 글 보기');
+  await ocr.locator('summary').click();
+  await expect(ocr).toContainText('<script>악성 내용</script>');
+});
+
+test('detail shows my Gemini summary first as a labelled callout and describes pictures by their text', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.waitForFunction(() => !!customElements.get('notice-detail-screen'));
+  await page.evaluate(() => {
+    const el = document.createElement('notice-detail-screen') as HTMLElement & { model: unknown };
+    el.id = 'summary-check';
+    document.body.append(el);
+    el.model = { notice: { id: 'a/2', source_id: 'a', article_no: '2', title: '졸업요건 안내', category: null, url: 'https://www.skku.edu/x', posted_on: '2026-11-01', pinned: false, deadline: null, first_seen: null },
+      source: '학교', today: '2026-11-08', interests: [], ai: null, rule: null, notified: false, retry: () => {},
+      mySummary: '재학생이 졸업요건을 확인해요.\n12월 5일까지 제출해요.',
+      body: { body: '본문', body_html: null, images: ['https://www.skku.edu/a.png'], ocr_text: ['졸업 요건 안내', '제출 기한 12월 5일'], attachments: [], fetched_at: 'x', body_from_image: false } };
+  });
+  const detail = page.locator('#summary-check');
+  const summary = detail.getByRole('region', { name: /요약/ });
+  await expect(summary).toContainText('내 Gemini');
+  await expect(summary).toContainText('12월 5일까지 제출해요.');
+  // 요약이 본문보다 앞에 있다.
+  const order = await detail.evaluate((root) => [...root.querySelectorAll('section, details')].map((n) => n.id || n.className));
+  expect(order[0]).toContain('summary');
+  const alt = await detail.locator('img').getAttribute('alt');
+  expect(alt).toContain('본문 그림 1');
+  expect(alt).toContain('졸업 요건 안내');
 });
 
 test('subscription filter keeps only the selected school board', async ({ page }) => {
