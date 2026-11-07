@@ -1,5 +1,7 @@
 from datetime import UTC, datetime
 
+import pytest
+
 from skku_notice import push_collection as worker
 
 NOW = datetime(2026, 11, 7, tzinfo=UTC)
@@ -63,3 +65,14 @@ def test_invalid_notice_url_is_not_sent_and_claim_is_bounded(monkeypatch):
     assert counts["retry"] == 1 and counts["sent"] == 19
     assert len(store.claims) == 20 and len(calls) == 19
     assert store.marks[0] == (1, "failed", NOW)
+
+
+def test_vapid_subject_is_normalized_to_what_py_vapid_accepts():
+    from py_vapid import _check_sub
+
+    assert worker.normalize_subject("https://example.pages.dev/") == "https://example.pages.dev"
+    assert worker.normalize_subject(" mailto:admin@example.com ") == "mailto:admin@example.com"
+    assert _check_sub(worker.normalize_subject("https://example.pages.dev/"))
+    for bad in ("", "http://example.com", "https://", "https://example.com/path", "ftp://x.y"):
+        with pytest.raises(ValueError):
+            worker.normalize_subject(bad)

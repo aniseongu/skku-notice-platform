@@ -1,6 +1,7 @@
 """Deliver a bounded batch of eligible personal notifications."""
 
 import os
+import re
 from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
@@ -62,6 +63,16 @@ def safe_school_url(value: str) -> bool:
         return False
 
 
+def normalize_subject(subject: str) -> str:
+    """py_vapid accepts `https://host` without a path; a trailing slash makes every send fail."""
+    value = subject.strip()
+    if value.startswith("https://"):
+        value = value.rstrip("/")
+    if not re.fullmatch(r"https://[\w-]+(\.[\w-]+)+|mailto:[^@\s]+@[\w-]+(\.[\w-]+)+", value):
+        raise ValueError("invalid VAPID subject")
+    return value
+
+
 def run_batch(store: PushStore, private_key: str, subject: str, now: datetime) -> dict[str, int]:
     counts = {"sent": 0, "expired": 0, "retry": 0, "skipped": 0}
     for candidate in store.candidates()[:20]:
@@ -101,8 +112,7 @@ def main() -> int:
     private_key = os.environ.get("VAPID_PRIVATE_KEY", "")
     subject = os.environ.get("VAPID_SUBJECT", "")
     try:
-        if not subject.startswith(("https://", "mailto:")):
-            raise ValueError("invalid VAPID subject")
+        subject = normalize_subject(subject)
         Vapid.from_string(private_key)
         store = PushStore(os.environ.get("SUPABASE_URL", ""), os.environ.get("SUPABASE_SECRET_KEY", ""))
         try:
