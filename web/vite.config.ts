@@ -56,7 +56,7 @@ export default defineConfig({
         globIgnores: ['**/libsodium*.js', '**/*-dark.png', '**/icons/notify/**', '**/screenshots/**'],
         navigateFallback: 'index.html',
         // 구글 연결에서 돌아오는 페이지는 주소 뒤에 code가 붙어 미리 저장본과 안 맞는다. 첫 화면으로 바꾸지 않는다.
-        navigateFallbackDenylist: [/\/api\//, /oauth-callback/],
+        navigateFallbackDenylist: [/\/api\//],
         runtimeCaching: [
           {
             // 공개 공지만 캐시한다. 인증·개인 JSON과 다른 출처의 응답은 보관하지 않는다.

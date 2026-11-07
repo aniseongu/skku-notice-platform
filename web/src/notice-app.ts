@@ -8,7 +8,7 @@ import {
 import { type SavedNotice, loadSaved, orderSaved, storeSaved, toggleSaved } from './saved-notices';
 import { isNoticeRead, loadReadState, mergeReadStates, parseReadState, readIds, setReadState, storeReadState } from './read-notices';
 import { keywordCounts } from './keyword-counts';
-import type { Theme } from './settings-view';
+import type { Theme } from './theme';
 import { APP_NAME } from './brand';
 import { authClient } from './auth';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
