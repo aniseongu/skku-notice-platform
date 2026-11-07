@@ -3,7 +3,7 @@
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import type { ByokStatus, CanvasStatus } from './byok';
-import { CANVAS_MODES, composeSummaryTime, summaryParts, type CanvasMode, type Device } from './devices';
+import { CANVAS_MODES, composeSummaryTime, summaryParts, validDeviceName, type CanvasMode, type Device } from './devices';
 import { ENROLLMENT, MILITARY, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
 import { programLabel } from './skku-programs';
 import { BOARD_CATALOG, COLLEGE_BOARD, DEPARTMENT_BOARD, OTHER_BOARDS } from './skku-boards';
@@ -67,6 +67,7 @@ export interface SettingsModel {
     refresh: () => void;
     setMode: (mode: string) => void;
     remove: (id: string) => void;
+    rename: (id: string, name: string) => Promise<boolean>;
     setSummaryTime: (period: 'am' | 'pm', hour: number, minute: number) => void;
   };
   calendar?: {
@@ -284,6 +285,30 @@ function DeleteAccount({ model }: { model: SettingsModel }) {
   </Setting>;
 }
 
+/** 알림 기기 한 줄: 이름(모델이나 기기 종류), 등록일, 아캠 알림 모드. 이름은 바꿀 수 있고 이 기기가 아닌 기기는 지울 수 있다. */
+function DeviceRow({ device, info }: { device: Device; info: NonNullable<SettingsModel['devicesInfo']> }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(device.name ?? '');
+  const name = device.name ?? '이름 없는 기기';
+  const save = async () => { if (validDeviceName(draft) && await info.rename(device.id, draft)) setEditing(false); };
+  return <li>
+    {editing
+      ? <div className="inline">
+        <input className="input" aria-label={`${name} 이름`} value={draft} maxLength={40} autoFocus onChange={(event) => setDraft(event.currentTarget.value)}
+          onKeyDown={(event) => { if (event.key === 'Enter') void save(); if (event.key === 'Escape') setEditing(false); }} />
+        <button type="button" className="solid-button" disabled={info.busy || !validDeviceName(draft)} onClick={() => void save()}>저장하기</button>
+        <button type="button" className="ghost-button" disabled={info.busy} onClick={() => setEditing(false)}>닫기</button>
+      </div>
+      : <span className="device-name">{name}{device.id === info.thisId ? <b className="badge">이 기기</b> : null}</span>}
+    <span className="field-note">{device.createdAt ? `${new Date(device.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}에 등록` : ''} · 아캠 알림 {CANVAS_MODES.find(([mode]) => mode === device.canvasMode)?.[1]}</span>
+    {editing ? null : <span className="device-actions">
+      <button type="button" className="text-button" disabled={info.busy} aria-label={`${name} 이름 바꾸기`} onClick={() => { setDraft(device.name ?? ''); setEditing(true); }}>이름 바꾸기</button>
+      {device.id === info.thisId ? null
+        : <button type="button" className="text-button" disabled={info.busy} aria-label={`${name} 지우기`} onClick={() => info.remove(device.id)}>지우기</button>}
+    </span>}
+  </li>;
+}
+
 function Notifications({ model }: { model: SettingsModel }) {
   const on = model.pushStatus === 'on';
   const info = model.devicesInfo;
@@ -337,12 +362,7 @@ function Notifications({ model }: { model: SettingsModel }) {
     {model.userId && info && info.devices.length > 0 ? <Section id="s-devices" title="알림 기기">
       <Setting name="등록된 기기" help="알림을 받도록 켜 둔 기기예요. 이 기기는 위에서 끄고, 다른 기기는 여기서 지워요">
         <ul className="device-list">
-          {info.devices.map((device) => <li key={device.id}>
-            <span className="device-name">{device.name ?? '이름 없는 기기'}{device.id === info.thisId ? <b className="badge">이 기기</b> : null}</span>
-            <span className="field-note">{device.createdAt ? `${new Date(device.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}에 등록` : ''} · 아캠 알림 {CANVAS_MODES.find(([mode]) => mode === device.canvasMode)?.[1]}</span>
-            {device.id === info.thisId ? null
-              : <button type="button" className="text-button" disabled={info.busy} aria-label={`${device.name ?? '이름 없는 기기'} 지우기`} onClick={() => info.remove(device.id)}>지우기</button>}
-          </li>)}
+          {info.devices.map((device) => <DeviceRow key={device.id} device={device} info={info} />)}
         </ul>
       </Setting>
     </Section> : null}

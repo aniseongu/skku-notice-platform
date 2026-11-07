@@ -1,13 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { composeSummaryTime, deviceLabel, loadDevices, loadSummaryTime, saveCanvasMode, saveSummaryTime, summaryParts } from '../src/devices.ts';
+import { composeSummaryTime, loadDevices, loadSummaryTime, saveCanvasMode, saveDeviceName, saveSummaryTime, suggestDeviceName, summaryParts, validDeviceName } from '../src/devices.ts';
 
-test('device names are built from the browser string', () => {
-  assert.equal(deviceLabel('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0 Safari/537.36 Whale/4.35'), 'Windows · Whale');
-  assert.equal(deviceLabel('Mozilla/5.0 (Linux; Android 14; SM-S911N) AppleWebKit/537.36 Chrome/150.0 Mobile Safari/537.36'), 'Android · Chrome');
-  assert.equal(deviceLabel('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1'), 'iOS · Safari');
-  assert.equal(deviceLabel('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Gecko/20100101 Firefox/130.0'), 'Mac · Firefox');
-  assert.equal(deviceLabel(''), '이름 없는 기기');
+test('device names suggest the model when the browser tells it, otherwise a plain kind of device', async () => {
+  const name = (ua) => suggestDeviceName(ua, false);
+  assert.equal(await name('Mozilla/5.0 (Linux; Android 14; SM-S911N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0 Mobile Safari/537.36'), 'SM-S911N');
+  assert.equal(await name('Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0 Mobile Safari/537.36'), '안드로이드 휴대폰');
+  assert.equal(await name('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0 Safari/537.36 Whale/4.35'), 'Windows PC');
+  assert.equal(await name('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'), 'iPhone');
+  assert.equal(await name('Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'), 'iPad');
+  assert.equal(await name('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'), 'Mac');
+  assert.equal(await name('Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0'), 'PC');
+  assert.equal(validDeviceName('내 노트북'), true);
+  assert.equal(validDeviceName('   '), false);
+  assert.equal(validDeviceName('가'.repeat(41)), false);
+  assert.equal(validDeviceName('줄바꿈\n있음'), false);
 });
 
 test('summary time converts to the original AM/PM control and back', () => {
@@ -46,6 +53,10 @@ test('devices and summary time are read and written only for my own rows', async
   assert.deepEqual(write.eq, { id: 'd1', user_id: 'user-a' });
   assert.equal(await loadSummaryTime(fake({ rows: [{ summary_time: '21:05:00' }] }), 'u'), '21:05');
   assert.equal(await loadSummaryTime(fake({ rows: [] }), 'u'), null);
+  await saveDeviceName(c, 'user-a', 'd1', ' 내 노트북 ');
+  assert.deepEqual(c.calls.at(-1).values, { device_name: '내 노트북' });
+  assert.deepEqual(c.calls.at(-1).eq, { id: 'd1', user_id: 'user-a' });
+  await assert.rejects(saveDeviceName(c, 'user-a', 'd1', ''), /40자/);
   await saveSummaryTime(c, 'user-a', '07:30');
   assert.deepEqual(c.calls.at(-1).values, { summary_time: '07:30' });
   await assert.rejects(saveSummaryTime(c, 'user-a', '25:00'), /형식/);

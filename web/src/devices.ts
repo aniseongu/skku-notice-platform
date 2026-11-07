@@ -1,17 +1,30 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { UAParser } from 'ua-parser-js';
 
 export type CanvasMode = 'off' | 'summary' | 'reminders';
 export const CANVAS_MODES: readonly (readonly [CanvasMode, string])[] = [['off', '끄기'], ['summary', '하루 요약'], ['reminders', '요약과 마감']];
 
 export interface Device { id: string; endpoint: string; name: string | null; canvasMode: CanvasMode; createdAt: string }
 
-/** 브라우저가 알려 주는 정보로 "Windows · Whale" 같은 기기 이름을 만든다(원본은 이름을 직접 정하거나 제안받았다). */
-export function deviceLabel(userAgent: string): string {
-  const os = /Windows/i.test(userAgent) ? 'Windows' : /Android/i.test(userAgent) ? 'Android' : /iPhone|iPad|iPod/i.test(userAgent) ? 'iOS'
-    : /Mac OS X|Macintosh/i.test(userAgent) ? 'Mac' : /Linux|X11/i.test(userAgent) ? 'Linux' : '';
-  const browser = /Whale\//i.test(userAgent) ? 'Whale' : /Edg\//i.test(userAgent) ? 'Edge' : /SamsungBrowser/i.test(userAgent) ? 'Samsung Internet'
-    : /Firefox\//i.test(userAgent) ? 'Firefox' : /Chrome\//i.test(userAgent) || /CriOS/i.test(userAgent) ? 'Chrome' : /Safari\//i.test(userAgent) ? 'Safari' : '';
-  return [os, browser].filter(Boolean).join(' · ') || '이름 없는 기기';
+// 출처: https://github.com/faisalman/ua-parser-js (원본 성공의 기기 이름 제안과 같은 방식)
+export function validDeviceName(value: string): boolean {
+  return value.trim().length > 0 && value.trim().length <= 40 && !/[\x00-\x1f\x7f]/.test(value);
+}
+
+/** 기기 이름 제안. 브라우저가 모델을 알려 주면(휴대폰) 모델명, 아니면 "Windows PC", "iPhone" 같은 종류 이름을 쓴다. */
+export async function suggestDeviceName(userAgent: string = navigator.userAgent, hints = true): Promise<string> {
+  const parser = new UAParser(userAgent);
+  let device = parser.getDevice();
+  if (hints) { try { device = await device.withClientHints(); } catch { /* 모델을 제공하지 않으면 기기 종류를 쓴다 */ } }
+  const model = device.model?.trim();
+  // 'K'는 안드로이드가 모델을 숨길 때, 'Macintosh'는 맥의 일반 이름이라 모델로 보지 않는다.
+  if (model && model !== 'K' && model !== 'Macintosh' && validDeviceName(model)) return model;
+  const os = parser.getOS().name ?? '';
+  if (os === 'iOS') return device.type === 'tablet' ? 'iPad' : 'iPhone';
+  if (os === 'Android') return device.type === 'tablet' ? '안드로이드 태블릿' : '안드로이드 휴대폰';
+  if (os === 'Windows') return 'Windows PC';
+  if (os === 'macOS') return 'Mac';
+  return device.type === 'mobile' ? '휴대폰' : device.type === 'tablet' ? '태블릿' : 'PC';
 }
 
 const MODES = new Set<string>(['off', 'summary', 'reminders']);
@@ -62,4 +75,11 @@ export function composeSummaryTime(period: 'am' | 'pm', hour: number, minute: nu
   if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 1 || hour > 12 || minute < 0 || minute > 59) return null;
   const h24 = (hour % 12) + (period === 'pm' ? 12 : 0);
   return `${String(h24).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+/** 기기 이름을 바꾼다(40자 이내). 본인의 기기 행만 바뀐다. */
+export async function saveDeviceName(client: SupabaseClient, userId: string, deviceId: string, name: string): Promise<void> {
+  if (!validDeviceName(name)) throw new Error('기기 이름을 40자 이내로 적어 주세요.');
+  const { error } = await client.from('user_push_subscriptions').update({ device_name: name.trim() }).eq('id', deviceId).eq('user_id', userId);
+  if (error) throw error;
 }

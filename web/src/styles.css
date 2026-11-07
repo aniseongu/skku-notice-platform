@@ -537,7 +537,8 @@
   .device-list li:first-child { border-top: 0; }
   .device-name { display: flex; align-items: center; gap: 8px; font-weight: 600; }
   .device-list .field-note { grid-column: 1; margin: 0; }
-  .device-list .text-button { grid-row: 1 / span 2; grid-column: 2; }
+  .device-actions { grid-row: 1 / span 2; grid-column: 2; display: flex; gap: 4px; }
+  .device-list li > .inline { grid-column: 1 / -1; }
   .time-control { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
   .time-numbers { display: flex; align-items: center; gap: 6px; }
   .time-number { width: 56px; min-width: 0; padding: 10px 6px; text-align: center; font-variant-numeric: tabular-nums; appearance: textfield; }

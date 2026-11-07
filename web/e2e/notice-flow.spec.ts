@@ -841,7 +841,7 @@ test('notifications page: this device iCampus mode, daily summary time and the d
   ];
   await withApp(page, { authUserId: 'account-a', pushStatus: 'on', devices, thisDeviceId: 'd1', summaryTime: '21:05',
     canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null },
-    refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', removeDevice: 'fn:remove', setSummaryTime: 'fn:time' });
+    refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', removeDevice: 'fn:remove', renameDevice: 'fn:rename', setSummaryTime: 'fn:time' });
   // 이 기기 아캠 알림: 원본과 같은 세 가지, 지금 값이 골라져 있다.
   const mode = screen.getByRole('radiogroup', { name: '이 기기 아캠 알림' });
   await expect(mode.getByRole('radio')).toHaveText(['끄기', '하루 요약', '요약과 마감']);
@@ -861,7 +861,12 @@ test('notifications page: this device iCampus mode, daily summary time and the d
   const list = screen.getByRole('region', { name: '알림 기기' });
   await expect(list).toContainText('Windows · Whale');
   await expect(list.locator('li', { hasText: 'Windows · Whale' })).toContainText('이 기기');
-  await expect(list.locator('li', { hasText: 'Windows · Whale' }).getByRole('button')).toHaveCount(0);
+  await expect(list.locator('li', { hasText: 'Windows · Whale' }).getByRole('button', { name: /지우기/ })).toHaveCount(0);   // 이 기기는 위에서 끈다
+  // 이름 바꾸기: 눌러서 고치고 저장하면 줄이 닫힌다(저장은 앱에 맡기고 여기서는 호출을 확인한다).
+  await list.getByRole('button', { name: 'Windows · Whale 이름 바꾸기' }).click();
+  await list.getByLabel('Windows · Whale 이름').fill('내 노트북');
+  await list.getByRole('button', { name: '저장하기' }).click();
+  expect((await calls(page)).filter((c) => c[0] === 'rename')).toEqual([['rename', 'd1', '내 노트북']]);
   await list.getByRole('button', { name: 'Android · Chrome 지우기' }).click();
   expect((await calls(page)).filter((c) => c[0] === 'remove')).toEqual([['remove', 'd2']]);
   // 아이캠퍼스 토큰이 없으면 모드와 요약 시간을 바꿀 수 없고 이유를 알려 준다.

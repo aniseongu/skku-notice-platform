@@ -14,7 +14,7 @@ import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from './preferences';
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
-import { composeSummaryTime, deleteDevice, loadDevices, loadSummaryTime, saveCanvasMode, saveSummaryTime, type CanvasMode, type Device } from './devices';
+import { composeSummaryTime, deleteDevice, loadDevices, loadSummaryTime, saveCanvasMode, saveDeviceName, saveSummaryTime, suggestDeviceName, type CanvasMode, type Device } from './devices';
 import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from './my-notices';
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
 import { byokAvailable, loadByokStatus, loadCanvasStatus, deleteMyAccount, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
@@ -743,6 +743,13 @@ export class AppController extends Reactive {
       if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
       this.devices = devices; this.summaryTime = time;
       this.thisDeviceId = devices.find((device) => device.endpoint === endpoint)?.id ?? null;
+      // 이름이 없는 이 기기는 브라우저가 알려 주는 모델이나 기기 종류로 이름을 자동으로 저장한다(원본과 같다).
+      const mine = devices.find((device) => device.id === this.thisDeviceId);
+      if (mine && !mine.name) {
+        const suggestion = await suggestDeviceName();
+        await saveDeviceName(authClient, userId, mine.id, suggestion).catch(() => undefined);
+        if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.devices = this.devices.map((device) => (device.id === mine.id ? { ...device, name: suggestion } : device));
+      }
     } catch { /* 열이 아직 없으면 기능 없이 보인다 */ }
   }
 
@@ -755,6 +762,22 @@ export class AppController extends Reactive {
       if (epoch === this.subscriptionsEpoch) this.devices = this.devices.map((device) => (device.id === id ? { ...device, canvasMode: mode } : device));
     } catch {
       if (epoch === this.subscriptionsEpoch) this.devicesError = '아이캠퍼스 알림을 바꾸지 못했어요. 잠시 뒤 다시 눌러 주세요';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.devicesBusy = false;
+    }
+  }
+
+  async renameDevice(id: string, name: string): Promise<boolean> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.devicesBusy) return false;
+    this.devicesBusy = true; this.devicesError = '';
+    try {
+      await saveDeviceName(authClient, userId, id, name);
+      if (epoch === this.subscriptionsEpoch) this.devices = this.devices.map((device) => (device.id === id ? { ...device, name: name.trim() } : device));
+      return true;
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) this.devicesError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '기기 이름을 바꾸지 못했어요. 잠시 뒤 다시 눌러 주세요';
+      return false;
     } finally {
       if (epoch === this.subscriptionsEpoch) this.devicesBusy = false;
     }
