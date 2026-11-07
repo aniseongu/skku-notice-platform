@@ -14,7 +14,7 @@ import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from './preferences';
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
-import { byokAvailable, loadByokStatus, registerByokKey, removeByokKey, type ByokStatus } from './byok';
+import { byokAvailable, loadByokStatus, loadCanvasStatus, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import type { Draft } from './onboarding-flow';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
@@ -139,7 +139,7 @@ export class AppController extends Reactive {
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, authName: { state: true }, authAvatar: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
-    byokOn: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true },
+    byokOn: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true }, canvasStatus: { state: true }, canvasBusy: { state: true }, canvasError: { state: true },
     profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, profileError: { state: true }, settingsSection: { state: true },
     onboardingOpen: { state: true }, onboardingManual: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
     keywordNote: { state: true },
@@ -171,6 +171,9 @@ export class AppController extends Reactive {
   byokLoading = false;
   byokBusy = false;
   byokError = '';
+  canvasStatus: CanvasStatus | null = null;
+  canvasBusy = false;
+  canvasError = '';
   profile: UserProfile = EMPTY_PROFILE;
   profileStatus: 'idle' | 'loading' | 'ready' | 'unavailable' = 'idle';
   profileMessage = '';
@@ -255,7 +258,7 @@ export class AppController extends Reactive {
           const previousUserId = this.authUserId;
           this.authUserId = userId;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -612,9 +615,9 @@ export class AppController extends Reactive {
   async refreshByok(userId: string, epoch: number): Promise<void> {
     if (!authClient || !this.byokOn) { if (epoch === this.subscriptionsEpoch) this.byokLoading = false; return; }
     try {
-      const status = await loadByokStatus(authClient, userId);
+      const [status, canvas] = await Promise.all([loadByokStatus(authClient, userId), loadCanvasStatus(authClient, userId).catch(() => null)]);
       if (epoch !== this.subscriptionsEpoch) return;
-      this.byokStatus = status; this.byokError = '';
+      this.byokStatus = status; this.canvasStatus = canvas; this.byokError = '';
     } catch {
       if (epoch === this.subscriptionsEpoch) this.byokError = '키 정보를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.';
     } finally {
@@ -635,6 +638,35 @@ export class AppController extends Reactive {
       if (epoch === this.subscriptionsEpoch) this.byokError = error instanceof Error ? error.message : '키를 저장하지 못했어요.';
     } finally {
       if (epoch === this.subscriptionsEpoch) this.byokBusy = false;
+    }
+  }
+
+  async registerCanvas(token: string): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.canvasBusy) return;
+    this.canvasBusy = true; this.canvasError = '';
+    try {
+      await registerCanvasToken(authClient, token);
+      const status = await loadCanvasStatus(authClient, userId);
+      if (epoch === this.subscriptionsEpoch) this.canvasStatus = status;
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) this.canvasError = error instanceof Error ? error.message : '토큰을 저장하지 못했어요.';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.canvasBusy = false;
+    }
+  }
+
+  async removeCanvas(): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.canvasBusy) return;
+    this.canvasBusy = true; this.canvasError = '';
+    try {
+      await removeCanvasToken(authClient);
+      if (epoch === this.subscriptionsEpoch) this.canvasStatus = null;
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) this.canvasError = error instanceof Error ? error.message : '토큰을 지우지 못했어요.';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.canvasBusy = false;
     }
   }
 

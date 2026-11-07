@@ -33,6 +33,25 @@ Deno.serve((req) => handle(req, {
     }, { onConflict: 'user_id' });
     if (error) throw error;
   },
+  async verifyCanvasToken(token) {
+    try {
+      const response = await fetch('https://canvas.skku.edu/api/v1/users/self', {
+        headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000), redirect: 'error',
+      });
+      if (response.ok) return 'valid';
+      return [400, 401, 403].includes(response.status) ? 'invalid' : 'unavailable';
+    } catch { return 'unavailable'; }
+  },
+  async saveCanvasToken(row) {
+    const { error } = await service.from('user_canvas_tokens').upsert({
+      ...row, disabled_at: null, last_error: null, error_at: null, updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' });
+    if (error) throw error;
+  },
+  async deleteCanvasToken(userId) {
+    const { error } = await service.from('user_canvas_tokens').delete().eq('user_id', userId);
+    if (error) throw error;
+  },
   async deleteKey(userId) {
     const { error } = await service.from('user_byok_keys').delete().eq('user_id', userId);
     if (error) throw error;

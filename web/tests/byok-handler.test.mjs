@@ -14,7 +14,10 @@ async function setup({ user = 'user-a', verdict = 'valid', saveError = false } =
     userFromAuthorization: async (auth) => (auth === 'Bearer good' ? user : null),
     verifyGeminiKey: async (k) => { verified.push(k); return verdict; },
     saveKey: async (row) => { if (saveError) throw new Error(`boom ${KEY}`); saved.push(row); },
-    deleteKey: async (id) => { deleted.push(id); } };
+    deleteKey: async (id) => { deleted.push(id); },
+    verifyCanvasToken: async (t) => { verified.push(t); return verdict; },
+    saveCanvasToken: async (row) => { saved.push({ canvas: true, ...row }); },
+    deleteCanvasToken: async (id) => { deleted.push(`canvas:${id}`); } };
   const call = (method, body, auth = 'Bearer good', origin = ORIGIN) => handle(new Request('https://x/byok', {
     method, headers: { Origin: origin, ...(auth ? { Authorization: auth } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }), deps);
   return { call, saved, deleted, verified, masterKey };
@@ -66,4 +69,37 @@ test('storage failures never echo the key and delete removes only the caller key
   assert.equal((await t.call('DELETE')).status, 200);
   assert.deepEqual(t.deleted, ['user-b']);
   assert.equal((await t.call('OPTIONS')).status, 204);
+});
+
+const CANVAS = `1234~${'x'.repeat(40)}`;
+
+test('stores an iCampus token encrypted for "<user>:canvas" and cannot be opened as the user alone', async () => {
+  const t = await setup();
+  const response = await t.call('POST', { provider: 'canvas', token: CANVAS });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body, { ok: true, keyHint: 'xxxx' });
+  assert.equal(JSON.stringify(body).includes(CANVAS), false);
+  assert.equal(t.saved[0].canvas, true);
+  assert.equal(t.saved[0].ciphertext.includes(CANVAS), false);
+  assert.equal(await decryptApiKey(t.masterKey, 'user-a:canvas', t.saved[0].ciphertext), CANVAS);
+  await assert.rejects(decryptApiKey(t.masterKey, 'user-a', t.saved[0].ciphertext));
+  await assert.rejects(decryptApiKey(t.masterKey, 'user-b:canvas', t.saved[0].ciphertext));
+});
+
+test('iCampus token: bad format, rejected and unreachable checks never reach storage, and delete is scoped', async () => {
+  const bad = await setup();
+  assert.equal((await bad.call('POST', { provider: 'canvas', token: 'short' })).status, 400);
+  assert.equal((await bad.call('POST', { provider: 'canvas', token: CANVAS }, null)).status, 401);
+  assert.equal(bad.saved.length, 0);
+  const invalid = await setup({ verdict: 'invalid' });
+  assert.equal((await invalid.call('POST', { provider: 'canvas', token: CANVAS })).status, 400);
+  const down = await setup({ verdict: 'unavailable' });
+  assert.equal((await down.call('POST', { provider: 'canvas', token: CANVAS })).status, 502);
+  assert.equal(invalid.saved.length + down.saved.length, 0);
+  const t = await setup();
+  const response = await handle(new Request('https://x/byok?provider=canvas', { method: 'DELETE', headers: { Origin: ORIGIN, Authorization: 'Bearer good' } }), {
+    masterKey: t.masterKey, userFromAuthorization: async () => 'user-a', deleteCanvasToken: async (id) => { t.deleted.push(`canvas:${id}`); }, deleteKey: async () => { throw new Error('gemini'); } });
+  assert.equal(response.status, 200);
+  assert.deepEqual(t.deleted, ['canvas:user-a']);
 });

@@ -13,6 +13,32 @@ export function looksLikeGeminiKey(value: string): boolean {
   return /^AIza[0-9A-Za-z_-]{35}$/.test(value);
 }
 
+export interface CanvasStatus { keyHint: string; disabled: boolean; lastError: string | null; lastOkAt: string | null }
+
+/** 아이캠퍼스(Canvas) 개인 액세스 토큰 형식. 실제 유효성은 서버가 아이캠퍼스에 확인한다. */
+export function looksLikeCanvasToken(value: string): boolean {
+  return /^[0-9A-Za-z~_-]{16,200}$/.test(value);
+}
+
+export async function loadCanvasStatus(client: SupabaseClient, userId: string): Promise<CanvasStatus | null> {
+  const { data, error } = await client.from('user_canvas_tokens')
+    .select('token_hint,disabled_at,last_error,last_ok_at').eq('user_id', userId).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { keyHint: data.token_hint, disabled: !!data.disabled_at, lastError: data.last_error, lastOkAt: data.last_ok_at };
+}
+
+export async function registerCanvasToken(client: SupabaseClient, token: string): Promise<void> {
+  if (!looksLikeCanvasToken(token)) throw new Error('아이캠퍼스 토큰 형식이 맞지 않아요.');
+  const { error } = await client.functions.invoke('byok', { method: 'POST', body: { provider: 'canvas', token } });
+  if (error) throw await failure(error, '토큰을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+}
+
+export async function removeCanvasToken(client: SupabaseClient): Promise<void> {
+  const { error } = await client.functions.invoke('byok?provider=canvas', { method: 'DELETE' });
+  if (error) throw await failure(error, '토큰을 지우지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+}
+
 /** 암호문 열은 브라우저가 읽을 수 없으므로 상태 열만 고른다. */
 export async function loadByokStatus(client: SupabaseClient, userId: string): Promise<ByokStatus | null> {
   const { data, error } = await client.from('user_byok_keys')

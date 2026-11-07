@@ -183,10 +183,10 @@ test('profile page edits year and status in place and can reopen the first-run s
   expect(recorded[2]).toEqual(['open']);
 });
 
-test('connection keys page follows the original rows: Gemini key flow, iCampus token not offered yet, no profile fields', async ({ page }) => {
+test('connection keys page follows the original rows: Gemini key and iCampus token flows, no profile fields', async ({ page }) => {
   await settingsAt(page, '&keys=1');
   const screen = page.locator('platform-settings-screen');
-  await withApp(page, { authUserId: 'account-a', byokOn: false, registerKey: 'fn:register', removeKey: 'fn:remove', profileStatus: 'ready', onboardingDismissed: true });
+  await withApp(page, { authUserId: 'account-a', byokOn: false, registerKey: 'fn:register', removeKey: 'fn:remove', registerCanvas: 'fn:registerCanvas', removeCanvas: 'fn:removeCanvas', profileStatus: 'ready', onboardingDismissed: true });
   // 서버 기능이 아직 없을 때도 줄은 보이고 이유를 알려 준다.
   await expect(screen.getByRole('heading', { name: '연결 키' })).toBeVisible();
   await expect(screen.locator('.setting', { hasText: 'Gemini 키' }).getByText('준비 중')).toBeVisible();
@@ -196,7 +196,8 @@ test('connection keys page follows the original rows: Gemini key flow, iCampus t
   await expect(screen.getByRole('radio', { name: '2학기' })).toHaveCount(0);
   await expect(screen.getByRole('radio', { name: '복무 전' })).toHaveCount(0);
   await withApp(page, { byokOn: true, byokLoading: false, byokStatus: null });
-  await expect(screen.getByText('미설정')).toBeVisible();
+  await expect(screen.locator('.setting', { hasText: 'Gemini 키' }).getByText('미설정')).toBeVisible();
+  await expect(screen.locator('.setting', { hasText: '아이캠퍼스 토큰' }).getByText('미설정')).toBeVisible();
   await screen.getByRole('button', { name: 'Gemini 키 입력하기' }).click();
   const save = screen.getByRole('button', { name: '저장하기' });
   await expect(save).toBeDisabled();
@@ -219,6 +220,25 @@ test('connection keys page follows the original rows: Gemini key flow, iCampus t
   await expect(screen.getByRole('alert')).toContainText('다시 등록');
   await screen.getByRole('button', { name: 'Gemini 키 지우기' }).click();
   expect(await calls(page)).toEqual([['remove']]);
+  // 아이캠퍼스 토큰도 같은 흐름이다. 형식이 맞지 않으면 저장할 수 없다.
+  await withApp(page, {});
+  await screen.getByRole('button', { name: '아이캠퍼스 토큰 입력하기' }).click();
+  const canvasInput = screen.getByLabel('아이캠퍼스 토큰', { exact: true });
+  await expect(canvasInput).toHaveAttribute('type', 'password');
+  await canvasInput.fill('짧음');
+  await expect(screen.getByRole('button', { name: '저장하기' })).toBeDisabled();
+  const token = `1234~${'Z'.repeat(40)}`;
+  await canvasInput.fill(token);
+  await screen.getByText('받는 방법').click();
+  await expect(screen.getByRole('link', { name: /아이캠퍼스 계정 설정/ })).toHaveAttribute('href', 'https://canvas.skku.edu/profile/settings');
+  await screen.getByRole('button', { name: '저장하기' }).click();
+  expect(await calls(page)).toEqual([['registerCanvas', token]]);
+  await withApp(page, { canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null } });
+  await expect(screen.getByText('저장됨 ····ZZZZ')).toBeVisible();
+  expect(await screen.innerText()).not.toContain(token);
+  await withApp(page, {});
+  await screen.getByRole('button', { name: '아이캠퍼스 토큰 지우기' }).click();
+  expect(await calls(page)).toEqual([['removeCanvas']]);
 });
 
 test('settings items live in the right place: list scope under display, profile fields together, shortcuts jump to the page', async ({ page }) => {

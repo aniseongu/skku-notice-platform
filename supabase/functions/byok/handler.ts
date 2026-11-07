@@ -13,6 +13,15 @@ export interface ByokDeps {
   verifyGeminiKey: (apiKey: string) => Promise<'valid' | 'invalid' | 'unavailable'>;
   saveKey: (row: { user_id: string; ciphertext: string; key_hint: string; model: string }) => Promise<void>;
   deleteKey: (userId: string) => Promise<void>;
+  /** 아이캠퍼스(Canvas) 토큰: 저장 없이 canvas.skku.edu에 확인만 한다. */
+  verifyCanvasToken: (token: string) => Promise<'valid' | 'invalid' | 'unavailable'>;
+  saveCanvasToken: (row: { user_id: string; ciphertext: string; token_hint: string }) => Promise<void>;
+  deleteCanvasToken: (userId: string) => Promise<void>;
+}
+
+/** Canvas 개인 액세스 토큰 형식(숫자~영숫자). 형식이 맞아도 실제 유효성은 별도 호출로 확인한다. */
+export function looksLikeCanvasToken(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9A-Za-z~_-]{16,200}$/.test(value);
 }
 
 function headers(origin: string | null): Headers {
@@ -38,13 +47,25 @@ export async function handle(req: Request, deps: ByokDeps): Promise<Response> {
   if (!userId) return reply(401, origin, { error: '로그인이 필요해요.' });
   try {
     if (req.method === 'DELETE') {
-      await deps.deleteKey(userId);
+      if (new URL(req.url).searchParams.get('provider') === 'canvas') await deps.deleteCanvasToken(userId);
+      else await deps.deleteKey(userId);
       return reply(200, origin, { ok: true });
     }
     const text = await req.text();
     if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) return reply(413, origin, { error: '요청이 너무 커요.' });
-    let body: { apiKey?: unknown; model?: unknown };
+    let body: { apiKey?: unknown; model?: unknown; provider?: unknown; token?: unknown };
     try { body = JSON.parse(text); } catch { return reply(400, origin, { error: '요청 형식을 확인해 주세요.' }); }
+    if (body.provider === 'canvas') {
+      if (!looksLikeCanvasToken(body.token)) return reply(400, origin, { error: '아이캠퍼스 토큰 형식이 맞지 않아요.' });
+      const result = await deps.verifyCanvasToken(body.token);
+      if (result === 'invalid') return reply(400, origin, { error: '아이캠퍼스에서 이 토큰을 받아 주지 않아요. 토큰을 확인해 주세요.' });
+      if (result === 'unavailable') return reply(502, origin, { error: '지금은 토큰을 확인할 수 없어요. 잠시 뒤 다시 시도해 주세요.' });
+      // 암호문은 "<사용자 ID>:canvas"에 묶어서 Gemini 키 표나 다른 사용자 행으로 옮겨도 열리지 않게 한다.
+      const ciphertext = await encryptApiKey(deps.masterKey, `${userId}:canvas`, body.token);
+      const tokenHint = body.token.slice(-4);
+      await deps.saveCanvasToken({ user_id: userId, ciphertext, token_hint: tokenHint });
+      return reply(200, origin, { ok: true, keyHint: tokenHint });
+    }
     if (!looksLikeGeminiKey(body.apiKey)) return reply(400, origin, { error: 'Gemini API 키 형식이 맞지 않아요.' });
     const model = body.model === undefined ? DEFAULT_MODEL : body.model;
     if (typeof model !== 'string' || !MODEL_PATTERN.test(model)) return reply(400, origin, { error: '모델 이름을 확인해 주세요.' });

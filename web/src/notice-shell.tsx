@@ -199,7 +199,9 @@ function settingsModel(app: AppController) {
     saveProfile: (profile: UserProfile) => { void app.saveProfile(profile); },
     openOnboarding: () => app.openOnboarding(),
     byok: { available: app.byokOn, loading: app.byokLoading, busy: app.byokBusy, error: app.byokError, status: app.byokStatus,
-      register: (apiKey: string) => { void app.registerKey(apiKey); }, remove: () => { void app.removeKey(); } },
+      register: (apiKey: string) => { void app.registerKey(apiKey); }, remove: () => { void app.removeKey(); },
+      canvas: app.canvasStatus, canvasBusy: app.canvasBusy, canvasError: app.canvasError,
+      registerCanvas: (token: string) => { void app.registerCanvas(token); }, removeCanvas: () => { void app.removeCanvas(); } },
   };
 }
 

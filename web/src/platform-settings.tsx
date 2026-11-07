@@ -2,7 +2,7 @@
 // 스위치는 바로 반영되는 설정에만 쓰고(role="switch"), 켜짐·꺼짐을 글자로도 알린다(색에만 의존하지 않는다).
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
-import type { ByokStatus } from './byok';
+import type { ByokStatus, CanvasStatus } from './byok';
 import { ENROLLMENT, MILITARY, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
 import { programLabel } from './skku-programs';
 import { BOARD_CATALOG, COLLEGE_BOARD, DEPARTMENT_BOARD, OTHER_BOARDS } from './skku-boards';
@@ -63,6 +63,11 @@ export interface SettingsModel {
     status: ByokStatus | null;
     register: (apiKey: string) => void;
     remove: () => void;
+    canvas: CanvasStatus | null;
+    canvasBusy: boolean;
+    canvasError: string;
+    registerCanvas: (token: string) => void;
+    removeCanvas: () => void;
   };
 }
 
@@ -369,13 +374,45 @@ function KeyRow({ name, help, state, children, guide }: { name: string; help: st
   </Setting>;
 }
 
-function GeminiRow({ model }: { model: SettingsModel }) {
-  const { byok } = model;
+/** 비밀 한 줄: 저장 상태, 입력하기·수정하기·지우기, 눌러서 펼치는 입력칸과 받는 방법(Gemini 키와 아이캠퍼스 토큰이 같이 쓴다). */
+function SecretRow({ name, help, placeholder, status, loading, busy, error, onRegister, onRemove, guide, valid }: {
+  name: string; help: string; placeholder: string;
+  status: { keyHint: string; disabled: boolean; lastError: string | null } | null;
+  loading: boolean; busy: boolean; error: string;
+  onRegister: (value: string) => void; onRemove: () => void; guide: ReactNode; valid?: (value: string) => boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const [shown, setShown] = useState(false);
-  const [apiKey, setApiKey] = useState('');
-  // 저장이 끝나 상태가 바뀌면 입력칸을 닫고 비운다. 키는 이 입력칸 밖에 남기지 않는다.
-  useEffect(() => { if (byok?.status) { setApiKey(''); setEditing(false); setShown(false); } }, [byok?.status?.keyHint]);
+  const [value, setValue] = useState('');
+  // 저장이 끝나 상태가 바뀌면 입력칸을 닫고 비운다. 값은 이 입력칸 밖에 남기지 않는다.
+  useEffect(() => { if (status) { setValue(''); setEditing(false); setShown(false); } }, [status?.keyHint]);
+  const state = loading ? '확인 중' : status ? `저장됨 ····${status.keyHint}${status.disabled ? ' (사용 중지됨)' : ''}` : '미설정';
+  return <Setting name={name} help={help}>
+    {editing ? <>
+      <div className="inline">
+        <input className="input" type={shown ? 'text' : 'password'} autoComplete="off" spellCheck={false} aria-label={name}
+          placeholder={placeholder} value={value} disabled={busy} onChange={(event) => setValue(event.currentTarget.value.trim())} />
+        <button type="button" className="ghost-button" aria-pressed={shown} disabled={busy} onClick={() => setShown(!shown)}>{shown ? '숨기기' : '보기'}</button>
+      </div>
+      <div className="inline">
+        <button type="button" className="solid-button" disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인하고 있어요' : '저장하기'}</button>
+        <button type="button" className="ghost-button" disabled={busy} onClick={() => { setEditing(false); setValue(''); setShown(false); }}>닫기</button>
+      </div>
+      {error ? <p className="field-note error" role="alert">{error}</p> : null}
+      {guide}
+    </> : <>
+      <div className="connection-summary"><span className="setting-state">{state}</span>
+        <button type="button" className="text-button key-action" aria-label={`${name} ${status ? '수정하기' : '입력하기'}`} disabled={loading} onClick={() => setEditing(true)}>{status ? '수정하기' : '입력하기'}</button>
+        {status ? <button type="button" className="text-button key-action" aria-label={`${name} 지우기`} disabled={busy} onClick={onRemove}>지우기</button> : null}
+      </div>
+      {status?.lastError ? <p className="field-note error" role="alert">{status.lastError}</p> : null}
+      {error ? <p className="field-note error" role="alert">{error}</p> : null}
+    </>}
+  </Setting>;
+}
+
+function GeminiRow({ model }: { model: SettingsModel }) {
+  const { byok } = model;
   const guide = <Guide label="받는 방법" steps={[
     <>{ext('https://aistudio.google.com/apikey', 'Google AI Studio의 API 키 화면')}을 열고 Google 계정으로 로그인해요</>,
     '"API 키 만들기"를 누르고, 프로젝트를 고르라고 하면 새 프로젝트를 만들어요',
@@ -388,29 +425,28 @@ function GeminiRow({ model }: { model: SettingsModel }) {
       <span className="field-note">키를 받는 기능을 서버에 설치하는 중이에요. 끝나면 여기에서 입력할 수 있어요</span>
     </KeyRow>;
   }
-  const state = byok.loading ? '확인 중' : byok.status ? `저장됨 ····${byok.status.keyHint}${byok.status.disabled ? ' (사용 중지됨)' : ''}` : '미설정';
-  return <Setting name="Gemini 키" help={help}>
-    {editing ? <>
-      <div className="inline">
-        <input className="input" type={shown ? 'text' : 'password'} autoComplete="off" spellCheck={false} aria-label="Gemini 키"
-          placeholder="AIza로 시작하는 키" value={apiKey} disabled={byok.busy} onChange={(event) => setApiKey(event.currentTarget.value.trim())} />
-        <button type="button" className="ghost-button" aria-pressed={shown} disabled={byok.busy} onClick={() => setShown(!shown)}>{shown ? '숨기기' : '보기'}</button>
-      </div>
-      <div className="inline">
-        <button type="button" className="solid-button" disabled={byok.busy || !apiKey} onClick={() => byok.register(apiKey)}>{byok.busy ? '확인하고 있어요' : '저장하기'}</button>
-        <button type="button" className="ghost-button" disabled={byok.busy} onClick={() => { setEditing(false); setApiKey(''); setShown(false); }}>닫기</button>
-      </div>
-      {byok.error ? <p className="field-note error" role="alert">{byok.error}</p> : null}
-      {guide}
-    </> : <>
-      <div className="connection-summary"><span className="setting-state">{state}</span>
-        <button type="button" className="text-button key-action" aria-label={`Gemini 키 ${byok.status ? '수정하기' : '입력하기'}`} disabled={byok.loading} onClick={() => setEditing(true)}>{byok.status ? '수정하기' : '입력하기'}</button>
-        {byok.status ? <button type="button" className="text-button key-action" aria-label="Gemini 키 지우기" disabled={byok.busy} onClick={() => byok.remove()}>지우기</button> : null}
-      </div>
-      {byok.status?.lastError ? <p className="field-note error" role="alert">{byok.status.lastError}</p> : null}
-      {byok.error ? <p className="field-note error" role="alert">{byok.error}</p> : null}
-    </>}
-  </Setting>;
+  return <SecretRow name="Gemini 키" help={help} placeholder="AIza로 시작하는 키" status={byok.status} loading={byok.loading} busy={byok.busy}
+    error={byok.error} onRegister={byok.register} onRemove={byok.remove} guide={guide} />;
+}
+
+function CanvasRow({ model }: { model: SettingsModel }) {
+  const { byok } = model;
+  const help = '아이캠퍼스의 강의와 과제 마감을 알려드리는 데 써요';
+  if (!byok?.available) {
+    return <KeyRow name="아이캠퍼스 토큰" help={help} state="준비 중" guide={null}>
+      <span className="field-note">토큰을 받는 기능을 서버에 설치하는 중이에요. 끝나면 여기에서 입력할 수 있어요</span>
+    </KeyRow>;
+  }
+  const guide = <Guide label="받는 방법" steps={[
+    <>{ext('https://canvas.skku.edu/profile/settings', '아이캠퍼스 계정 설정')}을 열고 로그인해요</>,
+    '"승인된 통합" 아래의 "새 액세스 토큰"을 눌러요',
+    '목적에 "성공 알림" 같은 이름을 쓰고 만료일은 비워 두거나 학기 끝으로 정해요',
+    '"토큰 생성"을 누르면 한 번만 보이는 긴 글자가 나와요. 복사해서 붙여 넣고 "저장하기"를 눌러요',
+    '저장하면 아이캠퍼스에 확인한 뒤 암호화해 서버에만 보관해요. 읽기만 하고 아이캠퍼스 내용을 바꾸지 않아요',
+  ]} />;
+  return <SecretRow name="아이캠퍼스 토큰" help={help} placeholder="숫자~로 시작하는 토큰" status={byok.canvas} loading={byok.loading} busy={byok.canvasBusy}
+    error={byok.canvasError} onRegister={byok.registerCanvas} onRemove={byok.removeCanvas} guide={guide}
+    valid={(value) => /^[0-9A-Za-z~_-]{16,200}$/.test(value)} />;
 }
 
 function Keys({ model }: { model: SettingsModel }) {
@@ -419,9 +455,7 @@ function Keys({ model }: { model: SettingsModel }) {
     <Back model={model} />
     <Section id="s-keys" title="연결 키">
       <GeminiRow model={model} />
-      <KeyRow name="아이캠퍼스 토큰" help="지금 할 수 있는 강의와 과제 마감을 알려요" state="준비 중">
-        <span className="field-note">아이캠퍼스 알림은 아직 만들고 있어서 토큰을 받지 않아요</span>
-      </KeyRow>
+      <CanvasRow model={model} />
     </Section>
     <Section id="s-eligibility" title="내 프로필">
       <Setting name="지원 자격 정보" help="Gemini가 지원 자격을 판단할 때 쓰는 학년, 학기, 재학 상태, 병역과 관심 분야는 프로필 설정에서 바꿔요">
