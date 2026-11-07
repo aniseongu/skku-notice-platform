@@ -181,6 +181,7 @@ def run_judging(
                         "summary": j.summary,
                         "deadline": j.deadline,
                         "deadline_kind": j.deadline_kind,
+                        "deadline_checked": judge is judge_school_notices,
                     }
                     for key, j in found.items()
                 ]

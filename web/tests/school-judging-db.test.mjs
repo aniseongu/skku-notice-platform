@@ -10,7 +10,8 @@ const MIGRATIONS = ['20261107030000_public_notices.sql', '20261107031000_notice_
   '20261107080000_push_subscriptions.sql', '20261107081000_push_claims.sql', '20261107082000_push_candidates.sql',
   '20261107100000_push_silent_priority.sql', '20261107101000_push_original_content.sql', '20261107110000_user_byok.sql',
   '20261107111000_source_external_flag.sql', '20261107112000_byok_judging.sql', '20261107113000_push_ai_candidates.sql',
-  '20261108110000_school_judging.sql', '20261108180000_school_summary_backfill.sql'];
+  '20261108110000_school_judging.sql', '20261108160000_notice_summaries.sql', '20261108180000_school_summary_backfill.sql',
+  '20261108190000_judgment_deadline.sql', '20261108200000_automatic_deadlines.sql'];
 
 async function database() {
   const db = new PGlite();
@@ -37,17 +38,19 @@ const seed = (db) => db.exec(`
     ('school/4','school','4','키를 넣기 전 공지','https://www.skku.edu/4',current_date,now()-interval '2 days',now(),'본문','[]'),
     ('other/1','other','1','구독하지 않은 게시판','https://x.skku.edu/1',current_date,now()-interval '5 minutes',now(),'본문','[]');`);
 
-test('school notices waiting for this user judgment: only own subscribed, recent, unjudged notices of a key owner', async () => {
+test('automatic deadlines cover old and unsubscribed school notices without crossing users or retrying checked results', async () => {
   const db = await database();
   try {
     await seed(db);
     await db.exec('set role service_role');
     const mine = (await db.query(`select notice_id from public.list_byok_pending_school('${A}', 6) order by notice_id`)).rows;
-    assert.deepEqual(mine.map((r) => r.notice_id), ['school/1', 'school/2', 'school/4']);   // 키를 넣기 전이라도 최근 3일 공지는 요약한다
+    assert.deepEqual(mine.map((r) => r.notice_id), ['other/1', 'school/1', 'school/2', 'school/3', 'school/4']);
     // 키가 없는 사용자에게는 판정할 것이 없다.
     assert.deepEqual((await db.query(`select * from public.list_byok_pending_school('${B}', 6)`)).rows, []);
-    await db.exec(`reset role; insert into user_notice_judgments(user_id,notice_id,verdict,reason,model) values ('${A}','school/1','relevant','대상이에요','m'); set role service_role`);
-    assert.deepEqual((await db.query(`select notice_id from public.list_byok_pending_school('${A}', 6)`)).rows.map((r) => r.notice_id), ['school/2', 'school/4']);
+    await db.exec(`reset role; insert into user_notice_judgments(user_id,notice_id,verdict,reason,model,deadline_checked) values ('${A}','school/1','relevant','대상이에요','m',true), ('${A}','school/2','maybe','확인','m',false); set role service_role`);
+    const pending = (await db.query(`select notice_id from public.list_byok_pending_school('${A}', 6)`)).rows.map((r) => r.notice_id);
+    assert.ok(!pending.includes('school/1'));
+    assert.ok(pending.includes('school/2'), 'old judgments without deadline extraction are retried');
     await db.exec('reset role; set role authenticated');
     await assert.rejects(db.exec(`select * from public.list_byok_pending_school('${A}', 6)`), /permission denied/);
   } finally { await db.close(); }

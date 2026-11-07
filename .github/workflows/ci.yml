@@ -20,6 +20,7 @@ jobs:
       - run: npm ci
       - run: npm test
   python:
+    needs: api
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -29,6 +30,7 @@ jobs:
       - run: uv run ruff check .
       - run: uv run pytest -q
   web:
+    needs: python
     runs-on: ubuntu-latest
     defaults:
       run:
