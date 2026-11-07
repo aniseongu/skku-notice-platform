@@ -739,7 +739,7 @@
   :root { --group-top: calc(var(--wco-h) + env(safe-area-inset-top)); }
   .group-head {
     position: sticky; top: var(--group-top); z-index: 1; margin: 0; min-height: 40px; padding: 8px var(--gutter);
-    background: light-dark(var(--sunken), color-mix(in oklch, var(--surface) 88%, var(--accent)));
+    background: light-dark(var(--sunken), var(--bg));
     border-block: 1px solid var(--line);
   }
   .group-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
