@@ -62,7 +62,7 @@ function PlatformSettings({ model }: { model: SettingsModel }) {
       </label>)}
       {model.error && <><p role="alert">{model.error}</p><button className="ghost-button" onClick={model.retry}>다시 불러오기</button></>}
     </>}
-    <p>저장과 읽음 표시는 현재 이 브라우저에만 남아요.</p>
+    <p>{model.userId ? '저장과 읽음 표시는 계정에 남아 다른 기기에서도 이어져요.' : '로그인하지 않으면 저장과 읽음 표시는 이 브라우저에만 남아요.'}</p>
   </section>;
 }
 
