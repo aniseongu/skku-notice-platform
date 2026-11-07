@@ -222,3 +222,38 @@ def test_ocr_runs_without_gemini_key(tmp_path: Path, monkeypatch) -> None:
     assert detail["body"] == "Gemini가 읽은 채용 안내"
     assert detail["body_from_image"] is True
     assert "ocr_text" not in detail
+
+
+def test_large_ocr_image_is_split_with_overlapping_bounded_tiles(monkeypatch):
+    from io import BytesIO
+    from types import SimpleNamespace
+
+    from PIL import Image
+
+    image = Image.new('RGB', (120, 3200), 'white')
+    payload = BytesIO()
+    image.save(payload, format='PNG')
+    sizes = []
+
+    def engine(data):
+        with Image.open(BytesIO(data)) as tile:
+            sizes.append(tile.size)
+        return SimpleNamespace(txts=['공지'])
+
+    monkeypatch.setattr(ocr, '_engine', lambda: engine)
+    assert ocr.read_images([payload.getvalue()]) == '공지\n공지\n공지'
+    assert sizes == [(120, 1480), (120, 1560), (120, 480)]
+
+
+def test_ocr_rejects_extreme_dimensions_without_running_engine(monkeypatch):
+    from io import BytesIO
+
+    from PIL import Image
+
+    image = Image.new('RGB', (4000, 3100), 'white')
+    payload = BytesIO()
+    image.save(payload, format='PNG')
+    calls = []
+    monkeypatch.setattr(ocr, '_engine', lambda: lambda data: calls.append(data))
+    assert ocr.read_images([payload.getvalue()]) == ''
+    assert not calls
