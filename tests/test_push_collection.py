@@ -114,3 +114,17 @@ def test_changed_claim_carries_kind_and_marker():
     seen.clear()
     Store().claim({"user_id": "u", "subscription_id": "d", "notice_id": "s/1"})
     assert "p_kind" not in seen
+
+
+def test_external_posting_message_carries_the_judgment_reason_before_the_deadline():
+    candidate = {
+        "notice_id": "linkareer-intern/1",
+        "title": "[회사] 백엔드 인턴",
+        "source_name": "링커리어",
+        "ai_reason": "서버 개발 직무예요",
+        "deadline": "2026-11-09T14:59:00+00:00",
+    }
+    assert worker.compose_message(candidate) == (
+        "[링커리어] [회사] 백엔드 인턴",
+        "서버 개발 직무예요\n마감 11월 9일(월)",
+    )

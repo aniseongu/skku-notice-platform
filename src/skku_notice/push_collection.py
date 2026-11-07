@@ -85,8 +85,11 @@ def compose_message(candidate: dict) -> tuple[str, str]:
     if changed:
         what = "제목이 바뀌었어요" if candidate.get("change_kind") == "제목" else "본문이 바뀌었어요"
         lines.append(f"학교가 글을 고쳤어요. {what}")
-    elif candidate.get("matched_words"):
-        lines.append(f"관심 {', '.join(candidate['matched_words'])}")
+    else:
+        if candidate.get("matched_words"):
+            lines.append(f"관심 {', '.join(candidate['matched_words'])}")
+        if candidate.get("ai_reason"):
+            lines.append(candidate["ai_reason"])
     deadline = _deadline_label(candidate.get("deadline"))
     if deadline:
         lines.append(deadline)
