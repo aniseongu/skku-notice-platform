@@ -922,7 +922,7 @@ export class AppController extends Reactive {
     window.scrollTo({ top: 0 });
   };
 
-  /** X와 Esc: 어느 쪽에 있든 설정을 한 번에 닫고 들어오기 전에 보던 보기로 돌아간다. */
+  /** 설정을 한 번에 닫고 들어오기 전에 보던 보기로 돌아간다. 첫 쪽의 X와 Esc가 쓴다. */
   closeSettings = () => {
     const depth = this.settingsDepth();
     if (depth > 0) { history.go(-depth); return; }
@@ -931,7 +931,8 @@ export class AppController extends Reactive {
     this.setView(isTab(last) ? last : 'all');
   };
 
-  leaveSettings = this.closeSettings;
+  /** X와 Esc: 하위 쪽에서는 한 단계 앞(설정 첫 쪽)으로, 첫 쪽에서는 설정을 나간다. 다시 들어오면 첫 쪽부터 시작한다. */
+  leaveSettings = this.backSettings;
 
   onPopState = () => {
     this.openedId = typeof history.state?.notice === 'string' ? history.state.notice : null;

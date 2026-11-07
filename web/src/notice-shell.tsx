@@ -7,6 +7,7 @@ import { authClient } from './auth';
 import { keywordCounts } from './keyword-counts';
 import { type AppController, STALE_MS, TABS, remember, settingsSubtitle, settingsTitle } from './app-controller';
 import type { UserProfile } from './profile';
+import { Avatar } from './ui';
 import { Onboarding } from './onboarding';
 import './platform-settings';
 import './notice-rows';
@@ -88,6 +89,11 @@ export function NoticeShell({ app }: { app: AppController }) {
           {app.tab() === 'intern' ? null : <button type="button" className="side-item add" onClick={() => app.openSettings('notifications')}>게시판 더 고르기</button>}
         </SideGroup>
         <div className="side-foot">
+          <button type="button" className="side-profile" onClick={() => (app.authUserId ? app.openSettings('profile') : app.setView('settings'))}>
+            <Avatar src={app.authAvatar} size={32} />
+            <span className="side-profile-text"><span className="side-profile-name">{app.authUserId ? (app.authName ?? app.authEmail ?? '내 계정') : '로그인하지 않았어요'}</span>
+              <span className="side-profile-sub">{app.authUserId ? '프로필 설정' : '설정에서 로그인해요'}</span></span>
+          </button>
           <SideItem label="설정" count={null} active={settings} onClick={() => app.setView('settings')} />
         </div>
       </aside>
@@ -113,9 +119,11 @@ export function NoticeShell({ app }: { app: AppController }) {
                 <button type="button" className="icon-button" aria-label="공지 다시 가져오기" title="공지 다시 가져오기 (R)" aria-keyshortcuts="r"
                   disabled={app.loading} onClick={() => { void app.collectNow(); }}><Icon name="refresh" /></button>
               </>}
+              {settings ? null : <button type="button" className="icon-button narrow-only avatar-button" aria-label={app.authUserId ? '프로필 설정' : '로그인하기'}
+                onClick={() => (app.authUserId ? app.openSettings('profile') : app.setView('settings'))}><Avatar src={app.authAvatar} size={28} /></button>}
               {settings ? null : <button type="button" className="icon-button narrow-only" aria-label="설정" onClick={() => app.setView('settings')}><GearIcon /></button>}
-              {settings ? <button type="button" className="icon-button wide-only" aria-label="설정 닫기" title="설정 닫기 (Esc)"
-                aria-keyshortcuts="Escape" onClick={app.closeSettings}><Icon name="close" /></button> : null}
+              {settings ? <button type="button" className="icon-button wide-only" aria-label={app.settingsSection ? '설정으로 돌아가기' : '설정 닫기'} title={app.settingsSection ? '설정으로 (Esc)' : '설정 닫기 (Esc)'}
+                aria-keyshortcuts="Escape" onClick={app.backSettings}><Icon name="close" /></button> : null}
             </header>
           </div>
 

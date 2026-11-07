@@ -345,56 +345,53 @@ test('first-run setup can be skipped and then stays out of the way; it can be re
   await expect(dialog).toHaveCount(0);
 });
 
-test('settings close button leaves settings from any page and the back arrow goes up one level', async ({ page }, testInfo) => {
+test('settings X goes up one level and leaves settings only from the first page, every time settings is entered', async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === 'mobile';
   const screen = page.locator('platform-settings-screen');
   const list = page.locator('notice-rows-screen a.row').first();
   const openSettings = () => (mobile ? page.getByRole('button', { name: '설정', exact: true }).click() : page.locator('.side-foot .side-item').click());
-  // 닫기: 데스크톱은 X, 모바일은 첫 쪽에서의 뒤로 가기 화살표. 둘 다 하위 쪽에 깊이 들어갔어도 설정 밖으로 한 번에 나간다.
-  const close = () => page.getByRole('button', { name: mobile ? '설정 닫기' : '설정 닫기', exact: true }).first();
+  // 데스크톱은 X, 모바일은 뒤로 가기 화살표가 같은 일을 한다(하위 쪽에서는 첫 쪽으로, 첫 쪽에서는 닫기).
+  const up = () => (mobile ? page.getByRole('button', { name: '설정으로 돌아가기' }) : page.getByRole('button', { name: '설정으로 돌아가기' }).first());
+  const close = () => page.getByRole('button', { name: '설정 닫기' }).first();
+  const hub = () => expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
   await page.goto('/?api=sample/api/v1');
   await list.waitFor();
+  for (let round = 1; round <= 2; round++) {          // 나갔다가 다시 들어와도 같게 동작한다
+    await openSettings();
+    await screen.getByRole('link', { name: /알림/ }).first().click();
+    await expect(page).toHaveURL(/section=notifications/);
+    await up().click();                                  // X: 하위 쪽 → 설정 첫 쪽
+    await hub();
+    await expect(page).toHaveURL(/view=settings/);
+    await expect(page).not.toHaveURL(/section=/);
+    await close().click();                               // X: 첫 쪽 → 나가기
+    await expect(page).not.toHaveURL(/view=settings/);
+    await expect(list).toBeVisible();
+    await expect(screen).toHaveCount(0);
+  }
+  // 하위 쪽을 여러 번 거쳐도 X는 한 번에 한 단계씩이다(알림 → 설정으로 → 키워드 → X → X).
   await openSettings();
   await screen.getByRole('link', { name: /알림/ }).first().click();
-  await expect(page).toHaveURL(/section=notifications/);
-  if (mobile) {
-    await page.getByRole('button', { name: '설정으로 돌아가기' }).click();     // 한 단계 위
-    await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
-    await page.getByRole('button', { name: '설정 닫기' }).click();            // 첫 쪽에서는 닫기
-  } else {
-    await close().click();                                                     // X는 한 번에 닫는다
-  }
-  await expect(page).not.toHaveURL(/view=settings/);
-  await expect(list).toBeVisible();
-  await expect(screen).toHaveCount(0);
-  // 하위 쪽을 두 번 거쳐도(알림 → 설정으로 → 키워드) 닫으면 설정 밖이다.
-  await openSettings();
-  await screen.getByRole('link', { name: /관심 키워드/ }).click();
   await screen.getByRole('link', { name: '설정으로' }).click();
-  await screen.getByRole('link', { name: /알림/ }).first().click();
-  if (mobile) {
-    await page.getByRole('button', { name: '설정으로 돌아가기' }).click();
-    await page.getByRole('button', { name: '설정 닫기' }).click();
-  } else {
-    await close().click();
-  }
+  await screen.getByRole('link', { name: /관심 키워드/ }).click();
+  await up().click();
+  await hub();
+  await close().click();
   await expect(page).not.toHaveURL(/view=settings/);
   await expect(list).toBeVisible();
-  // 주소로 바로 들어온 경우에도 닫으면 목록으로 간다.
+  // 주소로 바로 들어와도 X 한 번은 첫 쪽, 두 번째가 나가기다.
   await page.goto('/?view=settings&section=keywords&api=sample/api/v1');
   await screen.waitFor();
-  if (mobile) {
-    await page.getByRole('button', { name: '설정으로 돌아가기' }).click();
-    await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
-    await page.getByRole('button', { name: '설정 닫기' }).click();
-  } else {
-    await close().click();
-  }
+  await up().click();
+  await hub();
+  await close().click();
   await expect(page).not.toHaveURL(/view=settings/);
   await expect(list).toBeVisible();
   // Esc도 같다.
   await openSettings();
   await screen.getByRole('link', { name: /알림/ }).first().click();
+  await page.keyboard.press('Escape');
+  await hub();
   await page.keyboard.press('Escape');
   await expect(page).not.toHaveURL(/view=settings/);
   await expect(list).toBeVisible();
@@ -522,4 +519,23 @@ test('account shows an icon, name and email and leads to profile settings where 
   // 프로필을 불러오기 전에는 입력을 막는다.
   await withApp(page, { profileStatus: 'unavailable' });
   await expect(interests).toBeDisabled();
+});
+
+test('the main screen shows a profile icon: a silhouette when signed out, and it leads to profile settings when signed in', async ({ page }, testInfo) => {
+  const mobile = testInfo.project.name === 'mobile';
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.waitForLoadState('networkidle');
+  const chip = mobile ? page.locator('.avatar-button .avatar') : page.locator('.side-profile .avatar');
+  await expect(chip).toBeVisible();
+  await expect(chip.locator('svg')).toBeVisible();                          // 사진이 없으면 기본 실루엣
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.authUserId = 'account-a'; app.authName = '홍길동'; app.authEmail = 'a@skku.edu';
+    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: 'x', interests: '', wants: '', avoids: '' };
+    app.profileStatus = 'ready';
+  });
+  if (!mobile) await expect(page.locator('.side-profile')).toContainText('홍길동');
+  await (mobile ? page.getByRole('button', { name: '프로필 설정' }) : page.locator('.side-profile')).click();
+  await expect(page).toHaveURL(/section=profile/);
 });
