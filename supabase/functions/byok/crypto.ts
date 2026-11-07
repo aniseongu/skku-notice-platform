@@ -9,7 +9,7 @@ export function b64urlEncode(bytes: Uint8Array): string {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-export function b64urlDecode(value: string): Uint8Array {
+export function b64urlDecode(value: string): Uint8Array<ArrayBuffer> {
   const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4);
   return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
 }
@@ -20,7 +20,7 @@ export async function importMasterKey(masterKey: string): Promise<CryptoKey> {
   return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
 }
 
-export async function encryptApiKey(key: CryptoKey, userId: string, plaintext: string, iv = crypto.getRandomValues(new Uint8Array(12))): Promise<string> {
+export async function encryptApiKey(key: CryptoKey, userId: string, plaintext: string, iv: Uint8Array<ArrayBuffer> = crypto.getRandomValues(new Uint8Array(12))): Promise<string> {
   const body = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: enc.encode(userId) }, key, enc.encode(plaintext)));
   const out = new Uint8Array(iv.length + body.length);
   out.set(iv); out.set(body, iv.length);

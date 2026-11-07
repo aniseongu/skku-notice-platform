@@ -45,3 +45,6 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      # Edge Function은 Deno에서 실행되므로 타입 검사와 같은 테스트를 Deno로도 돌린다(npm의 공식 deno 패키지, 버전 고정).
+      - run: npx --yes deno@2.9.6 check ../supabase/functions/byok/index.ts
+      - run: npx --yes deno@2.9.6 test --allow-read --no-check tests/byok-crypto.test.mjs tests/byok-handler.test.mjs
