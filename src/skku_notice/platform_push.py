@@ -66,13 +66,14 @@ def send_one(
     url: str,
     tag: str,
     silent: bool = False,
+    body: str = "새 공지",
 ) -> str:
     """Return sent, expired or retry; never log endpoints, keys or response bodies."""
     if not valid_subscription(subscription):
         # DNS failures are indistinguishable here from invalid endpoints; never delete on uncertainty.
         return "retry"
     payload = json.dumps(
-        {"title": title[:180], "body": "새 공지가 도착했어요", "url": url, "tag": tag, "silent": silent},
+        {"title": title[:180], "body": body[:600], "url": url, "tag": tag, "silent": silent},
         ensure_ascii=False,
     )
     try:

@@ -12,9 +12,9 @@ test('push candidates honor subscriptions and start time; keywords and OCR decid
       create function auth.uid() returns uuid language sql stable as $$
         select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
       grant usage on schema auth to authenticated; insert into auth.users values ('${user}');`);
-    for (const name of ['20261107030000_public_notices.sql', '20261107040000_user_subscriptions.sql',
+    for (const name of ['20261107030000_public_notices.sql', '20261107031000_notice_changes.sql', '20261107040000_user_subscriptions.sql',
       '20261107060000_user_preferences.sql', '20261107070000_public_ocr_cache.sql',
-      '20261107080000_push_subscriptions.sql', '20261107081000_push_claims.sql', '20261107082000_push_candidates.sql', '20261107100000_push_silent_priority.sql']) {
+      '20261107080000_push_subscriptions.sql', '20261107081000_push_claims.sql', '20261107082000_push_candidates.sql', '20261107100000_push_silent_priority.sql', '20261107050000_user_notice_states.sql', '20261107101000_push_original_content.sql']) {
       await db.exec(await readFile(new URL(`../../supabase/migrations/${name}`, import.meta.url), 'utf8'));
     }
     const hash = 'a'.repeat(64);
@@ -47,5 +47,48 @@ test('push candidates honor subscriptions and start time; keywords and OCR decid
     assert.deepEqual(excluded.map((r) => [r.notice_id, r.silent]), [['school/1', true]]);
     await db.exec('reset role; set role authenticated');
     await assert.rejects(db.exec('select * from public.list_notice_push_candidates(20)'), /permission denied/);
+  } finally { await db.close(); }
+});
+
+test('change alerts go once per change, only for keyword matches or saved notices, with original content fields', async () => {
+  const db = new PGlite();
+  const user = '00000000-0000-0000-0000-000000000001';
+  try {
+    await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
+      create schema auth; create table auth.users(id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as $$
+        select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+      grant usage on schema auth to authenticated; insert into auth.users values ('${user}');`);
+    for (const name of ['20261107030000_public_notices.sql', '20261107031000_notice_changes.sql', '20261107040000_user_subscriptions.sql',
+      '20261107060000_user_preferences.sql', '20261107070000_public_ocr_cache.sql', '20261107080000_push_subscriptions.sql',
+      '20261107081000_push_claims.sql', '20261107082000_push_candidates.sql', '20261107100000_push_silent_priority.sql',
+      '20261107050000_user_notice_states.sql', '20261107101000_push_original_content.sql']) {
+      await db.exec(await readFile(new URL(`../../supabase/migrations/${name}`, import.meta.url), 'utf8'));
+    }
+    await db.exec(`insert into platform_sources(id,name,url) values ('school','소프트웨어학과','https://www.skku.edu/notice');
+      insert into user_source_subscriptions(user_id,source_id,created_at) values ('${user}','school',now()-interval '2 days');
+      insert into user_push_subscriptions(user_id,endpoint,p256dh,auth_secret,created_at)
+        values ('${user}','https://fcm.googleapis.com/fcm/send/test','${'A'.repeat(87)}','${'A'.repeat(22)}',now()-interval '2 days');
+      insert into user_preferences(user_id,keywords) values ('${user}',array['장학']);
+      insert into platform_notices(id,source_id,article_no,title,url,posted_on,first_seen,changed_at,change_kind,deadline) values
+        ('school/1','school','1','장학 안내','https://www.skku.edu/n?1',current_date,now()-interval '3 days',now()-interval '1 hour','제목',now()+interval '3 days'),
+        ('school/2','school','2','일반 공지','https://www.skku.edu/n?2',current_date,now()-interval '3 days',now()-interval '1 hour','본문',null),
+        ('school/3','school','3','저장한 공지','https://www.skku.edu/n?3',current_date,now()-interval '3 days',now()-interval '1 hour','본문',null);
+      insert into user_notice_states(user_id,notice_id,is_saved) values ('${user}','school/3',true);
+      set role service_role;`);
+    let rows = (await db.query('select * from public.list_notice_push_candidates(20)')).rows;
+    assert.deepEqual(rows.map((r) => [r.notice_id, r.kind]).sort(), [['school/1', 'changed'], ['school/3', 'changed']]);
+    const first = rows.find((r) => r.notice_id === 'school/1');
+    assert.equal(first.silent, false);
+    assert.equal(first.change_kind, '제목');
+    assert.equal(first.source_name, '소프트웨어학과');
+    assert.deepEqual(first.matched_words, ['장학']);
+    assert.ok(first.deadline);
+    await db.query(`select public.claim_notice_push('${user}','${first.subscription_id}','school/1','changed','${new Date(first.change_marker).toISOString()}')`);
+    rows = (await db.query('select * from public.list_notice_push_candidates(20)')).rows;
+    assert.deepEqual(rows.map((r) => r.notice_id), ['school/3']);
+    await db.exec("reset role; update platform_notices set changed_at = now(), change_kind = '본문' where id = 'school/1'; set role service_role");
+    rows = (await db.query('select * from public.list_notice_push_candidates(20)')).rows;
+    assert.deepEqual(rows.map((r) => r.notice_id).sort(), ['school/1', 'school/3']);
   } finally { await db.close(); }
 });

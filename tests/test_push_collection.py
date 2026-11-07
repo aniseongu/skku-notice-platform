@@ -76,3 +76,41 @@ def test_vapid_subject_is_normalized_to_what_py_vapid_accepts():
     for bad in ("", "http://example.com", "https://", "https://example.com/path", "ftp://x.y"):
         with pytest.raises(ValueError):
             worker.normalize_subject(bad)
+
+
+def test_message_matches_original_wording():
+    base = {"notice_id": "school/1", "title": "장학 안내", "source_name": "소프트웨어학과"}
+    assert worker.compose_message(base) == ("[소프트웨어학과] 장학 안내", "새 공지")
+    interested = {**base, "matched_words": ["인턴", "장학"], "deadline": "2026-11-09T14:59:00+00:00"}
+    title, body = worker.compose_message(interested)
+    assert title == "[소프트웨어학과] 장학 안내"
+    assert body == "관심 인턴, 장학\n마감 11월 9일(월)"
+    title, body = worker.compose_message(
+        {**base, "kind": "changed", "change_kind": "제목", "deadline": "2026-11-09T03:30:00+00:00"}
+    )
+    assert title == "[소프트웨어학과] [수정] 장학 안내"
+    assert body == "학교가 글을 고쳤어요. 제목이 바뀌었어요\n마감 11월 9일(월) 12:30"
+
+
+def test_changed_claim_carries_kind_and_marker():
+    seen = {}
+
+    class Store(worker.PushStore):
+        def __init__(self):
+            pass
+
+        def _request(self, method, path, **kwargs):
+            seen.update(kwargs["json"])
+
+            class R:
+                def json(self):
+                    return 1
+
+            return R()
+
+    Store().claim({"user_id": "u", "subscription_id": "d", "notice_id": "s/1", "kind": "changed",
+                   "change_marker": "2026-11-07T00:00:00+00:00"})
+    assert seen["p_kind"] == "changed" and seen["p_change_marker"] == "2026-11-07T00:00:00+00:00"
+    seen.clear()
+    Store().claim({"user_id": "u", "subscription_id": "d", "notice_id": "s/1"})
+    assert "p_kind" not in seen

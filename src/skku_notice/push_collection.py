@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 
 from py_vapid import Vapid
 
+from skku_notice.deadline import KST
 from skku_notice.platform_push import send_one
 from skku_notice.scheduled_collection import NoticeStore
 
@@ -16,15 +17,14 @@ class PushStore(NoticeStore):
         return self._request("POST", "rpc/list_notice_push_candidates", json={"p_limit": 20}).json()
 
     def claim(self, candidate: dict) -> int | None:
-        return self._request(
-            "POST",
-            "rpc/claim_notice_push",
-            json={
-                "p_user_id": candidate["user_id"],
-                "p_subscription_id": candidate["subscription_id"],
-                "p_notice_id": candidate["notice_id"],
-            },
-        ).json()
+        payload = {
+            "p_user_id": candidate["user_id"],
+            "p_subscription_id": candidate["subscription_id"],
+            "p_notice_id": candidate["notice_id"],
+        }
+        if candidate.get("kind") == "changed":
+            payload.update({"p_kind": "changed", "p_change_marker": candidate["change_marker"]})
+        return self._request("POST", "rpc/claim_notice_push", json=payload).json()
 
     def mark(self, claim_id: int, status: str, now: datetime) -> None:
         self._request(
@@ -63,6 +63,36 @@ def safe_school_url(value: str) -> bool:
         return False
 
 
+def _deadline_label(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        local = datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(KST)
+    except ValueError:
+        return None
+    label = f"마감 {local.month}월 {local.day}일({'월화수목금토일'[local.weekday()]})"
+    if (local.hour, local.minute) != (23, 59):
+        label += f" {local:%H:%M}"
+    return label
+
+
+def compose_message(candidate: dict) -> tuple[str, str]:
+    """Same wording as the original service: [board] title, with interest and deadline lines."""
+    changed = candidate.get("kind") == "changed"
+    title = f"[{candidate.get('source_name') or candidate['notice_id'].split('/')[0]}] "
+    title += f"[수정] {candidate['title']}" if changed else candidate["title"]
+    lines = []
+    if changed:
+        what = "제목이 바뀌었어요" if candidate.get("change_kind") == "제목" else "본문이 바뀌었어요"
+        lines.append(f"학교가 글을 고쳤어요. {what}")
+    elif candidate.get("matched_words"):
+        lines.append(f"관심 {', '.join(candidate['matched_words'])}")
+    deadline = _deadline_label(candidate.get("deadline"))
+    if deadline:
+        lines.append(deadline)
+    return title, "\n".join(lines) or "새 공지"
+
+
 def normalize_subject(subject: str) -> str:
     """py_vapid accepts `https://host` without a path; a trailing slash makes every send fail."""
     value = subject.strip()
@@ -91,13 +121,15 @@ def run_batch(store: PushStore, private_key: str, subject: str, now: datetime) -
                 "auth": candidate["auth_secret"],
             },
         }
+        title, body = compose_message(candidate)
         outcome = send_one(
             subscription,
             private_key,
             subject,
-            title=candidate["title"],
+            title=title,
+            body=body,
             url=candidate["url"],
-            tag=candidate["notice_id"],
+            tag=f"notice:{candidate['notice_id']}",
             silent=bool(candidate.get("silent", False)),
         )
         if outcome == "expired":
