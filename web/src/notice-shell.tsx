@@ -278,7 +278,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
     groups.set(key, [...(groups.get(key) ?? []), notice]);
   }
   return <>{[...groups].map(([heading, items], index) => <section className="group" aria-label={heading} key={heading}>
-    <div className="group-head"><h2>{heading}</h2>{index === 0 ? <BoardSelect app={app} /> : null}</div>
+    <div className="group-head"><div className="group-title"><h2>{heading}</h2><span className="group-count" aria-label={`${items.length}건`}>{items.length}건</span></div>{index === 0 ? <BoardSelect app={app} /> : null}</div>
     <notice-rows-screen model={{
       rows: items.map((notice) => {
         const ai = app.judgement(notice)?.ai ?? null;
