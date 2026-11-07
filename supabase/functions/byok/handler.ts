@@ -6,6 +6,7 @@ export const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
 const MAX_BODY_BYTES = 2048;
 
 export type SummaryFailure = 'no_key' | 'not_found' | 'limit' | 'rejected' | 'busy' | 'error';
+export interface SummaryResult { summary: string; deadline: string | null; deadlineKind: '마감' | '일정' | null }
 export class SummaryError extends Error {
   code: SummaryFailure;
   constructor(code: SummaryFailure) { super(code); this.code = code; }
@@ -22,7 +23,7 @@ const SUMMARY_MESSAGES: Record<SummaryFailure, [number, string]> = {
 
 export interface ByokDeps {
   /** 사용자의 Gemini 키로 공지 한 건을 요약해 저장하고 요약 글을 돌려준다. 실패는 SummaryError로 알린다. */
-  summarize?: (userId: string, noticeId: string) => Promise<string>;
+  summarize?: (userId: string, noticeId: string) => Promise<SummaryResult>;
   masterKey: CryptoKey;
   /** Returns the user id of a verified session token, or null. */
   userFromAuthorization: (authorization: string | null) => Promise<string | null>;
@@ -74,7 +75,7 @@ export async function handle(req: Request, deps: ByokDeps): Promise<Response> {
     try { body = JSON.parse(text); } catch { return reply(400, origin, { error: '요청 형식을 확인해 주세요.' }); }
     if (body.action === 'summarize') {
       if (!deps.summarize || typeof body.noticeId !== 'string' || !NOTICE_ID.test(body.noticeId)) return reply(400, origin, { error: '요청 형식을 확인해 주세요.' });
-      try { return reply(200, origin, { ok: true, summary: await deps.summarize(userId, body.noticeId) }); }
+      try { return reply(200, origin, { ok: true, ...(await deps.summarize(userId, body.noticeId)) }); }
       catch (error) {
         const [status, message] = SUMMARY_MESSAGES[error instanceof SummaryError ? error.code : 'error'];
         return reply(status, origin, { error: message });

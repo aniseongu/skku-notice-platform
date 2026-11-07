@@ -15,7 +15,7 @@ import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from '.
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
-import { byokAvailable, loadByokStatus, loadCanvasStatus, loadNoticeSummary, requestNoticeSummary, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
+import { byokAvailable, loadByokStatus, loadCanvasStatus, loadMyNoticeInfo, requestNoticeSummary, type MyNoticeInfo, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import type { Draft } from './onboarding-flow';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
@@ -251,7 +251,7 @@ export class AppController extends Reactive {
   // 글별 본문(D-013). 'loading'이면 받는 중, null이면 아직 서버가 받지 않은 글.
   bodies = new Map<string, NoticeBody | null | 'loading'>();
   /** 내 Gemini 요약. 공유 본문 캐시와 따로 두어 계정이 바뀌면 비운다. */
-  summaries = new Map<string, string | null | 'loading'>();
+  summaries = new Map<string, MyNoticeInfo | null | 'loading'>();
   toastTimer = 0;
   // 상세 칸에 실제로 보이는 글(고른 글이 없으면 첫 글). 목록 행 표시와 맞춘다.
   shownId: string | null = null;
@@ -1235,16 +1235,16 @@ export class AppController extends Reactive {
   }
 
   /** 로그인한 사용자 본인의 요약. 키를 등록하지 않았거나 아직 판정 전이면 null이다. */
-  summary(notice: Notice): string | null {
+  myInfo(notice: Notice): MyNoticeInfo | null {
     const userId = this.authUserId;
     if (!authClient || !userId) return null;
     const cached = this.summaries.get(notice.id);
     if (cached !== undefined) return cached === 'loading' ? null : cached;
     this.summaries.set(notice.id, 'loading');
     const epoch = this.subscriptionsEpoch;
-    loadNoticeSummary(authClient, userId, notice.id).catch(() => null).then((text) => {
+    loadMyNoticeInfo(authClient, userId, notice.id).catch(() => null).then((info) => {
       if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
-      this.summaries.set(notice.id, text);
+      this.summaries.set(notice.id, info);
       this.requestUpdate();
     });
     return null;
@@ -1265,9 +1265,10 @@ export class AppController extends Reactive {
     if (!authClient || !userId || this.summarizing) return;
     this.summarizing = notice.id; this.summaryError = ''; this.summaryErrorId = null;
     try {
-      const text = await requestNoticeSummary(authClient, notice.id);
+      const made = await requestNoticeSummary(authClient, notice.id);
       if (epoch !== this.subscriptionsEpoch) return;
-      this.summaries.set(notice.id, text);
+      const before = this.summaries.get(notice.id);
+      this.summaries.set(notice.id, { ai: typeof before === 'object' && before ? before.ai : null, ...made });
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) { this.summaryErrorId = notice.id; this.summaryError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '요약을 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.'; }
     } finally {

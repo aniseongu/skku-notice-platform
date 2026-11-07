@@ -44,6 +44,8 @@ class Judgment:
     interests: tuple[str, ...] = ()
     summary: str | None = None
     image_text: str = ""
+    deadline: str | None = None
+    deadline_kind: str | None = None
 
 
 def decide_priority(

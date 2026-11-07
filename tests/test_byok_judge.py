@@ -1,3 +1,4 @@
+# ruff: noqa: E501  (모의 Gemini 답변 문자열이 한 줄에 있다)
 from datetime import UTC, datetime
 
 import pytest
@@ -92,7 +93,8 @@ def test_judges_with_the_users_own_key_and_saves_per_user_results():
     assert counts["judged"] == 1
     assert store.saved == [
         {"user_id": "user-a", "notice_id": "ext/1", "verdict": "relevant",
-         "reason": "서버 개발 직무예요", "model": "gemini-3.1-flash-lite", "summary": None}
+         "reason": "서버 개발 직무예요", "model": "gemini-3.1-flash-lite", "summary": None,
+         "deadline": None, "deadline_kind": None}
     ]
     cleared = {"used_on": "2026-11-07", "used_today": 1, "last_error": None, "error_at": None}
     assert store.updates[-1][1] == cleared
@@ -208,7 +210,8 @@ def test_school_notices_are_judged_with_the_same_key_and_saved_like_internships(
     assert counts["judged"] == 1
     assert store.saved == [{"user_id": "user-a", "notice_id": "sw/1", "verdict": "relevant",
                             "reason": "소프트웨어학과 재학생이 대상이에요", "model": "gemini-3.1-flash-lite",
-                            "summary": "소프트웨어학과 재학생이 졸업요건을 확인해요.\n12월 5일까지 내요."}]
+                            "summary": "소프트웨어학과 재학생이 졸업요건을 확인해요.\n12월 5일까지 내요.",
+                            "deadline": None, "deadline_kind": None}]
     assert store.updates[-1][1]["used_today"] == 1
 
 
@@ -224,3 +227,29 @@ def test_both_kinds_use_one_call_each_and_a_failure_stops_the_user():
     failing = FakeStore([key_row("user-a")], school=school)
     counts = judge.run_judging(failing, MASTER, NOW, factory(ApiError(429)))
     assert counts["errors"] == 1 and failing.saved == [] and failing.updates[-1][1]["used_today"] == 1
+
+
+def test_school_deadline_read_from_the_body_is_kept_only_when_it_is_believable():
+    from datetime import timedelta
+
+    from skku_notice.school_ai import judge_school_notices
+
+    soon = (datetime.now(UTC) + timedelta(days=3)).astimezone().replace(microsecond=0).isoformat()
+    ancient = (datetime.now(UTC) - timedelta(days=200)).isoformat()
+    far = (datetime.now(UTC) + timedelta(days=900)).isoformat()
+    items = [{"id": key, "title": "t", "body": "b"} for key in ("ok", "event", "none", "old", "far", "junk")]
+    reply = Reply(
+        '{"items": ['
+        f'{{"id": "ok", "verdict": "relevant", "reason": "대상이에요", "summary": "s", "deadline_kind": "마감", "deadline_at": "{soon}"}},'
+        f'{{"id": "event", "verdict": "maybe", "reason": "행사예요", "summary": "s", "deadline_kind": "일정", "deadline_at": "{soon}"}},'
+        '{"id": "none", "verdict": "maybe", "reason": "날짜가 없어요", "summary": "s", "deadline_kind": "없음", "deadline_at": ""},'
+        f'{{"id": "old", "verdict": "maybe", "reason": "지난 일이에요", "summary": "s", "deadline_kind": "마감", "deadline_at": "{ancient}"}},'
+        f'{{"id": "far", "verdict": "maybe", "reason": "너무 멀어요", "summary": "s", "deadline_kind": "마감", "deadline_at": "{far}"}},'
+        '{"id": "junk", "verdict": "maybe", "reason": "읽지 못했어요", "summary": "s", "deadline_kind": "마감", "deadline_at": "내일쯤"}'
+        "]}"
+    )
+    found = judge_school_notices(items, "m", "k", client=FakeClient(reply))
+    assert found["ok"].deadline_kind == "마감" and found["ok"].deadline
+    assert found["event"].deadline_kind == "일정" and found["event"].deadline
+    for key in ("none", "old", "far", "junk"):
+        assert found[key].deadline is None and found[key].deadline_kind is None, key

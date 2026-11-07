@@ -39,23 +39,62 @@ export async function removeCanvasToken(client: SupabaseClient): Promise<void> {
   if (error) throw await failure(error, '토큰을 지우지 못했어요. 잠시 뒤 다시 시도해 주세요.');
 }
 
-/** 내 Gemini 키로 만든 공지 요약(본인 행만 읽힌다). 눌러서 만든 요약을 먼저 보고, 없으면 판정할 때 같이 만든 요약을 본다. 없으면 null. */
-export async function loadNoticeSummary(client: SupabaseClient, userId: string, noticeId: string): Promise<string | null> {
-  const requested = await client.from('user_notice_summaries').select('summary').eq('user_id', userId).eq('notice_id', noticeId).maybeSingle();
-  if (requested.error) throw requested.error;
-  if (typeof requested.data?.summary === 'string' && requested.data.summary.trim()) return requested.data.summary;
-  const judged = await client.from('user_notice_judgments').select('summary').eq('user_id', userId).eq('notice_id', noticeId).maybeSingle();
-  if (judged.error) throw judged.error;
-  return typeof judged.data?.summary === 'string' && judged.data.summary.trim() ? judged.data.summary : null;
+/** 내 Gemini 키로 만든 공지 정보: 요약, 본문에서 읽은 마감, 판정(맞는지와 이유). 본인 행만 읽힌다. */
+export interface MyNoticeInfo {
+  summary: string | null;
+  deadline: string | null;
+  deadlineKind: '마감' | '일정' | null;
+  ai: { verdict: 'relevant' | 'maybe' | 'not_relevant'; reason: string; model: string } | null;
 }
 
-/** 공지 한 건의 요약을 내 키로 지금 만든다. 서버가 키를 풀어 Gemini에 보내고 결과를 저장한다. */
-export async function requestNoticeSummary(client: SupabaseClient, noticeId: string): Promise<string> {
+const clean = (value: unknown): string | null => (typeof value === 'string' && value.trim() ? value : null);
+const kindOf = (value: unknown): '마감' | '일정' | null => (value === '마감' || value === '일정' ? value : null);
+
+/** 목록에 쓸 본인 날짜를 페이지 단위로 가져온다. 요청한 요약의 날짜가 판정 날짜보다 우선이다. */
+export async function loadMyDeadlines(client: SupabaseClient, userId: string): Promise<Map<string, Pick<MyNoticeInfo, 'deadline' | 'deadlineKind'>>> {
+  const result = new Map<string, Pick<MyNoticeInfo, 'deadline' | 'deadlineKind'>>();
+  for (const table of ['user_notice_summaries', 'user_notice_judgments']) {
+    for (let offset = 0; ; offset += 500) {
+      const { data, error } = await client.from(table).select('notice_id,deadline,deadline_kind')
+        .eq('user_id', userId).not('deadline', 'is', null).order('notice_id').range(offset, offset + 499);
+      if (error) throw error;
+      for (const row of data ?? []) {
+        const deadline = clean(row.deadline);
+        if (deadline && typeof row.notice_id === 'string' && !result.has(row.notice_id))
+          result.set(row.notice_id, { deadline, deadlineKind: kindOf(row.deadline_kind) });
+      }
+      if (!data || data.length < 500) break;
+    }
+  }
+  return result;
+}
+
+/** 눌러서(또는 열어서) 만든 요약을 먼저 보고, 없으면 판정할 때 같이 만든 것을 본다. 아무것도 없으면 null. */
+export async function loadMyNoticeInfo(client: SupabaseClient, userId: string, noticeId: string): Promise<MyNoticeInfo | null> {
+  const made = await client.from('user_notice_summaries').select('summary,deadline,deadline_kind').eq('user_id', userId).eq('notice_id', noticeId).maybeSingle();
+  if (made.error) throw made.error;
+  const judged = await client.from('user_notice_judgments').select('summary,verdict,reason,model,deadline,deadline_kind').eq('user_id', userId).eq('notice_id', noticeId).maybeSingle();
+  if (judged.error) throw judged.error;
+  const m = made.data as Record<string, unknown> | null;
+  const j = judged.data as Record<string, unknown> | null;
+  if (!m && !j) return null;
+  const verdict = j?.verdict;
+  const ai: MyNoticeInfo['ai'] = j && (verdict === 'relevant' || verdict === 'maybe' || verdict === 'not_relevant') && clean(j.reason)
+    ? { verdict, reason: String(j.reason), model: String(j.model ?? '') } : null;
+  const deadline = clean(m?.deadline) ?? clean(j?.deadline);
+  const deadlineKind = deadline ? (kindOf(m?.deadline_kind) ?? kindOf(j?.deadline_kind)) : null;
+  return { summary: clean(m?.summary) ?? clean(j?.summary), deadline, deadlineKind, ai };
+}
+
+/** 공지 한 건의 요약과 마감을 내 키로 지금 만든다. 서버가 키를 풀어 Gemini에 보내고 결과를 저장한다. */
+export async function requestNoticeSummary(client: SupabaseClient, noticeId: string): Promise<Pick<MyNoticeInfo, 'summary' | 'deadline' | 'deadlineKind'>> {
   const { data, error } = await client.functions.invoke('byok', { method: 'POST', body: { action: 'summarize', noticeId } });
   if (error) throw await failure(error, '요약을 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.');
-  const summary = (data as { summary?: unknown } | null)?.summary;
-  if (typeof summary !== 'string' || !summary.trim()) throw new Error('요약을 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.');
-  return summary;
+  const body = data as { summary?: unknown; deadline?: unknown; deadlineKind?: unknown } | null;
+  const summary = clean(body?.summary);
+  if (!summary) throw new Error('요약을 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.');
+  const deadline = clean(body?.deadline);
+  return { summary, deadline, deadlineKind: deadline ? kindOf(body?.deadlineKind) : null };
 }
 
 /** 암호문 열은 브라우저가 읽을 수 없으므로 상태 열만 고른다. */

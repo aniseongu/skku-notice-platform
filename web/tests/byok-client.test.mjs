@@ -41,7 +41,7 @@ test('client accepts the AQ. key format', () => {
   assert.equal(looksLikeGeminiKey(`AQ.Ab8RN6J${'x'.repeat(40)}`), true);
 });
 
-import { loadNoticeSummary } from '../src/byok.ts';
+import { loadMyNoticeInfo } from '../src/byok.ts';
 
 function summaryClient(tables) {
   const queries = [];
@@ -53,12 +53,24 @@ function summaryClient(tables) {
   } };
 }
 
-test('summary lookup prefers the one I asked for, falls back to the judgment summary, and always filters by my user', async () => {
-  const asked = summaryClient({ user_notice_summaries: { summary: '눌러서 만든 요약' }, user_notice_judgments: { summary: '판정 요약' } });
-  assert.equal(await loadNoticeSummary(asked, 'user-a', 'a/1'), '눌러서 만든 요약');
-  assert.deepEqual(asked.queries[0].eq, { user_id: 'user-a', notice_id: 'a/1' });
-  const judged = summaryClient({ user_notice_judgments: { summary: '판정 요약' } });
-  assert.equal(await loadNoticeSummary(judged, 'user-a', 'a/1'), '판정 요약');
-  assert.equal(await loadNoticeSummary(summaryClient({}), 'user-a', 'a/1'), null);
-  assert.equal(await loadNoticeSummary(summaryClient({ user_notice_summaries: { summary: '   ' } }), 'user-a', 'a/1'), null);
+test('my notice info merges what I asked for with the judgment, and always filters by my user', async () => {
+  const asked = summaryClient({
+    user_notice_summaries: { summary: '눌러서 만든 요약', deadline: '2026-11-10T05:00:00Z', deadline_kind: '마감' },
+    user_notice_judgments: { summary: '판정 요약', verdict: 'relevant', reason: '대상이에요', model: 'm', deadline: null, deadline_kind: null },
+  });
+  const info = await loadMyNoticeInfo(asked, 'user-a', 'a/1');
+  assert.deepEqual(info, { summary: '눌러서 만든 요약', deadline: '2026-11-10T05:00:00Z', deadlineKind: '마감', ai: { verdict: 'relevant', reason: '대상이에요', model: 'm' } });
+  assert.deepEqual(asked.queries.map((q) => q.eq), [{ user_id: 'user-a', notice_id: 'a/1' }, { user_id: 'user-a', notice_id: 'a/1' }]);
+  const judged = summaryClient({ user_notice_judgments: { summary: '판정 요약', verdict: 'maybe', reason: '확인이 필요해요', model: 'm', deadline: '2026-12-01T00:00:00Z', deadline_kind: '일정' } });
+  const fromJudgment = await loadMyNoticeInfo(judged, 'user-a', 'a/1');
+  assert.equal(fromJudgment.summary, '판정 요약');
+  assert.equal(fromJudgment.deadlineKind, '일정');
+  assert.equal(fromJudgment.ai.verdict, 'maybe');
+  assert.equal(await loadMyNoticeInfo(summaryClient({}), 'user-a', 'a/1'), null);
+  const blank = await loadMyNoticeInfo(summaryClient({ user_notice_summaries: { summary: '   ', deadline: null } }), 'user-a', 'a/1');
+  assert.equal(blank.summary, null);
+  assert.equal(blank.deadline, null);
+  // 알 수 없는 판정 값이나 이유가 없는 판정은 쓰지 않는다.
+  const odd = await loadMyNoticeInfo(summaryClient({ user_notice_judgments: { summary: 's', verdict: 'weird', reason: 'x', model: 'm' } }), 'user-a', 'a/1');
+  assert.equal(odd.ai, null);
 });

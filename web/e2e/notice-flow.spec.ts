@@ -753,3 +753,21 @@ test('summary is made automatically: progress text, a retry button on failure, n
   await expect(detail.getByRole('button', { name: '다시 만들기' })).toHaveCount(0);
   await expect(detail.getByRole('region', { name: '요약' })).toContainText('12월 5일까지');
 });
+
+test('detail shows keywords found in the body like the original (the judgment reason and deadline are covered by unit tests)', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '두 칸 화면에서 확인한다');
+  await page.route(/\/notices\/[\w-]+\/\d+\.json/, (route) => route.fulfill({ contentType: 'application/json',
+    body: JSON.stringify({ body: '장학금 신청 안내', body_html: null, images: [], attachments: [], fetched_at: 'x', body_from_image: false }) }));
+  await page.goto('/?api=sample/api/v1');
+  const first = page.locator('notice-rows-screen a.row').first();
+  await first.waitFor();
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.keywords = ['장학', '공모전'];
+  });
+  await first.click();
+  const detail = page.locator('notice-detail-screen');
+  await expect(detail.locator('.detail-reason')).toContainText('관심 장학');          // 본문에서 찾은 키워드
+  await expect(detail.locator('.detail-reason')).not.toContainText('공모전');          // 본문에 없는 키워드는 붙지 않는다
+});

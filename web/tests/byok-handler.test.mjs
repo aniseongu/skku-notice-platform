@@ -123,10 +123,10 @@ test('summarize runs with the caller identity only, validates the notice id and 
   const make = (summarize) => ({ masterKey, userFromAuthorization: async (a) => (a === 'Bearer good' ? 'user-a' : null), summarize });
   const call = (deps, body, auth = 'Bearer good') => handle(new Request('https://x/byok', {
     method: 'POST', headers: { Origin: ORIGIN, ...(auth ? { Authorization: auth } : {}) }, body: JSON.stringify(body) }), deps);
-  const ok = make(async (user, notice) => { asked.push([user, notice]); return '12월 5일까지 내요.'; });
+  const ok = make(async (user, notice) => { asked.push([user, notice]); return { summary: '12월 5일까지 내요.', deadline: '2026-12-05T14:59:00.000Z', deadlineKind: '마감' }; });
   const response = await call(ok, { action: 'summarize', noticeId: 'skku-notice01/12345' });
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, summary: '12월 5일까지 내요.' });
+  assert.deepEqual(await response.json(), { ok: true, summary: '12월 5일까지 내요.', deadline: '2026-12-05T14:59:00.000Z', deadlineKind: '마감' });
   assert.deepEqual(asked, [['user-a', 'skku-notice01/12345']]);
   assert.equal((await call(ok, { action: 'summarize', noticeId: 'skku-notice01/12345' }, null)).status, 401);
   for (const noticeId of ['../etc/passwd', 'a/b', 'x'.repeat(100) + '/1', 42, undefined]) {

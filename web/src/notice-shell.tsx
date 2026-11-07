@@ -1,7 +1,7 @@
 // 앱 화면. 상태와 동작은 AppController가 맡고, 이 파일은 구독해서 그리기만 한다.
 // 그림자 DOM을 쓰지 않아 전역 토큰과 글꼴을 그대로 받는다. 학교 글자는 React가 자동으로 이스케이프한다.
 import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
-import { type IconName, type Notice, boardName, deadlineGroup, deadlinePassed, postedGroup, safeUrl, todayKst } from './data';
+import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, deadlinePassed, postedGroup, safeUrl, todayKst } from './data';
 import { APP_NAME } from './brand';
 import { authClient } from './auth';
 import { keywordCounts } from './keyword-counts';
@@ -9,6 +9,7 @@ import { type AppController, STALE_MS, TABS, remember, settingsSubtitle, setting
 import type { UserProfile } from './profile';
 import { Avatar } from './ui';
 import { Onboarding } from './onboarding';
+import { bodyInterests, withMyDeadline } from './notice-view';
 import './platform-settings';
 import './notice-rows';
 import './notice-detail';
@@ -278,7 +279,9 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
       rows: items.map((notice) => {
         const ai = app.judgement(notice)?.ai ?? null;
         const interests = app.interests(notice);
-        return { notice, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
+        const cached = app.summaries.get(notice.id);
+        const rowNotice = withMyDeadline(notice, cached && cached !== 'loading' ? cached : null);
+        return { notice: rowNotice, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
           read: app.isRead(notice), saved: app.isSaved(notice), current: app.isWide && app.detailOpen && app.shownId === notice.id,
           selected: app.selectedReads.includes(notice.id), dim: ai?.verdict === 'not_relevant' && !interests.length,
           interests, ai, rule: app.judgement(notice)?.rule_name ?? null };
@@ -401,10 +404,14 @@ function SaveButton({ app, notice }: { app: AppController; notice: Notice }) {
 function Detail({ app, notice }: { app: AppController; notice: Notice }) {
   const judgement = app.judgement(notice);
   app.autoSummary(notice);
+  const mine = app.myInfo(notice);
+  const body = app.body(notice);
+  const interests = [...new Set([...app.interests(notice), ...bodyInterests(app.keywords, body, keywordMatches)])];
+  const shown = withMyDeadline(notice, mine);
   return <notice-detail-screen model={{
-    notice, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
-    today: todayKst(), body: app.body(notice), mySummary: app.summary(notice), summarizing: app.summarizing === notice.id, summaryError: app.summaryErrorId === notice.id && !app.summarizing ? app.summaryError : '', makeSummary: () => { void app.makeSummary(notice); }, interests: app.interests(notice),
-    ai: judgement?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
+    notice: shown, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
+    today: todayKst(), body, mySummary: mine?.summary ?? null, summarizing: app.summarizing === notice.id, summaryError: app.summaryErrorId === notice.id && !app.summarizing ? app.summaryError : '', makeSummary: () => { void app.makeSummary(notice); }, interests,
+    ai: judgement?.ai ?? mine?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
     retry: () => { app.bodies.delete(notice.id); app.requestUpdate(); },
   }} />;
 }

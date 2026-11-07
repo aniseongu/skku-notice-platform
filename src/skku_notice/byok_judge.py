@@ -179,6 +179,8 @@ def run_judging(
                         "reason": j.reason[:300],
                         "model": j.model,
                         "summary": j.summary,
+                        "deadline": j.deadline,
+                        "deadline_kind": j.deadline_kind,
                     }
                     for key, j in found.items()
                 ]
