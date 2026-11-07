@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'r
 import type { ByokStatus } from './byok';
 import { ENROLLMENT, MILITARY, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
 import { programLabel } from './skku-programs';
-import { BOARD_CATALOG, COLLEGE_BOARD, DEPARTMENT_BOARD } from './skku-boards';
+import { BOARD_CATALOG, COLLEGE_BOARD, DEPARTMENT_BOARD, OTHER_BOARDS } from './skku-boards';
 import { Avatar, SwitchRow } from './ui';
 
 export interface SettingsModel {
@@ -180,13 +180,14 @@ function BoardGroups({ model }: { model: SettingsModel }) {
     return map;
   }, []);
   const known = new Set(BOARD_CATALOG.map((board) => board.id));
+  const otherGroup = new Map(OTHER_BOARDS.map((board) => [board.id, board.group]));
   const mine = model.sources.filter((source) => model.subscriptions.includes(source.id));
   const needle = query.replace(/\s+/g, '').toLowerCase();
   const others = model.sources.filter((source) => !model.subscriptions.includes(source.id)
     && (!needle || source.label.replace(/\s+/g, '').toLowerCase().includes(needle)));
   const groups = new Map<string, typeof others>();
   for (const source of others) {
-    const group = collegeOf.get(source.id) ?? (known.has(source.id) ? '기타' : '학교 공통');
+    const group = otherGroup.get(source.id) ?? collegeOf.get(source.id) ?? (known.has(source.id) ? '기타' : '학교 공통');
     groups.set(group, [...(groups.get(group) ?? []), source]);
   }
   const busy = model.loading;

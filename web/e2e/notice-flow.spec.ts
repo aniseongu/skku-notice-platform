@@ -295,6 +295,11 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('button', { name: '3학년' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
+  // 기타 게시판: 전공과 상관없는 부트캠프 게시판을 고를 수 있고, 건너뛰어도 된다.
+  await expect(dialog.getByRole('heading', { name: '전공과 상관없는 게시판도 받을까요?' })).toBeVisible();
+  await expect(dialog.getByRole('switch', { name: /미래차 부트캠프 소식/ })).toHaveAttribute('aria-checked', 'false');
+  await dialog.getByRole('switch', { name: /미래차 부트캠프 소식/ }).click();
+  await dialog.getByRole('button', { name: '다음' }).click();
   // 게시판·키워드: 내 전공에 맞춰 추천이 켜져 있다.
   await expect(dialog.getByRole('heading', { name: '받을 공지를 골라 주세요' })).toBeFocused();
   await expect(dialog.getByRole('switch', { name: /^성균관대 공지 추천/ })).toHaveAttribute('aria-checked', 'true');
@@ -306,7 +311,7 @@ test('first-run setup: choices only, department list follows the college, double
     programs: [{ college: '소프트웨어융합대학', department: '소프트웨어학과' }, { college: '경영대학', department: '경영학과' }],
     year: 3, enrollmentStatus: '재학', keywords: ['장학'],
   });
-  expect(saved.boards).toEqual(expect.arrayContaining(['skku-notice01', 'cse-notice']));
+  expect(saved.boards).toEqual(expect.arrayContaining(['skku-notice01', 'cse-notice', 'futurecar-inform']));
   // 알림은 나중에 해도 된다.
   await expect(dialog.getByRole('heading', { name: '알림을 켜 둘까요?' })).toBeFocused();
   await dialog.getByRole('button', { name: '나중에 할게요' }).click();

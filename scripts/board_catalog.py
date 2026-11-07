@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # (id, 이름, 주소). 이미 운영 중인 4개(skku-notice01, cse-notice, sw-notice, futurecar-notice)는 sources.yaml에 따로 있다.
 BOARDS: list[tuple[str, str, str]] = [
+    ("futurecar-inform", "미래차 부트캠프 소식", "https://swb.skku.edu/futurecar/inform.do"),
     ("liberalarts-notice", "문과대학 공지", "https://liberalarts.skku.edu/liberal/community/under_notice.do"),
     ("sscience-notice", "사회과학대학 공지", "https://sscience.skku.edu/sscience/community/under_notice.do"),
     ("ecostat-notice", "경제대학 공지", "https://ecostat.skku.edu/ecostat/notice_total.do"),
@@ -112,6 +113,14 @@ DEPARTMENT_BOARD = {
     "스포츠과학대학/스포츠과학과": "sports-notice", "경제대학/경제학과": "ecostat-notice",
 }
 
+# 전공과 상관없이 누구나 고를 수 있는 게시판(온보딩의 "기타 게시판" 단계). (id, 묶음, 설명)
+# 부트캠프 모집 안내(청년도약·첨단산업 인재양성)는 성균관대 공지 전체 게시판에도 올라온다. 아래는 사업단이 따로 올리는 게시판이다.
+# 디스플레이 부트캠프 사업단은 공개 공지 게시판을 찾지 못했고, 인공지능·반도체 사업단은 주소가 확인되지 않아 넣지 않았다.
+OTHER_BOARDS: list[tuple[str, str, str]] = [
+    ("futurecar-notice", "부트캠프", "수강 모집과 행사 안내"),
+    ("futurecar-inform", "부트캠프", "견학, 대회, 수상 소식"),
+]
+
 # 이미 운영 중인 기본 게시판(모든 사용자에게 추천). sources.yaml의 앞쪽 4개는 이 스크립트가 건드리지 않는다.
 DEFAULT_BOARD = "skku-notice01"
 EXISTING = {
@@ -130,6 +139,7 @@ def check() -> None:
     assert len(set(urls)) == len(urls), "duplicate board url"
     assert all(url.startswith("https://") and ".skku.edu/" in url for url in urls), "unexpected host"
     known = set(ids) | set(EXISTING)
+    assert all(i in known for i, _, _ in OTHER_BOARDS), "unknown other board"
     for target in [*COLLEGE_BOARD.values(), *DEPARTMENT_BOARD.values()]:
         assert target in known, f"unknown board {target}"
 
@@ -155,6 +165,12 @@ def typescript() -> str:
         f"export const DEFAULT_BOARD = '{DEFAULT_BOARD}';",
         "export const BOARD_CATALOG: readonly BoardRef[] = [",
         *entries,
+        "];",
+        "",
+        "/** 전공과 상관없이 고르는 게시판(부트캠프 등). */",
+        "export interface OtherBoard { id: string; group: string; help: string }",
+        "export const OTHER_BOARDS: readonly OtherBoard[] = [",
+        *[f"  {{ id: '{i}', group: '{g}', help: '{h}' }}," for i, g, h in OTHER_BOARDS],
         "];",
         "",
         "export const COLLEGE_BOARD: Readonly<Record<string, string>> = {",
