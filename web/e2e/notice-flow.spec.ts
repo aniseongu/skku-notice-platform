@@ -869,3 +869,26 @@ test('notifications page: this device iCampus mode, daily summary time and the d
   await expect(mode.getByRole('radio', { name: '하루 요약' })).toBeDisabled();
   await expect(screen.getByText('연결 키에서 아이캠퍼스 토큰을 저장해 주세요').first()).toBeVisible();
 });
+
+test('a deadline that is close stays red even when the notice is already read, in both themes', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  const first = page.locator('notice-rows-screen a.row').first();
+  await first.waitFor();
+  await page.waitForLoadState('networkidle');
+  const id = await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, any>;
+    const notice = app.notices[0];
+    notice.deadline = new Date(Date.now() + 36 * 3600 * 1000).toISOString();     // 내일: 임박
+    app.read = new Set([notice.id]);                                              // 이미 읽은 글
+    app.requestUpdate();
+    return notice.id;
+  });
+  const dday = page.locator(`notice-rows-screen a.row[data-id="${id}"] .dday`);
+  await expect(page.locator(`notice-rows-screen a.row[data-id="${id}"]`)).toHaveClass(/read/);
+  await expect(dday).toHaveClass(/urgent/);
+  const danger = () => page.evaluate(() => { const probe = document.createElement('span'); probe.style.color = 'var(--danger)'; document.body.append(probe); const c = getComputedStyle(probe).color; probe.remove(); return c; });
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    expect(await dday.evaluate((el) => getComputedStyle(el).color)).toBe(await danger());
+  }
+});
