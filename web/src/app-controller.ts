@@ -15,7 +15,7 @@ import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from '.
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
-import { byokAvailable, loadByokStatus, loadCanvasStatus, loadMyNoticeInfo, loadMyDeadlines, requestNoticeSummary, type MyNoticeInfo, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
+import { byokAvailable, loadByokStatus, loadCanvasStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import type { Draft } from './onboarding-flow';
@@ -255,6 +255,8 @@ export class AppController extends Reactive {
   summaries = new Map<string, MyNoticeInfo | null | 'loading'>();
   myDeadlines = new Map<string, Pick<MyNoticeInfo, 'deadline' | 'deadlineKind'>>();
   private deadlineRequest = 0;
+  myTranslations = new Map<string, MyTranslation>();
+  private translationRequest = 0;
   toastTimer = 0;
   // 상세 칸에 실제로 보이는 글(고른 글이 없으면 첫 글). 목록 행 표시와 맞춘다.
   shownId: string | null = null;
@@ -276,7 +278,7 @@ export class AppController extends Reactive {
         if (!this.authReady || userId !== this.authUserId) {
           const previousUserId = this.authUserId;
           this.authUserId = userId;
-          this.myDeadlines = new Map(); ++this.deadlineRequest;
+          this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
           this.summaries = new Map(); this.autoSummaries = new Set(); this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
@@ -291,7 +293,7 @@ export class AppController extends Reactive {
           this.preferencesLoading = !!userId;
           this.preferencesError = '';
           this.preferencesUnavailable = false;
-          if (userId) setTimeout(() => { void this.refreshMyDeadlines(userId, epoch); void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch); }, 0);
+          if (userId) setTimeout(() => { void this.refreshMyDeadlines(userId, epoch); void this.refreshMyTranslations(userId, epoch); void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch); }, 0);
           setLocalOwner(userId);
           this.onboardingDismissed = !!userId && remember('onboarding-dismissed') === '1';
           this.saved = loadSaved();
@@ -351,6 +353,7 @@ export class AppController extends Reactive {
       this.sources = notices!.sources;
       this.generatedAt = notices!.generated_at;
       if (this.authUserId) void this.refreshMyDeadlines(this.authUserId, this.subscriptionsEpoch);
+      if (this.authUserId) void this.refreshMyTranslations(this.authUserId, this.subscriptionsEpoch);
       // 개인용 서비스의 판정 결과는 플랫폼에서 읽지 않는다.
       this.matched = null;
       this.failed = false;
@@ -1020,7 +1023,10 @@ export class AppController extends Reactive {
 
   tab(): Tab { return this.view === 'settings' ? 'all' : this.view; }
   visible(): Notice[] {
-    const decorate = (items: Notice[]) => items.map((notice) => withMyDeadline(notice, this.myDeadlines.get(notice.id) ?? null));
+    const decorate = (items: Notice[]) => items.map((notice) => {
+      const translated = this.myTranslations.get(notice.id);
+      return withMyDeadline(translated ? { ...notice, title_ko: translated.title } : notice, this.myDeadlines.get(notice.id) ?? null);
+    });
     return this.tab() === 'saved' ? this.filtered(decorate(this.savedNotices())) : this.byTab(this.filtered(decorate(this.notices)), this.tab());
   }
 
@@ -1250,6 +1256,17 @@ export class AppController extends Reactive {
       this.myDeadlines = deadlines;
       this.requestUpdate();
     } catch { /* 날짜 열이 아직 없다면 공용 마감일을 계속 쓴다. */ }
+  }
+
+  async refreshMyTranslations(userId: string, epoch: number): Promise<void> {
+    if (!authClient) return;
+    const request = ++this.translationRequest;
+    try {
+      const translations = await loadMyTranslations(authClient, userId);
+      if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId || request !== this.translationRequest) return;
+      this.myTranslations = translations;
+      this.requestUpdate();
+    } catch { /* 번역을 읽지 못하면 원문을 그대로 표시한다. */ }
   }
 
   myInfo(notice: Notice): MyNoticeInfo | null {

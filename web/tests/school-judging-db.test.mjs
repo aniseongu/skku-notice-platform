@@ -11,7 +11,8 @@ const MIGRATIONS = ['20261107030000_public_notices.sql', '20261107031000_notice_
   '20261107100000_push_silent_priority.sql', '20261107101000_push_original_content.sql', '20261107110000_user_byok.sql',
   '20261107111000_source_external_flag.sql', '20261107112000_byok_judging.sql', '20261107113000_push_ai_candidates.sql',
   '20261108110000_school_judging.sql', '20261108160000_notice_summaries.sql', '20261108180000_school_summary_backfill.sql',
-  '20261108190000_judgment_deadline.sql', '20261108200000_automatic_deadlines.sql'];
+  '20261108190000_judgment_deadline.sql', '20261108200000_automatic_deadlines.sql', '20261108210000_ocr_image_only.sql',
+  '20261108220000_user_notice_translations.sql'];
 
 async function database() {
   const db = new PGlite();
@@ -76,5 +77,38 @@ test('push candidates: a key owner waits for the judgment, relevant is announced
     await db.exec(`reset role; insert into user_preferences(user_id,keywords) values ('${A}', array['대학원']); set role service_role`);
     rows = (await pick()).filter((r) => r.user_id === A);
     assert.deepEqual(rows.map((r) => [r.notice_id, r.silent]), [['school/1', false], ['school/2', false]]);
+  } finally { await db.close(); }
+});
+
+test('image-only notices wait for OCR while a notice with text and an image is ready', async () => {
+  const db = await database();
+  try {
+    await seed(db);
+    await db.exec(`update platform_notices set images = '["https://www.skku.edu/a.png"]'::jsonb where id in ('school/1','school/2');
+      update platform_notices set body = '' where id = 'school/2';
+      insert into platform_sources(id,name,url,external) values ('jobs','외부','https://example.com',true);
+      insert into platform_notices(id,source_id,article_no,title,url,posted_on,first_seen,fetched_at,body,images)
+        values ('jobs/1','jobs','1','인턴','https://example.com/1',current_date,now(),now(),'인턴 공고', '["https://example.com/a.png"]');
+      set role service_role`);
+    const pending = (await db.query(`select notice_id from public.list_byok_pending_school('${A}', 6)`)).rows.map(r => r.notice_id);
+    assert.ok(pending.includes('school/1'));
+    assert.ok(!pending.includes('school/2'));
+    assert.deepEqual((await db.query(`select notice_id from public.list_byok_pending('${A}', 6)`)).rows,
+      [{ notice_id: 'jobs/1' }]);
+  } finally { await db.close(); }
+});
+
+test('translation queue finds English notices for the key owner and stops after two failures', async () => {
+  const db = await database();
+  try {
+    await seed(db);
+    await db.exec(`insert into platform_notices(id,source_id,article_no,title,url,posted_on,first_seen,fetched_at,body)
+      values ('school/5','school','5','International student seminar','https://www.skku.edu/5',current_date,now(),now(),'Please register for this seminar');
+      set role service_role`);
+    assert.deepEqual((await db.query(`select notice_id from public.list_byok_pending_translation('${A}', 3)`)).rows,
+      [{ notice_id: 'school/5' }]);
+    assert.deepEqual((await db.query(`select notice_id from public.list_byok_pending_translation('${B}', 3)`)).rows, []);
+    await db.exec(`insert into user_notice_translations(user_id,notice_id,model,attempts) values ('${A}','school/5','m',2)`);
+    assert.deepEqual((await db.query(`select notice_id from public.list_byok_pending_translation('${A}', 3)`)).rows, []);
   } finally { await db.close(); }
 });

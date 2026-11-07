@@ -14,6 +14,7 @@ from skku_notice.gemini_client import gemini_client
 from skku_notice.intern_ai import BATCH, judge_internships
 from skku_notice.scheduled_collection import NoticeStore, StoreError
 from skku_notice.school_ai import judge_school_notices
+from skku_notice.translate import translate_notice
 
 DAILY_CALLS = 60
 MAX_USERS_PER_RUN = 20
@@ -82,6 +83,15 @@ class JudgeStore(NoticeStore):
         body = {"p_user_id": user_id, "p_limit": BATCH}
         return self._request("POST", "rpc/list_byok_pending_school", json=body).json()
 
+    def pending_translation(self, user_id: str) -> list[dict]:
+        return self._request(
+            "POST", "rpc/list_byok_pending_translation", json={"p_user_id": user_id, "p_limit": 3}
+        ).json()
+
+    def save_translation(self, row: dict) -> None:
+        self._request("POST", "user_notice_translations", params={"on_conflict": "user_id,notice_id"},
+                      json=[row], headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
+
     def save_judgments(self, rows: list[dict]) -> None:
         if rows:
             self._request(
@@ -118,7 +128,8 @@ class _RecordingClient:
 def run_judging(
     store: JudgeStore, master_key: str, now: datetime, client_factory=gemini_client
 ) -> dict[str, int]:
-    counts = {"users": 0, "judged": 0, "rejected": 0, "limited": 0, "errors": 0}
+    counts = {"users": 0, "judged": 0, "translated": 0, "translation_failed": 0,
+              "rejected": 0, "limited": 0, "errors": 0}
     today = now.astimezone(UTC).date().isoformat()
     for row in store.keys():
         user_id = row["user_id"]
@@ -128,7 +139,8 @@ def run_judging(
             continue
         pending = store.pending(user_id)
         school = store.pending_school(user_id)
-        if not pending and not school:
+        translations = store.pending_translation(user_id)
+        if not pending and not school and not translations:
             continue
         counts["users"] += 1
         try:
@@ -188,6 +200,31 @@ def run_judging(
             )
             store.update_key(user_id, {**usage, "last_error": None, "error_at": None})
             counts["judged"] += len(found)
+        if client.failed:
+            continue
+        for item in translations:
+            if used >= DAILY_CALLS:
+                break
+            translated = translate_notice(
+                item["title"], item.get("body"), row["model"], api_key, client=client
+            )
+            used += 1
+            usage = {"used_on": today, "used_today": used}
+            if client.failed:
+                fields = {**usage, "last_error": "Gemini 번역을 잠시 못 했어요. 다시 시도해요.",
+                          "error_at": now.isoformat()}
+                if client.error_code in REJECTED_CODES:
+                    fields["disabled_at"] = now.isoformat()
+                    fields["last_error"] = "Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요."
+                store.update_key(user_id, fields)
+                counts["errors"] += 1
+                break
+            store.save_translation({"user_id": user_id, "notice_id": item["notice_id"],
+                                    "title": translated[0] if translated else None,
+                                    "body": translated[1] if translated else None, "model": row["model"],
+                                    "attempts": item["attempts"] + 1, "updated_at": now.isoformat()})
+            counts["translated" if translated else "translation_failed"] += 1
+            store.update_key(user_id, {**usage, "last_error": None, "error_at": None})
     return counts
 
 

@@ -41,7 +41,22 @@ test('client accepts the AQ. key format', () => {
   assert.equal(looksLikeGeminiKey(`AQ.Ab8RN6J${'x'.repeat(40)}`), true);
 });
 
-import { loadMyDeadlines, loadMyNoticeInfo } from '../src/byok.ts';
+import { loadMyDeadlines, loadMyNoticeInfo, loadMyTranslations } from '../src/byok.ts';
+
+test('translation query is bound to the current owner', async () => {
+  const filters = [];
+  const client = { from: (table) => {
+    assert.equal(table, 'user_notice_translations');
+    const q = { select: () => q, eq: (name, value) => { filters.push([name, value]); return q; },
+      not: () => q, order: () => q, range: async () => ({ data: [
+        { notice_id: 'a/1', title: '한국어 제목', body: '한국어 본문', model: 'm' },
+      ], error: null }) };
+    return q;
+  } };
+  const translations = await loadMyTranslations(client, 'user-a');
+  assert.deepEqual(filters, [['user_id', 'user-a']]);
+  assert.equal(translations.get('a/1').body, '한국어 본문');
+});
 
 test('deadline list is owner scoped, paginated, and favors an explicitly requested summary', async () => {
   const queries = [];

@@ -788,3 +788,20 @@ test('a personal body deadline appears beside the notice like a title deadline',
   }, id);
   await expect(page.locator(`notice-rows-screen a.row[data-id="${id}"] .dday`)).toBeVisible();
 });
+
+test('personal English translation is shown automatically with the original body', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  const row = page.locator('notice-rows-screen a.row').nth(1);
+  await row.waitFor();
+  const id = await row.getAttribute('data-id');
+  await page.evaluate((noticeId) => {
+    const app = (document.querySelector('notice-app') as any).controller;
+    app.myTranslations = new Map([[noticeId, { title: '번역된 공지 제목', body: '번역된 본문입니다.', model: 'm' }]]);
+    app.requestUpdate();
+  }, id);
+  await expect(page.locator(`notice-rows-screen a.row[data-id="${id}"] .title`)).toHaveText('번역된 공지 제목');
+  await page.locator(`notice-rows-screen a.row[data-id="${id}"]`).click();
+  const detail = page.locator('notice-detail-screen').filter({ visible: true });
+  await expect(detail.getByRole('region', { name: '한국어로 옮긴 본문' })).toContainText('번역된 본문입니다.');
+  await expect(detail.getByRole('region', { name: '영어 원문' })).toBeVisible();
+});

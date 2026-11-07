@@ -13,7 +13,7 @@ test('BYOK ciphertext is unreadable by browsers and judgments stay per user', as
       create function auth.uid() returns uuid language sql stable as $$
         select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
       grant usage on schema auth to authenticated; insert into auth.users values ('${a}'), ('${b}');`);
-    for (const name of ['20261107030000_public_notices.sql', '20261107110000_user_byok.sql']) {
+    for (const name of ['20261107030000_public_notices.sql', '20261107110000_user_byok.sql', '20261108220000_user_notice_translations.sql']) {
       await db.exec(await readFile(new URL(`../../supabase/migrations/${name}`, import.meta.url), 'utf8'));
     }
     const cipher = 'c'.repeat(60);
@@ -22,6 +22,8 @@ test('BYOK ciphertext is unreadable by browsers and judgments stay per user', as
         values ('school/1','school','1','인턴 모집','https://www.skku.edu/n?1',current_date,now());
       insert into user_byok_keys(user_id,ciphertext,key_hint) values ('${a}','${cipher}','AbCd'), ('${b}','${cipher}','WxYz');
       insert into user_notice_judgments(user_id,notice_id,verdict,reason,model) values ('${a}','school/1','relevant','개발 직무예요','m'), ('${b}','school/1','not_relevant','비개발 직무예요','m');
+      insert into user_notice_translations(user_id,notice_id,title,body,model) values
+        ('${a}','school/1','내 번역','본문 A','m'), ('${b}','school/1','다른 번역','본문 B','m');
       set role authenticated; set request.jwt.claim.sub = '${a}';`);
     const own = (await db.query('select user_id, key_hint, last_error from user_byok_keys')).rows;
     assert.deepEqual(own.map((r) => r.key_hint), ['AbCd']);
@@ -32,10 +34,14 @@ test('BYOK ciphertext is unreadable by browsers and judgments stay per user', as
     await assert.rejects(db.exec(`delete from user_byok_keys`), /permission denied/);
     const judged = (await db.query('select user_id, verdict from user_notice_judgments')).rows;
     assert.deepEqual(judged.map((r) => r.verdict), ['relevant']);
+    assert.deepEqual((await db.query('select title from user_notice_translations')).rows, [{ title: '내 번역' }]);
+    await assert.rejects(db.exec('delete from user_notice_translations'), /permission denied/);
+    await assert.rejects(db.exec("update user_notice_translations set title='변조'"), /permission denied/);
     await assert.rejects(db.exec(`insert into user_notice_judgments(user_id,notice_id,verdict,reason,model) values ('${a}','school/1','relevant','x','m')`), /permission denied/);
     await db.exec('reset role; set role anon');
     await assert.rejects(db.exec('select key_hint from user_byok_keys'), /permission denied/);
     await assert.rejects(db.exec('select * from user_notice_judgments'), /permission denied/);
+    await assert.rejects(db.exec('select * from user_notice_translations'), /permission denied/);
     await db.exec('reset role; set role service_role');
     assert.equal((await db.query('select ciphertext from user_byok_keys')).rows.length, 2);
   } finally { await db.close(); }

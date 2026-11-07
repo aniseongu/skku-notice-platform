@@ -406,11 +406,13 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
   app.autoSummary(notice);
   const mine = app.myInfo(notice);
   const body = app.body(notice);
+  const translation = app.myTranslations.get(notice.id);
+  const shownBody = body && body !== 'loading' && translation ? { ...body, translation } : body;
   const interests = [...new Set([...app.interests(notice), ...bodyInterests(app.keywords, body, keywordMatches)])];
   const shown = withMyDeadline(notice, mine);
   return <notice-detail-screen model={{
     notice: shown, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
-    today: todayKst(), body, mySummary: mine?.summary ?? null, summarizing: app.summarizing === notice.id, summaryError: app.summaryErrorId === notice.id && !app.summarizing ? app.summaryError : '', makeSummary: () => { void app.makeSummary(notice); }, interests,
+    today: todayKst(), body: shownBody, mySummary: mine?.summary ?? null, summarizing: app.summarizing === notice.id, summaryError: app.summaryErrorId === notice.id && !app.summarizing ? app.summaryError : '', makeSummary: () => { void app.makeSummary(notice); }, interests,
     ai: judgement?.ai ?? mine?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
     retry: () => { app.bodies.delete(notice.id); app.requestUpdate(); },
   }} />;

@@ -47,6 +47,24 @@ export interface MyNoticeInfo {
   ai: { verdict: 'relevant' | 'maybe' | 'not_relevant'; reason: string; model: string } | null;
 }
 
+export interface MyTranslation { title: string; body: string; model: string }
+
+/** 번역은 계정별 행에서 읽는다. 계정의 키로 만든 결과만 목록과 상세에 표시한다. */
+export async function loadMyTranslations(client: SupabaseClient, userId: string): Promise<Map<string, MyTranslation>> {
+  const translations = new Map<string, MyTranslation>();
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await client.from('user_notice_translations').select('notice_id,title,body,model')
+      .eq('user_id', userId).not('title', 'is', null).order('notice_id').range(offset, offset + 499);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      if (typeof row.notice_id === 'string' && typeof row.title === 'string' && typeof row.body === 'string')
+        translations.set(row.notice_id, { title: row.title, body: row.body, model: String(row.model ?? '') });
+    }
+    if (!data || data.length < 500) break;
+  }
+  return translations;
+}
+
 const clean = (value: unknown): string | null => (typeof value === 'string' && value.trim() ? value : null);
 const kindOf = (value: unknown): '마감' | '일정' | null => (value === '마감' || value === '일정' ? value : null);
 

@@ -26,6 +26,8 @@ class FakeStore:
     def __init__(self, rows, pending=ITEMS, profile=None, school=()):
         self.rows, self._pending, self._profile = rows, pending, profile or {"year": 3}
         self._school = list(school)
+        self.translations = []
+        self.translation_rows = []
         self.saved, self.updates, self.pending_calls = [], [], []
 
     def keys(self):
@@ -37,6 +39,12 @@ class FakeStore:
 
     def pending_school(self, user_id):
         return self._school
+
+    def pending_translation(self, user_id):
+        return self.translations
+
+    def save_translation(self, row):
+        self.translation_rows.append(row)
 
     def profile(self, user_id):
         return self._profile
@@ -227,6 +235,19 @@ def test_both_kinds_use_one_call_each_and_a_failure_stops_the_user():
     failing = FakeStore([key_row("user-a")], school=school)
     counts = judge.run_judging(failing, MASTER, NOW, factory(ApiError(429)))
     assert counts["errors"] == 1 and failing.saved == [] and failing.updates[-1][1]["used_today"] == 1
+
+
+def test_english_translation_uses_owner_key_and_is_recorded_for_that_owner():
+    store = FakeStore([key_row("user-a")], pending=[])
+    store.translations = [{"notice_id": "school/1", "title": "Student seminar announcement",
+                           "body": "Apply for the seminar", "attempts": 0}]
+    seen = []
+    reply = Reply('{"title": "학생 세미나 안내", "body": "세미나를 신청하세요."}')
+    judge.run_judging(store, MASTER, NOW, factory(reply, seen))
+    assert seen == [GOOD]
+    assert store.translation_rows[0]["user_id"] == "user-a"
+    assert store.translation_rows[0]["title"] == "학생 세미나 안내"
+    assert store.updates[-1][1]["used_today"] == 1
 
 
 def test_school_deadline_read_from_the_body_is_kept_only_when_it_is_believable():
