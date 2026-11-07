@@ -1,6 +1,20 @@
-# 성공 — 다중 사용자 성균관대 공지 플랫폼
+<div align="center">
 
-기존 [개인용 성공](https://github.com/aniseongu/skku-notice-alert)의 화면 구조와 알림 규칙을 로그인한 여러 사용자가 각자 쓰도록 옮긴 공지 플랫폼입니다. 테스트 사이트는 <https://skku-notice-platform.pages.dev/>입니다. **아직 정식 서비스가 아닙니다.** 기본 알림 수신 경로와 장기 부하는 계속 검증하고 있습니다.
+<img src="web/public/icon-192.png" width="96" height="96" alt="성공 아이콘">
+
+# 성공
+
+성균관대 공지와 인턴 공고를 모아 보고, 나에게 맞는 공지만 알림으로 받는 다중 사용자 웹 앱
+
+![status](https://img.shields.io/badge/status-testing-E0A400)
+![PWA](https://img.shields.io/badge/PWA-installable-124532)
+![hosting](https://img.shields.io/badge/Cloudflare%20Pages-F38020?logo=cloudflarepages&logoColor=white)
+
+[![테스트 사이트 열기](https://img.shields.io/badge/Open%20Test%20Site-F38020?style=for-the-badge&logo=cloudflarepages&logoColor=white)](https://skku-notice-platform.pages.dev/)
+
+</div>
+
+기존 [개인용 성공](https://github.com/aniseongu/skku-notice-alert)의 화면 구조와 알림 규칙을 로그인한 여러 사용자가 각자 쓰도록 옮긴 공지 플랫폼입니다. 위 버튼의 Cloudflare Pages 주소는 **시험 중인 사이트**이며 아직 정식 서비스가 아닙니다. 기본 알림 수신 경로와 장기 부하는 계속 검증하고 있습니다.
 
 ## 할 수 있는 것
 
@@ -21,7 +35,21 @@
 3. 푸시 워커가 관심 키워드와 판정 결과에 따라 소리 또는 무음으로 웹 푸시를 보냅니다.
 4. 웹앱은 Supabase에서 자기 계정의 데이터만 읽습니다. 키와 토큰은 Edge Function이 확인하고 암호화해 저장하며, 복호화는 서버의 해당 워커만 합니다.
 
-## 구성
+## 기술 구성
+
+[![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vite.dev/)
+[![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=flat-square&logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Gemini](https://img.shields.io/badge/Gemini-8E75B2?style=flat-square&logo=googlegemini&logoColor=white)](https://ai.google.dev/)
+[![Cloudflare Pages](https://img.shields.io/badge/Cloudflare_Pages-F38020?style=flat-square&logo=cloudflarepages&logoColor=white)](https://skku-notice-platform.pages.dev/)
+[![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-F80000?style=flat-square)](https://www.oracle.com/cloud/free/)
+[![Playwright](https://img.shields.io/badge/Playwright-2EAD33?style=flat-square)](https://playwright.dev/)
+[![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/aniseongu/skku-notice-platform/actions)
 
 | 영역 | 기술 |
 |---|---|
