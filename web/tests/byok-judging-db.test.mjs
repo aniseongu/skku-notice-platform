@@ -20,16 +20,16 @@ async function database() {
   return db;
 }
 
-test('judge profile is owner-only and validated', async () => {
+test('profile is owner-only and validated', async () => {
   const db = await database();
   try {
     await db.exec(`set role authenticated; set request.jwt.claim.sub = '${A}';
-      insert into user_judge_profiles(user_id, year, enrollment_status) values ('${A}', 3, '재학');`);
-    await assert.rejects(db.exec(`insert into user_judge_profiles(user_id, year) values ('${B}', 2)`), /row-level security/);
-    await assert.rejects(db.exec(`update user_judge_profiles set year = 9`), /check constraint/);
-    await assert.rejects(db.exec(`update user_judge_profiles set enrollment_status = '자유'`), /check constraint/);
-    await db.exec(`reset role; insert into user_judge_profiles(user_id, year) values ('${B}', 1); set role authenticated; set request.jwt.claim.sub = '${A}'`);
-    assert.deepEqual((await db.query('select year from user_judge_profiles')).rows, [{ year: 3 }]);
+      insert into user_profiles(user_id, year, enrollment_status) values ('${A}', 3, '재학');`);
+    await assert.rejects(db.exec(`insert into user_profiles(user_id, year) values ('${B}', 2)`), /row-level security/);
+    await assert.rejects(db.exec(`update user_profiles set year = 9`), /check constraint/);
+    await assert.rejects(db.exec(`update user_profiles set enrollment_status = '자유'`), /check constraint/);
+    await db.exec(`reset role; insert into user_profiles(user_id, year) values ('${B}', 1); set role authenticated; set request.jwt.claim.sub = '${A}'`);
+    assert.deepEqual((await db.query('select year from user_profiles')).rows, [{ year: 3 }]);
   } finally { await db.close(); }
 });
 

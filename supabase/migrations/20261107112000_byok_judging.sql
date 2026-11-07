@@ -1,6 +1,11 @@
--- Judging profile (same fields the original service sends to Gemini) and the pending list for the worker.
-create table public.user_judge_profiles (
+-- User profile (majors, year, status; the judging fields match what the original service sends to Gemini)
+-- and the pending list for the worker. onboarded_at marks a finished first-run setup.
+create table public.user_profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
+  -- 복수전공: [{"college": "...", "department": "..." | null}] 최대 4개. 첫 항목이 본전공이다.
+  programs jsonb not null default '[]'::jsonb
+    check (jsonb_typeof(programs) = 'array' and jsonb_array_length(programs) <= 4 and octet_length(programs::text) <= 1000),
+  onboarded_at timestamptz,
   year smallint check (year between 1 and 6),
   semester smallint check (semester in (1, 2)),
   enrolled_semester smallint check (enrolled_semester between 1 and 16),
@@ -8,14 +13,14 @@ create table public.user_judge_profiles (
   military_service text check (military_service in ('복무 전', '복무 완료', '해당 없음')),
   updated_at timestamptz not null default now()
 );
-alter table public.user_judge_profiles enable row level security;
-revoke all on public.user_judge_profiles from public, anon, authenticated;
-grant select, insert, update, delete on public.user_judge_profiles to authenticated;
-grant all on public.user_judge_profiles to service_role;
-create policy "Users read own judge profile" on public.user_judge_profiles for select to authenticated using ((select auth.uid()) = user_id);
-create policy "Users add own judge profile" on public.user_judge_profiles for insert to authenticated with check ((select auth.uid()) = user_id);
-create policy "Users update own judge profile" on public.user_judge_profiles for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
-create policy "Users delete own judge profile" on public.user_judge_profiles for delete to authenticated using ((select auth.uid()) = user_id);
+alter table public.user_profiles enable row level security;
+revoke all on public.user_profiles from public, anon, authenticated;
+grant select, insert, update, delete on public.user_profiles to authenticated;
+grant all on public.user_profiles to service_role;
+create policy "Users read own profile" on public.user_profiles for select to authenticated using ((select auth.uid()) = user_id);
+create policy "Users add own profile" on public.user_profiles for insert to authenticated with check ((select auth.uid()) = user_id);
+create policy "Users update own profile" on public.user_profiles for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create policy "Users delete own profile" on public.user_profiles for delete to authenticated using ((select auth.uid()) = user_id);
 
 alter table public.user_byok_keys alter column model set default 'gemini-3.1-flash-lite';
 

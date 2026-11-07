@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { byokAvailable, EMPTY_PROFILE, loadByokStatus, loadJudgeProfile, looksLikeGeminiKey, registerByokKey, removeByokKey, saveJudgeProfile } from '../src/byok.ts';
+import { byokAvailable, loadByokStatus, looksLikeGeminiKey, registerByokKey, removeByokKey } from '../src/byok.ts';
 
 const KEY = `AIza${'C'.repeat(35)}`;
 
@@ -35,18 +35,4 @@ test('availability probe needs a 204 from the function and treats network errors
   assert.equal(await byokAvailable('https://x.supabase.co', async () => ({ status: 404 })), false);
   assert.equal(await byokAvailable('https://x.supabase.co', async () => { throw new TypeError('cors'); }), false);
   assert.equal(await byokAvailable(undefined), false);
-});
-
-test('judge profile is validated before saving and empty when missing', async () => {
-  const rows = [];
-  const client = { from: () => ({ upsert: async (row) => { rows.push(row); return { error: null }; },
-    select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }) };
-  assert.deepEqual(await loadJudgeProfile(client, 'u'), EMPTY_PROFILE);
-  await saveJudgeProfile(client, 'u', { year: 3, semester: 2, enrollmentStatus: '재학', militaryService: '해당 없음' });
-  assert.equal(rows[0].user_id, 'u');
-  assert.equal(rows[0].enrollment_status, '재학');
-  for (const bad of [{ year: 9 }, { semester: 3 }, { year: 1.5 }, { enrollmentStatus: '자유' }, { militaryService: '모름' }]) {
-    await assert.rejects(saveJudgeProfile(client, 'u', { ...EMPTY_PROFILE, ...bad }), /확인해 주세요/);
-  }
-  assert.equal(rows.length, 1);
 });

@@ -8,17 +8,6 @@ export interface ByokStatus {
   usedToday: number;
 }
 
-export interface JudgeProfile {
-  year: number | null;
-  semester: number | null;
-  enrollmentStatus: string | null;
-  militaryService: string | null;
-}
-
-export const ENROLLMENT = ['재학', '휴학', '졸업예정', '졸업'] as const;
-export const MILITARY = ['복무 전', '복무 완료', '해당 없음'] as const;
-export const EMPTY_PROFILE: JudgeProfile = { year: null, semester: null, enrollmentStatus: null, militaryService: null };
-
 /** 키 문자열은 이 모듈 밖으로 나가지 않고 요청 한 번에만 쓴다. 화면과 로그에는 마지막 4글자만 남는다. */
 export function looksLikeGeminiKey(value: string): boolean {
   return /^AIza[0-9A-Za-z_-]{35}$/.test(value);
@@ -64,23 +53,4 @@ export async function byokAvailable(supabaseUrl: string | undefined, fetcher: ty
     const response = await fetcher(new URL('/functions/v1/byok', supabaseUrl), { method: 'OPTIONS', cache: 'no-store' });
     return response.status === 204;
   } catch { return false; }
-}
-
-export async function loadJudgeProfile(client: SupabaseClient, userId: string): Promise<JudgeProfile> {
-  const { data, error } = await client.from('user_judge_profiles')
-    .select('year,semester,enrollment_status,military_service').eq('user_id', userId).maybeSingle();
-  if (error) throw error;
-  return data ? { year: data.year, semester: data.semester, enrollmentStatus: data.enrollment_status, militaryService: data.military_service } : EMPTY_PROFILE;
-}
-
-export async function saveJudgeProfile(client: SupabaseClient, userId: string, profile: JudgeProfile): Promise<void> {
-  const inRange = (value: number | null, low: number, high: number) => value === null || (Number.isInteger(value) && value >= low && value <= high);
-  if (!inRange(profile.year, 1, 6) || !inRange(profile.semester, 1, 2)) throw new Error('학년과 학기를 확인해 주세요.');
-  if (profile.enrollmentStatus !== null && !(ENROLLMENT as readonly string[]).includes(profile.enrollmentStatus)) throw new Error('재학 상태를 확인해 주세요.');
-  if (profile.militaryService !== null && !(MILITARY as readonly string[]).includes(profile.militaryService)) throw new Error('병역 상태를 확인해 주세요.');
-  const { error } = await client.from('user_judge_profiles').upsert({
-    user_id: userId, year: profile.year, semester: profile.semester, enrollment_status: profile.enrollmentStatus,
-    military_service: profile.militaryService, updated_at: new Date().toISOString(),
-  }, { onConflict: 'user_id' });
-  if (error) throw error;
 }

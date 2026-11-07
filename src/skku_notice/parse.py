@@ -18,6 +18,7 @@ LINK_SELECTOR = "a[href]"
 CATEGORY_SELECTOR = ".c-board-list-category"
 INFO_SELECTOR = "dd.board-list-content-info li"
 DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+ITEM_ID_RE = re.compile(r"[0-9A-F]{32}[A-Z0-9]{6}")
 DETAIL_SELECTORS = ("dl.board-write-box dd", ".board-view-content-wrap")
 ATTACHMENT_SELECTOR = ".filedown_list a[href*='mode=download'], .board-view-box a[href*='mode=download']"
 BLOCK_TAGS = {"p", "div", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "br"}
@@ -52,8 +53,18 @@ def _parse_row(row: LexborNode, source_id: str, board_url: str) -> Notice:
     if link is None:
         raise ParseError("row without title link")
     href = link.attributes.get("href", "")
-    article_no = parse_qs(urlsplit(urljoin(board_url, href)).query).get("articleNo", [""])[0]
+    query = parse_qs(urlsplit(urljoin(board_url, href)).query)
+    article_no = query.get("articleNo", [""])[0]
     title = _clean(link)
+    view_url = None
+    if not article_no and query.get("viewBoardId"):
+        # 일부 단과대·학과 사이트는 articleNo 대신 viewBoardId와 itemId를 쓴다. itemId의 앞 32자리가 고정이고
+        # 뒤 6글자는 요청마다 바뀌지만 서버는 앞부분만 확인하므로, 주소가 흔들리지 않게 뒤를 고정해 저장한다.
+        article_no = query["viewBoardId"][0]
+        item = query.get("itemId", [""])[0]
+        if not ITEM_ID_RE.fullmatch(item):
+            raise ParseError("row without a usable itemId")
+        view_url = f"{board_url.split('?', 1)[0]}?mode=view&viewBoardId={article_no}&itemId={item[:32]}AAAAAA"
     if not article_no.isdecimal() or not title:
         raise ParseError("row without articleNo or title")
     info = row.css(INFO_SELECTOR)
@@ -72,7 +83,8 @@ def _parse_row(row: LexborNode, source_id: str, board_url: str) -> Notice:
     pinned = "board-list-content-top" in title_node.attributes.get("class", "").split()
     base = board_url.split("?", 1)[0]
     return Notice(
-        source_id, article_no, title, category, f"{base}?mode=view&articleNo={article_no}", posted_on, pinned
+        source_id, article_no, title, category,
+        view_url or f"{base}?mode=view&articleNo={article_no}", posted_on, pinned,
     )
 
 

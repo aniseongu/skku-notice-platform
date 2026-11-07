@@ -34,7 +34,7 @@ class JudgeStore(NoticeStore):
 
     def profile(self, user_id: str) -> dict:
         params = {"user_id": f"eq.{user_id}", "select": ",".join(PROFILE_FIELDS)}
-        rows = self._request("GET", "user_judge_profiles", params=params).json()
+        rows = self._request("GET", "user_profiles", params=params).json()
         return {k: v for k, v in (rows[0] if rows else {}).items() if v is not None}
 
     def pending(self, user_id: str) -> list[dict]:

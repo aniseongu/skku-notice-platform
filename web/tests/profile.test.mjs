@@ -1,0 +1,57 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { EMPTY_PROFILE, loadProfile, parsePrograms, saveProfile, validateProfile } from '../src/profile.ts';
+import { COLLEGES, findCollege, programKey, programLabel, validProgram } from '../src/skku-programs.ts';
+
+const base = { ...EMPTY_PROFILE };
+
+test('college list has unique names and non-empty unique departments', () => {
+  assert.equal(new Set(COLLEGES.map((c) => c.name)).size, COLLEGES.length);
+  const all = COLLEGES.flatMap((c) => c.departments.map((d) => `${c.name}/${d}`));
+  assert.equal(new Set(all).size, all.length);
+  assert.ok(COLLEGES.every((c) => c.departments.every((d) => d.trim() === d && d.length > 0 && d.length <= 40)));
+  assert.deepEqual(findCollege('소프트웨어융합대학').departments.slice(0, 2), ['소프트웨어학과', '글로벌융합학부']);
+  assert.equal(findCollege('없는대학'), undefined);
+});
+
+test('a program needs a department of its own college, except colleges without departments', () => {
+  assert.equal(validProgram({ college: '자연과학대학', department: '물리학과' }), true);
+  assert.equal(validProgram({ college: '자연과학대학', department: '국어국문학과' }), false);
+  assert.equal(validProgram({ college: '자연과학대학', department: null }), false);
+  assert.equal(validProgram({ college: '학부대학', department: null }), true);
+  assert.equal(validProgram({ college: '학부대학', department: '물리학과' }), false);
+  assert.equal(programLabel({ college: '학부대학', department: null }), '학부대학');
+  assert.notEqual(programKey({ college: 'a', department: 'b' }), programKey({ college: 'ab', department: '' }));
+});
+
+test('double majors across colleges are accepted, duplicates and more than four are not', () => {
+  const sw = { college: '소프트웨어융합대학', department: '소프트웨어학과' };
+  const biz = { college: '경영대학', department: '경영학과' };
+  assert.doesNotThrow(() => validateProfile({ ...base, programs: [sw, biz] }));
+  assert.throws(() => validateProfile({ ...base, programs: [sw, sw] }), /확인/);
+  const five = ['국어국문학과', '영어영문학과', '사학과', '철학과', '문헌정보학과'].map((department) => ({ college: '문과대학', department }));
+  assert.throws(() => validateProfile({ ...base, programs: five }), /확인/);
+  assert.throws(() => validateProfile({ ...base, programs: [{ college: '문과대학', department: '물리학과' }] }), /확인/);
+  assert.throws(() => validateProfile({ ...base, year: 9 }), /확인/);
+  assert.throws(() => validateProfile({ ...base, enrollmentStatus: '자유' }), /확인/);
+});
+
+test('stored programs are re-checked so a tampered row cannot inject unknown majors', () => {
+  const stored = [{ college: '경영대학', department: '경영학과' }, { college: '경영대학', department: '경영학과' },
+    { college: '가짜대학', department: 'x' }, { college: '경영대학', department: 7 }, null, 'text'];
+  assert.deepEqual(parsePrograms(stored), [{ college: '경영대학', department: '경영학과' }]);
+  assert.deepEqual(parsePrograms('nope'), []);
+});
+
+test('profile round trip uses the programs array and returns null when there is no row', async () => {
+  const rows = [];
+  const client = { from: () => ({ upsert: async (row) => { rows.push(row); return { error: null }; },
+    select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: rows[0] ? { programs: rows[0].programs, year: 3, semester: null, enrollment_status: '재학', military_service: null, onboarded_at: null } : null, error: null }) }) }) }) };
+  assert.equal(await loadProfile(client, 'u'), null);
+  await saveProfile(client, 'u', { ...base, programs: [{ college: '경영대학', department: '경영학과' }], year: 3, enrollmentStatus: '재학' });
+  assert.equal(rows[0].user_id, 'u');
+  assert.deepEqual(rows[0].programs, [{ college: '경영대학', department: '경영학과' }]);
+  assert.deepEqual((await loadProfile(client, 'u')).programs, [{ college: '경영대학', department: '경영학과' }]);
+  await assert.rejects(saveProfile(client, 'u', { ...base, programs: [{ college: '경영대학', department: '물리학과' }] }), /확인/);
+  assert.equal(rows.length, 1);
+});

@@ -1,0 +1,11 @@
+[Unit]
+Description=Judge external internship postings between collection and push
+
+[Timer]
+OnCalendar=*-*-* *:07,37:00
+Persistent=true
+RandomizedDelaySec=15
+Unit=skku-notice-judge.service
+
+[Install]
+WantedBy=timers.target

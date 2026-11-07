@@ -75,6 +75,24 @@ class NoticeStore:
         rows = self._request("GET", "platform_notices", params={"id": f"in.({ids})", "select": "*"}).json()
         return {row["id"]: row for row in rows}
 
+    def subscribed_source_ids(self) -> set[str]:
+        """Boards that at least one user follows. Only these on-demand boards are collected."""
+        rows = self._request(
+            "GET", "user_source_subscriptions", params={"select": "source_id", "limit": "20000"}
+        ).json()
+        return {row["source_id"] for row in rows}
+
+    def register_sources(self, rows: list[dict]) -> None:
+        """Make catalog boards subscribable without touching boards that already have a collection history."""
+        if rows:
+            self._request(
+                "POST",
+                "platform_sources",
+                params={"on_conflict": "id"},
+                json=rows,
+                headers={"Prefer": "resolution=ignore-duplicates,return=minimal"},
+            )
+
     def upsert(self, table: str, rows: list[dict]) -> None:
         if rows:
             self._request(
@@ -89,10 +107,35 @@ class NoticeStore:
         self.client.close()
 
 
-def run_collection(settings: dict, store: NoticeStore, now: datetime) -> tuple[int, int]:
+# 처음 구독이 몰려도 서버가 오래 묶이지 않게, 한 번의 실행에서 받는 본문 수를 제한한다.
+# 못 받은 글은 다음 실행에 이어서 받는다.
+DETAIL_BUDGET = 60
+
+
+def school_sources(settings: dict) -> list[dict]:
     sources = [s for s in settings["sources"] if s.get("kind") == "skku-cms" and not s.get("external")]
     if not sources or len({s["id"] for s in sources}) != len(sources):
         raise ValueError("invalid school sources")
+    return sources
+
+
+def collection_targets(settings: dict, subscribed: set[str]) -> list[dict]:
+    """Default boards always; catalog (on_demand) boards only when someone follows them."""
+    return [s for s in school_sources(settings) if not s.get("on_demand") or s["id"] in subscribed]
+
+
+def register_catalog(settings: dict, store: NoticeStore) -> None:
+    catalog = [s for s in school_sources(settings) if s.get("on_demand")]
+    store.register_sources([{"id": s["id"], "name": s["name"], "url": s["url"]} for s in catalog])
+
+
+def run_collection(
+    settings: dict, store: NoticeStore, now: datetime, subscribed: set[str] | None = None
+) -> tuple[int, int]:
+    sources = collection_targets(settings, subscribed or set())
+    if not sources:
+        return 0, 0
+    details_left = DETAIL_BUDGET
     stamp = now.astimezone(KST).isoformat()
     gap = max(1.5, float(settings.get("request_gap_seconds", 1.5)))
     agent, timeout = settings["user_agent"], float(settings["timeout_seconds"])
@@ -168,7 +211,11 @@ def run_collection(settings: dict, store: NoticeStore, now: datetime) -> tuple[i
                     "change_kind": "제목" if title_changed else old.get("change_kind"),
                     "previous_title": old.get("title") if title_changed else old.get("previous_title"),
                 }
+                if needs_detail and details_left <= 0:
+                    # 이번 실행의 본문 한도를 넘었다. 본문 없이 저장하고 다음 실행에서 이어 받는다.
+                    needs_detail = False
                 if needs_detail:
+                    details_left -= 1
                     try:
                         pace()
                         detail = parse_detail(fetch_detail(notice.url, agent, timeout), notice.url)
@@ -333,9 +380,15 @@ def _recent(posted_on: str, now: datetime) -> bool:
         return False
 
 
-def recently_collected(settings: dict, store: NoticeStore, now: datetime, minimum_minutes: int = 25) -> bool:
+def recently_collected(
+    settings: dict,
+    store: NoticeStore,
+    now: datetime,
+    minimum_minutes: int = 25,
+    subscribed: set[str] | None = None,
+) -> bool:
     """Skip duplicate runs while allowing the 30-minute timer to collect normally."""
-    sources = [s for s in settings["sources"] if s.get("kind") == "skku-cms" and not s.get("external")]
+    sources = collection_targets(settings, subscribed or set())
     if not sources:
         return False
     for source in sources:
@@ -357,11 +410,13 @@ def main() -> int:
         store = NoticeStore(url, key)
         try:
             now = datetime.now(KST)
-            if recently_collected(settings, store, now):
+            register_catalog(settings, store)
+            subscribed = store.subscribed_source_ids()
+            if recently_collected(settings, store, now, subscribed=subscribed):
                 print("최근에 모든 게시판을 확인해 이번 중복 요청을 건너뛰어요.", flush=True)
                 count, failed = 0, 0
             else:
-                count, failed = run_collection(settings, store, now)
+                count, failed = run_collection(settings, store, now, subscribed)
             # 외부 인턴 공고는 원본처럼 학교 게시판과 독립적으로 시간당 한 번 확인한다.
             # 실패해도 학교 수집 결과와 종료 코드에는 영향을 주지 않는다.
             external_count, _external_failed = run_external_collection(settings, store, now)

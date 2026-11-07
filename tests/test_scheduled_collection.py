@@ -254,3 +254,80 @@ def test_freshness_gate_skips_only_when_all_school_boards_were_recently_collecte
     assert not job.recently_collected(SETTINGS, store, NOW)
     store.sources.clear()
     assert not job.recently_collected(SETTINGS, store, NOW)
+
+
+CATALOG = {
+    "sources": [
+        {"id": "school", "name": "학교", "kind": "skku-cms", "url": "https://www.skku.edu/notice"},
+        {"id": "dept-a", "name": "A학과 공지", "kind": "skku-cms", "on_demand": True,
+         "url": "https://a.skku.edu/notice.do"},
+        {"id": "dept-b", "name": "B학과 공지", "kind": "skku-cms", "on_demand": True,
+         "url": "https://b.skku.edu/notice.do"},
+    ],
+    "user_agent": "test",
+    "timeout_seconds": 2,
+}
+
+
+def _notice(source_id, number):
+    return Notice(source_id, str(number), f"공지 {number}", "학사",
+                  f"https://x.skku.edu/?articleNo={number}", date(2026, 11, 6), False)
+
+
+def test_catalog_boards_are_collected_only_when_someone_follows_them(monkeypatch):
+    monkeypatch.setattr(job.time, "sleep", lambda _: None)
+    fetched = []
+    monkeypatch.setattr(job, "fetch_list", lambda url, *_: fetched.append(url) or "list")
+    monkeypatch.setattr(job, "parse_list", lambda _html, source_id, _url: [_notice(source_id, 1)])
+    monkeypatch.setattr(job, "fetch_detail", lambda *_: "detail")
+    monkeypatch.setattr(job, "parse_detail", lambda *_: SimpleNamespace(
+        body_text="본문", body_html="<p>본문</p>", attachments=(), images=()))
+    assert [s["id"] for s in job.collection_targets(CATALOG, set())] == ["school"]
+    assert [s["id"] for s in job.collection_targets(CATALOG, {"dept-b"})] == ["school", "dept-b"]
+    store = MemoryStore()
+    assert job.run_collection(CATALOG, store, NOW, {"dept-b"}) == (2, 0)
+    assert fetched == ["https://www.skku.edu/notice", "https://b.skku.edu/notice.do"]
+    assert set(store.sources) == {"school", "dept-b"}
+
+
+def test_catalog_registration_makes_boards_subscribable_without_collecting():
+    registered = []
+
+    class Store:
+        def register_sources(self, rows):
+            registered.extend(rows)
+
+    job.register_catalog(CATALOG, Store())
+    assert registered == [
+        {"id": "dept-a", "name": "A학과 공지", "url": "https://a.skku.edu/notice.do"},
+        {"id": "dept-b", "name": "B학과 공지", "url": "https://b.skku.edu/notice.do"},
+    ]
+
+
+def test_detail_budget_spreads_a_first_backfill_over_several_runs(monkeypatch):
+    monkeypatch.setattr(job.time, "sleep", lambda _: None)
+    monkeypatch.setattr(job, "DETAIL_BUDGET", 3)
+    monkeypatch.setattr(job, "fetch_list", lambda *_: "list")
+    monkeypatch.setattr(
+        job, "parse_list", lambda _h, source_id, _u: [_notice(source_id, n) for n in range(1, 8)]
+    )
+    details = []
+    monkeypatch.setattr(job, "fetch_detail", lambda url, *_: details.append(url) or "detail")
+    monkeypatch.setattr(job, "parse_detail", lambda *_: SimpleNamespace(
+        body_text="본문", body_html="<p>본문</p>", attachments=(), images=()))
+    store = MemoryStore()
+    one_board = {**CATALOG, "sources": CATALOG["sources"][:1]}
+    assert job.run_collection(one_board, store, NOW) == (7, 0)
+    assert len(details) == 3
+    assert sum(1 for row in store.rows.values() if row["fetched_at"]) == 3
+    job.run_collection(one_board, store, NOW)
+    assert len(details) == 6, "the next run continues with the notices that still have no body"
+
+
+def test_freshness_gate_ignores_catalog_boards_nobody_follows():
+    class Store:
+        def source(self, source_id):
+            return {"last_success_at": NOW.isoformat()} if source_id == "school" else None
+
+    assert job.recently_collected(CATALOG, Store(), NOW) is True
+    assert job.recently_collected(CATALOG, Store(), NOW, subscribed={"dept-a"}) is False

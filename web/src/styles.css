@@ -594,7 +594,55 @@
 
 @layer platform {
   .platform-preview { padding: 10px 16px; background: var(--sunken); color: var(--text-2); font-size: 13px; }
-  .platform-settings { display: grid; gap: 12px; padding: 24px 16px; color: var(--text-2); }
-  .platform-settings h2 { color: var(--text); font-size: 18px; }
-  .platform-settings textarea { display: block; width: min(100%, 32rem); margin-top: 8px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); }
+  /* 설정 화면은 원본의 구역(.settings-head + .box)과 줄(.setting)을 그대로 쓴다. 아래는 그 안에 들어가는 새 구성요소다. */
+  .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 52px; padding: 6px 0; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; color: var(--text); }
+  .setting-control > .switch-row:first-child, .box > .switch-row:first-child { border-top: 0; }
+  .switch-text { display: grid; gap: 2px; }
+  .switch-label { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
+  .switch-note { font-size: 13px; color: var(--text-3); }
+  .switch-state { margin-left: auto; padding-right: 10px; font-size: 13px; color: var(--text-3); }
+  .switch-row:focus-visible, .onb button:focus-visible, .settings-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .board-group { display: grid; margin-top: 12px; }
+  .board-group-title { margin: 0; padding: 8px 0 4px; font-size: 13px; font-weight: 600; color: var(--text-3); }
+  .info-list { display: grid; gap: 2px; margin: 0; }
+  .info-list > div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 14px; }
+  .info-list dt { flex: none; color: var(--text-3); }
+  .info-list dd { margin: 0; text-align: right; font-weight: 600; color: var(--text); }
+  .switch { position: relative; flex: none; width: 46px; height: 28px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--sunken); transition: background 0.15s, border-color 0.15s; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px oklch(0.2 0.02 var(--h) / 0.25); transition: transform 0.15s; }
+  .switch-row[aria-checked="true"] .switch { border-color: var(--accent); background: var(--accent); }
+  .switch-row[aria-checked="true"] .switch::after { transform: translateX(18px); }
+  .switch-row:disabled { opacity: 0.55; }
+  .badge { padding: 1px 8px; border-radius: var(--r-pill); background: color-mix(in oklch, var(--accent) 14%, transparent); color: var(--accent); font-size: 12px; font-weight: 600; }
+  .seg { display: flex; flex-wrap: wrap; gap: 8px; }
+  .seg button { flex: 1 1 4.5rem; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); color: var(--text); font-weight: 500; }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in oklch, var(--accent) 12%, var(--surface)); font-weight: 700; }
+  .choice-list { display: grid; gap: 8px; }
+  .choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 8px 16px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); color: var(--text); text-align: left; font-size: 16px; }
+  .choice[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in oklch, var(--accent) 10%, var(--surface)); font-weight: 600; }
+  .choice-note { display: block; font-size: 13px; font-weight: 400; color: var(--text-3); }
+  .choice-check { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line); }
+  .choice[aria-pressed="true"] .choice-check { border-color: var(--accent); background: var(--accent) radial-gradient(circle, var(--on-accent) 0 28%, transparent 30%); }
+  .chip-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip-wrap .chip[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in oklch, var(--accent) 12%, var(--surface)); color: var(--text); font-weight: 700; }
+  .hint { padding: 10px 12px; border-radius: var(--r-md); background: var(--sunken); color: var(--text-2); font-size: 14px; }
+  .error-text { color: var(--danger); font-size: 14px; }
+
+  /* 첫 로그인 설정(온보딩): 한 화면에 한 질문, 위에는 진행과 건너뛰기, 아래에는 하나의 주 행동. */
+  .onb { position: fixed; inset: 0; z-index: 60; display: grid; grid-template-rows: auto 1fr auto; background: var(--bg); color: var(--text); }
+  .onb-top { display: flex; align-items: center; gap: 8px; width: min(100%, 36rem); margin-inline: auto; padding: 8px 8px 0; }
+  .onb-progress { flex: 1; display: grid; gap: 6px; font-size: 12px; color: var(--text-3); text-align: center; }
+  .onb-bar { height: 4px; border-radius: var(--r-pill); background: var(--line); overflow: hidden; }
+  .onb-bar > span { display: block; height: 100%; background: var(--accent); transition: width 0.2s; }
+  .onb-skip { min-height: 44px; padding: 0 12px; border: 0; background: none; color: var(--text-3); font-weight: 600; }
+  .onb-body { overflow-y: auto; width: min(100%, 36rem); margin-inline: auto; padding: 16px 16px 24px; display: grid; grid-auto-rows: max-content; align-content: start; gap: 16px; }
+  /* 전역 h1은 한 줄 제목 막대용(overflow hidden, nowrap)이라 여기서는 줄바꿈을 허용하고 행이 눌려 사라지지 않게 한다. */
+  .onb-body h1 { margin: 8px 0 0; font-size: 24px; line-height: 1.35; font-weight: 700; overflow: visible; white-space: normal; text-overflow: clip; }
+  .onb-body > p, .onb-lead { margin: 0; color: var(--text-2); }
+  .onb-group { display: grid; gap: 8px; }
+  .onb-group h2 { margin: 8px 0 0; font-size: 15px; font-weight: 700; }
+  .onb-foot { width: min(100%, 36rem); margin-inline: auto; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); display: grid; gap: 8px; background: var(--bg); }
+  .onb-foot .solid-button, .onb-foot .ghost-button { width: 100%; }
+  .onb-search { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); }
+  @media (prefers-reduced-motion: reduce) { .switch, .switch::after, .onb-bar > span { transition: none; } }
 }

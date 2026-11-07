@@ -50,3 +50,356 @@ sources:
     kind: jasoseol
     url: https://jasoseol.com/recruit
     external: true
+
+# BEGIN catalog
+# scripts/board_catalog.py가 만든다. 직접 고치지 않는다. 구독자가 있는 게시판만 수집한다(on_demand).
+
+  - id: liberalarts-notice
+    name: 문과대학 공지
+    kind: skku-cms
+    url: https://liberalarts.skku.edu/liberal/community/under_notice.do
+    on_demand: true
+
+  - id: sscience-notice
+    name: 사회과학대학 공지
+    kind: skku-cms
+    url: https://sscience.skku.edu/sscience/community/under_notice.do
+    on_demand: true
+
+  - id: ecostat-notice
+    name: 경제대학 공지
+    kind: skku-cms
+    url: https://ecostat.skku.edu/ecostat/notice_total.do
+    on_demand: true
+
+  - id: biz-notice
+    name: 경영대학 공지
+    kind: skku-cms
+    url: https://biz.skku.edu/bizskk/notice.do
+    on_demand: true
+
+  - id: art-notice
+    name: 예술대학 공지
+    kind: skku-cms
+    url: https://art.skku.edu/art/notice.do
+    on_demand: true
+
+  - id: cscience-notice
+    name: 자연과학대학 공지
+    kind: skku-cms
+    url: https://cscience.skku.edu/cscience/community/under_notice.do
+    on_demand: true
+
+  - id: ice-notice
+    name: 정보통신대학 공지
+    kind: skku-cms
+    url: https://ice.skku.edu/ice/notice.do
+    on_demand: true
+
+  - id: enc-notice
+    name: 공과대학 공지
+    kind: skku-cms
+    url: https://enc.skku.edu/enc/notice.do
+    on_demand: true
+
+  - id: biotech-notice
+    name: 생명공학대학 공지
+    kind: skku-cms
+    url: https://biotech.skku.edu/biotech/notice_under.do
+    on_demand: true
+
+  - id: sports-notice
+    name: 스포츠과학대학 공지
+    kind: skku-cms
+    url: https://sport.skku.edu/sports/community/under_notice.do
+    on_demand: true
+
+  - id: scos-notice
+    name: 유학대학 공지
+    kind: skku-cms
+    url: https://scos.skku.edu/scos/community/under_notice.do
+    on_demand: true
+
+  - id: korean-notice
+    name: 국어국문학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/korean/community/under_notice.do
+    on_demand: true
+
+  - id: english-notice
+    name: 영어영문학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/english/notice.do
+    on_demand: true
+
+  - id: french-notice
+    name: 프랑스어문학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/french/community/notice.do
+    on_demand: true
+
+  - id: chinese-notice
+    name: 중어중문학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/chinese/undergraduate_notice.do
+    on_demand: true
+
+  - id: german-notice
+    name: 독어독문학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/german/04_Community/notice.do
+    on_demand: true
+
+  - id: russian-notice
+    name: 러시아어문학과 공지
+    kind: skku-cms
+    url: https://russian.skku.edu/russian/deptnews.do
+    on_demand: true
+
+  - id: klcc-notice
+    name: 한문학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/klcc/community/under_notice.do
+    on_demand: true
+
+  - id: history-notice
+    name: 사학과 공지
+    kind: skku-cms
+    url: https://history.skku.edu/history/community/under_notice.do
+    on_demand: true
+
+  - id: philosophy-notice
+    name: 철학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/philosophy/community/under_notice.do
+    on_demand: true
+
+  - id: lis-notice
+    name: 문헌정보학과 공지
+    kind: skku-cms
+    url: https://lis.skku.edu/lis/community/under_notice.do
+    on_demand: true
+
+  - id: psd-notice
+    name: 정치외교학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/psd/notice.do
+    on_demand: true
+
+  - id: mediacomm-notice
+    name: 미디어커뮤니케이션학과 공지
+    kind: skku-cms
+    url: https://mediacomm.skku.edu/mediacomm/community/notice.do
+    on_demand: true
+
+  - id: soc-notice
+    name: 사회학과 공지
+    kind: skku-cms
+    url: https://soc.skku.edu/soc/notice.do
+    on_demand: true
+
+  - id: welfare-notice
+    name: 사회복지학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/welfare/community/notice.do
+    on_demand: true
+
+  - id: psych-notice
+    name: 심리학과 공지
+    kind: skku-cms
+    url: https://psych.skku.edu/psy/notice_undergraduate.do
+    on_demand: true
+
+  - id: child-notice
+    name: 아동·청소년학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/child/notice.do
+    on_demand: true
+
+  - id: gld-notice
+    name: 글로벌리더학부 공지
+    kind: skku-cms
+    url: https://gld.skku.edu/gld/community/notice.do
+    on_demand: true
+
+  - id: stat-notice
+    name: 통계학과 공지
+    kind: skku-cms
+    url: https://stat.skku.edu/stat/community/under_notice.do
+    on_demand: true
+
+  - id: globalecon-notice
+    name: 글로벌경제학과 공지
+    kind: skku-cms
+    url: https://globalecon.skku.edu/gecon/notice.do
+    on_demand: true
+
+  - id: bus-notice
+    name: 경영학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/bus/notice.do
+    on_demand: true
+
+  - id: globalbiz-notice
+    name: 글로벌경영학과 공지
+    kind: skku-cms
+    url: https://globalbiz.skku.edu/gba/notice.do
+    on_demand: true
+
+  - id: edu-notice
+    name: 교육학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/skku-edu/community/under_notice.do
+    on_demand: true
+
+  - id: klccedu-notice
+    name: 한문교육과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/klccedu/community/notice.do
+    on_demand: true
+
+  - id: mathedu-notice
+    name: 수학교육과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/mathedu/notice.do
+    on_demand: true
+
+  - id: comedu-notice
+    name: 컴퓨터교육과 공지
+    kind: skku-cms
+    url: https://comedu.skku.edu/comedu/notice.do
+    on_demand: true
+
+  - id: design-notice
+    name: 디자인학과 공지
+    kind: skku-cms
+    url: https://design.skku.edu/design/notice_dept.do
+    on_demand: true
+
+  - id: dance-notice
+    name: 무용학과 공지
+    kind: skku-cms
+    url: https://dance.skku.edu/dance/notice.do
+    on_demand: true
+
+  - id: acting-notice
+    name: 연기예술학과 공지
+    kind: skku-cms
+    url: https://acting.skku.edu/acting/notice.do
+    on_demand: true
+
+  - id: fashion-notice
+    name: 의상학과 공지
+    kind: skku-cms
+    url: https://fashion.skku.edu/fashion/notice.do
+    on_demand: true
+
+  - id: math-notice
+    name: 수학과 공지
+    kind: skku-cms
+    url: https://math.skku.edu/math/community/under_notice.do
+    on_demand: true
+
+  - id: physics-notice
+    name: 물리학과 공지
+    kind: skku-cms
+    url: https://physics.skku.edu/physics/notice/notice.do
+    on_demand: true
+
+  - id: eee-notice
+    name: 전자전기공학부 공지
+    kind: skku-cms
+    url: https://eee.skku.edu/eee/notice.do
+    on_demand: true
+
+  - id: mcce-notice
+    name: 소재부품융합공학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/mcce/notice.do
+    on_demand: true
+
+  - id: intelligentsw-notice
+    name: 지능형소프트웨어학과 공지
+    kind: skku-cms
+    url: https://intelligentsw.skku.edu/intelligentsw/notice.do
+    on_demand: true
+
+  - id: ai-notice
+    name: 인공지능학과 공지
+    kind: skku-cms
+    url: https://ai.skku.edu/ai/notice.do
+    on_demand: true
+
+  - id: amse-notice
+    name: 신소재공학부 공지
+    kind: skku-cms
+    url: https://amse.skku.edu/AMSE/notice.do
+    on_demand: true
+
+  - id: mech-notice
+    name: 기계공학부 공지
+    kind: skku-cms
+    url: https://mech.skku.edu/me/notice.do
+    on_demand: true
+
+  - id: sme-notice
+    name: 시스템경영공학과 공지
+    kind: skku-cms
+    url: https://sme.skku.edu/iesys/notice.do
+    on_demand: true
+
+  - id: arch-notice
+    name: 건축학과 공지
+    kind: skku-cms
+    url: https://arch.skku.edu/arch/NEWS/notice.do
+    on_demand: true
+
+  - id: qie-notice
+    name: 양자정보공학과 공지
+    kind: skku-cms
+    url: https://qie.skku.edu/qie/notice.do
+    on_demand: true
+
+  - id: foodlife-notice
+    name: 식품생명공학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/foodlife/community/notice.do
+    on_demand: true
+
+  - id: biomecha-notice
+    name: 바이오메카트로닉스학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/biomecha/community/notice.do
+    on_demand: true
+
+  - id: gene-notice
+    name: 융합생명공학과 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/gene/community/under_notice.do
+    on_demand: true
+
+  - id: gbme-notice
+    name: 글로벌바이오메디컬공학과 공지
+    kind: skku-cms
+    url: https://gbme.skku.edu/gbme/community/under_notice.do
+    on_demand: true
+
+  - id: aicon-notice
+    name: 응용AI융합학부 공지
+    kind: skku-cms
+    url: https://aicon.skku.edu/aicon/notice.do
+    on_demand: true
+
+  - id: energy-notice
+    name: 에너지학과 공지
+    kind: skku-cms
+    url: https://energy.skku.edu/energy/notice.do
+    on_demand: true
+
+  - id: ssbat-notice
+    name: 배터리학과 공지
+    kind: skku-cms
+    url: https://ssbat.skku.edu/ssbat/notice.do
+    on_demand: true
+
+# END catalog

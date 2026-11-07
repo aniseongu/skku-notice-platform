@@ -14,7 +14,9 @@ import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from './preferences';
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
-import { byokAvailable, EMPTY_PROFILE, loadByokStatus, loadJudgeProfile, registerByokKey, removeByokKey, saveJudgeProfile, type ByokStatus, type JudgeProfile } from './byok';
+import { byokAvailable, loadByokStatus, registerByokKey, removeByokKey, type ByokStatus } from './byok';
+import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
+import type { Draft } from './onboarding-flow';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
 import { localKey, setLocalOwner } from './local-scope.ts';
 import type { Subscription } from '@supabase/supabase-js';
@@ -38,17 +40,24 @@ const INTERACTIVE = 'a, button, input, textarea, select, [contenteditable]';
 const wide = matchMedia('(min-width: 1080px)');
 const browserTab = matchMedia('(display-mode: browser)');
 
+export function settingsSectionFromUrl(): string | null {
+  const params = new URLSearchParams(location.search);
+  if (params.get('keys') === '1') return 'keys';
+  const section = params.get('section');
+  return section && ['notifications', 'keywords', 'profile'].includes(section) ? section : null;
+}
+
 export function settingsTitle(): string {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return '연결 키';
-  return ({ notifications: '알림', keywords: '관심 키워드', connection: '기기 연결', calendar: '캘린더' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
+  return ({ notifications: '알림', keywords: '관심 키워드', profile: '내 정보' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
 }
 
 export interface InstallPrompt extends Event { prompt(): Promise<void> }
 
 export function remember(key: string, value?: string): string | null {
   try {
-    const storageKey = ['keywords', 'board', 'view-unread', 'subscriptions-only'].includes(key) ? localKey(key) : key;
+    const storageKey = ['keywords', 'board', 'view-unread', 'subscriptions-only', 'onboarding-dismissed'].includes(key) ? localKey(key) : key;
     if (value === undefined) return localStorage.getItem(storageKey);
     localStorage.setItem(storageKey, value);
   } catch { /* 사생활 보호 모드에서는 기억하지 않는다 */ }
@@ -110,7 +119,9 @@ export class AppController extends Reactive {
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
     byokOn: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true },
-    judgeProfile: { state: true }, profileMessage: { state: true },
+    profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, settingsSection: { state: true },
+    onboardingOpen: { state: true }, onboardingManual: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
+    keywordNote: { state: true },
     subscriptions: { state: true }, subscriptionsLoading: { state: true }, subscriptionsError: { state: true }, subscriptionsOnly: { state: true },
     preferencesLoading: { state: true }, preferencesError: { state: true }, preferencesUnavailable: { state: true },
     unreadOnly: { state: true }, selecting: { state: true }, selectedReads: { state: true },
@@ -139,8 +150,19 @@ export class AppController extends Reactive {
   byokLoading = false;
   byokBusy = false;
   byokError = '';
-  judgeProfile: JudgeProfile = EMPTY_PROFILE;
+  profile: UserProfile = EMPTY_PROFILE;
+  profileStatus: 'idle' | 'loading' | 'ready' | 'unavailable' = 'idle';
   profileMessage = '';
+  // 설정 화면의 하위 쪽(원본과 같은 ?view=settings&section=... 주소). keys=1은 연결 키 쪽이다.
+  settingsSection: string | null = settingsSectionFromUrl();
+  onboardingOpen = false;
+  onboardingManual = false;
+  onboardingDismissed = false;
+  onboardingBusy = false;
+  onboardingError = '';
+  private onboardingChain: { key: string; run: () => Promise<void> } | null = null;
+  keywordNote = '';
+  private keywordWrite: Promise<void> = Promise.resolve();
   authReady = !authClient;
   authEmail: string | null = null;
   authError = '';
@@ -209,7 +231,8 @@ export class AppController extends Reactive {
           const previousUserId = this.authUserId;
           this.authUserId = userId;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.judgeProfile = EMPTY_PROFILE; this.profileMessage = '';
+          this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.keywordNote = '';
+          this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
           if (staleChain) void staleChain.chain.discard();
@@ -221,8 +244,9 @@ export class AppController extends Reactive {
           this.preferencesLoading = !!userId;
           this.preferencesError = '';
           this.preferencesUnavailable = false;
-          if (userId) setTimeout(() => { void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshPush(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); }, 0);
+          if (userId) setTimeout(() => { void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshPush(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch); }, 0);
           setLocalOwner(userId);
+          this.onboardingDismissed = !!userId && remember('onboarding-dismissed') === '1';
           this.saved = loadSaved();
           this.keywords = loadKeywords();
           this.readState = loadReadState();
@@ -468,12 +492,101 @@ export class AppController extends Reactive {
     }
   }
 
+  async refreshProfile(userId: string, epoch: number): Promise<void> {
+    if (!authClient) return;
+    try {
+      const row = await loadProfile(authClient, userId);
+      if (epoch !== this.subscriptionsEpoch) return;
+      this.profile = row ?? EMPTY_PROFILE;
+      this.profileStatus = 'ready';
+    } catch {
+      // 테이블이 아직 없거나 읽지 못하면 온보딩을 띄우지 않는다(설정에서는 그대로 쓸 수 있다).
+      if (epoch === this.subscriptionsEpoch) this.profileStatus = 'unavailable';
+    }
+  }
+
+  /** 첫 로그인 설정을 보여 줄지. 한 번 끝냈거나 건너뛴 사람에게는 다시 띄우지 않는다. */
+  needsOnboarding(): boolean {
+    if (!this.authUserId) return false;
+    if (this.onboardingOpen) return true;
+    return this.profileStatus === 'ready' && !this.profile.onboardedAt && !this.onboardingDismissed;
+  }
+
+  openOnboarding() { this.onboardingManual = true; this.onboardingError = ''; this.onboardingOpen = true; }
+
+  closeOnboarding() { this.onboardingOpen = false; this.onboardingManual = false; this.onboardingError = ''; }
+
+  /** 나중에 하기. 직접 연 경우는 닫기만 하고, 처음이면 이 계정에서는 다시 묻지 않는다. */
+  dismissOnboarding() {
+    if (!this.onboardingManual) { remember('onboarding-dismissed', '1'); this.onboardingDismissed = true; }
+    this.closeOnboarding();
+  }
+
+  /**
+   * 프로필 저장 → 게시판 구독 반영 → 키워드 저장 순서로 끝낸다. 중간에 실패하면 같은 내용으로 다시 부를 때
+   * 끝낸 단계는 건너뛰고 실패한 단계부터 이어서 저장한다. 계정이 바뀌면 단계마다 멈춘다.
+   */
+  async finishOnboarding(draft: Draft): Promise<boolean> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch, client = authClient;
+    if (!client || !userId || this.onboardingBusy) return false;
+    let words: string[];
+    try { words = parseKeywords(draft.keywords.join('\n')); }
+    catch (error) { this.onboardingError = error instanceof Error ? error.message : '키워드를 확인해 주세요.'; return false; }
+    const key = JSON.stringify([userId, epoch, draft]);
+    const nextProfile: UserProfile = {
+      ...this.profile, programs: draft.programs, year: draft.year, enrollmentStatus: draft.enrollmentStatus,
+      onboardedAt: this.profile.onboardedAt ?? new Date().toISOString(),
+    };
+    const boards = draft.boards.filter((id) => this.sources.some((source) => source.id === id && !source.external));
+    if (!this.onboardingChain || this.onboardingChain.key !== key) {
+      const same = async () => {
+        if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId || !(await sessionIs(client, userId))) throw new Error('계정이 바뀌었어요');
+      };
+      const chain = connectionChain([
+        async () => { await same(); await storeProfile(client, userId, nextProfile); },
+        async () => {
+          const current = new Set(this.subscriptions);
+          for (const id of boards) if (!current.has(id)) { await same(); await setSubscription(client, userId, id, true); }
+          for (const id of current) if (!boards.includes(id)) { await same(); await setSubscription(client, userId, id, false); }
+        },
+        async () => { await same(); await saveKeywordsPreference(client, userId, words); },
+      ]);
+      this.onboardingChain = { key, run: () => chain.run() };
+    }
+    const current = this.onboardingChain;
+    this.onboardingBusy = true; this.onboardingError = '';
+    try {
+      await current.run();
+      if (epoch !== this.subscriptionsEpoch) return false;
+      this.profile = nextProfile; this.subscriptions = boards; this.setKeywords(words);
+      this.onboardingChain = null;
+      this.showToast('설정을 저장했어요');
+      return true;
+    } catch {
+      if (epoch === this.subscriptionsEpoch) this.onboardingError = '저장하지 못했어요. 다시 시도하면 이어서 저장해요.';
+      return false;
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.onboardingBusy = false;
+    }
+  }
+
+  /** 이 기기에서 알림이 뜨는지 확인하는 테스트 알림(원본의 "테스트 알림 띄우기"). */
+  async testNotification(): Promise<void> {
+    try {
+      const registration = this.pushRegistration ?? await navigator.serviceWorker?.getRegistration() ?? null;
+      if (!registration || Notification.permission !== 'granted') { this.showToast('알림을 먼저 켜 주세요'); return; }
+      await registration.showNotification(APP_NAME, { body: '이렇게 알림이 와요', icon: new URL('icon-192.png', registration.scope).href, tag: 'skku-notice-test' });
+    } catch {
+      this.showToast('테스트 알림을 띄우지 못했어요');
+    }
+  }
+
   async refreshByok(userId: string, epoch: number): Promise<void> {
     if (!authClient || !this.byokOn) { if (epoch === this.subscriptionsEpoch) this.byokLoading = false; return; }
     try {
-      const [status, profile] = await Promise.all([loadByokStatus(authClient, userId), loadJudgeProfile(authClient, userId)]);
+      const status = await loadByokStatus(authClient, userId);
       if (epoch !== this.subscriptionsEpoch) return;
-      this.byokStatus = status; this.judgeProfile = profile; this.byokError = '';
+      this.byokStatus = status; this.byokError = '';
     } catch {
       if (epoch === this.subscriptionsEpoch) this.byokError = '키 정보를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.';
     } finally {
@@ -511,13 +624,13 @@ export class AppController extends Reactive {
     }
   }
 
-  async saveProfile(profile: JudgeProfile): Promise<void> {
+  async saveProfile(profile: UserProfile): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     if (!authClient || !userId || this.byokBusy) return;
     this.byokBusy = true; this.byokError = ''; this.profileMessage = '';
     try {
-      await saveJudgeProfile(authClient, userId, profile);
-      if (epoch === this.subscriptionsEpoch) { this.judgeProfile = profile; this.profileMessage = '저장했어요.'; }
+      await storeProfile(authClient, userId, profile);
+      if (epoch === this.subscriptionsEpoch) { this.profile = profile; this.profileMessage = '저장했어요.'; }
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) this.byokError = error instanceof Error ? error.message : '저장하지 못했어요.';
     } finally {
@@ -601,6 +714,36 @@ export class AppController extends Reactive {
         this.pushError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '알림을 끄지 못했어요. 잠시 뒤 다시 시도해 주세요.';
       }
     }
+  }
+
+  /** 원본처럼 추가와 삭제가 바로 적용된다. 계정에는 순서대로 저장하고, 실패하면 다시 바꿀 때 또 저장한다. */
+  addKeyword(input: string) {
+    const word = input.trim().replace(/\s+/g, ' ');
+    if (!word || this.keywords.includes(word)) return;
+    this.updateKeywords([...this.keywords, word]);
+  }
+
+  removeKeyword(word: string) { this.updateKeywords(this.keywords.filter((item) => item !== word)); }
+
+  updateKeywords(next: string[]) {
+    let words: string[];
+    try { words = parseKeywords(next.join('\n')); }
+    catch (error) { this.keywordNote = error instanceof Error ? error.message : '키워드를 확인해 주세요.'; return; }
+    this.setKeywords(words);
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId) { this.keywordNote = ''; return; }
+    const client = authClient;
+    this.keywordNote = '저장하고 있어요';
+    this.keywordWrite = this.keywordWrite.then(async () => {
+      if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId || !(await sessionIs(client, userId))) return;
+      try {
+        // 연달아 바꿨다면 가장 최근 목록 하나만 저장한다.
+        await saveKeywordsPreference(client, userId, this.keywords);
+        if (epoch === this.subscriptionsEpoch) this.keywordNote = '계정에 저장했어요';
+      } catch {
+        if (epoch === this.subscriptionsEpoch) this.keywordNote = '저장하지 못했어요. 다시 바꾸면 또 저장해요';
+      }
+    });
   }
 
   async saveKeywords(input: string): Promise<void> {
@@ -700,10 +843,17 @@ export class AppController extends Reactive {
     qsel('.list-pane')?.scrollTo({ top: 0 });
   }
 
-  // 설정을 닫으면 들어오기 전에 보던 보기로 돌아간다.
+  /** 설정의 하위 쪽을 연다. 주소도 원본과 같게 바꿔서 뒤로 가기와 새로고침이 그대로 동작한다. */
+  openSettingsSection(section: string | null) {
+    const query = section === 'keys' ? '?view=settings&keys=1' : section ? `?view=settings&section=${section}` : '?view=settings';
+    history.pushState({ view: 'settings' }, '', `${location.pathname}${query}`);
+    this.settingsSection = section;
+    window.scrollTo({ top: 0 });
+  }
+
+  // 설정을 닫으면 들어오기 전에 보던 보기로 돌아간다. 하위 쪽에서는 먼저 설정 첫 쪽으로 돌아간다.
   leaveSettings = () => {
-    const params = new URLSearchParams(location.search);
-    if (params.has('keys') || params.has('section')) { location.assign('?view=settings'); return; }
+    if (this.settingsSection) { this.openSettingsSection(null); return; }
     // 이 화면에서 설정을 열었으면 기록을 하나 되돌린다(주소에서 view=settings가 빠진다). 바로 설정 주소로 들어왔으면 바꿔 쓴다.
     if (history.state?.view === 'settings') { history.back(); return; }
     const last = normalizeTab(remember('tab'));
@@ -714,6 +864,7 @@ export class AppController extends Reactive {
     this.openedId = typeof history.state?.notice === 'string' ? history.state.notice : null;
     this.boardMenuOpen = false;
     this.sortMenuOpen = false;
+    this.settingsSection = settingsSectionFromUrl();
     const params = new URLSearchParams(location.search);
     const view: View = params.get('view') === 'settings' ? 'settings'
       : [normalizeTab(params.get('tab')), normalizeTab(remember('tab'))].find(isTab) ?? 'all';

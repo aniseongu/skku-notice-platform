@@ -51,3 +51,30 @@ def test_added_boards_2026_11_03(source_id: str, url: str, expected_count: int, 
     assert len(notices) == expected_count
     assert all(notice.url.startswith(f"{url}?mode=view&articleNo=") for notice in notices)
     assert bool(notices[0].category) is has_category
+
+
+def test_view_board_id_variant_uses_a_stable_canonical_url():
+    html = Path("tests/fixtures/art_notice_list_2026-11-07.html").read_text(encoding="utf-8")
+    notices = parse_list(html, "art-notice", "https://art.skku.edu/art/notice.do")
+    assert [n.article_no for n in notices] == ["138879", "138885"]
+    assert notices[0].title.startswith("[일반교직]")
+    assert notices[0].category == "학사"
+    assert notices[0].posted_on.isoformat() == "2026-11-06"
+    assert notices[1].pinned is True
+    # 요청마다 바뀌는 뒤 6글자는 AAAAAA로 고정하고 불필요한 쪽 번호 매개변수는 뺀다.
+    assert notices[0].url == (
+        "https://art.skku.edu/art/notice.do?mode=view&viewBoardId=138879"
+        "&itemId=B675138A6F559F0BA958AAABCF9D485AAAAAAA"
+    )
+
+
+def test_view_board_id_row_without_a_valid_item_id_is_rejected():
+    html = (
+        '<ul class="board-list-wrap"><li><dl class="board-list-content-wrap">'
+        '<dt class="board-list-content-title">'
+        '<a href="?mode=view&amp;viewBoardId=1&amp;itemId=short">제목</a></dt>'
+        '<dd class="board-list-content-info">'
+        "<ul><li>No.1</li><li>x</li><li>2026-11-06</li></ul></dd></dl></li></ul>"
+    )
+    with pytest.raises(ParseError):
+        parse_list(html, "art-notice", "https://art.skku.edu/art/notice.do")

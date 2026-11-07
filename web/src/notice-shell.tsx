@@ -6,7 +6,8 @@ import { APP_NAME } from './brand';
 import { authClient } from './auth';
 import { keywordCounts } from './keyword-counts';
 import { type AppController, STALE_MS, TABS, remember, settingsTitle } from './app-controller';
-import type { JudgeProfile } from './byok';
+import type { UserProfile } from './profile';
+import { Onboarding } from './onboarding';
 import './platform-settings';
 import './notice-rows';
 import './notice-detail';
@@ -62,11 +63,13 @@ export function NoticeShell({ app }: { app: AppController }) {
   app.shownId = selected?.id ?? null;
   const reading = !app.isWide && !settings
     ? app.notices.find((n) => n.id === app.openedId) ?? list.find((n) => n.id === app.openedId) : undefined;
+  // 첫 로그인 설정 창이 떠 있는 동안 뒤쪽 화면은 비활성으로 두어 Tab 키 포커스와 화면 낭독기가 새지 않게 한다.
+  const onboarding = app.needsOnboarding();
   const classes = [settings ? 'is-settings' : '', app.isWide && (!app.detailOpen || !selected) ? 'no-detail' : '', reading ? 'is-reading' : ''].join(' ');
 
   return <>
     <div className="wco-bar" aria-hidden="true"><Brand />{APP_NAME}</div>
-    <div className={`app ${classes}`}>
+    <div className={`app ${classes}`} inert={onboarding}>
       <aside className="sidebar" aria-label="탐색">
         <div className="pane-head brand"><Brand />{APP_NAME}</div>
         <nav className="side-group" aria-label="보기">
@@ -89,7 +92,7 @@ export function NoticeShell({ app }: { app: AppController }) {
       </aside>
 
       <main className="list-pane">
-        <p className="platform-preview" role="status">미리보기예요. 공지는 한 시간 간격으로 확인해요. 알림은 준비하고 있어요.</p>
+        <p className="platform-preview" role="status">미리보기예요. 공지는 30분마다 확인해요.</p>
         {reading ? <ReadingView app={app} notice={reading} /> : <>
           <div className="navigation-head">
             <header className={`pane-head topbar glass ${settings ? '' : 'feed-topbar'}`}>
@@ -147,7 +150,7 @@ export function NoticeShell({ app }: { app: AppController }) {
       </aside>
     </div>
 
-    <nav className="tabbar glass" aria-label="보기" hidden={settings || Boolean(reading)}>
+    <nav className="tabbar glass" aria-label="보기" hidden={settings || Boolean(reading)} inert={onboarding}>
       {TABS.map((t) => <button type="button" key={t.id} aria-current={app.view === t.id ? 'page' : 'false'}
         onClick={() => app.setView(t.id)}><Icon name={t.icon} /><span>{t.label}</span></button>)}
     </nav>
@@ -155,6 +158,7 @@ export function NoticeShell({ app }: { app: AppController }) {
       <a href={app.toastLink} target={app.toastLink.startsWith('?') ? '_self' : '_blank'} rel="noopener noreferrer">{app.toastLinkLabel}</a>
       <button type="button" onClick={() => { app.toast = ''; app.toastLink = null; }}>닫기</button></div> : null}</div>
     {app.shortcutsOpen ? <ShortcutsDialog app={app} /> : null}
+    {onboarding ? <Onboarding app={app} /> : null}
   </>;
 }
 
@@ -165,24 +169,28 @@ function settingsModel(app: AppController) {
   return {
     configured: !!authClient, userId: app.authUserId, email: app.authEmail,
     authBusy: app.authBusy, authError: app.authError,
+    signIn: () => { void app.signIn(); }, signOut: () => { void app.signOut(); },
+    section: app.settingsSection, openSection: (section: string | null) => app.openSettingsSection(section),
+    theme: app.theme, setTheme: (theme: 'auto' | 'light' | 'dark') => app.setTheme(theme),
+    canInstall: !!app.install, install: () => { void app.runInstall(); }, showShortcuts: () => { app.shortcutsOpen = true; },
     sources: app.sources.filter((source) => !source.external).map((source) => ({ id: source.id, label: boardName(source, source.id) })),
     subscriptions: app.subscriptions, loading: app.subscriptionsLoading, error: app.subscriptionsError,
     subscriptionsOnly: app.subscriptionsOnly,
     setSubscriptionsOnly: (enabled: boolean) => { app.subscriptionsOnly = enabled; app.selectedId = null; app.selectedReads = []; remember('subscriptions-only', enabled ? '1' : '0'); },
-    keywords: app.keywords, preferencesLoading: app.preferencesLoading, preferencesError: app.preferencesError, preferencesUnavailable: app.preferencesUnavailable,
-    retryPreferences: () => { if (app.authUserId) { app.preferencesLoading = true; app.preferencesError = ''; void app.refreshPreferences(app.authUserId, app.subscriptionsEpoch); } },
-    saveKeywords: (input: string) => { void app.saveKeywords(input); },
-    signIn: () => { void app.signIn(); }, signOut: () => { void app.signOut(); },
-    pushStatus: app.pushStatus, pushError: app.pushError, pushRetry: app.pushRetry,
-    byok: { available: app.byokOn, loading: app.byokLoading, busy: app.byokBusy, error: app.byokError, status: app.byokStatus,
-      profile: app.judgeProfile, profileMessage: app.profileMessage,
-      register: (apiKey: string) => { void app.registerKey(apiKey); }, remove: () => { void app.removeKey(); },
-      saveProfile: (profile: JudgeProfile) => { void app.saveProfile(profile); } },
-    enablePush: () => { void app.enablePush(); }, disablePush: () => { void app.disablePush(); },
     toggle: (id: string, enabled: boolean) => { void app.toggleSubscription(id, enabled); },
     retry: () => {
       if (app.authUserId) { app.subscriptionsLoading = true; app.subscriptionsError = ''; void app.refreshSubscriptions(app.authUserId, app.subscriptionsEpoch); }
     },
+    keywords: app.keywords, keywordNote: app.keywordNote,
+    addKeyword: (word: string) => app.addKeyword(word), removeKeyword: (word: string) => app.removeKeyword(word),
+    pushStatus: app.pushStatus, pushError: app.pushError, pushRetry: app.pushRetry,
+    enablePush: () => { void app.enablePush(); }, disablePush: () => { void app.disablePush(); },
+    testNotification: () => { void app.testNotification(); },
+    profile: app.profile, profileStatus: app.profileStatus, profileMessage: app.profileMessage,
+    saveProfile: (profile: UserProfile) => { void app.saveProfile(profile); },
+    openOnboarding: () => app.openOnboarding(),
+    byok: { available: app.byokOn, loading: app.byokLoading, busy: app.byokBusy, error: app.byokError, status: app.byokStatus,
+      register: (apiKey: string) => { void app.registerKey(apiKey); }, remove: () => { void app.removeKey(); } },
   };
 }
 
