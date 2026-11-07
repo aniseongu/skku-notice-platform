@@ -732,28 +732,6 @@
   }
 }
 
-/* 날짜 머리글: 공지 줄과 한눈에 구분되게 파인 면의 띠로 그리고, 스크롤해도 상단바 바로 아래에 붙어 있다.
-   (MUI ListSubheader와 같은 방식: 고정되고 다음 머리글이 밀어낸다. 배경이 불투명해서 아래 글이 비쳐 보이지 않는다.) */
-@layer platform {
-  /* 모바일은 상단바가 스크롤과 함께 올라가 버려서 화면 맨 위에, 넓은 화면은 고정된 상단바 바로 아래에 붙는다. */
-  :root { --group-top: calc(var(--wco-h) + env(safe-area-inset-top)); }
-  .group-head {
-    position: sticky; top: var(--group-top); z-index: 1; margin: 0; min-height: 40px; padding: 8px var(--gutter);
-    background: light-dark(var(--sunken), var(--bg));
-    border-block: 1px solid var(--line);
-  }
-  .group-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-  .group-head h2 { font-size: 14px; line-height: 20px; font-weight: 700; color: var(--text); }
-  .group-count { font-size: 12px; line-height: 16px; color: var(--text-3); font-variant-numeric: tabular-nums; }
-  .group-head.empty-head { position: static; border: 0; background: none; }
-  .group + .group { margin-top: 0; }
-  @media (min-width: 720px) {
-    :root { --group-top: var(--head-h); }
-    .group-head { padding: 8px 24px; }
-    .group-head h2 { font-size: 14px; line-height: 20px; }
-  }
-}
-
 @layer platform {
   /* 되돌릴 수 없는 일(계정 지우기)의 확인 버튼은 위험 색으로 구분한다. */
   .solid-button.danger { background: var(--danger); color: light-dark(oklch(0.99 0.005 25), oklch(0.2 0.03 25)); }

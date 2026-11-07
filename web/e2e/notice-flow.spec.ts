@@ -954,45 +954,6 @@ test('on read rows the judgment labels keep their hue, softer in dark mode, with
   }
 });
 
-test('date headers are told apart from notice rows, show how many notices follow and stay under the top bar while scrolling', async ({ page }, testInfo) => {
-  const mobile = testInfo.project.name === 'mobile';
-  await page.goto('/?api=sample/api/v1');
-  await page.locator('notice-rows-screen a.row').first().waitFor();
-  await page.waitForLoadState('networkidle');
-  const heads = page.locator('.group-head:not(.empty-head)');
-  expect(await heads.count()).toBeGreaterThan(1);
-  const first = heads.first();
-  // 구분: 머리글 띠의 배경이 공지 줄(목록 바탕)과 다르고, 날짜 글자가 굵다.
-  const look = await first.evaluate((el) => {
-    const s = getComputedStyle(el); const title = getComputedStyle(el.querySelector('h2')!);
-    const pane = getComputedStyle(document.querySelector('.list-pane')!);
-    return { bg: s.backgroundColor, paneBg: pane.backgroundColor, position: s.position, weight: Number(title.fontWeight), border: s.borderTopWidth };
-  });
-  expect(look.position).toBe('sticky');
-  expect(look.weight).toBeGreaterThanOrEqual(700);
-  expect(look.bg).not.toBe(look.paneBg);
-  expect(look.border).toBe('1px');
-  // 건수: "N건"이 보이고 그 아래 줄 수와 같다.
-  const counts = await page.evaluate(() => [...document.querySelectorAll('.group')].map((g) => ({
-    text: g.querySelector('.group-count')?.textContent ?? '', rows: g.querySelectorAll('a.row').length })));
-  for (const c of counts) expect(c.text).toBe(`${c.rows}건`);
-  // 고정: 스크롤한 뒤 화면 맨 위에 걸린 머리글은 상단바 바로 아래(겹치지 않고 틈도 없이)에 붙는다.
-  await page.evaluate((isMobile) => {
-    const scroller = isMobile ? window : document.querySelector('.list-pane')!;
-    (scroller as Window | Element).scrollTo({ top: 420 });
-  }, mobile);
-  await page.waitForTimeout(250);
-  const gap = await page.evaluate(() => {
-    // 상단바가 화면 밖으로 올라간 모바일에서는 화면 맨 위(0)가 기준이다.
-    const bar = Math.max(0, document.querySelector('.topbar')!.getBoundingClientRect().bottom);
-    const stuck = [...document.querySelectorAll('.group-head:not(.empty-head)')].map((h) => h.getBoundingClientRect())
-      .filter((r) => r.top <= bar + 1 && r.bottom > bar);
-    return stuck.length ? Math.abs(stuck[stuck.length - 1].top - bar) : null;
-  });
-  expect(gap).not.toBeNull();
-  expect(gap!).toBeLessThanOrEqual(1.5);
-});
-
 test('delete account needs two steps, says what goes away, and shows a failure with the next action', async ({ page }) => {
   await settingsAt(page);
   const screen = page.locator('platform-settings-screen');
