@@ -596,4 +596,5 @@
   .platform-preview { padding: 10px 16px; background: var(--sunken); color: var(--text-2); font-size: 13px; }
   .platform-settings { display: grid; gap: 12px; padding: 24px 16px; color: var(--text-2); }
   .platform-settings h2 { color: var(--text); font-size: 18px; }
+  .platform-settings textarea { display: block; width: min(100%, 32rem); margin-top: 8px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); }
 }

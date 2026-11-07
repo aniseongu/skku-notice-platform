@@ -26,3 +26,24 @@ test('notice HTML is sanitized in React detail', async ({ page }) => {
   await expect(page.locator('#xss-check .rich')).toBeVisible();
   await expect(page.locator('#xss-check [onerror], #xss-check a[href^="javascript:"]')).toHaveCount(0);
 });
+
+test('keyword editor saves input and clears a previous account on account change', async ({ page }) => {
+  await page.goto('/?view=settings&api=sample/api/v1');
+  const screen = page.locator('platform-settings-screen');
+  await expect(screen.getByRole('heading', { name: '계정' })).toBeVisible();
+  await page.evaluate(() => {
+    const el = document.querySelector('platform-settings-screen') as HTMLElement & { model: unknown };
+    (window as unknown as { keywordResult: string }).keywordResult = '';
+    el.model = { configured: true, userId: 'account-a', email: null, authBusy: false, authError: '', sources: [], subscriptions: [], loading: false, error: '', keywords: ['장학'], preferencesLoading: false, preferencesError: '', preferencesUnavailable: false, retryPreferences() {}, saveKeywords(value: string) { (window as unknown as { keywordResult: string }).keywordResult = value; }, signIn() {}, signOut() {}, toggle() {}, retry() {} };
+  });
+  const input = screen.getByRole('textbox', { name: '관심 키워드' });
+  await expect(input).toHaveValue('장학');
+  await input.fill('장학\n인턴');
+  await screen.getByRole('button', { name: '키워드 저장하기' }).click();
+  expect(await page.evaluate(() => (window as unknown as { keywordResult: string }).keywordResult)).toBe('장학\n인턴');
+  await page.evaluate(() => {
+    const el = document.querySelector('platform-settings-screen') as HTMLElement & { model: unknown };
+    el.model = { configured: true, userId: 'account-b', email: null, authBusy: false, authError: '', sources: [], subscriptions: [], loading: false, error: '', keywords: [], preferencesLoading: false, preferencesError: '', preferencesUnavailable: false, retryPreferences() {}, saveKeywords() {}, signIn() {}, signOut() {}, toggle() {}, retry() {} };
+  });
+  await expect(input).toHaveValue('');
+});

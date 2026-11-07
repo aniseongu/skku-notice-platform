@@ -12,6 +12,7 @@ import type { Theme } from './settings-view';
 import { APP_NAME } from './brand';
 import { authClient } from './auth';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
+import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from './preferences';
 import './platform-settings';
 import './notice-rows';
 import './notice-detail';
@@ -116,9 +117,13 @@ export class NoticeApp extends LitElement {
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true },
     subscriptions: { state: true }, subscriptionsLoading: { state: true }, subscriptionsError: { state: true },
+    preferencesLoading: { state: true }, preferencesError: { state: true }, preferencesUnavailable: { state: true },
     unreadOnly: { state: true }, selecting: { state: true }, selectedReads: { state: true },
   };
 
+  preferencesLoading = false;
+  preferencesError = '';
+  preferencesUnavailable = false;
   subscriptions: string[] = [];
   subscriptionsLoading = false;
   subscriptionsError = '';
@@ -191,7 +196,10 @@ export class NoticeApp extends LitElement {
           this.subscriptions = [];
           this.subscriptionsError = '';
           this.subscriptionsLoading = !!userId;
-          if (userId) setTimeout(() => { void this.refreshSubscriptions(userId, epoch); }, 0);
+          this.preferencesLoading = !!userId;
+          this.preferencesError = '';
+          this.preferencesUnavailable = false;
+          if (userId) setTimeout(() => { void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); }, 0);
           setLocalOwner(userId);
           this.saved = loadSaved();
           this.keywords = loadKeywords();
@@ -365,6 +373,48 @@ export class NoticeApp extends LitElement {
   }
 
   // 지금 탭에 맞는 게시판들. 인턴 공고 탭은 외부 게시판, 그 밖은 학교 게시판.
+  private async refreshPreferences(userId: string, epoch: number): Promise<void> {
+    if (!authClient) return;
+    try {
+      const keywords = await loadKeywordsPreference(authClient, userId);
+      if (epoch === this.subscriptionsEpoch) {
+        this.preferencesUnavailable = false;
+        if (keywords !== null) {
+          this.keywords = keywords;
+          remember('keywords', JSON.stringify(keywords));
+        }
+      }
+    } catch {
+      if (epoch === this.subscriptionsEpoch) { this.preferencesUnavailable = true; this.preferencesError = '키워드를 불러오지 못했어요. 다시 시도해 주세요.'; }
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.preferencesLoading = false;
+    }
+  }
+
+  private async saveKeywords(input: string): Promise<void> {
+    const userId = this.authUserId;
+    const epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.preferencesLoading || this.preferencesUnavailable) return;
+    let keywords: string[];
+    try { keywords = parseKeywords(input); }
+    catch (error) { this.preferencesError = error instanceof Error ? error.message : '키워드를 확인해 주세요.'; return; }
+    this.preferencesLoading = true;
+    this.preferencesError = '';
+    try {
+      await saveKeywordsPreference(authClient, userId, keywords);
+      if (epoch === this.subscriptionsEpoch) {
+        this.keywords = keywords;
+        remember('keywords', JSON.stringify(keywords));
+        if (this.keyword && !keywords.includes(this.keyword)) this.keyword = null;
+        this.showToast('키워드를 저장했어요');
+      }
+    } catch {
+      if (epoch === this.subscriptionsEpoch) this.preferencesError = '키워드를 저장하지 못했어요. 다시 시도해 주세요.';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.preferencesLoading = false;
+    }
+  }
+
   private async refreshSubscriptions(userId: string, epoch: number): Promise<void> {
     if (!authClient) return;
     try {
@@ -687,6 +737,9 @@ export class NoticeApp extends LitElement {
             authBusy: this.authBusy, authError: this.authError,
             sources: this.sources.filter((source) => !source.external).map((source) => ({ id: source.id, label: boardName(source, source.id) })),
             subscriptions: this.subscriptions, loading: this.subscriptionsLoading, error: this.subscriptionsError,
+            keywords: this.keywords, preferencesLoading: this.preferencesLoading, preferencesError: this.preferencesError, preferencesUnavailable: this.preferencesUnavailable,
+            retryPreferences: () => { if (this.authUserId) { this.preferencesLoading = true; this.preferencesError = ''; void this.refreshPreferences(this.authUserId, this.subscriptionsEpoch); } },
+            saveKeywords: (input: string) => { void this.saveKeywords(input); },
             signIn: () => { void this.signIn(); }, signOut: () => { void this.signOut(); },
             toggle: (id: string, enabled: boolean) => { void this.toggleSubscription(id, enabled); },
             retry: () => {
