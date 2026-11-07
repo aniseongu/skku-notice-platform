@@ -67,3 +67,29 @@ test('subscription filter keeps only the selected school board', async ({ page }
   await expect.poll(async () => rows.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-id') ?? '')))
     .toEqual(ids.filter((id) => id.startsWith(`${source}/`)));
 });
+
+test('push settings show each device state and call the click handlers', async ({ page }) => {
+  await page.goto('/?view=settings&api=sample/api/v1');
+  const screen = page.locator('platform-settings-screen');
+  await expect(screen.getByRole('heading', { name: '계정' })).toBeVisible();
+  const setModel = (pushStatus: string, pushError = '') => page.evaluate(([status, error]) => {
+    const w = window as unknown as { pushCalls: string[] };
+    w.pushCalls = [];
+    const el = document.querySelector('platform-settings-screen') as HTMLElement & { model: unknown };
+    el.model = { configured: true, userId: 'account-a', email: null, authBusy: false, authError: '', sources: [], subscriptions: [], subscriptionsOnly: false, setSubscriptionsOnly() {}, loading: false, error: '', keywords: [], preferencesLoading: false, preferencesError: '', preferencesUnavailable: false, retryPreferences() {}, saveKeywords() {}, signIn() {}, signOut() {}, toggle() {}, retry() {},
+      pushStatus: status, pushError: error, enablePush() { w.pushCalls.push('on'); }, disablePush() { w.pushCalls.push('off'); } };
+  }, [pushStatus, pushError]);
+  await setModel('off');
+  const calls = () => page.evaluate(() => (window as unknown as { pushCalls: string[] }).pushCalls);
+  await screen.getByRole('button', { name: '이 기기에서 알림 받기' }).click();
+  expect(await calls()).toEqual(['on']);
+  await setModel('on');
+  await screen.getByRole('button', { name: '이 기기 알림 끄기' }).click();
+  expect(await calls()).toEqual(['off']);
+  await setModel('checking');
+  await expect(screen.getByRole('button', { name: '확인하고 있어요' })).toBeDisabled();
+  await setModel('denied');
+  await expect(screen.getByText('브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요.')).toBeVisible();
+  await setModel('off', '알림을 켜지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+  await expect(screen.getByRole('alert')).toContainText('알림을 켜지 못했어요');
+});

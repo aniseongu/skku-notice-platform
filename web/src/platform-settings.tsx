@@ -23,6 +23,10 @@ export interface SettingsModel {
   signOut: () => void;
   toggle: (id: string, enabled: boolean) => void;
   retry: () => void;
+  pushStatus: 'unsupported' | 'checking' | 'off' | 'on' | 'busy' | 'denied';
+  pushError: string;
+  enablePush: () => void;
+  disablePush: () => void;
 }
 
 function PlatformSettings({ model }: { model: SettingsModel }) {
@@ -40,8 +44,16 @@ function PlatformSettings({ model }: { model: SettingsModel }) {
       {model.preferencesError ? <p role="alert">{model.preferencesError}</p> : null}
       {model.preferencesUnavailable ? <button className="ghost-button" disabled={model.preferencesLoading} onClick={model.retryPreferences}>키워드 다시 불러오기</button> : null}
       <button className="ghost-button" disabled={model.preferencesLoading || model.preferencesUnavailable} onClick={() => model.saveKeywords(keywordInput)}>키워드 저장하기</button>
+      <h2>알림</h2>
+      {model.pushStatus === 'unsupported' ? <p>이 브라우저에서는 알림을 받을 수 없어요.</p>
+        : model.pushStatus === 'denied' ? <p>브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요.</p>
+        : model.pushStatus === 'on' ? <><p>이 기기로 알림을 받고 있어요.</p><button className="ghost-button" onClick={model.disablePush}>이 기기 알림 끄기</button></>
+        : <><p>구독한 게시판의 새 공지를 이 기기로 알려드려요.</p>
+          <button className="solid-button" disabled={model.pushStatus !== 'off'} onClick={model.enablePush}>
+            {model.pushStatus === 'off' ? '이 기기에서 알림 받기' : '확인하고 있어요'}</button></>}
+      {model.pushError ? <p role="alert">{model.pushError}</p> : null}
       <h2>게시판 구독</h2>
-      <p>구독할 게시판을 선택해요. 알림 기능은 준비 중이에요.</p>
+      <p>알림을 받을 게시판을 선택해요.</p>
       <label><input type="checkbox" checked={model.subscriptionsOnly} disabled={model.loading || !!model.error}
         onChange={(event) => model.setSubscriptionsOnly(event.currentTarget.checked)} /> 구독한 게시판만 보기</label>
       {model.sources.map((source) => <label key={source.id}>

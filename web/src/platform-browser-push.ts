@@ -70,3 +70,12 @@ export async function disableDevicePush(client: SupabaseClient, userId: string, 
     .eq('user_id', userId).eq('endpoint', subscription.endpoint);
   return !error;
 }
+
+// 계정이 바뀌거나 세션이 사라졌을 때 쓴다. 서버 행은 세션 없이 지울 수 없으므로 이 브라우저의 구독만 끊는다.
+// 남은 서버 행은 발송 실패 정리로 닫힌다. 다른 사용자 소유의 구독은 건드리지 않는다.
+export async function releaseDevicePush(userId: string, registration: ServiceWorkerRegistration, storage: Storage): Promise<void> {
+  if (owner(storage) !== userId) return;
+  const subscription = await registration.pushManager.getSubscription();
+  if (subscription && !await subscription.unsubscribe()) throw new Error('이 기기의 알림을 끄지 못했어요.');
+  storage.removeItem(OWNER_KEY);
+}

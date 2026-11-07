@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { disableDevicePush, enableDevicePush, inspectDevicePush } from '../src/platform-browser-push.ts';
+import { disableDevicePush, enableDevicePush, inspectDevicePush, releaseDevicePush } from '../src/platform-browser-push.ts';
 
 const publicKey = Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 1)]).toString('base64url');
 function fixture({ owner = null, saveError = null, deleteError = null } = {}) {
@@ -56,4 +56,21 @@ test('disable stops the local device even when server cleanup fails', async () =
   assert.equal(await disableDevicePush(f.client, 'a', f.registration, f.storage), false);
   assert.equal(f.getUnsubscribed(), 1);
   assert.equal(f.values.has('platform:push-owner'), false);
+});
+
+test('release drops only the previous owner device locally without touching the server', async () => {
+  const f = fixture({ owner: 'a' });
+  f.setCurrent(f.makeSubscription());
+  await releaseDevicePush('a', f.registration, f.storage);
+  assert.equal(f.getUnsubscribed(), 1);
+  assert.equal(f.values.has('platform:push-owner'), false);
+  assert.equal(f.records.length, 0);
+});
+
+test('release leaves a device owned by another account alone', async () => {
+  const f = fixture({ owner: 'b' });
+  f.setCurrent(f.makeSubscription());
+  await releaseDevicePush('a', f.registration, f.storage);
+  assert.equal(f.getUnsubscribed(), 0);
+  assert.equal(f.values.get('platform:push-owner'), 'b');
 });

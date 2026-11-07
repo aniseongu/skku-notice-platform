@@ -14,6 +14,7 @@ import { authClient } from './auth';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from './preferences';
 import './platform-settings';
+import { disableDevicePush, enableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
 import './notice-rows';
 import './notice-detail';
 import { localKey, setLocalOwner } from './local-scope.ts';
@@ -115,7 +116,7 @@ export class NoticeApp extends LitElement {
     toast: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
-    authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true },
+    authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, pushStatus: { state: true }, pushError: { state: true },
     subscriptions: { state: true }, subscriptionsLoading: { state: true }, subscriptionsError: { state: true }, subscriptionsOnly: { state: true },
     preferencesLoading: { state: true }, preferencesError: { state: true }, preferencesUnavailable: { state: true },
     unreadOnly: { state: true }, selecting: { state: true }, selectedReads: { state: true },
@@ -129,6 +130,11 @@ export class NoticeApp extends LitElement {
   subscriptionsLoading = false;
   subscriptionsError = '';
   private subscriptionsEpoch = 0;
+  pushStatus: 'unsupported' | 'checking' | 'off' | 'on' | 'busy' | 'denied' = 'checking';
+  pushError = '';
+  // 클릭 안에서 권한 요청을 바로 부르려면 등록과 공개키를 미리 받아 둔다.
+  private pushRegistration: ServiceWorkerRegistration | null = null;
+  private pushVapidKey: string | null = null;
   authReady = !authClient;
   authEmail: string | null = null;
   authError = '';
@@ -192,7 +198,10 @@ export class NoticeApp extends LitElement {
       this.authSubscription = authClient.auth.onAuthStateChange((_event, session) => {
         const userId = session?.user.id ?? null;
         if (!this.authReady || userId !== this.authUserId) {
+          const previousUserId = this.authUserId;
           this.authUserId = userId;
+          this.pushStatus = userId ? 'checking' : 'off'; this.pushError = '';
+          if (previousUserId) setTimeout(() => { void this.releasePush(previousUserId); }, 0);
           const epoch = ++this.subscriptionsEpoch;
           this.subscriptions = [];
           this.subscriptionsError = '';
@@ -200,7 +209,7 @@ export class NoticeApp extends LitElement {
           this.preferencesLoading = !!userId;
           this.preferencesError = '';
           this.preferencesUnavailable = false;
-          if (userId) setTimeout(() => { void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); }, 0);
+          if (userId) setTimeout(() => { void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshPush(userId, epoch); }, 0);
           setLocalOwner(userId);
           this.saved = loadSaved();
           this.keywords = loadKeywords();
@@ -286,6 +295,10 @@ export class NoticeApp extends LitElement {
     if (!authClient || this.authBusy) return;
     this.authBusy = true; this.authError = '';
     try {
+      // 세션이 살아 있을 때 이 기기의 알림을 먼저 끈다. 실패해도 로그아웃은 막지 않는다.
+      if (this.authUserId && this.pushStatus === 'on' && this.pushRegistration) {
+        await disableDevicePush(authClient, this.authUserId, this.pushRegistration, localStorage).catch(() => false);
+      }
       const { error } = await authClient.auth.signOut({ scope: 'local' });
       if (error) throw error;
     } catch {
@@ -390,6 +403,71 @@ export class NoticeApp extends LitElement {
       if (epoch === this.subscriptionsEpoch) { this.preferencesUnavailable = true; this.preferencesError = '키워드를 불러오지 못했어요. 다시 시도해 주세요.'; }
     } finally {
       if (epoch === this.subscriptionsEpoch) this.preferencesLoading = false;
+    }
+  }
+
+  private async releasePush(userId: string): Promise<void> {
+    try {
+      const registration = this.pushRegistration ?? await navigator.serviceWorker?.getRegistration() ?? null;
+      if (registration) await releaseDevicePush(userId, registration, localStorage);
+    } catch { /* 다음 로그인에서 소유자 표시로 다시 정리한다 */ }
+  }
+
+  private async refreshPush(userId: string, epoch: number): Promise<void> {
+    if (!authClient) return;
+    const supported = isSecureContext && 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
+    if (!supported) { if (epoch === this.subscriptionsEpoch) this.pushStatus = 'unsupported'; return; }
+    try {
+      const [registration, config] = await Promise.all([
+        navigator.serviceWorker.ready,
+        fetch(new URL('push-config.json', document.baseURI), { cache: 'no-store' }).then((r) => r.ok ? r.json() as Promise<{ vapidPublicKey?: string }> : null).catch(() => null),
+      ]);
+      if (epoch !== this.subscriptionsEpoch) return;
+      this.pushRegistration = registration;
+      this.pushVapidKey = config?.vapidPublicKey ?? null;
+      const on = await inspectDevicePush(authClient, userId, registration, localStorage);
+      if (epoch !== this.subscriptionsEpoch) return;
+      this.pushStatus = on ? 'on' : Notification.permission === 'denied' ? 'denied' : 'off';
+    } catch {
+      if (epoch === this.subscriptionsEpoch) { this.pushStatus = 'off'; this.pushError = '알림 상태를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.'; }
+    }
+  }
+
+  // 클릭 핸들러에서 직접 불린다. 첫 await가 권한 요청이어야 브라우저가 사용자 동작으로 인정한다.
+  private async enablePush(): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch, registration = this.pushRegistration;
+    if (!authClient || !userId || this.pushStatus !== 'off') return;
+    if (!registration || !this.pushVapidKey) { this.pushError = '알림 설정을 아직 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.'; return; }
+    this.pushStatus = 'busy'; this.pushError = '';
+    try {
+      await enableDevicePush(authClient, userId, registration, localStorage, this.pushVapidKey, () => Notification.requestPermission());
+      if (epoch === this.subscriptionsEpoch) this.pushStatus = 'on';
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) {
+        this.pushStatus = Notification.permission === 'denied' ? 'denied' : 'off';
+        this.pushError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '알림을 켜지 못했어요. 잠시 뒤 다시 시도해 주세요.';
+      }
+    } finally {
+      // 기다리는 동안 계정이 바뀌었다면 이전 사용자 소유로 남은 구독을 이 기기에서 끊는다.
+      if (epoch !== this.subscriptionsEpoch) void this.releasePush(userId);
+    }
+  }
+
+  private async disablePush(): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch, registration = this.pushRegistration;
+    if (!authClient || !userId || !registration || this.pushStatus !== 'on') return;
+    this.pushStatus = 'busy'; this.pushError = '';
+    try {
+      const cleaned = await disableDevicePush(authClient, userId, registration, localStorage);
+      if (epoch === this.subscriptionsEpoch) {
+        this.pushStatus = 'off';
+        if (!cleaned) this.pushError = '이 기기의 알림은 껐지만 서버 정리는 끝나지 않았어요. 다시 확인해 주세요.';
+      }
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) {
+        this.pushStatus = 'on';
+        this.pushError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '알림을 끄지 못했어요. 잠시 뒤 다시 시도해 주세요.';
+      }
     }
   }
 
@@ -746,6 +824,8 @@ export class NoticeApp extends LitElement {
             retryPreferences: () => { if (this.authUserId) { this.preferencesLoading = true; this.preferencesError = ''; void this.refreshPreferences(this.authUserId, this.subscriptionsEpoch); } },
             saveKeywords: (input: string) => { void this.saveKeywords(input); },
             signIn: () => { void this.signIn(); }, signOut: () => { void this.signOut(); },
+            pushStatus: this.pushStatus, pushError: this.pushError,
+            enablePush: () => { void this.enablePush(); }, disablePush: () => { void this.disablePush(); },
             toggle: (id: string, enabled: boolean) => { void this.toggleSubscription(id, enabled); },
             retry: () => {
               if (this.authUserId) { this.subscriptionsLoading = true; this.subscriptionsError = ''; void this.refreshSubscriptions(this.authUserId, this.subscriptionsEpoch); }
