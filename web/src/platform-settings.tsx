@@ -118,7 +118,7 @@ function LoginNote({ model, what }: { model: SettingsModel; what: string }) {
   return <Setting name="로그인이 필요해요" help={`${what}은 로그인하면 쓸 수 있어요`}>
     {model.configured
       ? <button type="button" className="solid-button" disabled={model.authBusy} onClick={model.signIn}>Google 계정으로 계속하기</button>
-      : <p className="field-note">로그인 연결을 준비하고 있어요.</p>}
+      : <p className="field-note">지금은 로그인할 수 없어요. 잠시 뒤 다시 열어 주세요</p>}
   </Setting>;
 }
 
@@ -148,7 +148,7 @@ function Overview({ model }: { model: SettingsModel }) {
           {model.authError ? <p className="field-note error" role="alert">{model.authError}</p> : null}
         </Setting>
       </> : <Setting name="계정" help="로그인하면 구독과 저장이 계정에 남아요">
-        {!model.configured ? <p className="field-note">로그인 연결을 준비하고 있어요.</p>
+        {!model.configured ? <p className="field-note">지금은 로그인할 수 없어요. 잠시 뒤 다시 열어 주세요</p>
           : <button type="button" className="solid-button" disabled={model.authBusy} onClick={model.signIn}>Google 계정으로 계속하기</button>}
         {model.authError ? <p className="field-note error" role="alert">{model.authError}</p> : null}
       </Setting>}
@@ -228,7 +228,7 @@ function Notifications({ model }: { model: SettingsModel }) {
               : <button type="button" className="ghost-button" disabled={model.pushStatus !== 'off'} onClick={model.enablePush}>
                 {model.pushStatus === 'busy' ? '연결 중' : model.pushStatus === 'checking' ? '확인하고 있어요' : model.pushRetry ? '다시 시도하기' : '알림 받기'}</button>}
           </div>
-          {model.pushStatus === 'unsupported' ? <p className="field-note">최신 브라우저에서 알림을 연결해 주세요</p> : null}
+          {model.pushStatus === 'unsupported' ? <p className="field-note">이 브라우저는 알림을 지원하지 않아요. 최신 브라우저에서 열어 주세요</p> : null}
           {model.pushStatus === 'denied' ? <p className="field-note">브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요</p> : null}
           {model.pushError ? <p className="field-note error" role="alert">{model.pushError}</p> : null}
           {on && model.subscriptions.length === 0 ? <p className="field-note">받을 게시판을 고르면 새 공지를 알려드려요</p> : null}
@@ -240,7 +240,7 @@ function Notifications({ model }: { model: SettingsModel }) {
           <li>받는 게시판의 새 공지를 알려요</li>
           <li>관심 키워드와 맞는 공지는 소리로, 나머지는 조용히 알려요</li>
           <li>학교가 고친 중요한 글은 한 번 더 알려요</li>
-          <li>인턴 공고는 내 Gemini 키가 지원할 만하다고 본 것만 알려요</li>
+          <li>Gemini 키를 넣으면 나에게 맞는 공지도 소리로 알려요. 인턴 공고는 맞는 것만 알려요</li>
         </ul>
       </Setting>
     </Section>
@@ -303,7 +303,7 @@ function AboutMe({ model }: { model: SettingsModel }) {
   return <Section id="s-about" title="나를 소개해요 (선택)">
     <div className="setting">
       <div className="setting-text"><p className="setting-name">Gemini가 읽는 내용</p>
-        <p className="setting-help">인턴 공고에서 나에게 맞는 공고를 고를 때 참고해요. Google로 보내는 내용이라 이름, 학번, 연락처, 주소는 적지 마세요</p></div>
+        <p className="setting-help">나에게 맞는 공지와 인턴 공고를 고를 때 참고해요. Google로 보내는 내용이라 이름, 학번, 연락처, 주소는 적지 마세요</p></div>
     </div>
     {TEXT_FIELDS.map(({ key, name, help, placeholder }) => {
       const count = length(drafts[key]);
@@ -417,12 +417,12 @@ function GeminiRow({ model }: { model: SettingsModel }) {
     <>{ext('https://aistudio.google.com/apikey', 'Google AI Studio의 API 키 화면')}을 열고 Google 계정으로 로그인해요</>,
     '"API 키 만들기"를 누르고, 프로젝트를 고르라고 하면 새 프로젝트를 만들어요',
     '만들어진 키를 붙여 넣고 "저장하기"를 눌러요. 저장하면 Gemini에 확인한 뒤 암호화해 서버에만 보관해요',
-    '무료 등급은 보낸 내용이 Google 제품 개선에 쓰일 수 있어요. 키는 나에게 맞는 인턴 공고를 고르는 데만 써요',
+    '무료 등급은 보낸 내용이 Google 제품 개선에 쓰일 수 있어요. 키는 나에게 맞는 공지와 인턴 공고를 고르는 데만 써요',
   ]} />;
-  const help = '링커리어와 자소설닷컴의 인턴 공고 중 나에게 맞는 공고만 알려드리는 데 써요';
+  const help = '성대 공지와 인턴 공고 중 나에게 맞는 것을 소리로 알려드리는 데 써요';
   if (!byok?.available) {
     return <KeyRow name="Gemini 키" help={help} state="준비 중" guide={null}>
-      <span className="field-note">키를 받는 기능을 서버에 설치하는 중이에요. 끝나면 여기에서 입력할 수 있어요</span>
+      <span className="field-note">지금은 키를 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
     </KeyRow>;
   }
   return <SecretRow name="Gemini 키" help={help} placeholder="AIza 또는 AQ.로 시작하는 키" status={byok.status} loading={byok.loading} busy={byok.busy}
@@ -434,7 +434,7 @@ function CanvasRow({ model }: { model: SettingsModel }) {
   const help = '아이캠퍼스의 강의와 과제 마감을 알려드리는 데 써요';
   if (!byok?.available) {
     return <KeyRow name="아이캠퍼스 토큰" help={help} state="준비 중" guide={null}>
-      <span className="field-note">토큰을 받는 기능을 서버에 설치하는 중이에요. 끝나면 여기에서 입력할 수 있어요</span>
+      <span className="field-note">지금은 토큰을 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
     </KeyRow>;
   }
   const guide = <Guide label="받는 방법" steps={[
@@ -458,7 +458,7 @@ function Keys({ model }: { model: SettingsModel }) {
       <CanvasRow model={model} />
     </Section>
     <Section id="s-eligibility" title="내 프로필">
-      <Setting name="지원 자격 정보" help="Gemini가 지원 자격을 판단할 때 쓰는 학년, 학기, 재학 상태, 병역과 관심 분야는 프로필 설정에서 바꿔요">
+      <Setting name="지원 자격 정보" help="학년, 학기, 재학 상태, 병역, 관심 분야는 프로필 설정에서 바꿔요">
         <button type="button" className="ghost-button" onClick={() => model.openSection('profile')}>프로필 설정 열기</button>
       </Setting>
     </Section>

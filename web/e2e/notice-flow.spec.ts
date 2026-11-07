@@ -559,3 +559,56 @@ test('the main screen shows a profile icon: a silhouette when signed out, and it
   await (mobile ? page.getByRole('button', { name: '프로필 설정' }) : page.locator('.side-profile')).click();
   await expect(page).toHaveURL(/section=profile/);
 });
+
+// 클릭 수와 순서: 설정 첫 쪽에서 시작해 핵심 작업을 끝내는 데 필요한 클릭을 세고, 상한을 넘으면 실패한다.
+// 상한은 "첫 쪽 → 하위 쪽(1) → 입력을 여는 버튼 → 저장" 구조에서 더 줄일 수 없는 최소값이다.
+test('core settings tasks finish within their click budget and in the expected order', async ({ page }) => {
+  await settingsAt(page);
+  const screen = page.locator('platform-settings-screen');
+  await withApp(page, {
+    authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false, byokStatus: null,
+    subscriptions: ['skku-notice01'], keywords: [],
+    registerKey: 'fn:registerKey', registerCanvas: 'fn:registerCanvas', toggleSubscription: 'fn:toggle',
+    profile: { programs: [], year: 2, semester: 1, enrollmentStatus: '재학', militaryService: '해당 없음', onboardedAt: 'x', interests: '', wants: '', avoids: '' },
+    saveProfile: 'fn:saveProfile',
+  });
+  const log: string[] = [];
+  const click = async (label: string, locator: import('@playwright/test').Locator) => { await locator.click(); log.push(label); };
+  const hub = () => expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
+
+  // 1) Gemini 키: 연결 키 → 입력하기 → 저장하기 = 3클릭
+  await click('연결 키', screen.getByRole('link', { name: /연결 키/ }));
+  await click('Gemini 입력하기', screen.getByRole('button', { name: 'Gemini 키 입력하기' }));
+  await screen.getByLabel('Gemini 키', { exact: true }).fill(`AQ.${'a'.repeat(50)}`);
+  await click('Gemini 저장하기', screen.getByRole('button', { name: '저장하기' }));
+  expect(log.length).toBe(3);
+  expect((await calls(page))[0][0]).toBe('registerKey');
+  // 2) 같은 쪽에서 아이캠퍼스 토큰: 입력하기 → 저장하기 = 추가 2클릭(쪽 이동 없음)
+  await withApp(page, { byokStatus: { keyHint: 'aaaa', model: 'm', disabled: false, lastError: null, usedToday: 0 }, registerCanvas: 'fn:registerCanvas' });
+  log.length = 0;
+  await click('아이캠퍼스 입력하기', screen.getByRole('button', { name: '아이캠퍼스 토큰 입력하기' }));
+  await screen.getByLabel('아이캠퍼스 토큰', { exact: true }).fill(`1234~${'b'.repeat(40)}`);
+  await click('아이캠퍼스 저장하기', screen.getByRole('button', { name: '저장하기' }));
+  expect(log.length).toBe(2);
+  expect((await calls(page))[0][0]).toBe('registerCanvas');
+  // 3) 쪽 이동은 X(데스크톱) 또는 뒤로 가기(모바일) 한 번에 첫 쪽으로 돌아온다.
+  await page.goBack();
+  await hub();
+  // 4) 학년 바꾸기: 프로필 설정 → 학년 = 2클릭
+  await withApp(page, {});
+  log.length = 0;
+  await click('프로필 설정', screen.getByRole('link', { name: /프로필 설정/ }).first());
+  await click('3학년', screen.getByRole('radio', { name: '3학년' }));
+  expect(log.length).toBe(2);
+  expect((await calls(page))[0]).toEqual(['saveProfile', expect.objectContaining({ year: 3 })]);
+  await page.goBack();
+  await hub();
+  // 5) 게시판 하나 더 받기: 알림 → 게시판 더 보기 → 스위치 = 3클릭
+  await withApp(page, {});
+  log.length = 0;
+  await click('알림', screen.getByRole('link', { name: /알림/ }).first());
+  await click('게시판 더 보기', screen.locator('details.connection-manual > summary'));
+  await click('게시판 켜기', screen.getByRole('switch', { checked: false }).first());
+  expect(log.length).toBe(3);
+  expect((await calls(page)).some((call) => call[0] === 'toggle' && call[2] === true)).toBe(true);
+});
