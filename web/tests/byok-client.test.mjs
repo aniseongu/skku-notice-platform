@@ -41,7 +41,27 @@ test('client accepts the AQ. key format', () => {
   assert.equal(looksLikeGeminiKey(`AQ.Ab8RN6J${'x'.repeat(40)}`), true);
 });
 
-import { loadMyNoticeInfo } from '../src/byok.ts';
+import { loadMyDeadlines, loadMyNoticeInfo } from '../src/byok.ts';
+
+test('deadline list is owner scoped, paginated, and favors an explicitly requested summary', async () => {
+  const queries = [];
+  const client = { from: (table) => {
+    const state = { table };
+    const q = { select: () => q, eq: (key, value) => { state[key] = value; return q; }, not: () => q,
+      order: () => q, range: async (start, end) => {
+        queries.push({ ...state, start, end });
+        return { data: table === 'user_notice_summaries'
+          ? [{ notice_id: 'a/1', deadline: '2026-12-01T00:00:00Z', deadline_kind: '마감' }]
+          : [{ notice_id: 'a/1', deadline: '2026-12-02T00:00:00Z', deadline_kind: '일정' },
+             { notice_id: 'a/2', deadline: '2026-12-03T00:00:00Z', deadline_kind: '일정' }], error: null };
+      } };
+    return q;
+  } };
+  const result = await loadMyDeadlines(client, 'user-a');
+  assert.equal(result.get('a/1').deadline, '2026-12-01T00:00:00Z');
+  assert.equal(result.get('a/2').deadlineKind, '일정');
+  assert.deepEqual(queries.map((q) => q.user_id), ['user-a', 'user-a']);
+});
 
 function summaryClient(tables) {
   const queries = [];

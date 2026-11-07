@@ -771,3 +771,18 @@ test('detail shows keywords found in the body like the original (the judgment re
   await expect(detail.locator('.detail-reason')).toContainText('관심 장학');          // 본문에서 찾은 키워드
   await expect(detail.locator('.detail-reason')).not.toContainText('공모전');          // 본문에 없는 키워드는 붙지 않는다
 });
+
+test('a personal body deadline appears beside the notice like a title deadline', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  const row = page.locator('notice-rows-screen a.row').first();
+  await row.waitFor();
+  const id = await row.getAttribute('data-id');
+  await page.evaluate((noticeId) => {
+    const app = (document.querySelector('notice-app') as any).controller;
+    const original = app.notices.find((n: { id: string }) => n.id === noticeId);
+    original.deadline = null;
+    app.myDeadlines = new Map([[noticeId, { deadline: '2099-12-31T14:59:00Z', deadlineKind: '마감' }]]);
+    app.requestUpdate();
+  }, id);
+  await expect(page.locator(`notice-rows-screen a.row[data-id="${id}"] .dday`)).toBeVisible();
+});
