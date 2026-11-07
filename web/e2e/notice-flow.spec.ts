@@ -418,12 +418,25 @@ test('first-run setup layout: header and body share one column, the close contro
     const closeBox = (await close.boundingBox())!;
     expect(closeBox.x + closeBox.width).toBeLessThanOrEqual(top.x + top.width + 0.5);
     expect(closeBox.height).toBeGreaterThanOrEqual(44);
+    expect(await close.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe('1px');   // 글자만이 아니라 테두리 있는 버튼으로 보인다
+    // 넓은 화면: 왼쪽에 앱 아이콘·이름과 단계 목록, 오른쪽에 선택 영역. 좁은 화면: 왼쪽 칸은 숨긴다.
+    const wide = (page.viewportSize()?.width ?? 0) >= 900;
+    if (wide) {
+      const brand = await box('.onb-brand'), main = await box('.onb-main');
+      expect(brand.x).toBeLessThan(main.x);
+      expect(brand.x + brand.width).toBeLessThanOrEqual(main.x + 1);
+      await expect(page.locator('.onb-brand-lockup')).toHaveText('성공');
+      await expect(page.locator('.onb-brand-lockup svg')).toBeVisible();
+      await expect(page.locator('.onb-steplist li[data-state="current"]')).toContainText('주전공');
+    } else {
+      await expect(page.locator('.onb-brand')).toBeHidden();
+    }
     const bar = await box('.onb-progress');
     const centerY = (b: { y: number; height: number }) => b.y + b.height / 2;
     expect(Math.abs(centerY(closeBox) - centerY(bar))).toBeLessThanOrEqual(2);
     // 위 줄은 스크롤해도 붙어 있다.
     const before = (await box('.onb-top-inner')).y;
-    await page.evaluate(() => document.querySelector('.onb')!.scrollTo({ top: 400 }));
+    await page.evaluate(() => document.querySelector('.onb-main')!.scrollTo({ top: 400 }));
     expect(Math.abs((await box('.onb-top-inner')).y - before)).toBeLessThanOrEqual(1);
     await close.click();
     await expect(dialog).toHaveCount(0);

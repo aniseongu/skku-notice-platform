@@ -9,7 +9,10 @@ import {
   KEYWORD_SUGGESTIONS, SEARCH_THRESHOLD, STEPS, canContinue, filterDepartments, initialDraft, nextStep, previousStep,
   stepIndex, toggleValue, withPrograms, type Draft, type Step,
 } from './onboarding-flow';
+import { APP_NAME } from './brand';
 import { Card, ChipGroup, ChoiceList, Segmented, SwitchRow } from './ui';
+
+const STEP_LABELS = ['주전공', '복수전공', '학년·재학 상태', '받을 공지', '알림'] as const;
 
 const YEARS = [1, 2, 3, 4, 5].map((year) => ({ value: year, label: year === 5 ? '5학년 이상' : `${year}학년` }));
 const STATUS = ENROLLMENT.map((value) => ({ value, label: value }));
@@ -22,7 +25,7 @@ function ProgramPicker({ onPick, onCancel, current, title }: {
   const [query, setQuery] = useState('');
   const found = findCollege(college);
   // 대학 목록에서 아래쪽 항목을 눌러 스크롤된 채로 학과 목록이 열려 제목이 가려지지 않게, 목록이 바뀌면 맨 위로 되돌린다.
-  useEffect(() => { document.querySelector('.onb')?.scrollTo({ top: 0 }); }, [college]);
+  useEffect(() => { document.querySelector('.onb-main')?.scrollTo({ top: 0 }); }, [college]);
   if (!found) {
     return <div className="onb-group">
       <p className="onb-lead">{title}: 대학을 먼저 골라요.</p>
@@ -169,26 +172,38 @@ export function Onboarding({ app }: { app: AppController }) {
   }
 
   const showBack = index > 0 || addingDouble || (step === 'primary' && !changingPrimary);
-  return <div className="onb" role="dialog" aria-modal="true" aria-labelledby="onb-title" ref={bodyRef}>
-    <div className="onb-top">
-      <div className="onb-top-inner">
-        {showBack
-          ? <button type="button" className="icon-button" aria-label="이전" onClick={back}><svg className="i" aria-hidden="true"><use href="icons/sprite.svg#back" /></svg></button>
-          : <span className="onb-spacer" aria-hidden="true" />}
-        <div className="onb-progress" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={index + 1} aria-label="설정 진행">
-          <div className="onb-bar"><span style={{ width: `${((index + 1) / STEPS.length) * 100}%` }} /></div>
-          <span>{index + 1} / {STEPS.length}</span>
-        </div>
-        {manual
-          ? <button type="button" className="icon-button" aria-label="닫기" onClick={() => app.dismissOnboarding()}><svg className="i" aria-hidden="true"><use href="icons/sprite.svg#close" /></svg></button>
-          : <button type="button" className="onb-close" onClick={() => app.dismissOnboarding()}>나중에 하기</button>}
+  return <div className="onb" role="dialog" aria-modal="true" aria-labelledby="onb-title">
+    {/* 넓은 화면에서만 보이는 왼쪽 칸: 앱 아이콘과 이름, 설명, 단계 목록. 진행 정보는 오른쪽 progressbar가 알리므로 낭독기에서는 건너뛴다. */}
+    <aside className="onb-brand" aria-hidden="true">
+      <div className="onb-brand-lockup"><svg className="brand-mark"><use href="icons/sprite.svg#brand" /></svg>{APP_NAME}</div>
+      <div className="onb-brand-copy">
+        <h2>내 전공에 맞는 공지만<br />골라서 받아요</h2>
+        <p>몇 가지만 고르면 필요한 게시판과 알림을 맞춰 드려요.</p>
       </div>
+      <ol className="onb-steplist">{STEP_LABELS.map((label, i) =>
+        <li key={label} data-state={i < index ? 'done' : i === index ? 'current' : 'todo'}><span className="num">{i < index ? '✓' : i + 1}</span>{label}</li>)}</ol>
+    </aside>
+    <div className="onb-main" ref={bodyRef}>
+      <div className="onb-top">
+        <div className="onb-top-inner" data-back={showBack}>
+          {showBack
+            ? <button type="button" className="icon-button" aria-label="이전" onClick={back}><svg className="i" aria-hidden="true"><use href="icons/sprite.svg#back" /></svg></button>
+            : null}
+          <div className="onb-progress" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={index + 1}
+            aria-valuetext={`${STEPS.length}단계 중 ${index + 1}단계`} aria-label="설정 진행">
+            {STEPS.map((name, i) => <span key={name} data-done={i <= index} />)}
+          </div>
+          {manual
+            ? <button type="button" className="onb-x" aria-label="닫기" onClick={() => app.dismissOnboarding()}><svg className="i" aria-hidden="true"><use href="icons/sprite.svg#close" /></svg></button>
+            : <button type="button" className="onb-skip" onClick={() => app.dismissOnboarding()}>나중에 하기</button>}
+        </div>
+      </div>
+      <div className="onb-body">
+        <h1 id="onb-title" ref={heading} tabIndex={-1}>{title}</h1>
+        {lead ? <p className="onb-lead">{lead}</p> : null}
+        {body}
+      </div>
+      {foot ? <div className="onb-foot"><div className="onb-foot-inner">{foot}</div></div> : null}
     </div>
-    <div className="onb-body">
-      <h1 id="onb-title" ref={heading} tabIndex={-1}>{title}</h1>
-      {lead ? <p className="onb-lead">{lead}</p> : null}
-      {body}
-    </div>
-    {foot ? <div className="onb-foot"><div className="onb-foot-inner">{foot}</div></div> : null}
   </div>;
 }

@@ -8,15 +8,23 @@ export interface UserProfile {
   enrollmentStatus: string | null;
   militaryService: string | null;
   onboardedAt: string | null;
+  /** Gemini가 인턴 공고를 고를 때 읽는 주관식 설명. 각각 300자까지. */
+  interests: string;
+  wants: string;
+  avoids: string;
 }
+
+export const PROFILE_TEXT_LIMIT = 300;
+export type ProfileTextField = 'interests' | 'wants' | 'avoids';
 
 export const ENROLLMENT = ['재학', '휴학', '졸업예정', '졸업'] as const;
 export const MILITARY = ['복무 전', '복무 완료', '해당 없음'] as const;
 export const EMPTY_PROFILE: UserProfile = {
   programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null,
+  interests: '', wants: '', avoids: '',
 };
 
-const COLUMNS = 'programs,year,semester,enrollment_status,military_service,onboarded_at';
+const COLUMNS = 'programs,year,semester,enrollment_status,military_service,onboarded_at,interests,wants,avoids';
 
 /** 행이 없으면 null이다. 테이블이 아직 없는 환경처럼 읽을 수 없으면 던진다(호출하는 쪽이 온보딩을 숨긴다). */
 export async function loadProfile(client: SupabaseClient, userId: string): Promise<UserProfile | null> {
@@ -26,6 +34,7 @@ export async function loadProfile(client: SupabaseClient, userId: string): Promi
   return {
     programs: parsePrograms(data.programs), year: data.year, semester: data.semester,
     enrollmentStatus: data.enrollment_status, militaryService: data.military_service, onboardedAt: data.onboarded_at,
+    interests: cleanText(data.interests), wants: cleanText(data.wants), avoids: cleanText(data.avoids),
   };
 }
 
@@ -44,6 +53,11 @@ export function parsePrograms(value: unknown): Program[] {
   return result.slice(0, MAX_PROGRAMS);
 }
 
+/** 제어 문자를 지우고 앞뒤 공백을 정리한다. 줄바꿈은 남긴다. */
+export function cleanText(value: unknown): string {
+  return typeof value === 'string' ? value.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').replace(/[ \t]+\n/g, '\n').trim() : '';
+}
+
 export function validateProfile(profile: UserProfile): void {
   const inRange = (value: number | null, low: number, high: number) => value === null || (Number.isInteger(value) && value >= low && value <= high);
   const keys = profile.programs.map(programKey);
@@ -53,6 +67,9 @@ export function validateProfile(profile: UserProfile): void {
   if (!inRange(profile.year, 1, 6) || !inRange(profile.semester, 1, 2)) throw new Error('학년과 학기를 확인해 주세요.');
   if (profile.enrollmentStatus !== null && !(ENROLLMENT as readonly string[]).includes(profile.enrollmentStatus)) throw new Error('재학 상태를 확인해 주세요.');
   if (profile.militaryService !== null && !(MILITARY as readonly string[]).includes(profile.militaryService)) throw new Error('병역 상태를 확인해 주세요.');
+  for (const field of ['interests', 'wants', 'avoids'] as const) {
+    if (typeof profile[field] !== 'string' || [...profile[field]].length > PROFILE_TEXT_LIMIT) throw new Error(`${PROFILE_TEXT_LIMIT}자 이하로 적어 주세요.`);
+  }
 }
 
 export async function saveProfile(client: SupabaseClient, userId: string, profile: UserProfile): Promise<void> {
@@ -61,6 +78,7 @@ export async function saveProfile(client: SupabaseClient, userId: string, profil
     user_id: userId, programs: profile.programs, year: profile.year, semester: profile.semester,
     enrollment_status: profile.enrollmentStatus, military_service: profile.militaryService,
     onboarded_at: profile.onboardedAt, updated_at: new Date().toISOString(),
+    interests: cleanText(profile.interests), wants: cleanText(profile.wants), avoids: cleanText(profile.avoids),
   }, { onConflict: 'user_id' });
   if (error) throw error;
 }

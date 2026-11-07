@@ -6,6 +6,7 @@ are recorded on the key row without any secret material.
 """
 
 import os
+import re
 from datetime import UTC, datetime
 
 from skku_notice.byok_crypto import ByokCryptoError, decrypt_api_key
@@ -15,7 +16,42 @@ from skku_notice.scheduled_collection import NoticeStore, StoreError
 
 DAILY_CALLS = 30
 MAX_USERS_PER_RUN = 20
-PROFILE_FIELDS = ("year", "semester", "enrolled_semester", "enrollment_status", "military_service")
+# 원본은 학년·학기·재학 상태·병역 5개만 Gemini에 보냈다.
+# 사용자가 직접 적은 관심 분야 설명도 보내되 길이와 문자를 제한한다.
+PROFILE_COLUMNS = (
+    "programs", "year", "semester", "enrolled_semester", "enrollment_status", "military_service",
+    "interests", "wants", "avoids",
+)
+PROFILE_TEXT_LIMIT = 300
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+
+
+def _clean_text(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    return " ".join(_CONTROL.sub("", value).split())[:PROFILE_TEXT_LIMIT]
+
+
+def build_judge_profile(row: dict) -> dict:
+    """Gemini에 보낼 프로필. 이름·학번·연락처는 이 표에 없고, 주관식은 데이터로만 전달한다."""
+    profile: dict = {}
+    majors = []
+    for program in row.get("programs") or []:
+        if isinstance(program, dict) and isinstance(program.get("college"), str):
+            department = program.get("department")
+            college = program["college"]
+            label = f"{department} ({college})" if isinstance(department, str) else college
+            majors.append(_clean_text(label))
+    if majors:
+        profile["majors"] = majors[:4]  # 첫 항목이 주전공, 나머지가 복수전공
+    for key in ("year", "semester", "enrolled_semester", "enrollment_status", "military_service"):
+        if row.get(key) is not None:
+            profile[key] = row[key]
+    for key, name in (("interests", "interests"), ("wants", "wants"), ("avoids", "does_not_want")):
+        text = _clean_text(row.get(key))
+        if text:
+            profile[name] = text
+    return profile
 REJECTED_CODES = {400, 401, 403}
 
 
@@ -33,9 +69,9 @@ class JudgeStore(NoticeStore):
         ).json()
 
     def profile(self, user_id: str) -> dict:
-        params = {"user_id": f"eq.{user_id}", "select": ",".join(PROFILE_FIELDS)}
+        params = {"user_id": f"eq.{user_id}", "select": ",".join(PROFILE_COLUMNS)}
         rows = self._request("GET", "user_profiles", params=params).json()
-        return {k: v for k, v in (rows[0] if rows else {}).items() if v is not None}
+        return build_judge_profile(rows[0] if rows else {})
 
     def pending(self, user_id: str) -> list[dict]:
         body = {"p_user_id": user_id, "p_limit": BATCH}
