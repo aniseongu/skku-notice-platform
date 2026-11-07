@@ -14,6 +14,7 @@ import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from './preferences';
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
+import { composeSummaryTime, deleteDevice, loadDevices, loadSummaryTime, saveCanvasMode, saveSummaryTime, type CanvasMode, type Device } from './devices';
 import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from './my-notices';
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
 import { byokAvailable, loadByokStatus, loadCanvasStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
@@ -146,6 +147,7 @@ export class AppController extends Reactive {
     byokOn: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true }, canvasStatus: { state: true }, canvasBusy: { state: true }, canvasError: { state: true },
     calendarId: { state: true }, calendarBusy: { state: true }, calendarMessage: { state: true }, calendarError: { state: true }, calendarSyncedAt: { state: true },
     myJudgments: { state: true }, myInterests: { state: true },
+    devices: { state: true }, thisDeviceId: { state: true }, devicesBusy: { state: true }, devicesError: { state: true }, summaryTime: { state: true },
     summarizing: { state: true }, summaryError: { state: true }, summaryErrorId: { state: true },
     profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, profileError: { state: true }, settingsSection: { state: true },
     onboardingOpen: { state: true }, onboardingManual: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
@@ -191,6 +193,12 @@ export class AppController extends Reactive {
   /** 내 Gemini 키로 매긴 판정과 서버가 찾아 준 관심 키워드(원본의 matched.json 자리) */
   myJudgments = new Map<string, MyJudgment>();
   myInterests = new Map<string, string[]>();
+  /** 내 알림 기기 목록, 이 기기의 번호, 하루 요약 시간(HH:MM, 아이캠퍼스 토큰이 없으면 null) */
+  devices: Device[] = [];
+  thisDeviceId: string | null = null;
+  devicesBusy = false;
+  devicesError = '';
+  summaryTime: string | null = null;
   summarizing: string | null = null;
   summaryError = '';
   summaryErrorId: string | null = null;
@@ -285,7 +293,7 @@ export class AppController extends Reactive {
           this.authUserId = userId;
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.devices = []; this.thisDeviceId = null; this.devicesError = ''; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -718,6 +726,65 @@ export class AppController extends Reactive {
       if (epoch === this.subscriptionsEpoch) this.canvasError = error instanceof Error ? error.message : '토큰을 지우지 못했어요.';
     } finally {
       if (epoch === this.subscriptionsEpoch) this.canvasBusy = false;
+    }
+  }
+
+  // ----- 알림 기기와 아이캠퍼스 알림 설정(원본의 이 기기 아캠 알림, 알림 기기, 하루 요약 시간) -----
+  async refreshDevices(): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId) return;
+    try {
+      const [devices, time] = await Promise.all([loadDevices(authClient, userId), loadSummaryTime(authClient, userId).catch(() => null)]);
+      let endpoint = '';
+      try { endpoint = (await (await navigator.serviceWorker.ready).pushManager.getSubscription())?.endpoint ?? ''; } catch { /* 이 기기를 알 수 없으면 목록에서 표시만 못 한다 */ }
+      if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
+      this.devices = devices; this.summaryTime = time;
+      this.thisDeviceId = devices.find((device) => device.endpoint === endpoint)?.id ?? null;
+    } catch { /* 열이 아직 없으면 기능 없이 보인다 */ }
+  }
+
+  async setCanvasMode(mode: CanvasMode): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch, id = this.thisDeviceId;
+    if (!authClient || !userId || !id || this.devicesBusy) return;
+    this.devicesBusy = true; this.devicesError = '';
+    try {
+      await saveCanvasMode(authClient, userId, id, mode);
+      if (epoch === this.subscriptionsEpoch) this.devices = this.devices.map((device) => (device.id === id ? { ...device, canvasMode: mode } : device));
+    } catch {
+      if (epoch === this.subscriptionsEpoch) this.devicesError = '아이캠퍼스 알림을 바꾸지 못했어요. 잠시 뒤 다시 눌러 주세요';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.devicesBusy = false;
+    }
+  }
+
+  async removeDevice(id: string): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || id === this.thisDeviceId || this.devicesBusy) return;   // 이 기기는 "알림 끄기"로 해제한다
+    this.devicesBusy = true; this.devicesError = '';
+    try {
+      await deleteDevice(authClient, userId, id);
+      if (epoch === this.subscriptionsEpoch) this.devices = this.devices.filter((device) => device.id !== id);
+    } catch {
+      if (epoch === this.subscriptionsEpoch) this.devicesError = '기기를 지우지 못했어요. 잠시 뒤 다시 눌러 주세요';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.devicesBusy = false;
+    }
+  }
+
+  /** 오전·오후와 시, 분 중 바뀐 것을 받아 하루 요약 시간을 저장한다. */
+  async setSummaryTime(period: 'am' | 'pm', hour: number, minute: number): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    const time = composeSummaryTime(period, hour, minute);
+    if (!authClient || !userId || this.devicesBusy) return;
+    if (!time) { this.devicesError = '시는 1~12, 분은 0~59로 적어 주세요'; return; }
+    this.devicesBusy = true; this.devicesError = '';
+    try {
+      await saveSummaryTime(authClient, userId, time);
+      if (epoch === this.subscriptionsEpoch) this.summaryTime = time;
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) this.devicesError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '요약 시간을 바꾸지 못했어요. 잠시 뒤 다시 눌러 주세요';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.devicesBusy = false;
     }
   }
 

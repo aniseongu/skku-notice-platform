@@ -3,6 +3,7 @@
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import type { ByokStatus, CanvasStatus } from './byok';
+import { CANVAS_MODES, composeSummaryTime, summaryParts, type CanvasMode, type Device } from './devices';
 import { ENROLLMENT, MILITARY, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
 import { programLabel } from './skku-programs';
 import { BOARD_CATALOG, COLLEGE_BOARD, DEPARTMENT_BOARD, OTHER_BOARDS } from './skku-boards';
@@ -55,6 +56,18 @@ export interface SettingsModel {
   profileError: string;
   saveProfile: (profile: UserProfile) => void;
   openOnboarding: () => void;
+  devicesInfo?: {
+    devices: Device[];
+    thisId: string | null;
+    summaryTime: string | null;
+    hasCanvasToken: boolean;
+    busy: boolean;
+    error: string;
+    refresh: () => void;
+    setMode: (mode: string) => void;
+    remove: (id: string) => void;
+    setSummaryTime: (period: 'am' | 'pm', hour: number, minute: number) => void;
+  };
   calendar?: {
     id: string | null;
     syncedAt: string | null;
@@ -224,8 +237,38 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   </>;
 }
 
+/** 하루 요약 시간: 원본처럼 오전·오후, 시, 분을 따로 고른다. 바꾸는 즉시 저장한다. */
+function SummaryTime({ info }: { info: NonNullable<SettingsModel['devicesInfo']> }) {
+  const saved = summaryParts(info.summaryTime ?? '21:00');
+  const [period, setPeriod] = useState<'am' | 'pm'>(saved.period);
+  const [hour, setHour] = useState(String(saved.hour));
+  const [minute, setMinute] = useState(String(saved.minute).padStart(2, '0'));
+  // 저장된 값이 바뀌면(불러왔을 때, 저장했을 때) 입력칸도 맞춘다. 누른 즉시는 입력칸이 먼저 바뀌어서 눌린 모양이 바로 보인다.
+  useEffect(() => { const next = summaryParts(info.summaryTime ?? '21:00'); setPeriod(next.period); setHour(String(next.hour)); setMinute(String(next.minute).padStart(2, '0')); }, [info.summaryTime]);
+  const disabled = info.summaryTime === null || info.busy;
+  const commit = (period: 'am' | 'pm', h: string, m: string) => {
+    if (composeSummaryTime(period, Number(h), Number(m)) === (info.summaryTime ?? '')) return;
+    info.setSummaryTime(period, Number(h), Number(m));
+  };
+  return <div className="time-control" role="group" aria-labelledby="summary-time-label">
+    <Choice label="오전 또는 오후" value={period} disabled={disabled} options={[['am', '오전'], ['pm', '오후']] as const}
+      onPick={(next) => { setPeriod(next); commit(next, hour, minute); }} />
+    <div className="time-numbers">
+      <input className="input time-number" type="number" min={1} max={12} inputMode="numeric" aria-label="시" value={hour} disabled={disabled}
+        onChange={(event) => setHour(event.currentTarget.value)} onBlur={() => commit(period, hour, minute)} /><span>시</span>
+      <input className="input time-number" type="number" min={0} max={59} inputMode="numeric" aria-label="분" value={minute} disabled={disabled}
+        onChange={(event) => setMinute(event.currentTarget.value)} onBlur={() => commit(period, hour, minute)} /><span>분</span>
+    </div>
+  </div>;
+}
+
 function Notifications({ model }: { model: SettingsModel }) {
   const on = model.pushStatus === 'on';
+  const info = model.devicesInfo;
+  const refresh = info?.refresh;
+  // 설정 쪽을 열 때와 이 기기 알림을 켜고 끌 때 기기 목록을 다시 읽는다.
+  useEffect(() => { if (model.userId) refresh?.(); }, [model.userId, model.pushStatus]);
+  const thisDevice = info?.devices.find((device) => device.id === info.thisId) ?? null;
   return <div className="settings">
     <Back model={model} />
     <Section id="s-notify" title="알림 받을 곳">
@@ -247,6 +290,19 @@ function Notifications({ model }: { model: SettingsModel }) {
           <p className="field-note">알림 수신은 이 기기에만 적용해요</p>
         </>}
       </Setting>
+      {model.userId && info ? <>
+        <Setting name="이 기기 아캠 알림" help="아이캠퍼스의 하루 요약과 마감을 이 기기로 받을지 정해요">
+          <Choice label="이 기기 아캠 알림" value={on ? (thisDevice?.canvasMode ?? 'reminders') : null} options={CANVAS_MODES}
+            disabled={!on || !thisDevice || !info.hasCanvasToken || info.busy} onPick={(mode: CanvasMode) => info.setMode(mode)} />
+          <p className="field-note">{!on ? '먼저 이 기기 알림을 켜 주세요' : !info.hasCanvasToken ? '연결 키에서 아이캠퍼스 토큰을 저장해 주세요' : '요약과 마감을 고르면 하루 전과 3시간 전에도 알려요'}</p>
+        </Setting>
+        <Setting name="하루 요약 시간" help="모든 기기에 같은 시간을 적용해요. 할 일이 없어도 알려요">
+          <p className="setting-name visually-hidden" id="summary-time-label">하루 요약 시간</p>
+          <SummaryTime info={info} />
+          {info.summaryTime === null ? <p className="field-note">연결 키에서 아이캠퍼스 토큰을 저장하면 바꿀 수 있어요</p> : <p className="field-note">확인이 늦어지면 알림도 늦어져요</p>}
+          {info.error ? <p className="field-note error" role="alert">{info.error}</p> : null}
+        </Setting>
+      </> : null}
       <Setting name="받을 공지" help="알림을 보내는 기준이에요">
         <ul className="rule-list">
           <li>받는 게시판의 새 공지를 알려요</li>
@@ -256,6 +312,18 @@ function Notifications({ model }: { model: SettingsModel }) {
         </ul>
       </Setting>
     </Section>
+    {model.userId && info && info.devices.length > 0 ? <Section id="s-devices" title="알림 기기">
+      <Setting name="등록된 기기" help="알림을 받도록 켜 둔 기기예요. 이 기기는 위에서 끄고, 다른 기기는 여기서 지워요">
+        <ul className="device-list">
+          {info.devices.map((device) => <li key={device.id}>
+            <span className="device-name">{device.name ?? '이름 없는 기기'}{device.id === info.thisId ? <b className="badge">이 기기</b> : null}</span>
+            <span className="field-note">{device.createdAt ? `${new Date(device.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}에 등록` : ''} · 아캠 알림 {CANVAS_MODES.find(([mode]) => mode === device.canvasMode)?.[1]}</span>
+            {device.id === info.thisId ? null
+              : <button type="button" className="text-button" disabled={info.busy} aria-label={`${device.name ?? '이름 없는 기기'} 지우기`} onClick={() => info.remove(device.id)}>지우기</button>}
+          </li>)}
+        </ul>
+      </Setting>
+    </Section> : null}
     <Section id="s-boards" title="받을 게시판">
       {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <>
         <Setting name="게시판" help="알림을 받고 목록에 모아 볼 게시판이에요">

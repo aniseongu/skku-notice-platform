@@ -17,7 +17,7 @@ from datetime import UTC, datetime, time, timedelta
 
 from skku_notice.byok_crypto import ByokCryptoError, decrypt_api_key
 from skku_notice.canvas import CanvasError, read_canvas
-from skku_notice.canvas_alerts import CanvasState, mark_sent, plan_alerts, problem_alert
+from skku_notice.canvas_alerts import CanvasAlert, CanvasState, mark_sent, plan_alerts, problem_alert
 from skku_notice.scheduled_collection import NoticeStore, StoreError
 
 MAX_USERS_PER_RUN = 20
@@ -27,6 +27,22 @@ SUMMARY_TIME = time(21, 0)
 REJECTED = "아이캠퍼스가 이 토큰을 받아 주지 않아요. 토큰을 다시 등록해 주세요."
 INCOMPLETE_TITLE = "아이캠퍼스 일정을 모두 확인하지 못했어요"
 INCOMPLETE_BODY = "잠시 뒤 다시 확인할게요. 아이캠퍼스에서도 확인할 수 있어요"
+
+
+def alert_kind(alert: CanvasAlert) -> str:
+    """summary: the daily summary, problem: the connection broke, deadline: a reminder before a due time."""
+    if alert.summary_day:
+        return "summary"
+    return "problem" if alert.title == "아이캠퍼스 연결이 끊겼어요" else "deadline"
+
+
+def summary_time_of(value: object) -> time:
+    """The user's daily summary time (HH:MM or HH:MM:SS from the database); 21:00 when missing or invalid."""
+    try:
+        hour, minute = str(value).split(":")[:2]
+        return time(int(hour), int(minute))
+    except (ValueError, TypeError):
+        return SUMMARY_TIME
 
 
 def state_from_row(raw: dict | None) -> CanvasState:
@@ -63,7 +79,7 @@ class CanvasStore(NoticeStore):
             "GET",
             "user_canvas_tokens",
             params={
-                "select": "user_id,ciphertext,state,last_run_at",
+                "select": "user_id,ciphertext,state,last_run_at,summary_time",
                 "disabled_at": "is.null",
                 "order": "last_run_at.asc.nullsfirst",
                 "limit": str(MAX_USERS_PER_RUN),
@@ -76,7 +92,8 @@ class CanvasStore(NoticeStore):
     def add_alerts(self, user_id: str, alerts: list) -> None:
         if alerts:
             rows = [
-                {"user_id": user_id, "title": a.title[:180], "body": a.body[:600], "url": a.url, "priority": a.priority}
+                {"user_id": user_id, "title": a.title[:180], "body": a.body[:600], "url": a.url,
+                 "priority": a.priority, "kind": alert_kind(a)}
                 for a in alerts
             ]
             self._request("POST", "user_canvas_alerts", json=rows, headers={"Prefer": "return=minimal"})
@@ -123,7 +140,7 @@ def process_user(store, master_key: str, row: dict, now: datetime, read=read_can
         print(f"canvas {user_id[:8]}: {reason}", flush=True)
         return "error"
 
-    alerts, next_state = plan_alerts(items, state, now, LEADS, SUMMARY_TIME)
+    alerts, next_state = plan_alerts(items, state, now, LEADS, summary_time_of(row.get("summary_time")))
     if incomplete[0]:
         alerts = [
             replace(a, title=INCOMPLETE_TITLE, body=INCOMPLETE_BODY) if a.summary_day else a

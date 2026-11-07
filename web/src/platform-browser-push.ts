@@ -1,3 +1,4 @@
+import { deviceLabel } from './devices.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { connectionChain } from './connection-chain.ts';
 
@@ -59,6 +60,7 @@ export function createEnableChain(client: SupabaseClient, userId: string, regist
       if (!data.endpoint || !data.keys?.p256dh || !data.keys.auth) throw new Error('알림 기기 정보를 확인하지 못했어요.');
       const { error } = await client.from('user_push_subscriptions').upsert({
         user_id: userId, endpoint: data.endpoint, p256dh: data.keys.p256dh, auth_secret: data.keys.auth,
+        device_name: deviceLabel(navigator.userAgent),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'endpoint' });
       if (error) throw error;

@@ -128,3 +128,17 @@ def test_external_posting_message_carries_the_judgment_reason_before_the_deadlin
         "[링커리어] [회사] 백엔드 인턴",
         "서버 개발 직무예요\n마감 11월 9일(월)",
     )
+
+
+def test_device_canvas_mode_decides_which_alerts_a_device_gets():
+    from skku_notice.push_collection import canvas_wanted
+
+    matrix = {
+        "off": {"summary": False, "deadline": False, "problem": False},
+        "summary": {"summary": True, "deadline": False, "problem": True},
+        "reminders": {"summary": True, "deadline": True, "problem": True},
+        None: {"summary": True, "deadline": True, "problem": True},
+    }
+    for mode, kinds in matrix.items():
+        for kind, wanted in kinds.items():
+            assert canvas_wanted(mode, kind) is wanted, (mode, kind)

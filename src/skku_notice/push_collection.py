@@ -41,15 +41,17 @@ class PushStore(NoticeStore):
         return self._request(
             "GET",
             "user_canvas_alerts",
-            params={"select": "id,user_id,title,body,url,priority,attempts", "status": "in.(pending,failed)",
-                    "attempts": "lt.3", "order": "created_at.asc", "limit": "20"},
+            params={
+                "select": "id,user_id,title,body,url,priority,attempts,kind",
+                "status": "in.(pending,failed)", "attempts": "lt.3", "order": "created_at.asc", "limit": "20",
+            },
         ).json()
 
     def devices(self, user_id: str) -> list[dict]:
         return self._request(
             "GET",
             "user_push_subscriptions",
-            params={"select": "id,endpoint,p256dh,auth_secret", "user_id": f"eq.{user_id}"},
+            params={"select": "id,endpoint,p256dh,auth_secret,canvas_mode", "user_id": f"eq.{user_id}"},
         ).json()
 
     def mark_canvas(self, alert_id: int, status: str, attempts: int, now: datetime) -> None:
@@ -164,12 +166,26 @@ def run_batch(store: PushStore, private_key: str, subject: str, now: datetime) -
     return counts
 
 
+def canvas_wanted(mode: str | None, kind: str | None) -> bool:
+    """Per-device iCampus mode like the original: off = nothing, summary = daily summary only,
+    reminders (default) = summary and deadline reminders.
+    A broken connection reaches every device that is not off."""
+    mode = mode or "reminders"
+    if mode == "off":
+        return False
+    if mode == "summary":
+        return kind in {"summary", "problem"}
+    return True
+
+
 def run_canvas_batch(store: PushStore, private_key: str, subject: str, now: datetime) -> dict[str, int]:
     """Deliver queued iCampus alerts to the owner's own devices only."""
     counts = {"canvas_sent": 0, "canvas_failed": 0}
     for alert in store.canvas_alerts():
         outcomes = []
         for device in store.devices(alert["user_id"]):
+            if not canvas_wanted(device.get("canvas_mode"), alert.get("kind")):
+                continue
             keys = {"p256dh": device["p256dh"], "auth": device["auth_secret"]}
             outcome = send_one(
                 {"endpoint": device["endpoint"], "keys": keys},
@@ -180,7 +196,10 @@ def run_canvas_batch(store: PushStore, private_key: str, subject: str, now: date
                 store.remove_expired(device["id"], alert["user_id"])
             outcomes.append(outcome)
         attempts = alert["attempts"] + 1
-        if "sent" in outcomes:
+        if not outcomes:
+            # 모든 기기가 이 알림을 받지 않기로 했거나 기기가 없다. 보낼 곳이 없으니 끝난 것으로 둔다.
+            store.mark_canvas(alert["id"], "sent", attempts, now)
+        elif "sent" in outcomes:
             store.mark_canvas(alert["id"], "sent", attempts, now)
             counts["canvas_sent"] += 1
         else:

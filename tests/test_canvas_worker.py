@@ -121,3 +121,28 @@ def test_each_user_runs_at_most_once_per_hour():
     # user-c's ciphertext is bound to its own id, so the same fake token works for it
     counts = worker.run(store, MASTER, NOW, reader())
     assert counts["skipped"] == 1 and counts["ok"] == 1
+
+
+def test_alert_kind_and_summary_time_follow_the_users_settings():
+    from datetime import time
+
+    from skku_notice.canvas_alerts import CanvasAlert
+
+    assert worker.alert_kind(CanvasAlert("t", "b", "u", summary_day="2026-11-08")) == "summary"
+    assert worker.alert_kind(CanvasAlert("아이캠퍼스 연결이 끊겼어요", "b", "u")) == "problem"
+    assert worker.alert_kind(CanvasAlert("과제 마감까지 3시간 남았어요", "b", "u")) == "deadline"
+    assert worker.summary_time_of("07:30:00") == time(7, 30)
+    assert worker.summary_time_of("21:00") == time(21, 0)
+    for bad in (None, "", "아침", "25:99", 7):
+        assert worker.summary_time_of(bad) == time(21, 0), bad
+
+
+def test_the_summary_waits_for_the_users_own_summary_time():
+    state = {"initialized": True, "notified": {}}
+    morning = datetime(2026, 11, 7, 0, 0, tzinfo=UTC)   # 09:00 KST
+    early = Store([{**row(state=state), "summary_time": "08:00:00"}])
+    worker.process_user(early, MASTER, early.rows[0], morning, reader([item(30.0)]))
+    assert any(a.summary_day for _, a in early.alerts), "08:00 summary is due at 09:00"
+    late = Store([{**row(state=state), "summary_time": "21:00:00"}])
+    worker.process_user(late, MASTER, late.rows[0], morning, reader([item(30.0)]))
+    assert not any(a.summary_day for _, a in late.alerts), "21:00 summary is not due yet at 09:00"

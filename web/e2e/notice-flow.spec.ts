@@ -827,3 +827,41 @@ test('list rows show "관심 …" or my judgment label with its reason, like the
   await expect(reason(ids[1])).toContainText('확인 필요');
   await expect(reason(ids[2])).toContainText('관심 장학');          // 본문에서 서버가 찾은 키워드
 });
+
+test('notifications page: this device iCampus mode, daily summary time and the device list, like the original settings', async ({ page }) => {
+  await settingsAt(page, '&section=notifications');
+  const screen = page.locator('platform-settings-screen');
+  const devices = [
+    { id: 'd1', endpoint: 'https://fcm.googleapis.com/a', name: 'Windows · Whale', canvasMode: 'reminders', createdAt: '2026-11-07T10:00:00Z' },
+    { id: 'd2', endpoint: 'https://fcm.googleapis.com/b', name: 'Android · Chrome', canvasMode: 'summary', createdAt: '2026-11-08T01:00:00Z' },
+  ];
+  await withApp(page, { authUserId: 'account-a', pushStatus: 'on', devices, thisDeviceId: 'd1', summaryTime: '21:05',
+    canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null },
+    refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', removeDevice: 'fn:remove', setSummaryTime: 'fn:time' });
+  // 이 기기 아캠 알림: 원본과 같은 세 가지, 지금 값이 골라져 있다.
+  const mode = screen.getByRole('radiogroup', { name: '이 기기 아캠 알림' });
+  await expect(mode.getByRole('radio')).toHaveText(['끄기', '하루 요약', '요약과 마감']);
+  await expect(mode.getByRole('radio', { name: '요약과 마감' })).toHaveAttribute('aria-checked', 'true');
+  await mode.getByRole('radio', { name: '하루 요약' }).click();
+  expect((await calls(page)).filter((c) => c[0] === 'mode')).toEqual([['mode', 'summary']]);
+  // 하루 요약 시간: 오전·오후, 시, 분. 21:05는 오후 9시 05분.
+  const time = screen.getByRole('group', { name: '하루 요약 시간' });
+  await expect(time.getByRole('radio', { name: '오후' })).toHaveAttribute('aria-checked', 'true');
+  await expect(time.getByLabel('시')).toHaveValue('9');
+  await expect(time.getByLabel('분')).toHaveValue('05');
+  await time.getByRole('radio', { name: '오전' }).click();
+  await time.getByLabel('시').fill('7'); await time.getByLabel('분').fill('30'); await time.getByLabel('분').blur();
+  const timeCalls = (await calls(page)).filter((c) => c[0] === 'time');
+  expect(timeCalls.at(-1)).toEqual(['time', 'am', 7, 30]);
+  // 알림 기기 목록: 이 기기에는 지우기가 없고 다른 기기는 지울 수 있다.
+  const list = screen.getByRole('region', { name: '알림 기기' });
+  await expect(list).toContainText('Windows · Whale');
+  await expect(list.locator('li', { hasText: 'Windows · Whale' })).toContainText('이 기기');
+  await expect(list.locator('li', { hasText: 'Windows · Whale' }).getByRole('button')).toHaveCount(0);
+  await list.getByRole('button', { name: 'Android · Chrome 지우기' }).click();
+  expect((await calls(page)).filter((c) => c[0] === 'remove')).toEqual([['remove', 'd2']]);
+  // 아이캠퍼스 토큰이 없으면 모드와 요약 시간을 바꿀 수 없고 이유를 알려 준다.
+  await withApp(page, { canvasStatus: null, summaryTime: null });
+  await expect(mode.getByRole('radio', { name: '하루 요약' })).toBeDisabled();
+  await expect(screen.getByText('연결 키에서 아이캠퍼스 토큰을 저장해 주세요').first()).toBeVisible();
+});
