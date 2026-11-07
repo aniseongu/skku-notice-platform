@@ -1,0 +1,27 @@
+[Unit]
+Description=Keep each user Google calendar in step with their saved notices
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=skku-judge
+Group=skku-judge
+WorkingDirectory=/opt/skku-notice-platform
+Environment=PYTHONPATH=/opt/skku-notice-platform/src
+EnvironmentFile=/etc/skku-notice/worker.env
+# BYOK_MASTER_KEY는 root만 읽는 파일(0600)에 두고 systemd가 읽어 이 서비스의 환경으로만 넘긴다. 다른 워커의 환경 파일에 넣지 않는다.
+EnvironmentFile=/etc/skku-notice/byok.env
+# Google OAuth 클라이언트(ID와 비밀번호)는 root만 읽는 파일(0600)에 두고 systemd가 이 서비스의 환경으로만 넘긴다.
+EnvironmentFile=/etc/skku-notice/google.env
+RuntimeDirectory=skku-notice-gcal
+RuntimeDirectoryMode=0755
+ExecStart=/usr/bin/flock -n /run/skku-notice-gcal/gcal.lock /opt/skku-notice-judge/bin/python -m skku_notice.gcal_worker
+TimeoutStartSec=420
+MemoryMax=256M
+MemorySwapMax=256M
+CPUQuota=70%
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

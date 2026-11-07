@@ -164,3 +164,25 @@ test('delete-account removes only the caller account, needs a login and never ac
   assert.equal(failing.status, 500);
   assert.match(JSON.stringify(await failing.json()), /계정을 지우지 못했어요/);
 });
+
+test('google calendar link stores the refresh token encrypted for "<user>:gcal", only for a well-formed token and the caller', async () => {
+  const masterKey = await importMasterKey(MASTER);
+  const saved = [];
+  const deps = { masterKey, userFromAuthorization: async (a) => (a === 'Bearer good' ? 'user-a' : null), saveGoogleToken: async (row) => { saved.push(row); } };
+  const call = (body, auth = 'Bearer good') => handle(new Request('https://x/byok', { method: 'POST', headers: { Origin: ORIGIN, ...(auth ? { Authorization: auth } : {}) }, body: JSON.stringify(body) }), deps);
+  const REFRESH = `1//0g${'R'.repeat(60)}`;
+  assert.equal((await call({ action: 'google-calendar-link', refreshToken: REFRESH }, null)).status, 401);
+  for (const bad of ['', 'short', 'ya29.' + 'x'.repeat(60), `1//${'!'.repeat(40)}`, 42, undefined]) {
+    assert.equal((await call({ action: 'google-calendar-link', refreshToken: bad })).status, 400, String(bad));
+  }
+  assert.equal(saved.length, 0);
+  const ok = await call({ action: 'google-calendar-link', refreshToken: REFRESH, userId: 'user-b' });
+  assert.equal(ok.status, 200);
+  assert.ok(!JSON.stringify(await ok.json()).includes(REFRESH));
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].user_id, 'user-a');
+  assert.ok(!saved[0].ciphertext.includes(REFRESH));
+  assert.equal(await decryptApiKey(masterKey, 'user-a:gcal', saved[0].ciphertext), REFRESH);
+  await assert.rejects(decryptApiKey(masterKey, 'user-a', saved[0].ciphertext));          // 사용자 번호만으로는 열리지 않는다
+  await assert.rejects(decryptApiKey(masterKey, 'user-b:gcal', saved[0].ciphertext));     // 다른 사용자 이름으로도 열리지 않는다
+});

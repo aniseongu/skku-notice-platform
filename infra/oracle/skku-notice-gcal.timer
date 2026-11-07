@@ -1,0 +1,11 @@
+[Unit]
+Description=Sync users Google calendars every half hour
+
+[Timer]
+OnCalendar=*-*-* *:25,55:00
+Persistent=true
+RandomizedDelaySec=15
+Unit=skku-notice-gcal.service
+
+[Install]
+WantedBy=timers.target

@@ -26,6 +26,8 @@ export interface ByokDeps {
   summarize?: (userId: string, noticeId: string) => Promise<SummaryResult>;
   /** 호출한 사용자의 계정을 지운다. 이 사용자의 모든 표 행이 함께 지워진다(on delete cascade). */
   deleteAccount?: (userId: string) => Promise<void>;
+  /** 구글 갱신 열쇠를 암호화한 값으로 저장한다(서버가 캘린더를 자동으로 맞출 때 쓴다). */
+  saveGoogleToken?: (row: { user_id: string; ciphertext: string }) => Promise<void>;
   masterKey: CryptoKey;
   /** Returns the user id of a verified session token, or null. */
   userFromAuthorization: (authorization: string | null) => Promise<string | null>;
@@ -75,6 +77,14 @@ export async function handle(req: Request, deps: ByokDeps): Promise<Response> {
     if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) return reply(413, origin, { error: '요청이 너무 커요.' });
     let body: { apiKey?: unknown; model?: unknown; provider?: unknown; token?: unknown; action?: unknown; noticeId?: unknown };
     try { body = JSON.parse(text); } catch { return reply(400, origin, { error: '요청 형식을 확인해 주세요.' }); }
+    if (body.action === 'google-calendar-link') {
+      // 구글 갱신 열쇠는 "1//"로 시작한다. 실제로 쓸 수 있는지는 워커가 처음 맞출 때 구글에 확인한다.
+      const refresh = (body as { refreshToken?: unknown }).refreshToken;
+      if (!deps.saveGoogleToken || typeof refresh !== 'string' || !/^1\/\/[0-9A-Za-z_-]{20,400}$/.test(refresh)) return reply(400, origin, { error: '요청 형식을 확인해 주세요.' });
+      // 암호문은 "<사용자 ID>:gcal"에 묶어 다른 사용자 행이나 다른 표로 옮겨도 열리지 않게 한다.
+      await deps.saveGoogleToken({ user_id: userId, ciphertext: await encryptApiKey(deps.masterKey, `${userId}:gcal`, refresh) });
+      return reply(200, origin, { ok: true });
+    }
     if (body.action === 'delete-account') {
       if (!deps.deleteAccount) return reply(400, origin, { error: '요청 형식을 확인해 주세요.' });
       try { await deps.deleteAccount(userId); } catch { return reply(500, origin, { error: '계정을 지우지 못했어요. 잠시 뒤 다시 눌러 주세요.' }); }

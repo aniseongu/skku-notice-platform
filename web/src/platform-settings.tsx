@@ -71,6 +71,7 @@ export interface SettingsModel {
     setSummaryTime: (period: 'am' | 'pm', hour: number, minute: number) => void;
   };
   calendar?: {
+    auto: { active: boolean; error: string | null; lastRunAt: string | null };
     id: string | null;
     syncedAt: string | null;
     busy: boolean;
@@ -449,15 +450,21 @@ function CalendarPage({ model }: { model: SettingsModel }) {
   if (!calendar) return null;
   const connected = !!calendar.id;
   const syncedAt = calendar.syncedAt ? new Date(calendar.syncedAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
+  // 서버가 자동으로 맞추려면 연결할 때 받은 구글 장기 열쇠가 서버에 있어야 한다. 예전에 연결한 사람은 한 번 더 연결하면 된다.
+  const auto = calendar.auto;
+  const autoText = !connected ? '' : auto.active ? '자동으로 맞춰요' : auto.error ? '자동 맞춤이 멈췄어요' : '자동으로 맞추려면 다시 연결해 주세요';
   return <div className="settings">
     <Back model={model} />
     <Section id="s-calendar" title="구글 캘린더">
       <Setting name="저장한 공지의 마감" help={'저장한 공지 중 마감이 남은 것을 구글 캘린더의 "성대 공지"에 넣어요. 마감 30분 전부터 보여서 알림이 마감 전에 울려요'}>
         <div className="connection-summary"><span className="setting-state">{connected ? `연결됨${syncedAt ? ` · ${syncedAt}에 맞춤` : ''}` : '연결 안 됨'}</span></div>
+        {connected ? <p className={`field-note ${auto.active ? 'ok' : ''}`} role="status">{autoText}{auto.active ? ' · 30분마다 서버가 저장한 공지를 확인해요' : ''}</p> : null}
+        {connected && !auto.active && auto.error ? <p className="field-note error" role="alert">{auto.error}</p> : null}
         <div className="inline">
           {connected
             ? <button type="button" className="solid-button" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '맞추고 있어요' : '지금 맞추기'}</button>
             : <button type="button" className="solid-button" disabled={calendar.busy} onClick={calendar.connect}>구글 캘린더에 연결하기</button>}
+          {connected && !auto.active ? <button type="button" className="ghost-button" disabled={calendar.busy} onClick={calendar.connect}>다시 연결하기</button> : null}
           {connected ? <button type="button" className="ghost-button" disabled={calendar.busy} onClick={calendar.disconnect}>연결 끊기</button> : null}
         </div>
         {calendar.message ? <p className="field-note ok" role="status">{calendar.message}</p> : null}
@@ -467,7 +474,7 @@ function CalendarPage({ model }: { model: SettingsModel }) {
           '"구글 캘린더에 연결하기"를 누르면 구글 허용 화면으로 가요',
           '구글 계정을 고르고 "성공이 캘린더를 만들고 일정을 넣는 것"을 허용해요. "확인되지 않은 앱"이라고 나오면 "고급"을 누른 뒤 "계속"을 눌러요',
           '허용하고 돌아오면 구글 캘린더에 "성대 공지" 캘린더가 생기고 저장한 공지의 마감이 바로 들어가요',
-          '저장한 공지를 바꾼 뒤에는 이 화면에서 "지금 맞추기"를 눌러요',
+          '그다음부터는 서버가 30분마다 알아서 맞춰요. 지금 바로 보고 싶을 때만 "지금 맞추기"를 눌러요',
         ]} />
       </Setting>
     </Section>
@@ -475,7 +482,7 @@ function CalendarPage({ model }: { model: SettingsModel }) {
       <ul className="rule-list">
         <li>구글 로그인으로 허용한 권한은 이 앱이 만든 "성대 공지" 캘린더 안의 일정만 다뤄요. 내 다른 캘린더는 읽지도 쓰지도 못해요</li>
         <li>허용 화면이 "확인되지 않은 앱"이라고 나올 수 있어요. 이 앱이 아직 구글의 검증을 받지 않아서예요</li>
-        <li>구글이 주는 열쇠는 1시간쯤 뒤에 만료돼요. 저장한 공지를 바꾼 뒤에는 "지금 맞추기"를 눌러 주세요. 만료됐으면 구글에서 한 번 더 허용하면 돼요</li>
+        <li>자동으로 맞추려고 구글이 주는 장기 열쇠를 암호화해서 서버에 보관해요. 연결을 끊거나 계정을 지우면 그 열쇠도 지워지고, 구글 계정의 연결된 앱에서 권한을 거두면 서버도 더는 쓰지 못해요</li>
         <li>연결을 끊어도 구글 캘린더의 "성대 공지"는 남아요. 필요 없으면 구글 캘린더에서 지워 주세요</li>
       </ul>
     </Section>

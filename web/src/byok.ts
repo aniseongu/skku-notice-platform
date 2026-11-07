@@ -110,6 +110,22 @@ export async function deleteMyAccount(client: SupabaseClient): Promise<void> {
   if (error) throw await failure(error, '계정을 지우지 못했어요. 잠시 뒤 다시 눌러 주세요.');
 }
 
+/** 구글 갱신 열쇠를 서버에 맡겨 암호화해 보관하게 한다. 서버가 이 열쇠로 캘린더를 자동으로 맞춘다. */
+export async function linkGoogleCalendar(client: SupabaseClient, refreshToken: string): Promise<void> {
+  const { error } = await client.functions.invoke('byok', { method: 'POST', body: { action: 'google-calendar-link', refreshToken } });
+  if (error) throw await failure(error, '자동으로 맞추는 설정을 저장하지 못했어요. 잠시 뒤 다시 연결해 주세요.');
+}
+
+export interface GoogleAutoStatus { active: boolean; error: string | null; lastRunAt: string | null }
+
+/** 서버가 캘린더를 자동으로 맞추고 있는지(내 상태 열만 읽힌다). 열쇠가 없으면 active는 false. */
+export async function loadGoogleAutoStatus(client: SupabaseClient, userId: string): Promise<GoogleAutoStatus> {
+  const { data, error } = await client.from('user_google_tokens').select('disabled_at,last_error,last_run_at').eq('user_id', userId).maybeSingle();
+  if (error) throw error;
+  if (!data) return { active: false, error: null, lastRunAt: null };
+  return { active: !data.disabled_at, error: typeof data.last_error === 'string' ? data.last_error : null, lastRunAt: typeof data.last_run_at === 'string' ? data.last_run_at : null };
+}
+
 /** 공지 한 건의 요약과 마감을 내 키로 지금 만든다. 서버가 키를 풀어 Gemini에 보내고 결과를 저장한다. */
 export async function requestNoticeSummary(client: SupabaseClient, noticeId: string): Promise<Pick<MyNoticeInfo, 'summary' | 'deadline' | 'deadlineKind'>> {
   const { data, error } = await client.functions.invoke('byok', { method: 'POST', body: { action: 'summarize', noticeId } });

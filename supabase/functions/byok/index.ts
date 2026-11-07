@@ -26,6 +26,12 @@ const DAILY_CALLS = 60;
 
 Deno.serve((req) => handle(req, {
   masterKey,
+  async saveGoogleToken(row) {
+    const { error } = await service.from('user_google_tokens').upsert({
+      ...row, disabled_at: null, last_error: null, last_run_at: null, updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' });
+    if (error) throw error;
+  },
   async deleteAccount(userId) {
     const { error } = await service.auth.admin.deleteUser(userId);
     if (error) throw error;
