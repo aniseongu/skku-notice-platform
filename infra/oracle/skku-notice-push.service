@@ -1,0 +1,22 @@
+[Unit]
+Description=Deliver user notice web push notifications
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=skku-push
+Group=skku-push
+WorkingDirectory=/opt/skku-notice-platform
+Environment=PYTHONPATH=/opt/skku-notice-platform/src
+EnvironmentFile=/etc/skku-notice/worker.env
+EnvironmentFile=/etc/skku-notice/push.env
+RuntimeDirectory=skku-notice-push
+RuntimeDirectoryMode=0755
+ExecStart=/usr/bin/flock -n /run/skku-notice-push/push.lock /opt/skku-notice-push/bin/python -m skku_notice.push_collection
+TimeoutStartSec=300
+MemoryMax=192M
+MemorySwapMax=256M
+CPUQuota=70%
+NoNewPrivileges=true
+PrivateTmp=true
