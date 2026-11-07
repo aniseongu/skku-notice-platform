@@ -1,5 +1,5 @@
 // 설정과 온보딩이 같이 쓰는 작은 구성요소. 모양은 styles.css의 platform 층에 있다.
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 /** 원본 설정의 구역(작은 제목 + 상자). 구역 제목이 구역의 이름표가 된다. */
 export function Card({ id, title, children }: { id: string; title: string; children: ReactNode }) {
@@ -48,4 +48,28 @@ export function ChipGroup({ label, options, selected, onToggle }: { label: strin
   return <div className="chips chip-wrap" role="group" aria-label={label}>
     {options.map((option) => <button type="button" className="chip" key={option} aria-pressed={selected.includes(option)} onClick={() => onToggle(option)}>{option}</button>)}
   </div>;
+}
+
+/**
+ * 프로필 아이콘. Radix Avatar와 같은 규약이다: 사진은 실제로 불러온 뒤에만 보이고, 없거나 실패하면 기본 사람 모양이 보인다.
+ * 이름이나 이메일이 바로 옆에 있어 장식으로 취급한다(alt 비움). 사진 서버에 우리 주소가 새지 않게 referrer를 보내지 않는다.
+ */
+export function Avatar({ src, size = 48 }: { src?: string | null; size?: number }) {
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    setLoaded(false);
+    if (!src) return;
+    let alive = true;
+    const image = new Image();
+    image.referrerPolicy = 'no-referrer';
+    image.onload = () => { if (alive) setLoaded(true); };
+    image.onerror = () => { if (alive) setLoaded(false); };
+    image.src = src;
+    return () => { alive = false; };
+  }, [src]);
+  return <span className="avatar" style={{ width: size, height: size }} aria-hidden="true" data-loaded={loaded}>
+    {src && loaded
+      ? <img src={src} alt="" referrerPolicy="no-referrer" draggable={false} />
+      : <svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="9" r="4.2" /><path d="M3.5 22c.6-4.9 4.3-8 8.5-8s7.9 3.1 8.5 8z" /></svg>}
+  </span>;
 }

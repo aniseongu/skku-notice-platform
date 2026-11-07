@@ -168,7 +168,7 @@ test('profile page edits year and status in place and can reopen the first-run s
   await expect(screen.getByText('소프트웨어학과 (소프트웨어융합대학)')).toBeVisible();
   await withApp(page, { profileStatus: 'unavailable' });
   await expect(screen.getByRole('radio', { name: '4학년' })).toBeDisabled();
-  await expect(screen.getByText('지금은 내 정보를 불러올 수 없어요. 잠시 뒤 다시 열어 주세요')).toBeVisible();
+  await expect(screen.getByText('지금은 프로필을 불러올 수 없어요. 잠시 뒤 다시 열어 주세요')).toBeVisible();
   await withApp(page, { profileStatus: 'ready', profileError: '저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.' });
   await expect(screen.getByRole('alert')).toContainText('다시 시도');
   await withApp(page, { profileError: '', saveProfile: 'fn:save', openOnboarding: 'fn:open' });
@@ -192,7 +192,7 @@ test('connection keys page follows the original rows: Gemini key flow, iCampus t
   await expect(screen.locator('.setting', { hasText: 'Gemini 키' }).getByText('준비 중')).toBeVisible();
   await expect(screen.locator('.setting', { hasText: '아이캠퍼스 토큰' }).getByText('준비 중')).toBeVisible();
   await expect(screen.getByLabel('Gemini 키', { exact: true })).toHaveCount(0);
-  // 학기·병역 같은 프로필은 내 정보에서 바꾼다. 연결 키 쪽에는 두지 않는다.
+  // 학기·병역 같은 프로필은 프로필 설정에서 바꾼다. 연결 키 쪽에는 두지 않는다.
   await expect(screen.getByRole('radio', { name: '2학기' })).toHaveCount(0);
   await expect(screen.getByRole('radio', { name: '복무 전' })).toHaveCount(0);
   await withApp(page, { byokOn: true, byokLoading: false, byokStatus: null });
@@ -233,9 +233,9 @@ test('settings items live in the right place: list scope under display, profile 
   expect(await page.evaluate(() => (document.querySelector('notice-app') as unknown as { subscriptionsOnly: boolean }).subscriptionsOnly)).toBe(true);
   await screen.getByRole('link', { name: /알림/ }).first().click();
   await expect(screen.getByRole('radiogroup', { name: '목록 보기' })).toHaveCount(0);
-  // 학년·학기·재학 상태·병역은 내 정보 한 곳에 있다.
+  // 학년·학기·재학 상태·병역은 프로필 설정 한 곳에 있다.
   await screen.getByRole('link', { name: '설정으로' }).click();
-  await screen.getByRole('link', { name: /내 정보/ }).click();
+  await screen.getByRole('link', { name: /프로필 설정/ }).click();
   for (const name of ['학년', '학기', '재학 상태', '병역']) await expect(screen.getByRole('radiogroup', { name })).toBeVisible();
   // 사이드바의 "키워드 추가하기"는 설정 첫 쪽이 아니라 키워드 쪽으로 바로 간다.
   await page.goto('/?api=sample/api/v1');
@@ -473,4 +473,48 @@ test('left board list shows only chosen boards, falls back to boards with notice
   // "게시판 더 고르기"는 설정의 알림 쪽으로 바로 간다.
   await page.locator('#side-boards').getByRole('button', { name: '게시판 더 고르기' }).click();
   await expect(page).toHaveURL(/section=notifications/);
+});
+
+test('account shows an icon, name and email and leads to profile settings where free text for Gemini is written and saved', async ({ page }) => {
+  await settingsAt(page);
+  const screen = page.locator('platform-settings-screen');
+  const onePixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+  const profile = { programs: [{ college: '경영대학', department: '경영학과' }], year: 2, semester: null, enrollmentStatus: '재학', militaryService: null,
+    onboardedAt: 'x', interests: '', wants: '', avoids: '' };
+  await withApp(page, { authUserId: 'account-a', authEmail: 'student@g.skku.edu', authName: '홍길동', authAvatar: null, profile, profileStatus: 'ready', onboardingDismissed: true, saveProfile: 'fn:save' });
+  // 사진이 없으면 인스타그램처럼 기본 사람 모양이 보인다.
+  const account = screen.locator('.account-row');
+  await expect(account).toContainText('홍길동');
+  await expect(account).toContainText('student@g.skku.edu');
+  await expect(account.locator('.avatar svg')).toBeVisible();
+  await expect(account.locator('.avatar img')).toHaveCount(0);
+  // 사진이 실제로 불러와지면 사진으로 바뀐다. 불러오지 못하면 기본 모양을 유지한다.
+  await withApp(page, { authAvatar: onePixel });
+  await expect(account.locator('.avatar img')).toBeVisible();
+  await withApp(page, { authAvatar: 'https://invalid.invalid/photo.png' });
+  await expect(account.locator('.avatar svg')).toBeVisible();
+  await expect(account.locator('.avatar img')).toHaveCount(0);
+  // 계정 아래의 프로필 설정으로 들어간다.
+  await screen.getByRole('link', { name: /프로필 설정/ }).click();
+  await expect(page).toHaveURL(/section=profile/);
+  await expect(page.getByRole('heading', { name: '프로필 설정', level: 1 })).toBeVisible();
+  await expect(screen.locator('.profile-hero')).toContainText('홍길동');
+  // Gemini에게 알려 줄 주관식: 글자 수를 세고, 바뀐 뒤에만 저장할 수 있으며, 300자를 넘으면 막는다.
+  const interests = screen.getByRole('textbox', { name: '관심 분야' });
+  const save = screen.getByRole('button', { name: '저장하기' });
+  await expect(save).toBeDisabled();
+  await expect(screen.getByText('이름, 학번, 연락처, 주소는 적지 마세요', { exact: false })).toBeVisible();
+  await interests.fill('  인공지능, 백엔드 개발  ');
+  await screen.getByRole('textbox', { name: '받고 싶은 공지' }).fill('학부생 인턴');
+  await expect(screen.locator('#count-interests')).toHaveText('12/300');
+  await expect(save).toBeEnabled();
+  await save.click();
+  expect((await calls(page)).at(-1)).toEqual(['save', { ...profile, interests: '인공지능, 백엔드 개발', wants: '학부생 인턴', avoids: '' }]);
+  await screen.getByRole('textbox', { name: '받고 싶지 않은 공지' }).fill('가'.repeat(301));
+  await expect(screen.locator('#count-avoids')).toHaveText('301/300');
+  await expect(save).toBeDisabled();
+  await expect(screen.getByRole('alert')).toContainText('300자 이하');
+  // 프로필을 불러오기 전에는 입력을 막는다.
+  await withApp(page, { profileStatus: 'unavailable' });
+  await expect(interests).toBeDisabled();
 });

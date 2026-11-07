@@ -168,7 +168,7 @@ const boardChoices = (app: AppController) => [{ id: 'all', label: app.tab() === 
 
 function settingsModel(app: AppController) {
   return {
-    configured: !!authClient, userId: app.authUserId, email: app.authEmail,
+    configured: !!authClient, userId: app.authUserId, email: app.authEmail, name: app.authName, avatar: app.authAvatar,
     authBusy: app.authBusy, authError: app.authError,
     signIn: () => { void app.signIn(); }, signOut: () => { void app.signOut(); },
     section: app.settingsSection, openSection: (section: string | null) => app.openSettingsSection(section),

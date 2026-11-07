@@ -3,15 +3,17 @@
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import type { ByokStatus } from './byok';
-import { ENROLLMENT, MILITARY, type UserProfile } from './profile';
+import { ENROLLMENT, MILITARY, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
 import { programLabel } from './skku-programs';
 import { BOARD_CATALOG, COLLEGE_BOARD, DEPARTMENT_BOARD } from './skku-boards';
-import { SwitchRow } from './ui';
+import { Avatar, SwitchRow } from './ui';
 
 export interface SettingsModel {
   configured: boolean;
   userId: string | null;
   email: string | null;
+  name: string | null;
+  avatar: string | null;
   authBusy: boolean;
   authError: string;
   signIn: () => void;
@@ -126,17 +128,25 @@ function Overview({ model }: { model: SettingsModel }) {
     <Section id="s-preferences" title="내 설정">
       <SettingsLink model={model} label="알림" help="받을 게시판과 이 기기 알림" section="notifications" />
       <SettingsLink model={model} label="관심 키워드" help={model.keywords.length ? `${model.keywords.length}개 키워드를 쓰고 있어요` : '관심 있는 공지를 골라 봐요'} section="keywords" />
-      <SettingsLink model={model} label="내 정보" help={model.userId ? profileSummary(model.profile) : '전공과 학년을 저장해요'} section="profile" />
     </Section>
     <Section id="s-account" title="계정">
-      <Setting name="계정" help={model.userId ? '이 기기에서 로그인한 계정이에요' : '로그인하면 구독과 저장이 계정에 남아요'}>
-        {!model.configured ? <p className="field-note">로그인 연결을 준비하고 있어요.</p> : model.userId
-          ? <><p className="field-note">{model.email ?? '로그인됨'}</p>
-            <button type="button" className="ghost-button" disabled={model.authBusy} onClick={model.signOut}>이 기기에서 로그아웃</button></>
+      {model.userId ? <>
+        <div className="account-row">
+          <Avatar src={model.avatar} size={56} />
+          <div><span className="setting-name">{model.name ?? model.email ?? '로그인됨'}</span>
+            {model.name && model.email ? <span className="setting-help">{model.email}</span> : null}</div>
+        </div>
+        <SettingsLink model={model} label="프로필 설정" help={profileSummary(model.profile)} section="profile" />
+        <SettingsLink model={model} label="연결 키" help="Gemini 키와 아이캠퍼스 토큰" section="keys" />
+        <Setting name="로그아웃" help="이 기기에서만 나가요. 구독과 저장은 계정에 남아요">
+          <button type="button" className="ghost-button" disabled={model.authBusy} onClick={model.signOut}>이 기기에서 로그아웃</button>
+          {model.authError ? <p className="field-note error" role="alert">{model.authError}</p> : null}
+        </Setting>
+      </> : <Setting name="계정" help="로그인하면 구독과 저장이 계정에 남아요">
+        {!model.configured ? <p className="field-note">로그인 연결을 준비하고 있어요.</p>
           : <button type="button" className="solid-button" disabled={model.authBusy} onClick={model.signIn}>Google 계정으로 계속하기</button>}
         {model.authError ? <p className="field-note error" role="alert">{model.authError}</p> : null}
-      </Setting>
-      {model.userId ? <SettingsLink model={model} label="연결 키" help="Gemini 키와 아이캠퍼스 토큰" section="keys" /> : null}
+      </Setting>}
     </Section>
     <Section id="s-view" title="화면">
       <Setting name="화면 모드" help="자동은 휴대폰과 PC 설정을 따라요">
@@ -265,35 +275,82 @@ function Keywords({ model }: { model: SettingsModel }) {
   </div>;
 }
 
+const TEXT_FIELDS: { key: ProfileTextField; name: string; help: string; placeholder: string }[] = [
+  { key: 'interests', name: '관심 분야', help: '어떤 일이나 주제에 관심이 있는지 적어요', placeholder: '예: 인공지능, 백엔드 개발, 데이터 분석' },
+  { key: 'wants', name: '받고 싶은 공지', help: '꼭 알고 싶은 공지의 종류를 적어요', placeholder: '예: 학부생이 지원할 수 있는 인턴, 장학금, 해커톤' },
+  { key: 'avoids', name: '받고 싶지 않은 공지', help: '알림이 오지 않았으면 하는 공지를 적어요', placeholder: '예: 대학원생 전용 모집, 졸업생 대상 채용' },
+];
+
+/** Gemini에게 알려 줄 주관식 3칸. 글자 수를 세어 보여 주고 한 번에 저장한다(쓰는 중에 저장하지 않는다). */
+function AboutMe({ model }: { model: SettingsModel }) {
+  const { profile } = model;
+  // 주관식 컬럼이 아직 없는 데이터가 들어와도 깨지지 않게 빈 글로 본다.
+  const saved: Record<ProfileTextField, string> = { interests: profile.interests ?? '', wants: profile.wants ?? '', avoids: profile.avoids ?? '' };
+  const stored = JSON.stringify([saved.interests, saved.wants, saved.avoids]);
+  const [drafts, setDrafts] = useState<Record<ProfileTextField, string>>(saved);
+  useEffect(() => setDrafts(saved), [stored]);
+  // 글자 수는 저장될 값(앞뒤 공백 제외) 기준으로 센다.
+  const length = (value: string) => [...value.trim()].length;
+  const over = TEXT_FIELDS.some(({ key }) => length(drafts[key]) > PROFILE_TEXT_LIMIT);
+  const changed = JSON.stringify([drafts.interests.trim(), drafts.wants.trim(), drafts.avoids.trim()]) !== stored;
+  const ready = model.profileStatus === 'ready';
+  return <Section id="s-about" title="나를 소개해요 (선택)">
+    <div className="setting">
+      <div className="setting-text"><p className="setting-name">Gemini가 읽는 내용</p>
+        <p className="setting-help">인턴 공고에서 나에게 맞는 공고를 고를 때 참고해요. Google로 보내는 내용이라 이름, 학번, 연락처, 주소는 적지 마세요</p></div>
+    </div>
+    {TEXT_FIELDS.map(({ key, name, help, placeholder }) => {
+      const count = length(drafts[key]);
+      return <Setting key={key} name={name} help={help}>
+        <textarea className="input" rows={3} aria-label={name} placeholder={placeholder} value={drafts[key]} disabled={!ready}
+          aria-describedby={`count-${key}`} onChange={(event) => setDrafts({ ...drafts, [key]: event.currentTarget.value })} />
+        <span id={`count-${key}`} className={`counter ${count > PROFILE_TEXT_LIMIT ? 'over' : ''}`} aria-live="polite">{count}/{PROFILE_TEXT_LIMIT}</span>
+      </Setting>;
+    })}
+    <Setting name="저장">
+      <button type="button" className="solid-button" disabled={!ready || !changed || over}
+        onClick={() => model.saveProfile({ ...profile, interests: drafts.interests.trim(), wants: drafts.wants.trim(), avoids: drafts.avoids.trim() })}>저장하기</button>
+      {over ? <p className="field-note error" role="alert">{PROFILE_TEXT_LIMIT}자 이하로 적어 주세요</p> : null}
+    </Setting>
+  </Section>;
+}
+
 function Profile({ model }: { model: SettingsModel }) {
   const { profile } = model;
   const save = (patch: Partial<UserProfile>) => model.saveProfile({ ...profile, ...patch });
   const [main, ...doubles] = profile.programs;
+  if (!model.userId) return <div className="settings"><Back model={model} /><Section id="s-profile" title="프로필 설정"><LoginNote model={model} what="프로필 설정" /></Section></div>;
+  const ready = model.profileStatus === 'ready';
   return <div className="settings">
     <Back model={model} />
-    <Section id="s-profile" title="내 정보">
-      {!model.userId ? <LoginNote model={model} what="내 정보" /> : <>
-        <Setting name="전공" help="공지를 받을 게시판을 고를 때 참고해요">
-          <dl className="info-list">
-            <div><dt>주전공</dt><dd>{main ? `${programLabel(main)}${main.department ? ` (${main.college})` : ''}` : '아직 없어요'}</dd></div>
-            <div><dt>복수전공</dt><dd>{doubles.length ? doubles.map(programLabel).join(', ') : '없어요'}</dd></div>
-          </dl>
-          <button type="button" className="ghost-button" onClick={model.openOnboarding}>전공과 게시판 다시 고르기</button>
-        </Setting>
-        <Setting name="학년"><Choice label="학년" value={profile.year} disabled={model.profileStatus !== 'ready'}
-          options={YEARS.map((year) => [year, year === 5 ? '5학년 이상' : `${year}학년`] as const)} onPick={(year) => save({ year })} /></Setting>
-        <Setting name="재학 상태"><Choice label="재학 상태" value={profile.enrollmentStatus} disabled={model.profileStatus !== 'ready'}
-          options={ENROLLMENT.map((value) => [value, value] as const)} onPick={(enrollmentStatus) => save({ enrollmentStatus })} /></Setting>
-        <Setting name="학기" help="인턴 공고의 지원 자격을 가릴 때만 써요. 이름이나 학번은 받지 않아요">
-          <Choice label="학기" value={profile.semester} disabled={model.profileStatus !== 'ready'}
-            options={SEMESTERS.map((value) => [value, `${value}학기`] as const)} onPick={(semester) => save({ semester })} /></Setting>
-        <Setting name="병역"><Choice label="병역" value={profile.militaryService} disabled={model.profileStatus !== 'ready'}
-          options={MILITARY.map((value) => [value, value] as const)} onPick={(militaryService) => save({ militaryService })} /></Setting>
-        {model.profileMessage ? <p className="field-note ok" role="status">{model.profileMessage}</p> : null}
-        {model.profileError ? <p className="field-note error" role="alert">{model.profileError}</p> : null}
-        {model.profileStatus === 'unavailable' ? <p className="field-note">지금은 내 정보를 불러올 수 없어요. 잠시 뒤 다시 열어 주세요</p> : null}
-      </>}
+    <div className="profile-hero">
+      <Avatar src={model.avatar} size={64} />
+      <div><p className="setting-name">{model.name ?? model.email ?? '로그인됨'}</p>{model.name && model.email ? <p className="setting-help">{model.email}</p> : null}</div>
+    </div>
+    <Section id="s-major" title="전공">
+      <Setting name="전공" help="공지를 받을 게시판을 고를 때 참고해요">
+        <dl className="info-list">
+          <div><dt>주전공</dt><dd>{main ? `${programLabel(main)}${main.department ? ` (${main.college})` : ''}` : '아직 없어요'}</dd></div>
+          <div><dt>복수전공</dt><dd>{doubles.length ? doubles.map(programLabel).join(', ') : '없어요'}</dd></div>
+        </dl>
+        <button type="button" className="ghost-button" disabled={!ready} onClick={model.openOnboarding}>전공과 게시판 다시 고르기</button>
+      </Setting>
     </Section>
+    <Section id="s-school" title="학교 정보">
+      <Setting name="학년"><Choice label="학년" value={profile.year} disabled={!ready}
+        options={YEARS.map((year) => [year, year === 5 ? '5학년 이상' : `${year}학년`] as const)} onPick={(year) => save({ year })} /></Setting>
+      <Setting name="재학 상태"><Choice label="재학 상태" value={profile.enrollmentStatus} disabled={!ready}
+        options={ENROLLMENT.map((value) => [value, value] as const)} onPick={(enrollmentStatus) => save({ enrollmentStatus })} /></Setting>
+      <Setting name="학기" help="인턴 공고의 지원 자격을 가릴 때만 써요. 이름이나 학번은 받지 않아요">
+        <Choice label="학기" value={profile.semester} disabled={!ready}
+          options={SEMESTERS.map((value) => [value, `${value}학기`] as const)} onPick={(semester) => save({ semester })} /></Setting>
+      <Setting name="병역"><Choice label="병역" value={profile.militaryService} disabled={!ready}
+        options={MILITARY.map((value) => [value, value] as const)} onPick={(militaryService) => save({ militaryService })} /></Setting>
+    </Section>
+    <AboutMe model={model} />
+    {model.profileMessage ? <p className="field-note ok" role="status">{model.profileMessage}</p> : null}
+    {model.profileError ? <p className="field-note error" role="alert">{model.profileError}</p> : null}
+    {model.profileStatus === 'unavailable' ? <p className="field-note">지금은 프로필을 불러올 수 없어요. 잠시 뒤 다시 열어 주세요</p> : null}
   </div>;
 }
 
@@ -366,8 +423,8 @@ function Keys({ model }: { model: SettingsModel }) {
       </KeyRow>
     </Section>
     <Section id="s-eligibility" title="내 프로필">
-      <Setting name="지원 자격 정보" help="Gemini가 지원 자격을 판단할 때 쓰는 학년, 학기, 재학 상태, 병역은 내 정보에서 바꿔요">
-        <button type="button" className="ghost-button" onClick={() => model.openSection('profile')}>내 정보 열기</button>
+      <Setting name="지원 자격 정보" help="Gemini가 지원 자격을 판단할 때 쓰는 학년, 학기, 재학 상태, 병역과 관심 분야는 프로필 설정에서 바꿔요">
+        <button type="button" className="ghost-button" onClick={() => model.openSection('profile')}>프로필 설정 열기</button>
       </Setting>
     </Section>
   </div>;

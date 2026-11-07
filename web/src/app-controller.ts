@@ -40,6 +40,16 @@ const INTERACTIVE = 'a, button, input, textarea, select, [contenteditable]';
 const wide = matchMedia('(min-width: 1080px)');
 const browserTab = matchMedia('(display-mode: browser)');
 
+/** Google 로그인이 주는 프로필 사진 주소만 쓴다(그 밖의 주소는 사진으로 불러오지 않는다). */
+export function safeAvatarUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    return url.protocol === 'https:' && !url.username && !url.password && (host === 'googleusercontent.com' || host.endsWith('.googleusercontent.com')) ? url.href : null;
+  } catch { return null; }
+}
+
 export function settingsSectionFromUrl(): string | null {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'keys';
@@ -52,7 +62,7 @@ export function settingsSubtitle(): string {
   switch (settingsSectionFromUrl()) {
     case 'notifications': return '받을 게시판과 이 기기 알림을 정해요';
     case 'keywords': return '관심 있는 공지를 골라 봐요';
-    case 'profile': return '전공과 학년을 알려 주세요';
+    case 'profile': return '내 정보와 Gemini에 알려줄 내용을 적어요';
     case 'keys': return '키와 지원 자격 정보를 관리해요';
     default: return '알림과 연결을 정해요';
   }
@@ -61,7 +71,7 @@ export function settingsSubtitle(): string {
 export function settingsTitle(): string {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return '연결 키';
-  return ({ notifications: '알림', keywords: '관심 키워드', profile: '내 정보' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
+  return ({ notifications: '알림', keywords: '관심 키워드', profile: '프로필 설정' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
 }
 
 export interface InstallPrompt extends Event { prompt(): Promise<void> }
@@ -128,7 +138,7 @@ export class AppController extends Reactive {
     toast: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
-    authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
+    authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, authName: { state: true }, authAvatar: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
     byokOn: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true },
     profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, profileError: { state: true }, settingsSection: { state: true },
     onboardingOpen: { state: true }, onboardingManual: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
@@ -177,6 +187,8 @@ export class AppController extends Reactive {
   private keywordWrite: Promise<void> = Promise.resolve();
   authReady = !authClient;
   authEmail: string | null = null;
+  authName: string | null = null;
+  authAvatar: string | null = null;
   authError = '';
   authBusy = false;
   authUserId: string | null = null;
@@ -272,6 +284,10 @@ export class AppController extends Reactive {
           this.selecting = false; this.selectedReads = [];
         }
         this.authEmail = session?.user.email ?? null;
+        const meta = (session?.user.user_metadata ?? {}) as Record<string, unknown>;
+        const name = meta.full_name ?? meta.name;
+        this.authName = typeof name === 'string' && name.trim() ? name.trim().slice(0, 60) : null;
+        this.authAvatar = safeAvatarUrl(meta.avatar_url ?? meta.picture);
         if (!this.authReady) { this.authReady = true; void this.refresh(); }
       }).data.subscription;
     } else { void this.refresh(); }
