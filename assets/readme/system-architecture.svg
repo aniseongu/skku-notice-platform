@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 880" width="1280" height="880" role="img" aria-labelledby="t d" font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif">
-<title id="t">성공 시스템 아키텍처</title><desc id="d">공지 출처를 Oracle Cloud 서버의 타이머와 Python 워커가 수집·판정해 Supabase에 저장하고, 웹앱과 웹 푸시로 사용자의 기기에 전달하는 구조와 사용한 기술</desc>
+<title id="t">성공 시스템 아키텍처</title><desc id="d">공지 출처를 Oracle Cloud 서버의 타이머와 Python 워커가 수집·판정해 Supabase에 저장하고, 웹앱과 웹 푸시로 사용자의 기기에 전달하는 구조</desc>
 <defs><marker id="m" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#dfe8e4"/></marker>
 <style>
 .bg{fill:#101816}.fr{fill:none;stroke:#cdd8d3;stroke-width:1.6}.dsh{stroke-dasharray:7 6;stroke:#8fb3a6}.ft{fill:#eaf2ee;font-size:16px;font-weight:700}
