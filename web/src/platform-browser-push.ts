@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { connectionChain } from './connection-chain.ts';
 
 const OWNER_KEY = 'platform:push-owner';
 
@@ -29,35 +30,55 @@ export async function inspectDevicePush(client: SupabaseClient, userId: string, 
   return !!data;
 }
 
+// 권한 요청 → 구독 생성 → 서버 등록을 순서대로 실행한다. 실패하면 다시 run()할 때 끝난 단계는 건너뛰고 실패한 단계부터 이어 간다.
+// 첫 단계(권한 요청)는 run()을 부른 같은 호출 안에서 시작되므로 클릭 동작 안에서 실행된다.
+export function createEnableChain(client: SupabaseClient, userId: string, registration: ServiceWorkerRegistration,
+  storage: Storage, vapidKey: string, requestPermission: () => Promise<NotificationPermission>) {
+  const key = decodeVapid(vapidKey);
+  let subscription: PushSubscription | null = null;
+  let created = false;
+  let saved = false;
+  const chain = connectionChain([
+    async () => { if (await requestPermission() !== 'granted') throw new Error('브라우저에서 알림을 허용해 주세요.'); },
+    async () => {
+      subscription = await dropForeign(await registration.pushManager.getSubscription(), userId, storage);
+      const currentKey = subscription?.options.applicationServerKey;
+      if (subscription && currentKey) {
+        const bytes = new Uint8Array(currentKey);
+        if (bytes.length !== key.length || bytes.some((value, index) => value !== key[index])) {
+          if (!await subscription.unsubscribe()) throw new Error('이 기기의 이전 알림을 끄지 못했어요.');
+          storage.removeItem(OWNER_KEY);
+          subscription = null;
+        }
+      }
+      created = !subscription;
+      if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+    },
+    async () => {
+      const data = subscription!.toJSON();
+      if (!data.endpoint || !data.keys?.p256dh || !data.keys.auth) throw new Error('알림 기기 정보를 확인하지 못했어요.');
+      const { error } = await client.from('user_push_subscriptions').upsert({
+        user_id: userId, endpoint: data.endpoint, p256dh: data.keys.p256dh, auth_secret: data.keys.auth,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'endpoint' });
+      if (error) throw error;
+      storage.setItem(OWNER_KEY, userId);
+      saved = true;
+    },
+  ]);
+  return {
+    run: () => chain.run(),
+    // 사용자가 그만두거나 계정이 바뀌면, 서버에 등록하지 못한 채 새로 만든 구독만 이 기기에서 끊는다.
+    async discard(): Promise<void> {
+      if (created && !saved && subscription) await subscription.unsubscribe().catch(() => false);
+    },
+  };
+}
+
 export async function enableDevicePush(client: SupabaseClient, userId: string, registration: ServiceWorkerRegistration,
   storage: Storage, vapidKey: string, requestPermission: () => Promise<NotificationPermission>): Promise<void> {
-  const key = decodeVapid(vapidKey);
-  if (await requestPermission() !== 'granted') throw new Error('브라우저에서 알림을 허용해 주세요.');
-  let subscription = await dropForeign(await registration.pushManager.getSubscription(), userId, storage);
-  const currentKey = subscription?.options.applicationServerKey;
-  if (subscription && currentKey) {
-    const bytes = new Uint8Array(currentKey);
-    if (bytes.length !== key.length || bytes.some((value, index) => value !== key[index])) {
-      if (!await subscription.unsubscribe()) throw new Error('이 기기의 이전 알림을 끄지 못했어요.');
-      storage.removeItem(OWNER_KEY);
-      subscription = null;
-    }
-  }
-  const created = !subscription;
-  if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-  try {
-    const data = subscription.toJSON();
-    if (!data.endpoint || !data.keys?.p256dh || !data.keys.auth) throw new Error('알림 기기 정보를 확인하지 못했어요.');
-    const { error } = await client.from('user_push_subscriptions').upsert({
-      user_id: userId, endpoint: data.endpoint, p256dh: data.keys.p256dh, auth_secret: data.keys.auth,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'endpoint' });
-    if (error) throw error;
-    storage.setItem(OWNER_KEY, userId);
-  } catch (error) {
-    if (created) await subscription.unsubscribe().catch(() => false);
-    throw error;
-  }
+  const chain = createEnableChain(client, userId, registration, storage, vapidKey, requestPermission);
+  try { await chain.run(); } catch (error) { await chain.discard(); throw error; }
 }
 
 export async function disableDevicePush(client: SupabaseClient, userId: string, registration: ServiceWorkerRegistration,

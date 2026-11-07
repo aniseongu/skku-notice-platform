@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { disableDevicePush, enableDevicePush, inspectDevicePush, releaseDevicePush } from '../src/platform-browser-push.ts';
+import { createEnableChain, disableDevicePush, enableDevicePush, inspectDevicePush, releaseDevicePush } from '../src/platform-browser-push.ts';
 
 const publicKey = Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 1)]).toString('base64url');
 function fixture({ owner = null, saveError = null, deleteError = null } = {}) {
@@ -73,4 +73,29 @@ test('release leaves a device owned by another account alone', async () => {
   await releaseDevicePush('a', f.registration, f.storage);
   assert.equal(f.getUnsubscribed(), 0);
   assert.equal(f.values.get('platform:push-owner'), 'b');
+});
+
+test('enable chain resumes at the failed server step without asking permission or subscribing again', async () => {
+  const f = fixture();
+  let permissionAsks = 0, subscribes = 0, saves = 0, failSave = true;
+  const registration = { pushManager: { getSubscription: async () => f.registration.pushManager.getSubscription(),
+    subscribe: async (options) => { subscribes++; return f.registration.pushManager.subscribe(options); } } };
+  const client = { from: () => ({ upsert: async (row) => { saves++; if (failSave) return { error: new Error('offline') }; f.records.push(row); return { error: null }; } }) };
+  const chain = createEnableChain(client, 'a', registration, f.storage, publicKey, async () => { permissionAsks++; return 'granted'; });
+  await assert.rejects(chain.run(), /offline/);
+  assert.equal(f.values.has('platform:push-owner'), false);
+  failSave = false;
+  await chain.run();
+  assert.deepEqual([permissionAsks, subscribes, saves], [1, 1, 2]);
+  assert.equal(f.values.get('platform:push-owner'), 'a');
+  await chain.discard();
+  assert.equal(f.getUnsubscribed(), 0);
+});
+
+test('discard removes a subscription that never reached the server', async () => {
+  const f = fixture({ saveError: new Error('offline') });
+  const chain = createEnableChain(f.client, 'a', f.registration, f.storage, publicKey, async () => 'granted');
+  await assert.rejects(chain.run(), /offline/);
+  await chain.discard();
+  assert.equal(f.getUnsubscribed(), 1);
 });

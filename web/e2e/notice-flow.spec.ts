@@ -75,13 +75,13 @@ test('push settings show each device state and call the click handlers', async (
   await page.goto('/?view=settings&api=sample/api/v1');
   const screen = page.locator('platform-settings-screen');
   await expect(screen.getByRole('heading', { name: '계정' })).toBeVisible();
-  const setModel = (pushStatus: string, pushError = '') => page.evaluate(([status, error]) => {
+  const setModel = (pushStatus: string, pushError = '', pushRetry = false) => page.evaluate(([status, error, retry]) => {
     const w = window as unknown as { pushCalls: string[] };
     w.pushCalls = [];
     const el = document.querySelector('platform-settings-screen') as HTMLElement & { model: unknown };
     el.model = { configured: true, userId: 'account-a', email: null, authBusy: false, authError: '', sources: [], subscriptions: [], subscriptionsOnly: false, setSubscriptionsOnly() {}, loading: false, error: '', keywords: [], preferencesLoading: false, preferencesError: '', preferencesUnavailable: false, retryPreferences() {}, saveKeywords() {}, signIn() {}, signOut() {}, toggle() {}, retry() {},
-      pushStatus: status, pushError: error, enablePush() { w.pushCalls.push('on'); }, disablePush() { w.pushCalls.push('off'); } };
-  }, [pushStatus, pushError]);
+      pushStatus: status, pushError: error, pushRetry: retry, enablePush() { w.pushCalls.push('on'); }, disablePush() { w.pushCalls.push('off'); } };
+  }, [pushStatus, pushError, pushRetry] as [string, string, boolean]);
   await setModel('off');
   const calls = () => page.evaluate(() => (window as unknown as { pushCalls: string[] }).pushCalls);
   await screen.getByRole('button', { name: '이 기기에서 알림 받기' }).click();
@@ -95,4 +95,7 @@ test('push settings show each device state and call the click handlers', async (
   await expect(screen.getByText('브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요.')).toBeVisible();
   await setModel('off', '알림을 켜지 못했어요. 잠시 뒤 다시 시도해 주세요.');
   await expect(screen.getByRole('alert')).toContainText('알림을 켜지 못했어요');
+  await setModel('off', '알림을 켜지 못했어요. 다시 시도하면 이어서 진행해요.', true);
+  await screen.getByRole('button', { name: '다시 시도하기' }).click();
+  expect(await calls()).toEqual(['on']);
 });

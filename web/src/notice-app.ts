@@ -14,8 +14,9 @@ import { authClient } from './auth';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from './preferences';
 import './platform-settings';
-import { loadNoticeStates, planStateSync, pushRead, pushSaved } from './notice-state-sync';
-import { disableDevicePush, enableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
+import { loadNoticeStates, planStateSync, pushRead, pushSaved, type StatePlan } from './notice-state-sync';
+import { connectionChain } from './connection-chain';
+import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
 import './notice-rows';
 import './notice-detail';
 import { localKey, setLocalOwner } from './local-scope.ts';
@@ -117,7 +118,7 @@ export class NoticeApp extends LitElement {
     toast: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
-    authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, pushStatus: { state: true }, pushError: { state: true },
+    authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
     subscriptions: { state: true }, subscriptionsLoading: { state: true }, subscriptionsError: { state: true }, subscriptionsOnly: { state: true },
     preferencesLoading: { state: true }, preferencesError: { state: true }, preferencesUnavailable: { state: true },
     unreadOnly: { state: true }, selecting: { state: true }, selectedReads: { state: true },
@@ -137,6 +138,10 @@ export class NoticeApp extends LitElement {
   private pushRegistration: ServiceWorkerRegistration | null = null;
   private pushVapidKey: string | null = null;
   private stateSyncedEpoch = -1;
+  private stateChain: { run: () => Promise<void>; epoch: number } | null = null;
+  // 실패한 켜기 작업을 이어서 실행하기 위해 사용자와 epoch마다 하나만 보관한다.
+  private pushChain: { chain: ReturnType<typeof createEnableChain>; userId: string; epoch: number } | null = null;
+  pushRetry = false;
   authReady = !authClient;
   authEmail: string | null = null;
   authError = '';
@@ -202,7 +207,9 @@ export class NoticeApp extends LitElement {
         if (!this.authReady || userId !== this.authUserId) {
           const previousUserId = this.authUserId;
           this.authUserId = userId;
-          this.pushStatus = userId ? 'checking' : 'off'; this.pushError = '';
+          this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
+          const staleChain = this.pushChain; this.pushChain = null;
+          if (staleChain) void staleChain.chain.discard();
           if (previousUserId) setTimeout(() => { void this.releasePush(previousUserId); }, 0);
           const epoch = ++this.subscriptionsEpoch;
           this.subscriptions = [];
@@ -425,24 +432,34 @@ export class NoticeApp extends LitElement {
   }
 
   // 로그인 사용자의 저장·읽음을 서버와 맞춘다. 공지 목록이 있어야 서버에만 있는 저장의 글 정보를 찾을 수 있다.
+  // 병합 → 저장 업로드 → 읽음 업로드 순서의 체인이며, 업로드가 일부 실패하면 다음 새로고침에서 실패한 단계부터 이어 간다.
   private async syncStates(): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     if (!authClient || !userId || !this.notices.length || this.stateSyncedEpoch === epoch) return;
-    this.stateSyncedEpoch = epoch;
-    try {
-      const remote = await loadNoticeStates(authClient, userId);
-      if (epoch !== this.subscriptionsEpoch) return;
+    if (!this.stateChain || this.stateChain.epoch !== epoch) {
+      const client = authClient;
+      let plan: StatePlan | null = null;
       const syncable = (id: string) => this.isSyncable(id);
-      const plan = planStateSync(remote, this.saved, this.readState ?? parseReadState(null), this.notices);
-      this.saved = plan.saved; storeSaved(plan.saved);
-      this.readState = plan.read; this.read = readIds(plan.read); storeReadState(plan.read);
-      const uploads = await Promise.all([
-        pushSaved(authClient, plan.uploadSaved.filter((item) => syncable(item.id))),
-        pushRead(authClient, plan.uploadRead.filter((item) => syncable(item.id))),
+      const chain = connectionChain([
+        async () => {
+          const remote = await loadNoticeStates(client, userId);
+          if (epoch !== this.subscriptionsEpoch) throw new Error('계정이 바뀌었어요');
+          plan = planStateSync(remote, this.saved, this.readState ?? parseReadState(null), this.notices);
+          this.saved = plan.saved; storeSaved(plan.saved);
+          this.readState = plan.read; this.read = readIds(plan.read); storeReadState(plan.read);
+        },
+        async () => { if (!await pushSaved(client, plan!.uploadSaved.filter((item) => syncable(item.id)))) throw new Error('저장을 올리지 못했어요'); },
+        async () => { if (!await pushRead(client, plan!.uploadRead.filter((item) => syncable(item.id)))) throw new Error('읽음을 올리지 못했어요'); },
       ]);
-      if (epoch === this.subscriptionsEpoch && uploads.includes(false)) this.stateSyncedEpoch = -1;
+      this.stateChain = { run: () => chain.run(), epoch };
+    }
+    const current = this.stateChain;
+    try {
+      await current.run();
+      if (epoch === this.subscriptionsEpoch) this.stateSyncedEpoch = epoch;
     } catch {
-      if (epoch === this.subscriptionsEpoch) { this.stateSyncedEpoch = -1; this.showToast('저장과 읽음을 계정과 맞추지 못했어요. 잠시 뒤 다시 시도할게요'); }
+      if (epoch === this.subscriptionsEpoch) this.showToast('저장과 읽음을 계정과 맞추지 못했어요. 잠시 뒤 이어서 시도할게요');
+      else if (this.stateChain === current) this.stateChain = null;
     }
   }
 
@@ -474,21 +491,34 @@ export class NoticeApp extends LitElement {
   }
 
   // 클릭 핸들러에서 직접 불린다. 첫 await가 권한 요청이어야 브라우저가 사용자 동작으로 인정한다.
+  // 실패하면 체인을 남겨 두어 "다시 시도"가 끝난 단계는 건너뛰고 실패한 단계부터 이어 가게 한다.
   private async enablePush(): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch, registration = this.pushRegistration;
     if (!authClient || !userId || this.pushStatus !== 'off') return;
     if (!registration || !this.pushVapidKey) { this.pushError = '알림 설정을 아직 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.'; return; }
+    if (!this.pushChain || this.pushChain.userId !== userId || this.pushChain.epoch !== epoch) {
+      this.pushChain = { chain: createEnableChain(authClient, userId, registration, localStorage, this.pushVapidKey, () => Notification.requestPermission()), userId, epoch };
+    }
+    const current = this.pushChain;
     this.pushStatus = 'busy'; this.pushError = '';
     try {
-      await enableDevicePush(authClient, userId, registration, localStorage, this.pushVapidKey, () => Notification.requestPermission());
-      if (epoch === this.subscriptionsEpoch) this.pushStatus = 'on';
+      await current.chain.run();
+      if (epoch === this.subscriptionsEpoch) { this.pushStatus = 'on'; this.pushRetry = false; }
+      if (this.pushChain === current) this.pushChain = null;
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) {
-        this.pushStatus = Notification.permission === 'denied' ? 'denied' : 'off';
-        this.pushError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '알림을 켜지 못했어요. 잠시 뒤 다시 시도해 주세요.';
+        const denied = Notification.permission === 'denied';
+        this.pushStatus = denied ? 'denied' : 'off';
+        this.pushRetry = !denied;
+        if (denied && this.pushChain === current) { this.pushChain = null; void current.chain.discard(); }
+        this.pushError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '알림을 켜지 못했어요. 다시 시도하면 이어서 진행해요.';
+      } else {
+        // 기다리는 동안 계정이 바뀌었다면 서버에 못 올린 구독을 이 기기에서 끊는다.
+        if (this.pushChain === current) this.pushChain = null;
+        void current.chain.discard();
       }
     } finally {
-      // 기다리는 동안 계정이 바뀌었다면 이전 사용자 소유로 남은 구독을 이 기기에서 끊는다.
+      // 성공했어도 그 사이 계정이 바뀌었다면 이전 사용자 소유로 남은 구독을 이 기기에서 끊는다.
       if (epoch !== this.subscriptionsEpoch) void this.releasePush(userId);
     }
   }
@@ -864,7 +894,7 @@ export class NoticeApp extends LitElement {
             retryPreferences: () => { if (this.authUserId) { this.preferencesLoading = true; this.preferencesError = ''; void this.refreshPreferences(this.authUserId, this.subscriptionsEpoch); } },
             saveKeywords: (input: string) => { void this.saveKeywords(input); },
             signIn: () => { void this.signIn(); }, signOut: () => { void this.signOut(); },
-            pushStatus: this.pushStatus, pushError: this.pushError,
+            pushStatus: this.pushStatus, pushError: this.pushError, pushRetry: this.pushRetry,
             enablePush: () => { void this.enablePush(); }, disablePush: () => { void this.disablePush(); },
             toggle: (id: string, enabled: boolean) => { void this.toggleSubscription(id, enabled); },
             retry: () => {

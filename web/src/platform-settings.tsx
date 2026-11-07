@@ -25,6 +25,7 @@ export interface SettingsModel {
   retry: () => void;
   pushStatus: 'unsupported' | 'checking' | 'off' | 'on' | 'busy' | 'denied';
   pushError: string;
+  pushRetry?: boolean;
   enablePush: () => void;
   disablePush: () => void;
 }
@@ -50,7 +51,7 @@ function PlatformSettings({ model }: { model: SettingsModel }) {
         : model.pushStatus === 'on' ? <><p>이 기기로 알림을 받고 있어요.</p><button className="ghost-button" onClick={model.disablePush}>이 기기 알림 끄기</button></>
         : <><p>구독한 게시판의 새 공지를 알려드려요. 관심 키워드와 맞는 공지는 소리로, 나머지는 조용히 보여드려요.</p>
           <button className="solid-button" disabled={model.pushStatus !== 'off'} onClick={model.enablePush}>
-            {model.pushStatus === 'off' ? '이 기기에서 알림 받기' : '확인하고 있어요'}</button></>}
+            {model.pushStatus === 'off' ? (model.pushRetry ? '다시 시도하기' : '이 기기에서 알림 받기') : '확인하고 있어요'}</button></>}
       {model.pushError ? <p role="alert">{model.pushError}</p> : null}
       <h2>게시판 구독</h2>
       <p>알림을 받을 게시판을 선택해요.</p>
