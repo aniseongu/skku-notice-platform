@@ -1,0 +1,11 @@
+[Unit]
+Description=Read iCampus deadlines every half hour (each user at most once an hour)
+
+[Timer]
+OnCalendar=*-*-* *:20,50:00
+Persistent=true
+RandomizedDelaySec=15
+Unit=skku-notice-canvas.service
+
+[Install]
+WantedBy=timers.target

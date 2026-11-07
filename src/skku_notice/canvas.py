@@ -19,6 +19,10 @@ FAVORITES = "/api/v1/users/self/favorites/courses?per_page=100"
 OFFLINE_TYPES = {"none", "on_paper", "not_graded"}
 
 
+# 퀴즈 목록 API가 이 과목에 없거나 이 토큰으로는 열 수 없을 때의 고정 문구(영구적인 상태).
+QUIZ_API_ABSENT = {"Canvas HTTP 404", "Canvas HTTP 403"}
+
+
 class CanvasError(Exception):
     """A safe error code; never includes request details."""
 
@@ -221,7 +225,8 @@ def read_canvas(
         lecture_session = None
         try:
             courses = _get_pages(client, FAVORITES, gap)
-            if reserve_learningx and courses and reserve_learningx():
+            reserved = bool(reserve_learningx and courses and reserve_learningx())
+            if reserved:
                 lecture_session = LearningXSession()
                 try:
                     if not lecture_session.authenticate(client, courses, gap):
@@ -233,6 +238,9 @@ def read_canvas(
                     lecture_session.close()
                     lecture_session = None
             if courses and not lecture_session and on_incomplete:
+                # 사유를 남긴다. 건너뛴 이유가 로그에 없으면 불완전 경고의 원인을 알 수 없다.
+                if reserve_learningx and not reserved:
+                    print("강의 조회 대기: 1시간 안에 이미 조회해서 건너뛰었어요", file=sys.stderr)
                 on_incomplete()
             result = _read_courses(courses, now, lambda path: _get_pages(client, path, gap),
                                    gap, True, lecture_session, on_incomplete)
@@ -270,7 +278,7 @@ def _read_courses(courses: list[dict], now: datetime, get, gap: float, network: 
                 print(f"강의 조회 대기: {exc}", file=sys.stderr)
                 if on_incomplete:
                     on_incomplete()
-        quizzes = []
+        quizzes: list[dict] | None = []
         if network and any(_quiz_assignment(row) for row in assignments):
             time.sleep(gap)
             try:
@@ -278,11 +286,18 @@ def _read_courses(courses: list[dict], now: datetime, get, gap: float, network: 
             except CanvasError as exc:
                 if str(exc) == "토큰 거절":
                     raise
-                if on_incomplete:
-                    on_incomplete()
-                # Keep ordinary assignments usable; unverified quizzes are excluded for this scan.
+                if str(exc) in QUIZ_API_ABSENT:
+                    # 이 과목은 고전 퀴즈 목록 API가 없다(새 퀴즈 등). 영구적인 상태라
+                    # 불완전 표시를 켜지 않고, 아이캠퍼스 플러스처럼 과제의 열림·잠금 필드로만 판단한다.
+                    quizzes = None
+                else:
+                    print(f"퀴즈 조회 대기: {exc}", file=sys.stderr)
+                    if on_incomplete:
+                        on_incomplete()
+                    # 일시적인 오류: 이번 조회에서는 확인하지 못한 퀴즈를 뺀다.
         for row in assignments:
-            if network and _quiz_assignment(row) and not _quiz_available(row, quizzes, now):
+            quiz_checked = network and quizzes is not None and _quiz_assignment(row)
+            if quiz_checked and not _quiz_available(row, quizzes, now):
                 continue
             item = _assignment(course, row, now)
             if item:

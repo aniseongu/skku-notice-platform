@@ -1,0 +1,25 @@
+[Unit]
+Description=Read iCampus deadlines with each user own token and queue alerts
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=skku-judge
+Group=skku-judge
+WorkingDirectory=/opt/skku-notice-platform
+Environment=PYTHONPATH=/opt/skku-notice-platform/src
+EnvironmentFile=/etc/skku-notice/worker.env
+# BYOK_MASTER_KEY는 root만 읽는 파일(0600)에 두고 systemd가 읽어 이 서비스의 환경으로만 넘긴다. 다른 워커의 환경 파일에 넣지 않는다.
+EnvironmentFile=/etc/skku-notice/byok.env
+RuntimeDirectory=skku-notice-canvas
+RuntimeDirectoryMode=0755
+ExecStart=/usr/bin/flock -n /run/skku-notice-canvas/canvas.lock /opt/skku-notice-judge/bin/python -m skku_notice.canvas_worker
+TimeoutStartSec=420
+MemoryMax=256M
+MemorySwapMax=256M
+CPUQuota=70%
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

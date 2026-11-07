@@ -37,6 +37,27 @@ class PushStore(NoticeStore):
             json={"status": status, "updated_at": now.isoformat()},
         )
 
+    def canvas_alerts(self) -> list[dict]:
+        return self._request(
+            "GET",
+            "user_canvas_alerts",
+            params={"select": "id,user_id,title,body,url,priority,attempts", "status": "in.(pending,failed)",
+                    "attempts": "lt.3", "order": "created_at.asc", "limit": "20"},
+        ).json()
+
+    def devices(self, user_id: str) -> list[dict]:
+        return self._request(
+            "GET",
+            "user_push_subscriptions",
+            params={"select": "id,endpoint,p256dh,auth_secret", "user_id": f"eq.{user_id}"},
+        ).json()
+
+    def mark_canvas(self, alert_id: int, status: str, attempts: int, now: datetime) -> None:
+        self._request(
+            "PATCH", "user_canvas_alerts", params={"id": f"eq.{alert_id}"},
+            json={"status": status, "attempts": attempts, "updated_at": now.isoformat()},
+        )
+
     def remove_expired(self, subscription_id: str, user_id: str) -> None:
         self._request(
             "DELETE",
@@ -143,6 +164,31 @@ def run_batch(store: PushStore, private_key: str, subject: str, now: datetime) -
     return counts
 
 
+def run_canvas_batch(store: PushStore, private_key: str, subject: str, now: datetime) -> dict[str, int]:
+    """Deliver queued iCampus alerts to the owner's own devices only."""
+    counts = {"canvas_sent": 0, "canvas_failed": 0}
+    for alert in store.canvas_alerts():
+        outcomes = []
+        for device in store.devices(alert["user_id"]):
+            keys = {"p256dh": device["p256dh"], "auth": device["auth_secret"]}
+            outcome = send_one(
+                {"endpoint": device["endpoint"], "keys": keys},
+                private_key, subject, title=alert["title"], body=alert["body"], url=alert["url"],
+                tag=f"canvas:{alert['id']}",
+            )
+            if outcome == "expired":
+                store.remove_expired(device["id"], alert["user_id"])
+            outcomes.append(outcome)
+        attempts = alert["attempts"] + 1
+        if "sent" in outcomes:
+            store.mark_canvas(alert["id"], "sent", attempts, now)
+            counts["canvas_sent"] += 1
+        else:
+            store.mark_canvas(alert["id"], "failed", attempts, now)
+            counts["canvas_failed"] += 1
+    return counts
+
+
 def main() -> int:
     private_key = os.environ.get("VAPID_PRIVATE_KEY", "")
     subject = os.environ.get("VAPID_SUBJECT", "")
@@ -151,7 +197,9 @@ def main() -> int:
         Vapid.from_string(private_key)
         store = PushStore(os.environ.get("SUPABASE_URL", ""), os.environ.get("SUPABASE_SECRET_KEY", ""))
         try:
-            counts = run_batch(store, private_key, subject, datetime.now(UTC))
+            now = datetime.now(UTC)
+            counts = run_batch(store, private_key, subject, now)
+            canvas = run_canvas_batch(store, private_key, subject, now)
         finally:
             store.close()
     except Exception:
@@ -159,7 +207,9 @@ def main() -> int:
         print("Push worker configuration or store error", flush=True)
         return 1
     print(
-        f"Push worker: sent={counts['sent']} expired={counts['expired']} retry={counts['retry']}", flush=True
+        f"Push worker: sent={counts['sent']} expired={counts['expired']} retry={counts['retry']} "
+        f"canvas_sent={canvas['canvas_sent']} canvas_failed={canvas['canvas_failed']}",
+        flush=True,
     )
     return int(counts["retry"] > 0)
 

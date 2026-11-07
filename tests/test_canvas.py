@@ -274,14 +274,45 @@ def test_quiz_resource_availability_controls_summary_count(monkeypatch, blocked)
         transport=httpx.MockTransport(respond), **kwargs,
     ))
     items = canvas.read_canvas("fixture-pat", NOW, gap=0)
-    count = 1 if blocked == "unavailable" else 2
+    # 퀴즈 목록 API를 쓸 수 없으면(403·404) 아이캠퍼스 플러스처럼 과제 필드만 보므로 세 개가 모두 남는다.
+    count = 3 if blocked == "unavailable" else 2
     assert len(items) == count
-    assert "아직 못 하는 퀴즈" not in [item.title for item in items]
-    assert ("지금 할 수 있는 퀴즈" in [item.title for item in items]) == (count == 2)
+    assert ("아직 못 하는 퀴즈" in [item.title for item in items]) == (blocked == "unavailable")
+    assert "지금 할 수 있는 퀴즈" in [item.title for item in items]
     alerts, _ = plan_alerts(items, CanvasState(initialized=True), NOW, [], time(18))
     assert len(alerts) == 1 and alerts[0].title == f"내일까지 마감 {count}개가 있어요"
     assert len(requests) == 3
     assert all(request.method == "GET" and request.url.path.startswith("/api/v1/") for request in requests)
+
+
+def test_missing_quiz_api_is_not_reported_as_incomplete(capsys) -> None:
+    """HTTP 404 on /quizzes is permanent for that course; it must not trigger the incomplete warning."""
+    class Lectures:
+        def read_modules(self, course_id, gap):
+            return []
+
+    def get(path):
+        if path.endswith("quizzes?per_page=100"):
+            raise canvas.CanvasError("Canvas HTTP 404")
+        return [{"id": 1, "name": "새 퀴즈", "due_at": "2026-11-03T12:00:00Z", "submission": {},
+                 "submission_types": ["external_tool"], "is_quiz_assignment": True}]
+
+    incomplete = []
+    items = canvas._read_courses([{"id": 101, "name": "테스트 과목"}], NOW, get, 0, True, Lectures(),
+                                 lambda: incomplete.append(True))
+    assert [item.title for item in items] == ["새 퀴즈"] and items[0].kind == "퀴즈"
+    assert incomplete == []
+    assert "퀴즈 조회 대기" not in capsys.readouterr().err
+
+    def flaky(path):
+        if path.endswith("quizzes?per_page=100"):
+            raise canvas.CanvasError("Canvas HTTP 500")
+        return get("assignments")
+
+    items = canvas._read_courses([{"id": 101, "name": "테스트 과목"}], NOW, flaky, 0, True, Lectures(),
+                                 lambda: incomplete.append(True))
+    assert items == [] and incomplete == [True]  # 일시적인 오류는 계속 불완전로 알린다
+    assert "퀴즈 조회 대기: Canvas HTTP 500" in capsys.readouterr().err
 
 
 def test_quiz_match_by_assignment_id_keeps_assignment_locks() -> None:
