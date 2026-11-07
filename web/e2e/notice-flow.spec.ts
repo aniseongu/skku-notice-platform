@@ -709,8 +709,10 @@ test('side menu scrollbar: absent when everything fits, thin when it overflows',
   expect(short.overflowing).toBe(true);
   expect(short.thin).toBe('thin');                              // 넘쳐도 막대는 얇은 모양이다(실제 두께는 웨일에서 확인)
   // 평소에는 막대 색이 투명하고, 마우스를 올리면 색이 생긴다.
+  await page.mouse.move(900, 200);                               // 포인터가 메뉴 위에 있으면 평소 모습을 잴 수 없다
   const rest = await sidebar.evaluate((el) => getComputedStyle(el).scrollbarColor);
   await sidebar.hover();
   const hover = await sidebar.evaluate((el) => getComputedStyle(el).scrollbarColor);
-  expect(rest).not.toBe(hover);
+  expect(rest).toContain('rgba(0, 0, 0, 0)');
+  expect(hover).not.toBe(rest);
 });
