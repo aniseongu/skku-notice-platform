@@ -32,7 +32,7 @@
 
 ## 시스템 아키텍처
 
-![성공 시스템 아키텍처: 공지 출처 → 서버의 타이머(수집, OCR, Gemini 판정, 아이캠퍼스 확인, 푸시 발송) → Supabase(PostgreSQL·Auth·Edge Function) → 웹앱과 기기 알림](assets/readme/architecture.svg)
+![성공 시스템 아키텍처: 공지 출처 → 서버의 타이머(수집, OCR, Gemini 판정, 아이캠퍼스 확인, 푸시 발송) → Supabase(PostgreSQL·Auth·Edge Function) → 웹앱과 기기 알림](assets/readme/system-architecture.svg)
 
 ## 기술 구성
 
