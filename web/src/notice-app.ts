@@ -16,6 +16,7 @@ import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from '.
 import './platform-settings';
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
+import { byokAvailable, EMPTY_PROFILE, loadByokStatus, loadJudgeProfile, registerByokKey, removeByokKey, saveJudgeProfile, type ByokStatus, type JudgeProfile } from './byok';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
 import './notice-rows';
 import './notice-detail';
@@ -119,6 +120,8 @@ export class NoticeApp extends LitElement {
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
+    byokOn: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true },
+    judgeProfile: { state: true }, profileMessage: { state: true },
     subscriptions: { state: true }, subscriptionsLoading: { state: true }, subscriptionsError: { state: true }, subscriptionsOnly: { state: true },
     preferencesLoading: { state: true }, preferencesError: { state: true }, preferencesUnavailable: { state: true },
     unreadOnly: { state: true }, selecting: { state: true }, selectedReads: { state: true },
@@ -142,6 +145,13 @@ export class NoticeApp extends LitElement {
   // 실패한 켜기 작업을 이어서 실행하기 위해 사용자와 epoch마다 하나만 보관한다.
   private pushChain: { chain: ReturnType<typeof createEnableChain>; userId: string; epoch: number } | null = null;
   pushRetry = false;
+  byokOn = false;
+  byokStatus: ByokStatus | null = null;
+  byokLoading = false;
+  byokBusy = false;
+  byokError = '';
+  judgeProfile: JudgeProfile = EMPTY_PROFILE;
+  profileMessage = '';
   authReady = !authClient;
   authEmail: string | null = null;
   authError = '';
@@ -201,6 +211,10 @@ export class NoticeApp extends LitElement {
     remember('notice-sort', this.sort);
     remember('intern-sort', this.internSort);
     applyTheme(this.theme);
+    void byokAvailable(import.meta.env.VITE_SUPABASE_URL).then((available) => {
+      this.byokOn = available;
+      if (available && this.authUserId) { this.byokLoading = true; void this.refreshByok(this.authUserId, this.subscriptionsEpoch); }
+    });
     if (authClient) {
       this.authSubscription = authClient.auth.onAuthStateChange((_event, session) => {
         const userId = session?.user.id ?? null;
@@ -208,6 +222,8 @@ export class NoticeApp extends LitElement {
           const previousUserId = this.authUserId;
           this.authUserId = userId;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
+          this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.judgeProfile = EMPTY_PROFILE; this.profileMessage = '';
+          this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
           if (staleChain) void staleChain.chain.discard();
           if (previousUserId) setTimeout(() => { void this.releasePush(previousUserId); }, 0);
@@ -218,7 +234,7 @@ export class NoticeApp extends LitElement {
           this.preferencesLoading = !!userId;
           this.preferencesError = '';
           this.preferencesUnavailable = false;
-          if (userId) setTimeout(() => { void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshPush(userId, epoch); void this.syncStates(); }, 0);
+          if (userId) setTimeout(() => { void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshPush(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); }, 0);
           setLocalOwner(userId);
           this.saved = loadSaved();
           this.keywords = loadKeywords();
@@ -463,6 +479,63 @@ export class NoticeApp extends LitElement {
     } catch {
       if (epoch === this.subscriptionsEpoch) this.showToast('저장과 읽음을 계정과 맞추지 못했어요. 잠시 뒤 이어서 시도할게요');
       else if (this.stateChain === current) this.stateChain = null;
+    }
+  }
+
+  private async refreshByok(userId: string, epoch: number): Promise<void> {
+    if (!authClient || !this.byokOn) { if (epoch === this.subscriptionsEpoch) this.byokLoading = false; return; }
+    try {
+      const [status, profile] = await Promise.all([loadByokStatus(authClient, userId), loadJudgeProfile(authClient, userId)]);
+      if (epoch !== this.subscriptionsEpoch) return;
+      this.byokStatus = status; this.judgeProfile = profile; this.byokError = '';
+    } catch {
+      if (epoch === this.subscriptionsEpoch) this.byokError = '키 정보를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.byokLoading = false;
+    }
+  }
+
+  // 키는 요청 한 번에만 쓰고 앱 상태에는 두지 않는다. 계정이 바뀌면 결과를 버린다.
+  private async registerKey(apiKey: string): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.byokBusy) return;
+    this.byokBusy = true; this.byokError = '';
+    try {
+      await registerByokKey(authClient, apiKey);
+      const status = await loadByokStatus(authClient, userId);
+      if (epoch === this.subscriptionsEpoch) this.byokStatus = status;
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) this.byokError = error instanceof Error ? error.message : '키를 저장하지 못했어요.';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.byokBusy = false;
+    }
+  }
+
+  private async removeKey(): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.byokBusy) return;
+    this.byokBusy = true; this.byokError = '';
+    try {
+      await removeByokKey(authClient);
+      if (epoch === this.subscriptionsEpoch) this.byokStatus = null;
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) this.byokError = error instanceof Error ? error.message : '키를 지우지 못했어요.';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.byokBusy = false;
+    }
+  }
+
+  private async saveProfile(profile: JudgeProfile): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.byokBusy) return;
+    this.byokBusy = true; this.byokError = ''; this.profileMessage = '';
+    try {
+      await saveJudgeProfile(authClient, userId, profile);
+      if (epoch === this.subscriptionsEpoch) { this.judgeProfile = profile; this.profileMessage = '저장했어요.'; }
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) this.byokError = error instanceof Error ? error.message : '저장하지 못했어요.';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.byokBusy = false;
     }
   }
 
@@ -898,6 +971,10 @@ export class NoticeApp extends LitElement {
             saveKeywords: (input: string) => { void this.saveKeywords(input); },
             signIn: () => { void this.signIn(); }, signOut: () => { void this.signOut(); },
             pushStatus: this.pushStatus, pushError: this.pushError, pushRetry: this.pushRetry,
+            byok: { available: this.byokOn, loading: this.byokLoading, busy: this.byokBusy, error: this.byokError, status: this.byokStatus,
+              profile: this.judgeProfile, profileMessage: this.profileMessage,
+              register: (apiKey: string) => { void this.registerKey(apiKey); }, remove: () => { void this.removeKey(); },
+              saveProfile: (profile: JudgeProfile) => { void this.saveProfile(profile); } },
             enablePush: () => { void this.enablePush(); }, disablePush: () => { void this.disablePush(); },
             toggle: (id: string, enabled: boolean) => { void this.toggleSubscription(id, enabled); },
             retry: () => {

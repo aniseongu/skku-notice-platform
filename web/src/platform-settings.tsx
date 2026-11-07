@@ -1,5 +1,6 @@
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useState } from 'react';
+import { ENROLLMENT, MILITARY, type ByokStatus, type JudgeProfile } from './byok';
 
 export interface SettingsModel {
   configured: boolean;
@@ -28,6 +29,55 @@ export interface SettingsModel {
   pushRetry?: boolean;
   enablePush: () => void;
   disablePush: () => void;
+  byok?: {
+    available: boolean;
+    loading: boolean;
+    busy: boolean;
+    error: string;
+    status: ByokStatus | null;
+    profile: JudgeProfile;
+    profileMessage: string;
+    register: (apiKey: string) => void;
+    remove: () => void;
+    saveProfile: (profile: JudgeProfile) => void;
+  };
+}
+
+function ByokSection({ byok }: { byok: NonNullable<SettingsModel['byok']> }) {
+  const [apiKey, setApiKey] = useState('');
+  const [profile, setProfile] = useState(byok.profile);
+  const profileKey = JSON.stringify(byok.profile);
+  useEffect(() => setProfile(byok.profile), [profileKey]);
+  // 등록이 끝나 상태가 생기면 입력란을 비운다. 키는 이 입력란 밖에 남기지 않는다.
+  useEffect(() => { if (byok.status) setApiKey(''); }, [byok.status?.keyHint]);
+  const numeric = (value: string) => value === '' ? null : Number(value);
+  return <>
+    <h2>인턴 공고 알림 (선택)</h2>
+    <p>링커리어와 자소설닷컴의 인턴 공고를 내 Gemini 키로 살펴보고, 나에게 맞는 공고만 알려드려요. 키가 없어도 다른 알림은 그대로예요.</p>
+    {byok.loading ? <p role="status">불러오고 있어요.</p> : byok.status
+      ? <><p>등록된 키 ····{byok.status.keyHint}{byok.status.disabled ? ' (사용 중지됨)' : ''}</p>
+        {byok.status.lastError ? <p role="alert">{byok.status.lastError}</p> : null}
+        <button className="ghost-button" disabled={byok.busy} onClick={() => byok.remove()}>키 지우기</button></>
+      : <>
+        <label>Gemini API 키<input type="password" autoComplete="off" spellCheck={false} aria-label="Gemini API 키" value={apiKey}
+          disabled={byok.busy} onChange={(event) => setApiKey(event.currentTarget.value.trim())} /></label>
+        <p>키는 암호화해 서버에만 저장하고, 나에게 맞는 공고를 고르는 데만 써요.</p>
+        <button className="solid-button" disabled={byok.busy || !apiKey} onClick={() => byok.register(apiKey)}>
+          {byok.busy ? '확인하고 있어요' : '키 등록하기'}</button></>}
+    {byok.error ? <p role="alert">{byok.error}</p> : null}
+    <h3>지원 자격 확인용 정보</h3>
+    <p>공고의 지원 자격을 판단할 때만 써요. 이름이나 학번은 받지 않아요.</p>
+    <label>학년<select aria-label="학년" value={profile.year ?? ''} onChange={(event) => setProfile({ ...profile, year: numeric(event.currentTarget.value) })}>
+      <option value="">선택 안 함</option>{[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}학년</option>)}</select></label>
+    <label>학기<select aria-label="학기" value={profile.semester ?? ''} onChange={(event) => setProfile({ ...profile, semester: numeric(event.currentTarget.value) })}>
+      <option value="">선택 안 함</option><option value="1">1학기</option><option value="2">2학기</option></select></label>
+    <label>재학 상태<select aria-label="재학 상태" value={profile.enrollmentStatus ?? ''} onChange={(event) => setProfile({ ...profile, enrollmentStatus: event.currentTarget.value || null })}>
+      <option value="">선택 안 함</option>{ENROLLMENT.map((v) => <option key={v} value={v}>{v}</option>)}</select></label>
+    <label>병역<select aria-label="병역" value={profile.militaryService ?? ''} onChange={(event) => setProfile({ ...profile, militaryService: event.currentTarget.value || null })}>
+      <option value="">선택 안 함</option>{MILITARY.map((v) => <option key={v} value={v}>{v}</option>)}</select></label>
+    <button className="ghost-button" disabled={byok.busy} onClick={() => byok.saveProfile(profile)}>정보 저장하기</button>
+    {byok.profileMessage ? <p role="status">{byok.profileMessage}</p> : null}
+  </>;
 }
 
 function PlatformSettings({ model }: { model: SettingsModel }) {
@@ -53,6 +103,7 @@ function PlatformSettings({ model }: { model: SettingsModel }) {
           <button className="solid-button" disabled={model.pushStatus !== 'off'} onClick={model.enablePush}>
             {model.pushStatus === 'off' ? (model.pushRetry ? '다시 시도하기' : '이 기기에서 알림 받기') : '확인하고 있어요'}</button></>}
       {model.pushError ? <p role="alert">{model.pushError}</p> : null}
+      {model.byok?.available ? <ByokSection byok={model.byok} /> : null}
       <h2>게시판 구독</h2>
       <p>알림을 받을 게시판을 선택해요.</p>
       <label><input type="checkbox" checked={model.subscriptionsOnly} disabled={model.loading || !!model.error}

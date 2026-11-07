@@ -99,3 +99,46 @@ test('push settings show each device state and call the click handlers', async (
   await screen.getByRole('button', { name: '다시 시도하기' }).click();
   expect(await calls()).toEqual(['on']);
 });
+
+test('Gemini key section registers once, never shows the key again and hides when unavailable', async ({ page }) => {
+  await page.goto('/?view=settings&api=sample/api/v1');
+  const screen = page.locator('platform-settings-screen');
+  await expect(screen.getByRole('heading', { name: '계정' })).toBeVisible();
+  const profile = { year: 3, semester: null, enrollmentStatus: '재학', militaryService: null };
+  const setModel = (byok: Record<string, unknown> | undefined) => page.evaluate((value) => {
+    const w = window as unknown as { byokCalls: unknown[] };
+    w.byokCalls = [];
+    const el = document.querySelector('platform-settings-screen') as HTMLElement & { model: unknown };
+    const record = (name: string) => (...args: unknown[]) => { w.byokCalls.push([name, ...args]); };
+    el.model = { configured: true, userId: 'account-a', email: null, authBusy: false, authError: '', sources: [], subscriptions: [], subscriptionsOnly: false, setSubscriptionsOnly() {}, loading: false, error: '', keywords: [], preferencesLoading: false, preferencesError: '', preferencesUnavailable: false, retryPreferences() {}, saveKeywords() {}, signIn() {}, signOut() {}, toggle() {}, retry() {},
+      pushStatus: 'off', pushError: '', enablePush() {}, disablePush() {},
+      byok: value ? { ...value, register: record('register'), remove: record('remove'), saveProfile: record('profile') } : undefined };
+  }, byok);
+  const base = { available: true, loading: false, busy: false, error: '', status: null, profile, profileMessage: '' };
+  await setModel(undefined);
+  await expect(screen.getByRole('heading', { name: '인턴 공고 알림 (선택)' })).toHaveCount(0);
+  await setModel({ ...base, available: false });
+  await expect(screen.getByRole('heading', { name: '인턴 공고 알림 (선택)' })).toHaveCount(0);
+  await setModel(base);
+  const button = screen.getByRole('button', { name: '키 등록하기' });
+  await expect(button).toBeDisabled();
+  const key = `AIza${'D'.repeat(35)}`;
+  const input = screen.getByLabel('Gemini API 키');
+  await expect(input).toHaveAttribute('type', 'password');
+  await input.fill(key);
+  await button.click();
+  expect(await page.evaluate(() => (window as unknown as { byokCalls: unknown[][] }).byokCalls)).toEqual([['register', key]]);
+  await expect(screen.getByLabel('학년')).toHaveValue('3');
+  await screen.getByLabel('학기').selectOption('2');
+  await screen.getByRole('button', { name: '정보 저장하기' }).click();
+  expect(await page.evaluate(() => (window as unknown as { byokCalls: unknown[][] }).byokCalls.at(-1)))
+    .toEqual(['profile', { year: 3, semester: 2, enrollmentStatus: '재학', militaryService: null }]);
+  await setModel({ ...base, status: { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 } });
+  await expect(screen.getByText('등록된 키 ····DDDD')).toBeVisible();
+  expect(await screen.innerText()).not.toContain(key);
+  await expect(screen.getByLabel('Gemini API 키')).toHaveCount(0);
+  await setModel({ ...base, status: { keyHint: 'DDDD', model: 'm', disabled: true, lastError: 'Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요.', usedToday: 0 } });
+  await expect(screen.getByRole('alert')).toContainText('다시 등록');
+  await screen.getByRole('button', { name: '키 지우기' }).click();
+  expect(await page.evaluate(() => (window as unknown as { byokCalls: unknown[][] }).byokCalls)).toEqual([['remove']]);
+});
