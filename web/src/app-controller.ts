@@ -17,7 +17,7 @@ import { connectionChain } from './connection-chain';
 import { composeSummaryTime, deleteDevice, loadDevices, loadSummaryTime, saveCanvasMode, saveSummaryTime, type CanvasMode, type Device } from './devices';
 import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from './my-notices';
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
-import { byokAvailable, loadByokStatus, loadCanvasStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
+import { byokAvailable, loadByokStatus, loadCanvasStatus, deleteMyAccount, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import type { Draft } from './onboarding-flow';
@@ -148,6 +148,7 @@ export class AppController extends Reactive {
     calendarId: { state: true }, calendarBusy: { state: true }, calendarMessage: { state: true }, calendarError: { state: true }, calendarSyncedAt: { state: true },
     myJudgments: { state: true }, myInterests: { state: true },
     devices: { state: true }, thisDeviceId: { state: true }, devicesBusy: { state: true }, devicesError: { state: true }, summaryTime: { state: true },
+    accountBusy: { state: true }, accountError: { state: true },
     summarizing: { state: true }, summaryError: { state: true }, summaryErrorId: { state: true },
     profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, profileError: { state: true }, settingsSection: { state: true },
     onboardingOpen: { state: true }, onboardingManual: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
@@ -200,6 +201,8 @@ export class AppController extends Reactive {
   devicesError = '';
   summaryTime: string | null = null;
   summarizing: string | null = null;
+  accountBusy = false;
+  accountError = '';
   summaryError = '';
   summaryErrorId: string | null = null;
   profile: UserProfile = EMPTY_PROFILE;
@@ -880,6 +883,23 @@ export class AppController extends Reactive {
       if (epoch === this.subscriptionsEpoch) this.calendarError = '연결을 끊지 못했어요. 잠시 뒤 다시 눌러 주세요';
     } finally {
       if (epoch === this.subscriptionsEpoch) this.calendarBusy = false;
+    }
+  }
+
+  /** 계정과 모든 정보를 지우고 이 기기에서도 로그아웃한다. 화면에서 두 번 확인한 뒤에만 부른다. */
+  async deleteAccount(): Promise<void> {
+    const userId = this.authUserId;
+    if (!authClient || !userId || this.accountBusy) return;
+    this.accountBusy = true; this.accountError = '';
+    try {
+      await deleteMyAccount(authClient);
+      await this.releasePush(userId);          // 이 기기의 알림 등록도 풀어 둔다
+      await authClient.auth.signOut({ scope: 'local' }).catch(() => undefined);
+      this.showToast('계정과 저장된 정보를 모두 지웠어요');
+    } catch (error) {
+      this.accountError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '계정을 지우지 못했어요. 잠시 뒤 다시 눌러 주세요.';
+    } finally {
+      this.accountBusy = false;
     }
   }
 

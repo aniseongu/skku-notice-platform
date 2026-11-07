@@ -752,3 +752,8 @@
     .group-head h2 { font-size: 14px; line-height: 20px; }
   }
 }
+
+@layer platform {
+  /* 되돌릴 수 없는 일(계정 지우기)의 확인 버튼은 위험 색으로 구분한다. */
+  .solid-button.danger { background: var(--danger); color: light-dark(oklch(0.99 0.005 25), oklch(0.2 0.03 25)); }
+}

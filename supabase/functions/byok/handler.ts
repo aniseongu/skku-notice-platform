@@ -24,6 +24,8 @@ const SUMMARY_MESSAGES: Record<SummaryFailure, [number, string]> = {
 export interface ByokDeps {
   /** 사용자의 Gemini 키로 공지 한 건을 요약해 저장하고 요약 글을 돌려준다. 실패는 SummaryError로 알린다. */
   summarize?: (userId: string, noticeId: string) => Promise<SummaryResult>;
+  /** 호출한 사용자의 계정을 지운다. 이 사용자의 모든 표 행이 함께 지워진다(on delete cascade). */
+  deleteAccount?: (userId: string) => Promise<void>;
   masterKey: CryptoKey;
   /** Returns the user id of a verified session token, or null. */
   userFromAuthorization: (authorization: string | null) => Promise<string | null>;
@@ -73,6 +75,11 @@ export async function handle(req: Request, deps: ByokDeps): Promise<Response> {
     if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) return reply(413, origin, { error: '요청이 너무 커요.' });
     let body: { apiKey?: unknown; model?: unknown; provider?: unknown; token?: unknown; action?: unknown; noticeId?: unknown };
     try { body = JSON.parse(text); } catch { return reply(400, origin, { error: '요청 형식을 확인해 주세요.' }); }
+    if (body.action === 'delete-account') {
+      if (!deps.deleteAccount) return reply(400, origin, { error: '요청 형식을 확인해 주세요.' });
+      try { await deps.deleteAccount(userId); } catch { return reply(500, origin, { error: '계정을 지우지 못했어요. 잠시 뒤 다시 눌러 주세요.' }); }
+      return reply(200, origin, { ok: true });
+    }
     if (body.action === 'summarize') {
       if (!deps.summarize || typeof body.noticeId !== 'string' || !NOTICE_ID.test(body.noticeId)) return reply(400, origin, { error: '요청 형식을 확인해 주세요.' });
       try { return reply(200, origin, { ok: true, ...(await deps.summarize(userId, body.noticeId)) }); }

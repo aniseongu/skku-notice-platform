@@ -147,3 +147,20 @@ test('summarize runs with the caller identity only, validates the notice id and 
   assert.equal(crashed.status, 502);
   assert.ok(!JSON.stringify(await crashed.json()).includes('AIza'));
 });
+
+test('delete-account removes only the caller account, needs a login and never accepts another id', async () => {
+  const masterKey = await importMasterKey(MASTER);
+  const deleted = [];
+  const deps = { masterKey, userFromAuthorization: async (a) => (a === 'Bearer good' ? 'user-a' : null), deleteAccount: async (id) => { deleted.push(id); } };
+  const call = (body, auth = 'Bearer good') => handle(new Request('https://x/byok', { method: 'POST', headers: { Origin: ORIGIN, ...(auth ? { Authorization: auth } : {}) }, body: JSON.stringify(body) }), deps);
+  assert.equal((await call({ action: 'delete-account' }, null)).status, 401);
+  assert.equal(deleted.length, 0);
+  // 본문에 다른 사용자 번호를 넣어도 지워지는 것은 로그인한 본인뿐이다.
+  const ok = await call({ action: 'delete-account', userId: 'user-b', id: 'user-b' });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(deleted, ['user-a']);
+  const failing = await handle(new Request('https://x/byok', { method: 'POST', headers: { Origin: ORIGIN, Authorization: 'Bearer good' }, body: JSON.stringify({ action: 'delete-account' }) }),
+    { ...deps, deleteAccount: async () => { throw new Error('boom'); } });
+  assert.equal(failing.status, 500);
+  assert.match(JSON.stringify(await failing.json()), /계정을 지우지 못했어요/);
+});

@@ -56,6 +56,7 @@ export interface SettingsModel {
   profileError: string;
   saveProfile: (profile: UserProfile) => void;
   openOnboarding: () => void;
+  account?: { busy: boolean; error: string; remove: () => void };
   devicesInfo?: {
     devices: Device[];
     thisId: string | null;
@@ -168,6 +169,7 @@ function Overview({ model }: { model: SettingsModel }) {
         </div>
         <SettingsLink model={model} label="프로필 설정" help={profileSummary(model.profile)} section="profile" />
         <SettingsLink model={model} label="연결 키" help="Gemini 키와 아이캠퍼스 토큰" section="keys" />
+        <DeleteAccount model={model} />
         <Setting name="로그아웃" help="이 기기에서만 나가요. 구독과 저장은 계정에 남아요">
           <button type="button" className="ghost-button" disabled={model.authBusy} onClick={model.signOut}>이 기기에서 로그아웃</button>
           {model.authError ? <p className="field-note error" role="alert">{model.authError}</p> : null}
@@ -186,6 +188,9 @@ function Overview({ model }: { model: SettingsModel }) {
         <Choice label="목록 보기" value={model.subscriptionsOnly ? 'mine' : 'all'} disabled={model.loading || !!model.error}
           options={[['all', '모든 게시판'], ['mine', '받는 게시판만']]} onPick={(value) => model.setSubscriptionsOnly(value === 'mine')} />
       </Setting> : null}
+      <Setting name="개인정보 처리방침" help="어떤 정보를 어디에 쓰고 어떻게 지우는지 알려 드려요">
+        <a className="settings-link inline-link" href="privacy.html" target="_blank" rel="noopener">처리방침 보기</a>
+      </Setting>
       {model.canInstall ? <Setting name="앱 설치" help="바탕화면이나 홈 화면에서 바로 열어요">
         <button type="button" className="ghost-button" onClick={model.install}>앱으로 설치하기</button>
       </Setting> : null}
@@ -260,6 +265,23 @@ function SummaryTime({ info }: { info: NonNullable<SettingsModel['devicesInfo']>
         onChange={(event) => setMinute(event.currentTarget.value)} onBlur={() => commit(period, hour, minute)} /><span>분</span>
     </div>
   </div>;
+}
+
+/** 계정 지우기: 되돌릴 수 없어서 한 번 더 확인한다. 버튼 이름으로 무엇이 지워지는지 먼저 알려 준다. */
+function DeleteAccount({ model }: { model: SettingsModel }) {
+  const account = model.account;
+  const [confirming, setConfirming] = useState(false);
+  if (!account) return null;
+  return <Setting name="계정 지우기" help="계정과 구독, 키워드, 저장한 공지, 프로필, 연결한 키와 토큰을 모두 지워요. 되돌릴 수 없어요">
+    {confirming ? <>
+      <p className="field-note error" role="alert">정말 지울까요? 지운 정보는 다시 가져올 수 없어요</p>
+      <div className="inline">
+        <button type="button" className="solid-button danger" disabled={account.busy} onClick={account.remove}>{account.busy ? '지우고 있어요' : '네, 모두 지울게요'}</button>
+        <button type="button" className="ghost-button" disabled={account.busy} onClick={() => setConfirming(false)}>그만둘게요</button>
+      </div>
+    </> : <button type="button" className="ghost-button" onClick={() => setConfirming(true)}>계정 지우기</button>}
+    {account.error ? <p className="field-note error" role="alert">{account.error}</p> : null}
+  </Setting>;
 }
 
 function Notifications({ model }: { model: SettingsModel }) {

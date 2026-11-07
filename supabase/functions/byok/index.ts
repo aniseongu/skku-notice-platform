@@ -26,6 +26,10 @@ const DAILY_CALLS = 60;
 
 Deno.serve((req) => handle(req, {
   masterKey,
+  async deleteAccount(userId) {
+    const { error } = await service.auth.admin.deleteUser(userId);
+    if (error) throw error;
+  },
   async summarize(userId, noticeId) {
     const { data: key } = await service.from('user_byok_keys').select('ciphertext,model,disabled_at,used_on,used_today').eq('user_id', userId).maybeSingle();
     if (!key || key.disabled_at) throw new SummaryError('no_key');

@@ -976,3 +976,22 @@ test('date headers are told apart from notice rows, show how many notices follow
   expect(gap).not.toBeNull();
   expect(gap!).toBeLessThanOrEqual(1.5);
 });
+
+test('delete account needs two steps, says what goes away, and shows a failure with the next action', async ({ page }) => {
+  await settingsAt(page);
+  const screen = page.locator('platform-settings-screen');
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, deleteAccount: 'fn:delete' });
+  const row = screen.locator('.setting', { hasText: '계정 지우기' });
+  await expect(row).toContainText('구독, 키워드, 저장한 공지, 프로필, 연결한 키와 토큰');
+  await expect(row).toContainText('되돌릴 수 없어요');
+  await row.getByRole('button', { name: '계정 지우기' }).click();                    // 1단계: 확인 문구만 나온다
+  expect(await calls(page)).toEqual([]);
+  await expect(row.getByRole('alert')).toContainText('정말 지울까요');
+  await row.getByRole('button', { name: '그만둘게요' }).click();                       // 그만두면 아무 일도 없다
+  expect(await calls(page)).toEqual([]);
+  await row.getByRole('button', { name: '계정 지우기' }).click();
+  await row.getByRole('button', { name: '네, 모두 지울게요' }).click();                // 2단계: 실제로 지운다
+  expect(await calls(page)).toEqual([['delete']]);
+  await withApp(page, { accountError: '계정을 지우지 못했어요. 잠시 뒤 다시 눌러 주세요.' });
+  await expect(row.getByRole('alert').last()).toContainText('다시 눌러 주세요');
+});

@@ -104,6 +104,12 @@ export async function loadMyNoticeInfo(client: SupabaseClient, userId: string, n
   return { summary: clean(m?.summary) ?? clean(j?.summary), deadline, deadlineKind, ai };
 }
 
+/** 내 계정과 거기 딸린 모든 정보(구독, 키워드, 저장·읽음, 프로필, 암호화한 키와 토큰, 알림 기기)를 지운다. 되돌릴 수 없다. */
+export async function deleteMyAccount(client: SupabaseClient): Promise<void> {
+  const { error } = await client.functions.invoke('byok', { method: 'POST', body: { action: 'delete-account' } });
+  if (error) throw await failure(error, '계정을 지우지 못했어요. 잠시 뒤 다시 눌러 주세요.');
+}
+
 /** 공지 한 건의 요약과 마감을 내 키로 지금 만든다. 서버가 키를 풀어 Gemini에 보내고 결과를 저장한다. */
 export async function requestNoticeSummary(client: SupabaseClient, noticeId: string): Promise<Pick<MyNoticeInfo, 'summary' | 'deadline' | 'deadlineKind'>> {
   const { data, error } = await client.functions.invoke('byok', { method: 'POST', body: { action: 'summarize', noticeId } });
