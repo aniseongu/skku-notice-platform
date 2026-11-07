@@ -15,7 +15,7 @@ import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from '.
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
-import { byokAvailable, loadByokStatus, loadCanvasStatus, loadNoticeSummary, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
+import { byokAvailable, loadByokStatus, loadCanvasStatus, loadNoticeSummary, requestNoticeSummary, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import type { Draft } from './onboarding-flow';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
@@ -143,6 +143,7 @@ export class AppController extends Reactive {
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, authName: { state: true }, authAvatar: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
     byokOn: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true }, canvasStatus: { state: true }, canvasBusy: { state: true }, canvasError: { state: true },
     calendarId: { state: true }, calendarBusy: { state: true }, calendarMessage: { state: true }, calendarError: { state: true }, calendarSyncedAt: { state: true },
+    summarizing: { state: true }, summaryError: { state: true },
     profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, profileError: { state: true }, settingsSection: { state: true },
     onboardingOpen: { state: true }, onboardingManual: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
     keywordNote: { state: true },
@@ -183,6 +184,9 @@ export class AppController extends Reactive {
   calendarMessage = '';
   calendarError = '';
   calendarSyncedAt: string | null = null;
+  /** 요약을 만드는 중인 공지 id와 마지막 오류 */
+  summarizing: string | null = null;
+  summaryError = '';
   profile: UserProfile = EMPTY_PROFILE;
   profileStatus: 'idle' | 'loading' | 'ready' | 'unavailable' = 'idle';
   profileMessage = '';
@@ -269,7 +273,7 @@ export class AppController extends Reactive {
           const previousUserId = this.authUserId;
           this.authUserId = userId;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.summaries = new Map(); this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.summaries = new Map(); this.summarizing = null; this.summaryError = ''; this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -1047,6 +1051,17 @@ export class AppController extends Reactive {
     window.scrollTo({ top: 0 });
   }
 
+  /** 사이드바의 "설정": 다른 화면이면 설정 첫 쪽을 열고, 설정의 하위 쪽이면 첫 쪽으로 돌아온다. 첫 쪽이면 그대로 둔다. */
+  openSettingsHome = () => {
+    if (this.view !== 'settings') { this.setView('settings'); return; }
+    if (!this.settingsSection) return;
+    const depth = this.settingsDepth();
+    if (depth > 1) { history.go(-(depth - 1)); return; }
+    history.replaceState({ view: 'settings', depth: 1 }, '', this.settingsUrl(null));
+    this.settingsSection = null;
+    window.scrollTo({ top: 0 });
+  };
+
   /** 어느 화면에서든 설정의 해당 쪽으로 바로 간다(키워드 관리하기, 게시판 고르기 같은 단축). */
   openSettings(section: string | null) {
     if (this.view === 'settings') { this.openSettingsSection(section); return; }
@@ -1232,6 +1247,22 @@ export class AppController extends Reactive {
       this.requestUpdate();
     });
     return null;
+  }
+
+  /** 상세 화면의 "요약 만들기". 내 Gemini 키가 있어야 하고, 만든 요약은 저장돼서 다시 만들지 않는다. */
+  async makeSummary(notice: Notice): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.summarizing) return;
+    this.summarizing = notice.id; this.summaryError = '';
+    try {
+      const text = await requestNoticeSummary(authClient, notice.id);
+      if (epoch !== this.subscriptionsEpoch) return;
+      this.summaries.set(notice.id, text);
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) this.summaryError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '요약을 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.summarizing = null;
+    }
   }
 
   body(notice: Notice): NoticeBody | null | 'loading' {

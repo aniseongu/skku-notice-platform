@@ -9,6 +9,11 @@ export interface NoticeDetailModel {
   body: NoticeBody | null | 'loading';
   /** 내 Gemini 키로 만든 요약(없으면 null) */
   mySummary?: string | null;
+  /** 내 Gemini 키가 있어서 "요약 만들기"를 보일 수 있는지 */
+  summaryAvailable?: boolean;
+  summarizing?: boolean;
+  summaryError?: string;
+  makeSummary?: () => void;
   interests: string[];
   ai: { verdict: Verdict; reason: string } | null;
   rule: string | null;
@@ -62,6 +67,10 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
     {summary ? <section className="detail-section summary callout" aria-labelledby="sec-summary">
       <h3 id="sec-summary">요약 <span className="tag">{model.mySummary ? '내 Gemini' : 'AI'}</span></h3>
       {summary.split('\n').filter(Boolean).map((line, index) => <p key={index}>{line}</p>)}</section>
+      : model.summaryAvailable && model.makeSummary ? <section className="detail-section" aria-labelledby="sec-summary">
+        <h3 id="sec-summary">요약</h3>
+        <button type="button" className="ghost-button" disabled={model.summarizing} onClick={model.makeSummary}>{model.summarizing ? '요약을 만들고 있어요' : '내 Gemini로 요약 만들기'}</button>
+        {model.summaryError ? <p className="field-note error" role="alert">{model.summaryError}</p> : null}</section>
       : loaded?.summary_status === 'failed' ? <section className="detail-section" aria-labelledby="sec-summary"><h3 id="sec-summary">요약</h3><p className="detail-note first" role="status">요약을 만들지 못했어요. 나중에 다시 만들어 볼게요</p></section> : null}
     {body === 'loading' ? <p className="detail-note">본문을 불러오고 있어요</p> : !loaded ? <><p className="detail-note" role="status">본문을 불러오지 못했어요. 다시 불러오거나 원문을 확인해 주세요</p><button type="button" className="text-button" onClick={model.retry}>본문 다시 불러오기</button></>
       : loaded.translation?.body ? <><section className="detail-section body-text" aria-label="한국어로 옮긴 본문"><h3>본문 (한국어로 옮긴 글)</h3><p className="detail-note first">Gemini 번역이에요. 정확한 내용은 아래 영어 원문을 확인해 주세요</p>{loaded.translation.body.split(/\n+/).filter(Boolean).map((para, index) => <p key={index}>{para}</p>)}</section><div className="original-body" lang="en"><Body body={loaded} heading="영어 원문" /></div></> : <Body body={loaded} />}

@@ -40,3 +40,25 @@ test('availability probe needs a 204 from the function and treats network errors
 test('client accepts the AQ. key format', () => {
   assert.equal(looksLikeGeminiKey(`AQ.Ab8RN6J${'x'.repeat(40)}`), true);
 });
+
+import { loadNoticeSummary } from '../src/byok.ts';
+
+function summaryClient(tables) {
+  const queries = [];
+  return { queries, from: (table) => {
+    const state = { table };
+    const chain = { select: () => chain, eq: (column, value) => { (state.eq ??= {})[column] = value; return chain; },
+      maybeSingle: async () => { queries.push({ table, eq: state.eq }); return { data: tables[table] ?? null, error: null }; } };
+    return chain;
+  } };
+}
+
+test('summary lookup prefers the one I asked for, falls back to the judgment summary, and always filters by my user', async () => {
+  const asked = summaryClient({ user_notice_summaries: { summary: '눌러서 만든 요약' }, user_notice_judgments: { summary: '판정 요약' } });
+  assert.equal(await loadNoticeSummary(asked, 'user-a', 'a/1'), '눌러서 만든 요약');
+  assert.deepEqual(asked.queries[0].eq, { user_id: 'user-a', notice_id: 'a/1' });
+  const judged = summaryClient({ user_notice_judgments: { summary: '판정 요약' } });
+  assert.equal(await loadNoticeSummary(judged, 'user-a', 'a/1'), '판정 요약');
+  assert.equal(await loadNoticeSummary(summaryClient({}), 'user-a', 'a/1'), null);
+  assert.equal(await loadNoticeSummary(summaryClient({ user_notice_summaries: { summary: '   ' } }), 'user-a', 'a/1'), null);
+});

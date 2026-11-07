@@ -39,12 +39,23 @@ export async function removeCanvasToken(client: SupabaseClient): Promise<void> {
   if (error) throw await failure(error, '토큰을 지우지 못했어요. 잠시 뒤 다시 시도해 주세요.');
 }
 
-/** 내 Gemini 키로 만든 공지 요약(본인 행만 읽힌다). 없으면 null. */
+/** 내 Gemini 키로 만든 공지 요약(본인 행만 읽힌다). 눌러서 만든 요약을 먼저 보고, 없으면 판정할 때 같이 만든 요약을 본다. 없으면 null. */
 export async function loadNoticeSummary(client: SupabaseClient, userId: string, noticeId: string): Promise<string | null> {
-  const { data, error } = await client.from('user_notice_judgments').select('summary')
-    .eq('user_id', userId).eq('notice_id', noticeId).maybeSingle();
-  if (error) throw error;
-  return typeof data?.summary === 'string' && data.summary.trim() ? data.summary : null;
+  const requested = await client.from('user_notice_summaries').select('summary').eq('user_id', userId).eq('notice_id', noticeId).maybeSingle();
+  if (requested.error) throw requested.error;
+  if (typeof requested.data?.summary === 'string' && requested.data.summary.trim()) return requested.data.summary;
+  const judged = await client.from('user_notice_judgments').select('summary').eq('user_id', userId).eq('notice_id', noticeId).maybeSingle();
+  if (judged.error) throw judged.error;
+  return typeof judged.data?.summary === 'string' && judged.data.summary.trim() ? judged.data.summary : null;
+}
+
+/** 공지 한 건의 요약을 내 키로 지금 만든다. 서버가 키를 풀어 Gemini에 보내고 결과를 저장한다. */
+export async function requestNoticeSummary(client: SupabaseClient, noticeId: string): Promise<string> {
+  const { data, error } = await client.functions.invoke('byok', { method: 'POST', body: { action: 'summarize', noticeId } });
+  if (error) throw await failure(error, '요약을 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.');
+  const summary = (data as { summary?: unknown } | null)?.summary;
+  if (typeof summary !== 'string' || !summary.trim()) throw new Error('요약을 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.');
+  return summary;
 }
 
 /** 암호문 열은 브라우저가 읽을 수 없으므로 상태 열만 고른다. */

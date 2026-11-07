@@ -114,3 +114,36 @@ test('stores an AQ. key and shows a table-safe last four characters', async () =
   assert.equal(body.keyHint, 'xx_z');
   assert.equal(await decryptApiKey(t.masterKey, 'user-a', t.saved[0].ciphertext), key);
 });
+
+import { SummaryError } from '../../supabase/functions/byok/handler.ts';
+
+test('summarize runs with the caller identity only, validates the notice id and maps failures to plain messages', async () => {
+  const masterKey = await importMasterKey(MASTER);
+  const asked = [];
+  const make = (summarize) => ({ masterKey, userFromAuthorization: async (a) => (a === 'Bearer good' ? 'user-a' : null), summarize });
+  const call = (deps, body, auth = 'Bearer good') => handle(new Request('https://x/byok', {
+    method: 'POST', headers: { Origin: ORIGIN, ...(auth ? { Authorization: auth } : {}) }, body: JSON.stringify(body) }), deps);
+  const ok = make(async (user, notice) => { asked.push([user, notice]); return '12월 5일까지 내요.'; });
+  const response = await call(ok, { action: 'summarize', noticeId: 'skku-notice01/12345' });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, summary: '12월 5일까지 내요.' });
+  assert.deepEqual(asked, [['user-a', 'skku-notice01/12345']]);
+  assert.equal((await call(ok, { action: 'summarize', noticeId: 'skku-notice01/12345' }, null)).status, 401);
+  for (const noticeId of ['../etc/passwd', 'a/b', 'x'.repeat(100) + '/1', 42, undefined]) {
+    assert.equal((await call(ok, { action: 'summarize', noticeId })).status, 400, String(noticeId));
+  }
+  assert.equal(asked.length, 1, 'bad ids never reach the summarizer');
+  const failures = { no_key: 409, not_found: 404, limit: 429, rejected: 400, busy: 429, error: 502 };
+  for (const [code, status] of Object.entries(failures)) {
+    const failing = make(async () => { throw new SummaryError(code); });
+    const r = await call(failing, { action: 'summarize', noticeId: 'a/1' });
+    assert.equal(r.status, status, code);
+    const text = JSON.stringify(await r.json());
+    assert.match(text, /[가-힣]/);
+    assert.ok(!text.includes('AIza'));
+  }
+  const crashing = make(async () => { throw new Error('boom AIza' + 'X'.repeat(35)); });
+  const crashed = await call(crashing, { action: 'summarize', noticeId: 'a/1' });
+  assert.equal(crashed.status, 502);
+  assert.ok(!JSON.stringify(await crashed.json()).includes('AIza'));
+});

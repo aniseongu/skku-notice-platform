@@ -5,7 +5,24 @@ const MODEL_PATTERN = /^[a-z0-9.-]{3,60}$/;
 export const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
 const MAX_BODY_BYTES = 2048;
 
+export type SummaryFailure = 'no_key' | 'not_found' | 'limit' | 'rejected' | 'busy' | 'error';
+export class SummaryError extends Error {
+  code: SummaryFailure;
+  constructor(code: SummaryFailure) { super(code); this.code = code; }
+}
+const NOTICE_ID = /^[\w-]{1,60}\/\d{1,12}$/;
+const SUMMARY_MESSAGES: Record<SummaryFailure, [number, string]> = {
+  no_key: [409, '먼저 설정의 연결 키에서 Gemini 키를 넣어 주세요.'],
+  not_found: [404, '이 공지를 찾지 못했어요.'],
+  limit: [429, '오늘 쓸 수 있는 요약을 모두 썼어요. 내일 다시 눌러 주세요.'],
+  rejected: [400, 'Gemini가 이 키를 받아 주지 않아요. 설정에서 키를 다시 넣어 주세요.'],
+  busy: [429, 'Gemini 사용 한도를 넘었어요. 잠시 뒤 다시 눌러 주세요.'],
+  error: [502, '지금은 요약을 만들 수 없어요. 잠시 뒤 다시 눌러 주세요.'],
+};
+
 export interface ByokDeps {
+  /** 사용자의 Gemini 키로 공지 한 건을 요약해 저장하고 요약 글을 돌려준다. 실패는 SummaryError로 알린다. */
+  summarize?: (userId: string, noticeId: string) => Promise<string>;
   masterKey: CryptoKey;
   /** Returns the user id of a verified session token, or null. */
   userFromAuthorization: (authorization: string | null) => Promise<string | null>;
@@ -53,8 +70,16 @@ export async function handle(req: Request, deps: ByokDeps): Promise<Response> {
     }
     const text = await req.text();
     if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) return reply(413, origin, { error: '요청이 너무 커요.' });
-    let body: { apiKey?: unknown; model?: unknown; provider?: unknown; token?: unknown };
+    let body: { apiKey?: unknown; model?: unknown; provider?: unknown; token?: unknown; action?: unknown; noticeId?: unknown };
     try { body = JSON.parse(text); } catch { return reply(400, origin, { error: '요청 형식을 확인해 주세요.' }); }
+    if (body.action === 'summarize') {
+      if (!deps.summarize || typeof body.noticeId !== 'string' || !NOTICE_ID.test(body.noticeId)) return reply(400, origin, { error: '요청 형식을 확인해 주세요.' });
+      try { return reply(200, origin, { ok: true, summary: await deps.summarize(userId, body.noticeId) }); }
+      catch (error) {
+        const [status, message] = SUMMARY_MESSAGES[error instanceof SummaryError ? error.code : 'error'];
+        return reply(status, origin, { error: message });
+      }
+    }
     if (body.provider === 'canvas') {
       if (!looksLikeCanvasToken(body.token)) return reply(400, origin, { error: '아이캠퍼스 토큰 형식이 맞지 않아요.' });
       const result = await deps.verifyCanvasToken(body.token);

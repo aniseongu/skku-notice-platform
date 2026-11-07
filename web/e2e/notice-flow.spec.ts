@@ -569,27 +569,46 @@ test('account shows an icon, name and email and leads to profile settings where 
   await expect(interests).toBeDisabled();
 });
 
-test('the main screen shows a profile icon: a silhouette when signed out, and it leads to profile settings when signed in', async ({ page }, testInfo) => {
+test('the side menu has no profile entry; the profile lives inside settings, and the menu item always leads to the settings home', async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === 'mobile';
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
   await page.waitForLoadState('networkidle');
-  const chip = mobile ? page.locator('.avatar-button .avatar') : page.locator('.side-profile .avatar');
-  await expect(chip).toBeVisible();
-  await expect(chip.locator('svg')).toBeVisible();                          // 사진이 없으면 기본 실루엣
+  // 왼쪽 메뉴와 모바일 상단에는 프로필 항목이 없다.
+  await expect(page.locator('.side-profile, .avatar-button')).toHaveCount(0);
   await page.evaluate(() => {
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
     app.authUserId = 'account-a'; app.authName = '홍길동'; app.authEmail = 'a@skku.edu';
     app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: 'x', interests: '', wants: '', avoids: '' };
-    app.profileStatus = 'ready';
+    app.profileStatus = 'ready'; app.onboardingDismissed = true;
   });
-  if (!mobile) await expect(page.locator('.side-profile')).toContainText('홍길동');
-  await (mobile ? page.getByRole('button', { name: '프로필 설정' }) : page.locator('.side-profile')).click();
+  const screen = page.locator('platform-settings-screen');
+  const menu = () => (mobile ? page.getByRole('button', { name: '설정', exact: true }) : page.locator('.side-foot .side-item'));
+  await menu().click();
+  // 설정 안의 계정 줄에 아이콘과 이름, 프로필 설정이 있다.
+  await expect(screen.locator('.account-row .avatar svg')).toBeVisible();
+  await expect(screen.locator('.account-row')).toContainText('홍길동');
+  await screen.getByRole('link', { name: /프로필 설정/ }).first().click();
   await expect(page).toHaveURL(/section=profile/);
+  await expect(screen.getByRole('heading', { name: '학교 정보' })).toBeVisible();
+  if (!mobile) {
+    // 프로필 설정 쪽에서 왼쪽 "설정"을 누르면 설정 첫 쪽으로 돌아온다(예전에는 아무 일도 없었다).
+    await menu().click();
+    await expect(page).not.toHaveURL(/section=/);
+    await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
+    // 첫 쪽에서 한 번 더 눌러도 그대로다.
+    await menu().click();
+    await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
+    // 여러 쪽을 거쳐도 한 번에 첫 쪽으로 온다.
+    await screen.getByRole('link', { name: /알림/ }).first().click();
+    await screen.getByRole('link', { name: '설정으로' }).click();
+    await screen.getByRole('link', { name: /프로필 설정/ }).first().click();
+    await menu().click();
+    await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
+    await expect(page).not.toHaveURL(/section=/);
+  }
 });
 
-// 클릭 수와 순서: 설정 첫 쪽에서 시작해 핵심 작업을 끝내는 데 필요한 클릭을 세고, 상한을 넘으면 실패한다.
-// 상한은 "첫 쪽 → 하위 쪽(1) → 입력을 여는 버튼 → 저장" 구조에서 더 줄일 수 없는 최소값이다.
 test('core settings tasks finish within their click budget and in the expected order', async ({ page }) => {
   await settingsAt(page);
   const screen = page.locator('platform-settings-screen');
