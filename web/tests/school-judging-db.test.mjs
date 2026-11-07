@@ -112,3 +112,35 @@ test('translation queue finds English notices for the key owner and stops after 
     assert.deepEqual((await db.query(`select notice_id from public.list_byok_pending_translation('${A}', 3)`)).rows, []);
   } finally { await db.close(); }
 });
+
+test('my_notice_interests lists only my own keyword hits on my boards and is closed to anonymous callers', async () => {
+  const db = new PGlite();
+  try {
+    await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
+      create schema auth; create table auth.users(id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as $$
+        select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+      grant usage on schema auth to authenticated; insert into auth.users values ('${A}'), ('${B}');`);
+    for (const name of ['20261107030000_public_notices.sql', '20261107031000_notice_changes.sql', '20261107040000_user_subscriptions.sql',
+      '20261107050000_user_notice_states.sql', '20261107060000_user_preferences.sql', '20261107070000_public_ocr_cache.sql',
+      '20261107080000_push_subscriptions.sql', '20261107081000_push_claims.sql', '20261107082000_push_candidates.sql',
+      '20261107100000_push_silent_priority.sql', '20261107101000_push_original_content.sql', '20261108230000_my_notice_interests.sql']) {
+      await db.exec(await readFile(new URL(`../../supabase/migrations/${name}`, import.meta.url), 'utf8'));
+    }
+    await db.exec(`insert into platform_sources(id,name,url) values ('s1','학교','https://www.skku.edu/n'), ('s2','학과','https://cse.skku.edu/n');
+      insert into user_source_subscriptions(user_id,source_id) values ('${A}','s1'), ('${B}','s2');
+      insert into user_preferences(user_id,keywords) values ('${A}', array['장학','공모전']), ('${B}', array['인턴']);
+      insert into platform_notices(id,source_id,article_no,title,url,posted_on,first_seen,body) values
+        ('s1/1','s1','1','교내 안내','https://www.skku.edu/1',current_date,now(),'장학금 신청 안내'),
+        ('s1/2','s1','2','다른 안내','https://www.skku.edu/2',current_date,now(),'관련 없는 내용'),
+        ('s2/1','s2','1','인턴 모집','https://cse.skku.edu/1',current_date,now(),'장학 인턴');`);
+    await db.exec(`set role authenticated; set request.jwt.claim.sub = '${A}'`);
+    const mine = (await db.query('select notice_id, words from public.my_notice_interests()')).rows;
+    assert.deepEqual(mine.map((r) => [r.notice_id, r.words]), [['s1/1', ['장학']]], 'A sees only A keywords on A boards');
+    await db.exec(`set request.jwt.claim.sub = '${B}'`);
+    const theirs = (await db.query('select notice_id, words from public.my_notice_interests()')).rows;
+    assert.deepEqual(theirs.map((r) => [r.notice_id, r.words]), [['s2/1', ['인턴']]]);
+    await db.exec('reset role; set role anon; reset request.jwt.claim.sub');
+    await assert.rejects(db.exec('select * from public.my_notice_interests()'), /permission denied/);
+  } finally { await db.close(); }
+});

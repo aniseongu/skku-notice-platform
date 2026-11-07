@@ -14,6 +14,7 @@ import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from './preferences';
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
+import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from './my-notices';
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
 import { byokAvailable, loadByokStatus, loadCanvasStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
@@ -144,6 +145,7 @@ export class AppController extends Reactive {
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, authName: { state: true }, authAvatar: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
     byokOn: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true }, canvasStatus: { state: true }, canvasBusy: { state: true }, canvasError: { state: true },
     calendarId: { state: true }, calendarBusy: { state: true }, calendarMessage: { state: true }, calendarError: { state: true }, calendarSyncedAt: { state: true },
+    myJudgments: { state: true }, myInterests: { state: true },
     summarizing: { state: true }, summaryError: { state: true }, summaryErrorId: { state: true },
     profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, profileError: { state: true }, settingsSection: { state: true },
     onboardingOpen: { state: true }, onboardingManual: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
@@ -186,6 +188,9 @@ export class AppController extends Reactive {
   calendarError = '';
   calendarSyncedAt: string | null = null;
   /** 요약을 만드는 중인 공지 id와 마지막 오류 */
+  /** 내 Gemini 키로 매긴 판정과 서버가 찾아 준 관심 키워드(원본의 matched.json 자리) */
+  myJudgments = new Map<string, MyJudgment>();
+  myInterests = new Map<string, string[]>();
   summarizing: string | null = null;
   summaryError = '';
   summaryErrorId: string | null = null;
@@ -280,7 +285,7 @@ export class AppController extends Reactive {
           this.authUserId = userId;
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.summaries = new Map(); this.autoSummaries = new Set(); this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -293,7 +298,7 @@ export class AppController extends Reactive {
           this.preferencesLoading = !!userId;
           this.preferencesError = '';
           this.preferencesUnavailable = false;
-          if (userId) setTimeout(() => { void this.refreshMyDeadlines(userId, epoch); void this.refreshMyTranslations(userId, epoch); void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch); }, 0);
+          if (userId) setTimeout(() => { void this.refreshMyDeadlines(userId, epoch); void this.refreshMyTranslations(userId, epoch); void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.refreshMine(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch); }, 0);
           setLocalOwner(userId);
           this.onboardingDismissed = !!userId && remember('onboarding-dismissed') === '1';
           this.saved = loadSaved();
@@ -353,6 +358,7 @@ export class AppController extends Reactive {
       this.sources = notices!.sources;
       this.generatedAt = notices!.generated_at;
       if (this.authUserId) void this.refreshMyDeadlines(this.authUserId, this.subscriptionsEpoch);
+      if (this.authUserId) void this.refreshMine(this.authUserId, this.subscriptionsEpoch);
       if (this.authUserId) void this.refreshMyTranslations(this.authUserId, this.subscriptionsEpoch);
       // 개인용 서비스의 판정 결과는 플랫폼에서 읽지 않는다.
       this.matched = null;
@@ -462,7 +468,19 @@ export class AppController extends Reactive {
     return orderSaved(this.saved, this.notices, this.savedSort);
   }
 
-  judgement(notice: Notice): Judgement | undefined { return this.matched?.items[notice.id]; }
+  judgement(notice: Notice): Judgement | undefined {
+    const mine = this.myJudgments.get(notice.id);
+    return this.matched?.items[notice.id] ?? (mine ? asJudgement(mine) : undefined);
+  }
+
+  /** 내 판정과 관심 키워드를 다시 읽는다. 로그인할 때와 공지를 새로 불러올 때 부른다. */
+  async refreshMine(userId: string, epoch: number): Promise<void> {
+    if (!authClient) return;
+    const [judgments, interests] = await Promise.all([loadMyJudgments(authClient, userId).catch(() => null), loadMyInterests(authClient).catch(() => null)]);
+    if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
+    if (judgments) this.myJudgments = judgments;
+    if (interests) this.myInterests = interests;
+  }
 
   /** 이 글에 맞는 관심 키워드: 이 기기의 글자 매칭 + 서버의 글자 매칭 + Gemini가 뜻으로 맞춘 것 */
   interests(notice: Notice): string[] {
@@ -471,6 +489,9 @@ export class AppController extends Reactive {
     const text = `${notice.title} ${notice.title_ko ?? ''} ${notice.category ?? ''}`;
     const found = new Set(this.keywords.filter((word) => keywordMatches(word, text)));
     for (const word of judgement?.interests ?? []) {
+      if (this.keywords.includes(word)) found.add(word);
+    }
+    for (const word of this.myInterests.get(notice.id) ?? []) {
       if (this.keywords.includes(word)) found.add(word);
     }
     return [...found];

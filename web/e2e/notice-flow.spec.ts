@@ -805,3 +805,25 @@ test('personal English translation is shown automatically with the original body
   await expect(detail.getByRole('region', { name: '한국어로 옮긴 본문' })).toContainText('번역된 본문입니다.');
   await expect(detail.getByRole('region', { name: '영어 원문' })).toBeVisible();
 });
+
+test('list rows show "관심 …" or my judgment label with its reason, like the original list', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  const rows = page.locator('notice-rows-screen a.row');
+  await rows.first().waitFor();
+  await page.waitForLoadState('networkidle');
+  const ids = await page.evaluate(() => (document.querySelector('notice-app') as unknown as { notices: { id: string }[] }).notices.slice(0, 3).map((n) => n.id));
+  await page.evaluate((list) => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.keywords = ['장학'];
+    app.myJudgments = new Map([
+      [list[0], { verdict: 'not_relevant', reason: '대학원생을 대상으로 하는 공고예요', model: 'm', deadline: null, deadlineKind: null }],
+      [list[1], { verdict: 'maybe', reason: '자격을 확인해야 해요', model: 'm', deadline: null, deadlineKind: null }],
+    ]);
+    app.myInterests = new Map([[list[2], ['장학']]]);
+  }, ids);
+  const reason = (id: string) => page.locator(`notice-rows-screen a.row[data-id="${id}"] .reason`);
+  await expect(reason(ids[0])).toContainText('해당 없음');
+  await expect(reason(ids[0])).toContainText('대학원생을 대상으로 하는 공고예요');
+  await expect(reason(ids[1])).toContainText('확인 필요');
+  await expect(reason(ids[2])).toContainText('관심 장학');          // 본문에서 서버가 찾은 키워드
+});
