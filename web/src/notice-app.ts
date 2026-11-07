@@ -14,6 +14,7 @@ import { authClient } from './auth';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from './preferences';
 import './platform-settings';
+import { loadNoticeStates, planStateSync, pushRead, pushSaved } from './notice-state-sync';
 import { disableDevicePush, enableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
 import './notice-rows';
 import './notice-detail';
@@ -135,6 +136,7 @@ export class NoticeApp extends LitElement {
   // 클릭 안에서 권한 요청을 바로 부르려면 등록과 공개키를 미리 받아 둔다.
   private pushRegistration: ServiceWorkerRegistration | null = null;
   private pushVapidKey: string | null = null;
+  private stateSyncedEpoch = -1;
   authReady = !authClient;
   authEmail: string | null = null;
   authError = '';
@@ -209,7 +211,7 @@ export class NoticeApp extends LitElement {
           this.preferencesLoading = !!userId;
           this.preferencesError = '';
           this.preferencesUnavailable = false;
-          if (userId) setTimeout(() => { void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshPush(userId, epoch); }, 0);
+          if (userId) setTimeout(() => { void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshPush(userId, epoch); void this.syncStates(); }, 0);
           setLocalOwner(userId);
           this.saved = loadSaved();
           this.keywords = loadKeywords();
@@ -270,6 +272,7 @@ export class NoticeApp extends LitElement {
         this.needsReadBaseline = false;
       }
       if (this.board !== 'all' && !this.sources.some((s) => s.id === this.board)) this.board = 'all';
+      void this.syncStates();
     } catch (error) {
       console.error(error);
       this.failed = true;
@@ -317,6 +320,8 @@ export class NoticeApp extends LitElement {
     this.readState = setReadState(this.readState ?? parseReadState(null), ids, read, Math.max(Date.now(), latestChange));
     this.read = readIds(this.readState);
     storeReadState(this.readState);
+    const syncable = ids.filter((id) => this.isSyncable(id));
+    if (syncable.length) this.uploadStates(() => pushRead(authClient!, syncable.map((id) => ({ id, read }))));
   }
 
   private markRead(notice: Notice) {
@@ -355,6 +360,7 @@ export class NoticeApp extends LitElement {
     this.saved = next;
     storeSaved(next);
     this.showToast(added ? '저장했어요' : '저장을 지웠어요');
+    this.uploadStates(() => pushSaved(authClient!, [{ id: notice.id, saved: added }]));
   }
 
   /** 저장한 글. 지금 목록에 있으면 최신 정보로, 밀려났으면 저장할 때 정보로 보여 준다. */
@@ -403,6 +409,40 @@ export class NoticeApp extends LitElement {
       if (epoch === this.subscriptionsEpoch) { this.preferencesUnavailable = true; this.preferencesError = '키워드를 불러오지 못했어요. 다시 시도해 주세요.'; }
     } finally {
       if (epoch === this.subscriptionsEpoch) this.preferencesLoading = false;
+    }
+  }
+
+  // 외부 인턴 공고는 서버 공지 테이블에 없어 계정에 올리지 않는다.
+  private isSyncable(id: string): boolean {
+    const notice = this.notices.find((item) => item.id === id);
+    return !!notice && !this.sources.find((source) => source.id === notice.source_id)?.external;
+  }
+
+  private uploadStates(run: () => Promise<boolean>): void {
+    if (!authClient || !this.authUserId) return;
+    const epoch = this.subscriptionsEpoch;
+    void run().then((ok) => { if (!ok && epoch === this.subscriptionsEpoch) this.showToast('이 기기에는 저장했지만 계정에 올리지 못했어요. 다음에 다시 맞출게요'); });
+  }
+
+  // 로그인 사용자의 저장·읽음을 서버와 맞춘다. 공지 목록이 있어야 서버에만 있는 저장의 글 정보를 찾을 수 있다.
+  private async syncStates(): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || !this.notices.length || this.stateSyncedEpoch === epoch) return;
+    this.stateSyncedEpoch = epoch;
+    try {
+      const remote = await loadNoticeStates(authClient, userId);
+      if (epoch !== this.subscriptionsEpoch) return;
+      const syncable = (id: string) => this.isSyncable(id);
+      const plan = planStateSync(remote, this.saved, this.readState ?? parseReadState(null), this.notices);
+      this.saved = plan.saved; storeSaved(plan.saved);
+      this.readState = plan.read; this.read = readIds(plan.read); storeReadState(plan.read);
+      const uploads = await Promise.all([
+        pushSaved(authClient, plan.uploadSaved.filter((item) => syncable(item.id))),
+        pushRead(authClient, plan.uploadRead.filter((item) => syncable(item.id))),
+      ]);
+      if (epoch === this.subscriptionsEpoch && uploads.includes(false)) this.stateSyncedEpoch = -1;
+    } catch {
+      if (epoch === this.subscriptionsEpoch) { this.stateSyncedEpoch = -1; this.showToast('저장과 읽음을 계정과 맞추지 못했어요. 잠시 뒤 다시 시도할게요'); }
     }
   }
 
