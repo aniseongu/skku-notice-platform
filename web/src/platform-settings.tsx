@@ -175,7 +175,6 @@ function Overview({ model }: { model: SettingsModel }) {
           <button type="button" className="ghost-button" disabled={model.authBusy} onClick={model.signOut}>이 기기에서 로그아웃</button>
           {model.authError ? <p className="field-note error" role="alert">{model.authError}</p> : null}
         </Setting>
-        <DeleteAccount model={model} />
       </> : <Setting name="계정" help="로그인하면 구독과 저장이 계정에 남아요">
         {!model.configured ? <p className="field-note">지금은 로그인할 수 없어요. 잠시 뒤 다시 열어 주세요</p>
           : <button type="button" className="solid-button" disabled={model.authBusy} onClick={model.signIn}>Google 계정으로 계속하기</button>}
@@ -202,6 +201,7 @@ function Overview({ model }: { model: SettingsModel }) {
         <button type="button" className="ghost-button" aria-keyshortcuts="?" onClick={model.showShortcuts}>단축키 보기</button>
       </Setting>
     </Section>
+    {model.userId ? <DeleteAccount model={model} /> : null}
   </div>;
 }
 
@@ -271,21 +271,22 @@ function SummaryTime({ info }: { info: NonNullable<SettingsModel['devicesInfo']>
   </div>;
 }
 
-/** 계정 지우기: 되돌릴 수 없어서 한 번 더 확인한다. 버튼 이름으로 무엇이 지워지는지 먼저 알려 준다. */
+/** 계정 삭제: 되돌릴 수 없어서 설정 맨 아래에 작게 따로 두고, 누르면 무엇이 지워지는지 알려 준 뒤 한 번 더 확인한다. */
 function DeleteAccount({ model }: { model: SettingsModel }) {
   const account = model.account;
   const [confirming, setConfirming] = useState(false);
   if (!account) return null;
-  return <Setting name="계정 지우기" help="계정과 구독, 키워드, 저장한 공지, 프로필, 연결한 키와 토큰을 모두 지워요. 되돌릴 수 없어요">
+  return <div className="delete-account">
     {confirming ? <>
-      <p className="field-note error" role="alert">정말 지울까요? 지운 정보는 다시 가져올 수 없어요</p>
+      <p className="setting-help">계정과 구독, 키워드, 저장한 공지, 프로필, 연결한 키와 토큰을 모두 삭제해요. 되돌릴 수 없어요</p>
+      <p className="field-note error" role="alert">정말 삭제할까요?</p>
       <div className="inline">
-        <button type="button" className="solid-button danger" disabled={account.busy} onClick={account.remove}>{account.busy ? '지우고 있어요' : '네, 모두 지울게요'}</button>
+        <button type="button" className="solid-button danger" disabled={account.busy} onClick={account.remove}>{account.busy ? '삭제하고 있어요' : '계정 삭제하기'}</button>
         <button type="button" className="ghost-button" disabled={account.busy} onClick={() => setConfirming(false)}>그만둘게요</button>
       </div>
-    </> : <button type="button" className="ghost-button" onClick={() => setConfirming(true)}>계정 지우기</button>}
+    </> : <button type="button" className="text-button" onClick={() => setConfirming(true)}>계정 삭제</button>}
     {account.error ? <p className="field-note error" role="alert">{account.error}</p> : null}
-  </Setting>;
+  </div>;
 }
 
 /** 알림 기기 한 줄: 이름(모델이나 기기 종류), 등록일, 아캠 알림 모드. 이름은 바꿀 수 있고 이 기기가 아닌 기기는 지울 수 있다. */

@@ -733,6 +733,12 @@
 }
 
 @layer platform {
-  /* 되돌릴 수 없는 일(계정 지우기)의 확인 버튼은 위험 색으로 구분한다. */
+  /* 되돌릴 수 없는 일(계정 삭제)의 확인 버튼은 위험 색으로 구분한다. */
   .solid-button.danger { background: var(--danger); color: light-dark(oklch(0.99 0.005 25), oklch(0.2 0.03 25)); }
+}
+
+@layer platform {
+  /* 계정 삭제는 설정 맨 아래에 작은 글자로 따로 둔다. 눈에 띄지 않되 찾을 수는 있다. */
+  .delete-account { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; margin-top: 8px; padding: 8px 4px 24px; }
+  .delete-account .text-button { color: var(--text-3); font-size: 13px; font-weight: 500; }
 }
