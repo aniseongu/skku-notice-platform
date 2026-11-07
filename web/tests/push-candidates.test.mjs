@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 
-test('push candidates honor subscriptions, start time, keywords, OCR and claims', async () => {
+test('push candidates honor subscriptions and start time; keywords and OCR decide silence', async () => {
   const db = new PGlite();
   const user = '00000000-0000-0000-0000-000000000001';
   try {
@@ -14,7 +14,7 @@ test('push candidates honor subscriptions, start time, keywords, OCR and claims'
       grant usage on schema auth to authenticated; insert into auth.users values ('${user}');`);
     for (const name of ['20261107030000_public_notices.sql', '20261107040000_user_subscriptions.sql',
       '20261107060000_user_preferences.sql', '20261107070000_public_ocr_cache.sql',
-      '20261107080000_push_subscriptions.sql', '20261107081000_push_claims.sql', '20261107082000_push_candidates.sql']) {
+      '20261107080000_push_subscriptions.sql', '20261107081000_push_claims.sql', '20261107082000_push_candidates.sql', '20261107100000_push_silent_priority.sql']) {
       await db.exec(await readFile(new URL(`../../supabase/migrations/${name}`, import.meta.url), 'utf8'));
     }
     const hash = 'a'.repeat(64);
@@ -32,12 +32,19 @@ test('push candidates honor subscriptions, start time, keywords, OCR and claims'
       set role service_role;`);
     let rows = (await db.query('select * from public.list_notice_push_candidates(20)')).rows;
     assert.deepEqual(rows.map((r) => r.notice_id), ['school/1']);
+    assert.equal(rows[0].silent, false);
+    await db.exec("reset role; insert into platform_notices(id,source_id,article_no,title,url,posted_on,first_seen) values ('school/3','school','3','관련 없는 공지','https://www.skku.edu/notice?articleNo=3',current_date,now()-interval '12 hours'); set role service_role");
+    rows = (await db.query('select * from public.list_notice_push_candidates(20)')).rows;
+    assert.deepEqual(rows.map((r) => [r.notice_id, r.silent]), [['school/1', false], ['school/3', true]]);
+    await db.exec("reset role; delete from platform_notices where id='school/3'; set role service_role");
+    rows = (await db.query('select * from public.list_notice_push_candidates(20)')).rows;
     await db.query(`select public.claim_notice_push('${user}','${rows[0].subscription_id}','school/1')`);
     assert.equal((await db.query('select * from public.list_notice_push_candidates(20)')).rows.length, 0);
     await db.exec("update user_notification_history set status='failed',updated_at=now()-interval '31 minutes'");
     assert.equal((await db.query('select * from public.list_notice_push_candidates(20)')).rows.length, 1);
     await db.exec("reset role; update user_preferences set excluded_keywords=array['장학']; set role service_role");
-    assert.equal((await db.query('select * from public.list_notice_push_candidates(20)')).rows.length, 0);
+    const excluded = (await db.query('select * from public.list_notice_push_candidates(20)')).rows;
+    assert.deepEqual(excluded.map((r) => [r.notice_id, r.silent]), [['school/1', true]]);
     await db.exec('reset role; set role authenticated');
     await assert.rejects(db.exec('select * from public.list_notice_push_candidates(20)'), /permission denied/);
   } finally { await db.close(); }

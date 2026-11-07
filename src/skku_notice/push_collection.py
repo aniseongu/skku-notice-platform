@@ -87,6 +87,7 @@ def run_batch(store: PushStore, private_key: str, subject: str, now: datetime) -
             title=candidate["title"],
             url=candidate["url"],
             tag=candidate["notice_id"],
+            silent=bool(candidate.get("silent", False)),
         )
         if outcome == "expired":
             store.remove_expired(candidate["subscription_id"], candidate["user_id"])

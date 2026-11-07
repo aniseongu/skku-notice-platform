@@ -48,7 +48,7 @@ function PlatformSettings({ model }: { model: SettingsModel }) {
       {model.pushStatus === 'unsupported' ? <p>이 브라우저에서는 알림을 받을 수 없어요.</p>
         : model.pushStatus === 'denied' ? <p>브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요.</p>
         : model.pushStatus === 'on' ? <><p>이 기기로 알림을 받고 있어요.</p><button className="ghost-button" onClick={model.disablePush}>이 기기 알림 끄기</button></>
-        : <><p>구독한 게시판의 새 공지를 이 기기로 알려드려요.</p>
+        : <><p>구독한 게시판의 새 공지를 알려드려요. 관심 키워드와 맞는 공지는 소리로, 나머지는 조용히 보여드려요.</p>
           <button className="solid-button" disabled={model.pushStatus !== 'off'} onClick={model.enablePush}>
             {model.pushStatus === 'off' ? '이 기기에서 알림 받기' : '확인하고 있어요'}</button></>}
       {model.pushError ? <p role="alert">{model.pushError}</p> : null}

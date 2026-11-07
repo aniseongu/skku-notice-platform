@@ -1,4 +1,5 @@
 import base64
+import json
 import socket
 
 import requests
@@ -105,3 +106,22 @@ def test_expired_push_service_response_is_distinct_from_temporary_failure(monkey
         )
         == "expired"
     )
+
+
+def test_silent_flag_and_original_ttl_are_sent(monkeypatch):
+    calls = []
+
+    def send(**kwargs):
+        calls.append(kwargs)
+        response = requests.Response()
+        response.status_code = 201
+        return response
+
+    monkeypatch.setattr(push, "webpush", send)
+    for silent in (False, True):
+        push.send_one(
+            subscription(), "private", "mailto:test@example.invalid",
+            title="공지", url="https://www.skku.edu/", tag="notice", silent=silent,
+        )
+    assert [json.loads(call["data"])["silent"] for call in calls] == [False, True]
+    assert {call["ttl"] for call in calls} == {86400}

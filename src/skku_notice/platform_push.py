@@ -57,13 +57,23 @@ class NoRedirectSession(requests.Session):
         return super().request(method, url, **kwargs)
 
 
-def send_one(subscription: dict, private_key: str, subject: str, *, title: str, url: str, tag: str) -> str:
+def send_one(
+    subscription: dict,
+    private_key: str,
+    subject: str,
+    *,
+    title: str,
+    url: str,
+    tag: str,
+    silent: bool = False,
+) -> str:
     """Return sent, expired or retry; never log endpoints, keys or response bodies."""
     if not valid_subscription(subscription):
         # DNS failures are indistinguishable here from invalid endpoints; never delete on uncertainty.
         return "retry"
     payload = json.dumps(
-        {"title": title[:180], "body": "새 공지가 도착했어요", "url": url, "tag": tag}, ensure_ascii=False
+        {"title": title[:180], "body": "새 공지가 도착했어요", "url": url, "tag": tag, "silent": silent},
+        ensure_ascii=False,
     )
     try:
         with NoRedirectSession() as session:
@@ -72,7 +82,7 @@ def send_one(subscription: dict, private_key: str, subject: str, *, title: str, 
                 data=payload,
                 vapid_private_key=private_key,
                 vapid_claims={"sub": subject},
-                ttl=3600,
+                ttl=86400,
                 timeout=10,
                 requests_session=session,
             )
