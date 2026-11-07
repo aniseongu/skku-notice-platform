@@ -29,8 +29,8 @@ sources:
     url: https://swb.skku.edu/futurecar/notice.do
 
   # 외부 인턴 공고. 목록은 사이트마다 실행당 한 번, 상세는 게시판별 최대 5건(D-028).
-  # 학생인재개발팀(job.skku.edu)은 robots.txt가 전체를 막아 다수 사용자용 플랫폼 워커는 수집하지 않는다(콜렉터 없음).
-  # 개인용 원본 서비스에서만 사용자가 예외 수집을 요청했다(2026-11-06).
+  # 학생인재개발팀(job.skku.edu)은 robots.txt가 막지만 원본과 같게 공개 목록만 읽는다(로그인·접근 제한 우회 없음).
+  # 프로젝트 소유자가 예외 수집을 명시 요청했다(원본 2026-11-06, 플랫폼 2026-11-08, docs/BLOCKERS.md).
   - id: skku-career-intern
     name: 성대 학생인재개발팀
     kind: skku-career-intern

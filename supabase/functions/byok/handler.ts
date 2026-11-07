@@ -73,7 +73,7 @@ export async function handle(req: Request, deps: ByokDeps): Promise<Response> {
     if (verdict === 'invalid') return reply(400, origin, { error: 'Gemini에서 이 키를 받아 주지 않아요. 키를 확인해 주세요.' });
     if (verdict === 'unavailable') return reply(502, origin, { error: '지금은 키를 확인할 수 없어요. 잠시 뒤 다시 시도해 주세요.' });
     const ciphertext = await encryptApiKey(deps.masterKey, userId, body.apiKey);
-    const keyHint = body.apiKey.slice(-4);
+    const keyHint = body.apiKey.slice(-4).replace(/[^A-Za-z0-9_-]/g, '_'); // 표시용 끝 4글자(점은 표 제약에 맞게 바꾼다)
     await deps.saveKey({ user_id: userId, ciphertext, key_hint: keyHint, model });
     return reply(200, origin, { ok: true, keyHint, model });
   } catch {

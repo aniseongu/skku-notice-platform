@@ -19,6 +19,7 @@ from skku_notice.jobs import (
     LK_HEADERS,
     parse_job_detail,
     parse_linkareer_detail,
+    skku_career_list,
 )
 from skku_notice.parse import ParseError, parse_detail, parse_list
 
@@ -266,9 +267,15 @@ def run_external_collection(settings: dict, store: NoticeStore, now: datetime, p
     """Collect approved external internship boards like the original service.
 
     One list request per site per run (at most once an hour), then up to five missing bodies per board.
-    Sources whose robots.txt forbids crawling (skku-career-intern) have no collector and are never fetched.
+    The school career center (skku-career-intern) is read like the original service: a plain public list page,
+    no login and no bypass of access limits. Its robots.txt disallows crawling, so it is collected
+    only because
+    the project owner explicitly instructed it (2026-11-08), with the same hourly limit as the others.
     """
-    sources = [s for s in settings["sources"] if s.get("external") and s.get("kind") in COLLECTORS]
+    sources = [
+        s for s in settings["sources"]
+        if s.get("external") and (s.get("kind") in COLLECTORS or s.get("kind") == "skku-career-intern")
+    ]
     stamp = now.astimezone(KST).isoformat()
     gap = max(1.5, float(settings.get("request_gap_seconds", 1.5)))
     agent, timeout = settings["user_agent"], float(settings["timeout_seconds"])
@@ -293,7 +300,10 @@ def run_external_collection(settings: dict, store: NoticeStore, now: datetime, p
             except (TypeError, ValueError):
                 pass
             pace()
-            postings = COLLECTORS[source["kind"]](post, now, source_id)
+            if source["kind"] == "skku-career-intern":
+                postings = skku_career_list(fetch_list(source["url"], agent, timeout), now, source_id)
+            else:
+                postings = COLLECTORS[source["kind"]](post, now, source_id)
             numbers = [notice.article_no for notice, _ in postings]
             previous = store.notices(source_id, numbers)
             source_row = {
@@ -367,7 +377,7 @@ def run_external_collection(settings: dict, store: NoticeStore, now: datetime, p
             store.upsert("platform_sources", [{**source_row, "last_success_at": stamp}])
             total += len(rows)
             print(f"{source_id}: 외부 목록 {len(rows)}건, 본문 {len(waiting)}건 시도", flush=True)
-        except (FetchError, StoreError, KeyError, TypeError, ValueError) as exc:
+        except (FetchError, ParseError, StoreError, KeyError, TypeError, ValueError) as exc:
             failed += 1
             print(f"{source_id}: 외부 수집 실패 ({type(exc).__name__})", flush=True)
     return total, failed

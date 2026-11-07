@@ -10,7 +10,7 @@ export interface ByokStatus {
 
 /** 키 문자열은 이 모듈 밖으로 나가지 않고 요청 한 번에만 쓴다. 화면과 로그에는 마지막 4글자만 남는다. */
 export function looksLikeGeminiKey(value: string): boolean {
-  return /^AIza[0-9A-Za-z_-]{35}$/.test(value);
+  return /^(AIza[0-9A-Za-z_-]{35}|AQ\.[0-9A-Za-z_.-]{20,150})$/.test(value);
 }
 
 export interface CanvasStatus { keyHint: string; disabled: boolean; lastError: string | null; lastOkAt: string | null }

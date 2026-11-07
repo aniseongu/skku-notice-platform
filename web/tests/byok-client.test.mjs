@@ -36,3 +36,7 @@ test('availability probe needs a 204 from the function and treats network errors
   assert.equal(await byokAvailable('https://x.supabase.co', async () => { throw new TypeError('cors'); }), false);
   assert.equal(await byokAvailable(undefined), false);
 });
+
+test('client accepts the AQ. key format', () => {
+  assert.equal(looksLikeGeminiKey(`AQ.Ab8RN6J${'x'.repeat(40)}`), true);
+});

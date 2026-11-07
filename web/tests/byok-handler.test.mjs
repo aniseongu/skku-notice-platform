@@ -103,3 +103,14 @@ test('iCampus token: bad format, rejected and unreachable checks never reach sto
   assert.equal(response.status, 200);
   assert.deepEqual(t.deleted, ['canvas:user-a']);
 });
+
+test('stores an AQ. key and shows a table-safe last four characters', async () => {
+  const t = await setup();
+  const key = `AQ.Ab8RN6J${'x'.repeat(38)}.z`;
+  const response = await t.call('POST', { apiKey: key });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.match(body.keyHint, /^[A-Za-z0-9_-]{4}$/);
+  assert.equal(body.keyHint, 'xx_z');
+  assert.equal(await decryptApiKey(t.masterKey, 'user-a', t.saved[0].ciphertext), key);
+});

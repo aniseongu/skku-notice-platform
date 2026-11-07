@@ -31,3 +31,11 @@ test('master key must be 32 bytes and key format is checked', async () => {
   assert.equal(looksLikeGeminiKey(KEY), true);
   for (const bad of ['', 'AIza', `AIza${'!'.repeat(35)}`, `sk-${'a'.repeat(40)}`, null, 12]) assert.equal(looksLikeGeminiKey(bad), false);
 });
+
+test('accepts both Gemini key formats (AIza and AQ.) and nothing else', () => {
+  assert.equal(looksLikeGeminiKey(`AQ.${'a'.repeat(50)}`), true);
+  assert.equal(looksLikeGeminiKey(`AQ.Ab8RN6J${'x'.repeat(40)}`), true);
+  assert.equal(looksLikeGeminiKey('AQ.short'), false);
+  assert.equal(looksLikeGeminiKey(`AQ-${'a'.repeat(50)}`), false);
+  assert.equal(looksLikeGeminiKey(`AQ.${'a'.repeat(30)} x`), false);
+});

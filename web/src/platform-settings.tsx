@@ -425,7 +425,7 @@ function GeminiRow({ model }: { model: SettingsModel }) {
       <span className="field-note">키를 받는 기능을 서버에 설치하는 중이에요. 끝나면 여기에서 입력할 수 있어요</span>
     </KeyRow>;
   }
-  return <SecretRow name="Gemini 키" help={help} placeholder="AIza로 시작하는 키" status={byok.status} loading={byok.loading} busy={byok.busy}
+  return <SecretRow name="Gemini 키" help={help} placeholder="AIza 또는 AQ.로 시작하는 키" status={byok.status} loading={byok.loading} busy={byok.busy}
     error={byok.error} onRegister={byok.register} onRemove={byok.remove} guide={guide} />;
 }
 
