@@ -22,7 +22,7 @@ function ProgramPicker({ onPick, onCancel, current, title }: {
   const [query, setQuery] = useState('');
   const found = findCollege(college);
   // 대학 목록에서 아래쪽 항목을 눌러 스크롤된 채로 학과 목록이 열려 제목이 가려지지 않게, 목록이 바뀌면 맨 위로 되돌린다.
-  useEffect(() => { document.querySelector('.onb-body')?.scrollTo({ top: 0 }); }, [college]);
+  useEffect(() => { document.querySelector('.onb')?.scrollTo({ top: 0 }); }, [college]);
   if (!found) {
     return <div className="onb-group">
       <p className="onb-lead">{title}: 대학을 먼저 골라요.</p>
@@ -168,22 +168,27 @@ export function Onboarding({ app }: { app: AppController }) {
     </>;
   }
 
-  return <div className="onb" role="dialog" aria-modal="true" aria-labelledby="onb-title">
+  const showBack = index > 0 || addingDouble || (step === 'primary' && !changingPrimary);
+  return <div className="onb" role="dialog" aria-modal="true" aria-labelledby="onb-title" ref={bodyRef}>
     <div className="onb-top">
-      {index > 0 || addingDouble || (step === 'primary' && !changingPrimary)
-        ? <button type="button" className="icon-button" aria-label="이전" onClick={back}><svg className="i" aria-hidden="true"><use href="icons/sprite.svg#back" /></svg></button>
-        : <span style={{ width: 44 }} />}
-      <div className="onb-progress" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={index + 1} aria-label="설정 진행">
-        <div className="onb-bar"><span style={{ width: `${((index + 1) / STEPS.length) * 100}%` }} /></div>
-        <span>{index + 1} / {STEPS.length}</span>
+      <div className="onb-top-inner">
+        {showBack
+          ? <button type="button" className="icon-button" aria-label="이전" onClick={back}><svg className="i" aria-hidden="true"><use href="icons/sprite.svg#back" /></svg></button>
+          : <span className="onb-spacer" aria-hidden="true" />}
+        <div className="onb-progress" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={index + 1} aria-label="설정 진행">
+          <div className="onb-bar"><span style={{ width: `${((index + 1) / STEPS.length) * 100}%` }} /></div>
+          <span>{index + 1} / {STEPS.length}</span>
+        </div>
+        {manual
+          ? <button type="button" className="icon-button" aria-label="닫기" onClick={() => app.dismissOnboarding()}><svg className="i" aria-hidden="true"><use href="icons/sprite.svg#close" /></svg></button>
+          : <button type="button" className="onb-close" onClick={() => app.dismissOnboarding()}>나중에 하기</button>}
       </div>
-      <button type="button" className="onb-skip" onClick={() => app.dismissOnboarding()}>{manual ? '닫기' : '나중에 하기'}</button>
     </div>
-    <div className="onb-body" ref={bodyRef}>
+    <div className="onb-body">
       <h1 id="onb-title" ref={heading} tabIndex={-1}>{title}</h1>
       {lead ? <p className="onb-lead">{lead}</p> : null}
       {body}
     </div>
-    {foot ? <div className="onb-foot">{foot}</div> : <div />}
+    {foot ? <div className="onb-foot"><div className="onb-foot-inner">{foot}</div></div> : null}
   </div>;
 }

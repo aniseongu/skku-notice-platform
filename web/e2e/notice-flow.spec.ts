@@ -394,3 +394,70 @@ test('settings close button leaves settings from any page and the back arrow goe
   await expect(page).not.toHaveURL(/view=settings/);
   await expect(list).toBeVisible();
 });
+
+test('first-run setup layout: header and body share one column, the close control stays inside it and the bar items are centered together', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.waitForLoadState('networkidle');
+  const open = (manual: boolean) => page.evaluate((isManual) => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: isManual ? 'x' : null };
+    app.profileStatus = 'ready'; app.authUserId = 'account-a'; app.onboardingDismissed = false;
+    if (isManual) (app.openOnboarding as () => void)();
+  }, manual);
+  const box = async (selector: string) => (await page.locator(selector).first().boundingBox())!;
+  for (const manual of [false, true]) {
+    await open(manual);
+    const dialog = page.getByRole('dialog');
+    await dialog.waitFor();
+    await dialog.getByRole('button', { name: '문과대학', exact: true }).scrollIntoViewIfNeeded();   // 아래로 스크롤된 상태에서도 어긋나지 않아야 한다
+    const top = await box('.onb-top-inner'), body = await box('.onb-body');
+    expect(Math.abs(top.x - body.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(top.width - body.width)).toBeLessThanOrEqual(1);
+    const close = manual ? dialog.getByRole('button', { name: '닫기' }) : dialog.getByRole('button', { name: '나중에 하기' });
+    const closeBox = (await close.boundingBox())!;
+    expect(closeBox.x + closeBox.width).toBeLessThanOrEqual(top.x + top.width + 0.5);
+    expect(closeBox.height).toBeGreaterThanOrEqual(44);
+    const bar = await box('.onb-progress');
+    const centerY = (b: { y: number; height: number }) => b.y + b.height / 2;
+    expect(Math.abs(centerY(closeBox) - centerY(bar))).toBeLessThanOrEqual(2);
+    // 위 줄은 스크롤해도 붙어 있다.
+    const before = (await box('.onb-top-inner')).y;
+    await page.evaluate(() => document.querySelector('.onb')!.scrollTo({ top: 400 }));
+    expect(Math.abs((await box('.onb-top-inner')).y - before)).toBeLessThanOrEqual(1);
+    await close.click();
+    await expect(dialog).toHaveCount(0);
+  }
+});
+
+test('left board list shows only chosen boards, falls back to boards with notices, keeps the current one and links to more', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '사이드바는 넓은 화면에서만 보인다');
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.waitForLoadState('networkidle');
+  const labels = () => page.locator('#side-boards .side-item').evaluateAll((items) => items.map((item) => (item as HTMLElement).innerText.replace(/\s+/g, ' ').trim()));
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as { sources: { id: string; name: string; url: string }[] };
+    const extra = [['korean-notice', '국어국문학과 공지'], ['biz-notice', '경영대학 공지'], ['art-notice', '예술대학 공지'], ['enc-notice', '공과대학 공지']]
+      .map(([id, name]) => ({ id, name, url: `https://${id}.skku.edu/` }));
+    app.sources = [...app.sources, ...extra];
+  });
+  // 로그인 전: 등록된 학과 게시판이 수십 개여도 공지가 있는 기본 게시판만 나온다.
+  let list = await labels();
+  expect(list[0]).toBe('모든 게시판');
+  expect(list.some((label) => label.includes('경영대학') || label.includes('공과대학'))).toBe(false);
+  expect(list.length).toBeLessThanOrEqual(4);
+  // 로그인해서 구독했으면 구독한 게시판만 나온다(처음 설정을 마쳤다면 전공에 맞춰 추천된 것).
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.authUserId = 'account-a'; app.subscriptions = ['korean-notice', 'biz-notice']; app.subscriptionsLoading = false;
+  });
+  list = await labels();
+  expect(list).toEqual(['모든 게시판', '국어국문학과', '경영대학', '게시판 더 고르기']);
+  // 지금 보고 있는 게시판은 구독이 아니어도 사라지지 않는다.
+  await page.evaluate(() => { (document.querySelector('notice-app') as unknown as { board: string }).board = 'enc-notice'; });
+  expect(await labels()).toContain('공과대학');
+  // "게시판 더 고르기"는 설정의 알림 쪽으로 바로 간다.
+  await page.locator('#side-boards').getByRole('button', { name: '게시판 더 고르기' }).click();
+  await expect(page).toHaveURL(/section=notifications/);
+});

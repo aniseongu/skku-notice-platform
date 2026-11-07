@@ -812,7 +812,21 @@ export class AppController extends Reactive {
     }
   }
 
-  tabSources(): Source[] { return this.sources.filter((s) => Boolean(s.external) === (this.tab() === 'intern')); }
+  /**
+   * 사이드바와 게시판 선택에 보일 게시판. 학교 공지 탭에서는 로그인한 사람이 구독한 게시판(처음 설정을 마쳤다면 전공에 맞춰 추천된 것)만 보이고,
+   * 구독이 없거나 로그인 전이면 지금 공지가 있는 기본 게시판만 보인다. 카탈로그의 수십 개 학과 게시판이 한꺼번에 나열되지 않게 한다.
+   */
+  tabSources(): Source[] {
+    const external = this.tab() === 'intern';
+    const all = this.sources.filter((s) => Boolean(s.external) === external);
+    if (external) return all;
+    const subscribed = this.authUserId && !this.subscriptionsLoading && this.subscriptions.length > 0;
+    const withNotices = new Set(this.notices.map((n) => n.source_id));
+    const chosen = all.filter((s) => (subscribed ? this.subscriptions.includes(s.id) : withNotices.has(s.id)));
+    // 지금 보고 있는 게시판은 목록에서 사라지지 않게 한다.
+    const current = all.filter((s) => s.id === this.board && !chosen.includes(s));
+    return [...chosen, ...current];
+  }
 
   // 고른 게시판이 지금 탭에 없으면 모든 게시판으로 본다(탭을 오가도 빈 목록이 되지 않게).
   activeBoard(): string { return this.tabSources().some((s) => s.id === this.board) ? this.board : 'all'; }

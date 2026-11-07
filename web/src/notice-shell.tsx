@@ -85,6 +85,7 @@ export function NoticeShell({ app }: { app: AppController }) {
         <SideGroup app={app} id="boards" title={app.tab() === 'intern' ? '인턴 공고 사이트' : '게시판'} count={app.tabSources().length}>
           {boardChoices(app).map((b) => <SideItem key={b.id} label={b.label} count={null} active={app.activeBoard() === b.id && !settings}
             onClick={() => { app.setBoard(b.id); if (settings) app.leaveSettings(); }} />)}
+          {app.tab() === 'intern' ? null : <button type="button" className="side-item add" onClick={() => app.openSettings('notifications')}>게시판 더 고르기</button>}
         </SideGroup>
         <div className="side-foot">
           <SideItem label="설정" count={null} active={settings} onClick={() => app.setView('settings')} />
@@ -380,6 +381,7 @@ function BoardSelect({ app }: { app: AppController }) {
       {boards.map((b) => <button type="button" className="board-option" key={b.id} aria-pressed={app.activeBoard() === b.id}
         onClick={() => { app.setBoard(b.id); void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.board-picker .board-trigger')?.focus()); }}>
         <span>{b.label}</span>{app.activeBoard() === b.id ? <span className="board-check" aria-hidden="true" /> : null}</button>)}
+      {app.tab() === 'intern' ? null : <button type="button" className="board-option board-more" onClick={() => app.openSettings('notifications')}><span>게시판 더 고르기</span></button>}
     </div> : null}
   </div>;
 }
