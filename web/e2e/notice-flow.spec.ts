@@ -892,3 +892,48 @@ test('a deadline that is close stays red even when the notice is already read, i
     expect(await dday.evaluate((el) => getComputedStyle(el).color)).toBe(await danger());
   }
 });
+
+test('on read rows the judgment labels keep their hue, softer in dark mode, with readable contrast', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  const rows = page.locator('notice-rows-screen a.row');
+  await rows.first().waitFor();
+  await page.waitForLoadState('networkidle');
+  const ids = await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, any>;
+    const list = app.notices.slice(0, 2).map((n: { id: string }) => n.id);
+    app.myJudgments = new Map([
+      [list[0], { verdict: 'relevant', reason: '대상이에요', model: 'm', deadline: null, deadlineKind: null }],
+      [list[1], { verdict: 'maybe', reason: '확인이 필요해요', model: 'm', deadline: null, deadlineKind: null }],
+    ]);
+    app.read = new Set(list);                          // 두 글 모두 읽은 상태
+    app.requestUpdate();
+    return list;
+  });
+  // 색 문자열을 화면에 그려 실제 RGB로 바꾼 뒤 WCAG 대비를 계산한다.
+  const rgb = (page_: typeof page, css: string) => page_.evaluate((value) => {
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
+    const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#000'; ctx.fillStyle = value; ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data; return [r, g, b];
+  }, css);
+  const luminance = ([r, g, b]: number[]) => { const f = (c: number) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const contrast = (a: number[], b: number[]) => { const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    for (const [id, tone] of [[ids[0], 'relevant'], [ids[1], 'maybe']] as const) {
+      const row = page.locator(`notice-rows-screen a.row[data-id="${id}"]`);
+      await expect(row).toHaveClass(/read/);
+      const label = await row.locator('.reason b').evaluate((el) => getComputedStyle(el).color);
+      const plain = await row.locator('.sub').evaluate((el) => getComputedStyle(el).color);   // 이유 문장(회색)
+      // 라벨 뒤에 실제로 보이는 배경: 조상 중 투명하지 않은 첫 배경색.
+      const surface = await row.locator('.reason b').evaluate((el) => {
+        for (let node: Element | null = el; node; node = node.parentElement) {
+          const c = getComputedStyle(node).backgroundColor;
+          if (c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') return c;
+        }
+        return getComputedStyle(document.documentElement).backgroundColor;
+      });
+      expect(label, `${scheme} ${tone}: 라벨은 이유 문장과 다른 색(색 계열 유지)`).not.toBe(plain);
+      expect(contrast(await rgb(page, label), await rgb(page, surface)), `${scheme} ${tone} 대비`).toBeGreaterThanOrEqual(4.5);
+    }
+  }
+});
