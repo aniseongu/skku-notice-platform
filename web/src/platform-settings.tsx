@@ -9,6 +9,8 @@ export interface SettingsModel {
   authError: string;
   sources: { id: string; label: string }[];
   subscriptions: string[];
+  subscriptionsOnly: boolean;
+  setSubscriptionsOnly: (enabled: boolean) => void;
   keywords: string[];
   preferencesLoading: boolean;
   preferencesError: string;
@@ -40,6 +42,8 @@ function PlatformSettings({ model }: { model: SettingsModel }) {
       <button className="ghost-button" disabled={model.preferencesLoading || model.preferencesUnavailable} onClick={() => model.saveKeywords(keywordInput)}>키워드 저장하기</button>
       <h2>게시판 구독</h2>
       <p>구독할 게시판을 선택해요. 알림 기능은 준비 중이에요.</p>
+      <label><input type="checkbox" checked={model.subscriptionsOnly} disabled={model.loading || !!model.error}
+        onChange={(event) => model.setSubscriptionsOnly(event.currentTarget.checked)} /> 구독한 게시판만 보기</label>
       {model.sources.map((source) => <label key={source.id}>
         <input type="checkbox" checked={model.subscriptions.includes(source.id)} disabled={model.loading || !!model.error}
           onChange={(event) => model.toggle(source.id, event.currentTarget.checked)} /> {source.label}

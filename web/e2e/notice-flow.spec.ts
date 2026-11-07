@@ -35,7 +35,7 @@ test('keyword editor saves input and clears a previous account on account change
   await page.evaluate(() => {
     const el = document.querySelector('platform-settings-screen') as HTMLElement & { model: unknown };
     (window as unknown as { keywordResult: string }).keywordResult = '';
-    el.model = { configured: true, userId: 'account-a', email: null, authBusy: false, authError: '', sources: [], subscriptions: [], loading: false, error: '', keywords: ['장학'], preferencesLoading: false, preferencesError: '', preferencesUnavailable: false, retryPreferences() {}, saveKeywords(value: string) { (window as unknown as { keywordResult: string }).keywordResult = value; }, signIn() {}, signOut() {}, toggle() {}, retry() {} };
+    el.model = { configured: true, userId: 'account-a', email: null, authBusy: false, authError: '', sources: [], subscriptions: [], subscriptionsOnly: false, setSubscriptionsOnly() {}, loading: false, error: '', keywords: ['장학'], preferencesLoading: false, preferencesError: '', preferencesUnavailable: false, retryPreferences() {}, saveKeywords(value: string) { (window as unknown as { keywordResult: string }).keywordResult = value; }, signIn() {}, signOut() {}, toggle() {}, retry() {} };
   });
   const input = screen.getByRole('textbox', { name: '관심 키워드' });
   await expect(input).toHaveValue('장학');
@@ -44,7 +44,26 @@ test('keyword editor saves input and clears a previous account on account change
   expect(await page.evaluate(() => (window as unknown as { keywordResult: string }).keywordResult)).toBe('장학\n인턴');
   await page.evaluate(() => {
     const el = document.querySelector('platform-settings-screen') as HTMLElement & { model: unknown };
-    el.model = { configured: true, userId: 'account-b', email: null, authBusy: false, authError: '', sources: [], subscriptions: [], loading: false, error: '', keywords: [], preferencesLoading: false, preferencesError: '', preferencesUnavailable: false, retryPreferences() {}, saveKeywords() {}, signIn() {}, signOut() {}, toggle() {}, retry() {} };
+    el.model = { configured: true, userId: 'account-b', email: null, authBusy: false, authError: '', sources: [], subscriptions: [], subscriptionsOnly: false, setSubscriptionsOnly() {}, loading: false, error: '', keywords: [], preferencesLoading: false, preferencesError: '', preferencesUnavailable: false, retryPreferences() {}, saveKeywords() {}, signIn() {}, signOut() {}, toggle() {}, retry() {} };
   });
   await expect(input).toHaveValue('');
+});
+
+test('subscription filter keeps only the selected school board', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  const rows = page.locator('notice-rows-screen a.row');
+  await expect(rows.first()).toBeVisible();
+  const ids = await rows.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-id') ?? ''));
+  const source = ids[0].split('/')[0];
+  expect(ids.some((id) => !id.startsWith(`${source}/`))).toBeTruthy();
+  await page.evaluate((id) => {
+    const app = document.querySelector('notice-app') as HTMLElement & Record<string, unknown>;
+    app.authUserId = 'account-a';
+    app.subscriptions = [id];
+    app.subscriptionsError = '';
+    app.subscriptionsLoading = false;
+    app.subscriptionsOnly = true;
+  }, source);
+  await expect.poll(async () => rows.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-id') ?? '')))
+    .toEqual(ids.filter((id) => id.startsWith(`${source}/`)));
 });

@@ -47,7 +47,7 @@ interface InstallPrompt extends Event { prompt(): Promise<void> }
 
 function remember(key: string, value?: string): string | null {
   try {
-    const storageKey = ['keywords', 'board', 'view-unread'].includes(key) ? localKey(key) : key;
+    const storageKey = ['keywords', 'board', 'view-unread', 'subscriptions-only'].includes(key) ? localKey(key) : key;
     if (value === undefined) return localStorage.getItem(storageKey);
     localStorage.setItem(storageKey, value);
   } catch { /* 사생활 보호 모드에서는 기억하지 않는다 */ }
@@ -116,7 +116,7 @@ export class NoticeApp extends LitElement {
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true },
-    subscriptions: { state: true }, subscriptionsLoading: { state: true }, subscriptionsError: { state: true },
+    subscriptions: { state: true }, subscriptionsLoading: { state: true }, subscriptionsError: { state: true }, subscriptionsOnly: { state: true },
     preferencesLoading: { state: true }, preferencesError: { state: true }, preferencesUnavailable: { state: true },
     unreadOnly: { state: true }, selecting: { state: true }, selectedReads: { state: true },
   };
@@ -124,6 +124,7 @@ export class NoticeApp extends LitElement {
   preferencesLoading = false;
   preferencesError = '';
   preferencesUnavailable = false;
+  subscriptionsOnly = remember('subscriptions-only') === '1';
   subscriptions: string[] = [];
   subscriptionsLoading = false;
   subscriptionsError = '';
@@ -209,6 +210,7 @@ export class NoticeApp extends LitElement {
           this.keyword = null;
           this.query = '';
           this.board = remember('board') ?? 'all';
+          this.subscriptionsOnly = remember('subscriptions-only') === '1';
           this.unreadOnly = remember('view-unread') === '1';
           this.selecting = false; this.selectedReads = [];
         }
@@ -459,6 +461,8 @@ export class NoticeApp extends LitElement {
     // 읽고 있는 글은 상세를 닫거나 다른 글로 옮길 때까지 남긴다.
     const scoped = list.filter((n) => !n.deadline || !deadlinePassed(n.deadline))
       .filter((n) => this.isExternal(n) === external)
+      .filter((n) => tab !== 'all' || !this.authUserId || !this.subscriptionsOnly
+        || (!this.subscriptionsLoading && !this.subscriptionsError && this.subscriptions.includes(n.source_id)))
       .filter((n) => !this.unreadOnly || !this.isRead(n) || n.id === this.selectedId || n.id === this.openedId);
     return orderNotices(scoped, this.sortFor(tab));
   }
@@ -737,6 +741,7 @@ export class NoticeApp extends LitElement {
             authBusy: this.authBusy, authError: this.authError,
             sources: this.sources.filter((source) => !source.external).map((source) => ({ id: source.id, label: boardName(source, source.id) })),
             subscriptions: this.subscriptions, loading: this.subscriptionsLoading, error: this.subscriptionsError,
+            subscriptionsOnly: this.subscriptionsOnly, setSubscriptionsOnly: (enabled: boolean) => { this.subscriptionsOnly = enabled; this.selectedId = null; this.selectedReads = []; remember('subscriptions-only', enabled ? '1' : '0'); },
             keywords: this.keywords, preferencesLoading: this.preferencesLoading, preferencesError: this.preferencesError, preferencesUnavailable: this.preferencesUnavailable,
             retryPreferences: () => { if (this.authUserId) { this.preferencesLoading = true; this.preferencesError = ''; void this.refreshPreferences(this.authUserId, this.subscriptionsEpoch); } },
             saveKeywords: (input: string) => { void this.saveKeywords(input); },
@@ -855,6 +860,15 @@ export class NoticeApp extends LitElement {
       return this.empty('목록을 불러오지 못했어요', '공지 데이터를 연결하는 중이에요. 잠시 뒤 다시 확인해 주세요', '다시 불러오기', () => this.refresh());
     }
     if (!list.length) {
+      if (this.tab() === 'all' && this.authUserId && this.subscriptionsOnly && this.subscriptionsLoading) {
+        return html`<p class="detail-note" role="status">구독한 게시판을 불러오고 있어요.</p>`;
+      }
+      if (this.tab() === 'all' && this.authUserId && this.subscriptionsOnly && this.subscriptionsError) {
+        return this.empty('구독을 불러오지 못했어요', '설정에서 다시 불러와 주세요', '설정 열기', () => this.setView('settings'));
+      }
+      if (this.tab() === 'all' && this.authUserId && this.subscriptionsOnly && !this.subscriptions.length) {
+        return this.empty('구독한 게시판이 없어요', '설정에서 게시판을 선택해 주세요', '설정 열기', () => this.setView('settings'));
+      }
       const boardPicker = html`<div class="group-head empty-head"><span></span>${this.boardSelect()}</div>`;
       if (this.query) return html`${boardPicker}${this.empty(`'${this.query}'에 맞는 공지가 없어요`, '다른 단어로 찾아보세요', '검색어 지우기', () => { this.query = ''; })}`;
       if (this.keyword && this.view !== 'saved' && this.unreadOnly) return html`${boardPicker}${this.empty(
