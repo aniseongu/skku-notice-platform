@@ -53,6 +53,9 @@ test('subscription filter keeps only the selected school board', async ({ page }
   await page.goto('/?api=sample/api/v1');
   const rows = page.locator('notice-rows-screen a.row');
   await expect(rows.first()).toBeVisible();
+  // 목록이 점진적으로 그려지므로 행 수가 두 번 연속 같을 때까지 기다린 뒤 기준 목록을 잡는다.
+  let previous = -1;
+  await expect.poll(async () => { const count = await rows.count(); const same = count === previous; previous = count; return same; }, { intervals: [300] }).toBe(true);
   const ids = await rows.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-id') ?? ''));
   const source = ids[0].split('/')[0];
   expect(ids.some((id) => !id.startsWith(`${source}/`))).toBeTruthy();
