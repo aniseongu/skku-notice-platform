@@ -697,22 +697,28 @@ test('side menu scrollbar: absent when everything fits, thin when it overflows',
   const sidebar = page.locator('.sidebar');
   const measure = () => sidebar.evaluate((el) => {
     const style = getComputedStyle(el);
-    return { overflowY: style.overflowY, thin: style.scrollbarWidth, gutter: el.offsetWidth - el.clientWidth - parseFloat(style.borderRightWidth), overflowing: el.scrollHeight > el.clientHeight };
+    return { overflowY: style.overflowY, thin: style.scrollbarWidth, bar: getComputedStyle(el, '::-webkit-scrollbar').width, gutter: el.offsetWidth - el.clientWidth - parseFloat(style.borderRightWidth), overflowing: el.scrollHeight > el.clientHeight };
   });
   const tall = await measure();
   expect(tall.overflowY).toBe('auto');
-  expect(tall.thin).toBe('thin');
+  expect(['thin', 'auto']).toContain(tall.thin);                // 크로미움은 ::-webkit-scrollbar, 파이어폭스는 thin
+  if (tall.thin === 'auto') expect(tall.bar).toBe('8px');
   expect(tall.overflowing).toBe(false);
   expect(tall.gutter).toBeLessThanOrEqual(0.5);                 // 넘치지 않으면 막대 자리도 없다(헤드리스는 막대를 그리지 않아 이 값은 참고용이다)
   await page.setViewportSize({ width: 1280, height: 360 });
   const short = await measure();
   expect(short.overflowing).toBe(true);
-  expect(short.thin).toBe('thin');                              // 넘쳐도 막대는 얇은 모양이다(실제 두께는 웨일에서 확인)
+  if (short.thin === 'auto') expect(short.bar).toBe('8px');     // 넘쳐도 막대는 8px 자리의 얇은 모양이다(실제 모양은 웨일에서 확인)
   // 평소에는 막대 색이 투명하고, 마우스를 올리면 색이 생긴다.
   await page.mouse.move(900, 200);                               // 포인터가 메뉴 위에 있으면 평소 모습을 잴 수 없다
   const rest = await sidebar.evaluate((el) => getComputedStyle(el).scrollbarColor);
   await sidebar.hover();
   const hover = await sidebar.evaluate((el) => getComputedStyle(el).scrollbarColor);
-  expect(rest).toContain('rgba(0, 0, 0, 0)');
-  expect(hover).not.toBe(rest);
+  const thumb = (state: string) => sidebar.evaluate((el, s) => getComputedStyle(el, '::-webkit-scrollbar-thumb').backgroundColor + s, state);
+  await page.mouse.move(900, 200);
+  const restThumb = await thumb('');
+  await sidebar.hover();
+  const hoverThumb = await thumb('');
+  if (short.thin === 'auto') { expect(restThumb).toBe('rgba(0, 0, 0, 0)'); expect(hoverThumb).not.toBe(restThumb); }
+  else { expect(rest).toContain('rgba(0, 0, 0, 0)'); expect(hover).not.toBe(rest); }
 });
