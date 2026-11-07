@@ -29,14 +29,16 @@ sources:
     url: https://swb.skku.edu/futurecar/notice.do
 
   # 외부 인턴 공고. 목록은 사이트마다 실행당 한 번, 상세는 게시판별 최대 5건(D-028).
-  # 학생인재개발팀은 사용자가 robots.txt 예외 수집을 명시 요청했다(2026-11-06).
+  # 학생인재개발팀(job.skku.edu)은 robots.txt가 전체를 막아 다수 사용자용 플랫폼 워커는 수집하지 않는다(콜렉터 없음).
+  # 개인용 원본 서비스에서만 사용자가 예외 수집을 요청했다(2026-11-06).
   - id: skku-career-intern
     name: 성대 학생인재개발팀
     kind: skku-career-intern
     url: https://job.skku.edu/Recruit/RecruitInternList.aspx?rp=1
     external: true
 
-  # robots.txt 확인(2026-11-03): linkareer.com은 / 허용, api.linkareer.com은 robots.txt 없음, jasoseol.com은 / 허용.
+  # robots.txt 확인(2026-11-03, 2026-11-07 재확인): linkareer.com은 / 허용, api.linkareer.com은 robots.txt 없음, jasoseol.com은 / 허용.
+  # 이용약관은 허가 없는 자동 수집을 금지한다. 프로젝트 소유자가 위험을 알고 2026-11-07에 수집을 지시했다(docs/BLOCKERS.md).
   - id: linkareer-intern
     name: 링커리어
     kind: linkareer

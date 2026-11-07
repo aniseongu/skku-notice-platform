@@ -11,7 +11,15 @@ import httpx
 import yaml
 
 from skku_notice.deadline import KST, extract_deadline
-from skku_notice.fetch import FetchError, fetch_detail, fetch_list
+from skku_notice.fetch import FetchError, fetch_detail, fetch_json_post, fetch_list
+from skku_notice.jobs import (
+    COLLECTORS,
+    LK_API,
+    LK_DETAIL,
+    LK_HEADERS,
+    parse_job_detail,
+    parse_linkareer_detail,
+)
 from skku_notice.parse import ParseError, parse_detail, parse_list
 
 
@@ -202,6 +210,129 @@ def run_collection(settings: dict, store: NoticeStore, now: datetime) -> tuple[i
     return total, failed
 
 
+EXTERNAL_INTERVAL = timedelta(minutes=55)
+EXTERNAL_DETAILS_PER_RUN = 5
+EXTERNAL_DETAIL_WINDOW = timedelta(days=45)
+
+
+def run_external_collection(settings: dict, store: NoticeStore, now: datetime, post=None) -> tuple[int, int]:
+    """Collect approved external internship boards like the original service.
+
+    One list request per site per run (at most once an hour), then up to five missing bodies per board.
+    Sources whose robots.txt forbids crawling (skku-career-intern) have no collector and are never fetched.
+    """
+    sources = [s for s in settings["sources"] if s.get("external") and s.get("kind") in COLLECTORS]
+    stamp = now.astimezone(KST).isoformat()
+    gap = max(1.5, float(settings.get("request_gap_seconds", 1.5)))
+    agent, timeout = settings["user_agent"], float(settings["timeout_seconds"])
+    post = post or (lambda url, body, headers: fetch_json_post(url, body, agent, timeout, headers))
+    last_request = None
+    total, failed = 0, 0
+
+    def pace():
+        nonlocal last_request
+        if last_request is not None:
+            time.sleep(max(0, gap - (time.monotonic() - last_request)))
+        last_request = time.monotonic()
+
+    for source in sources:
+        source_id = source["id"]
+        try:
+            previous_source = store.source(source_id) or {}
+            try:
+                age = now - datetime.fromisoformat(previous_source.get("last_success_at") or "")
+                if age.total_seconds() >= 0 and age < EXTERNAL_INTERVAL:
+                    continue
+            except (TypeError, ValueError):
+                pass
+            pace()
+            postings = COLLECTORS[source["kind"]](post, now, source_id)
+            numbers = [notice.article_no for notice, _ in postings]
+            previous = store.notices(source_id, numbers)
+            source_row = {
+                "id": source_id,
+                "name": source["name"],
+                "url": source["url"],
+                "external": True,
+                "last_success_at": previous_source.get("last_success_at"),
+            }
+            store.upsert("platform_sources", [source_row])
+            rows = []
+            for notice, deadline in postings:
+                notice_id = f"{source_id}/{notice.article_no}"
+                old = previous.get(notice_id, {})
+                title_changed = bool(old) and old.get("title") != notice.title
+                rows.append(
+                    {
+                        "id": notice_id,
+                        "source_id": source_id,
+                        "article_no": notice.article_no,
+                        "title": notice.title,
+                        "category": notice.category,
+                        "url": notice.url,
+                        "posted_on": notice.posted_on.isoformat(),
+                        "pinned": False,
+                        "deadline": deadline,
+                        "first_seen": old.get("first_seen", stamp),
+                        "fetched_at": old.get("fetched_at"),
+                        "body": old.get("body"),
+                        "body_html": old.get("body_html"),
+                        "attachments": old.get("attachments", []),
+                        "images": old.get("images", []),
+                        "changed_at": stamp if title_changed else old.get("changed_at"),
+                        "change_kind": "제목" if title_changed else old.get("change_kind"),
+                        "previous_title": (
+                            old.get("title") if title_changed else old.get("previous_title")
+                        ),
+                    }
+                )
+            # Newest postings without a body first; a failed body stays empty and is retried next run.
+            waiting = sorted(
+                (r for r in rows if not r["fetched_at"] and _recent(r["posted_on"], now)),
+                key=lambda r: (r["posted_on"], r["first_seen"]),
+                reverse=True,
+            )[:EXTERNAL_DETAILS_PER_RUN]
+            for row in waiting:
+                try:
+                    pace()
+                    if source["kind"] == "linkareer":
+                        query = {"query": LK_DETAIL, "variables": {"id": row["article_no"]}}
+                        data = post(LK_API, query, LK_HEADERS)
+                        detail = parse_linkareer_detail(data, row["article_no"], row["url"])
+                    else:
+                        html = fetch_detail(row["url"], agent, timeout)
+                        detail = parse_job_detail(html, source["kind"], row["article_no"], row["url"])
+                    row.update(
+                        {
+                            "body": detail.body_text,
+                            "body_html": detail.body_html,
+                            "attachments": [
+                                {"name": n, "url": u, "type": t, "size": z}
+                                for n, u, t, z in detail.attachments
+                            ],
+                            "images": list(detail.images),
+                            "fetched_at": stamp,
+                        }
+                    )
+                except (FetchError, ParseError, ValueError) as exc:
+                    print(f"{row['id']}: 본문 실패 ({type(exc).__name__})", flush=True)
+            store.upsert("platform_notices", rows)
+            store.upsert("platform_sources", [{**source_row, "last_success_at": stamp}])
+            total += len(rows)
+            print(f"{source_id}: 외부 목록 {len(rows)}건, 본문 {len(waiting)}건 시도", flush=True)
+        except (FetchError, StoreError, KeyError, TypeError, ValueError) as exc:
+            failed += 1
+            print(f"{source_id}: 외부 수집 실패 ({type(exc).__name__})", flush=True)
+    return total, failed
+
+
+def _recent(posted_on: str, now: datetime) -> bool:
+    try:
+        return now.date() - datetime.fromisoformat(posted_on).date() <= EXTERNAL_DETAIL_WINDOW
+    except ValueError:
+        return False
+
+
 def recently_collected(settings: dict, store: NoticeStore, now: datetime, minimum_minutes: int = 25) -> bool:
     """Skip duplicate runs while allowing the 30-minute timer to collect normally."""
     sources = [s for s in settings["sources"] if s.get("kind") == "skku-cms" and not s.get("external")]
@@ -228,8 +359,13 @@ def main() -> int:
             now = datetime.now(KST)
             if recently_collected(settings, store, now):
                 print("최근에 모든 게시판을 확인해 이번 중복 요청을 건너뛰어요.", flush=True)
-                return 0
-            count, failed = run_collection(settings, store, now)
+                count, failed = 0, 0
+            else:
+                count, failed = run_collection(settings, store, now)
+            # 외부 인턴 공고는 원본처럼 학교 게시판과 독립적으로 시간당 한 번 확인한다.
+            # 실패해도 학교 수집 결과와 종료 코드에는 영향을 주지 않는다.
+            external_count, _external_failed = run_external_collection(settings, store, now)
+            count += external_count
         finally:
             store.close()
     except (OSError, ValueError, yaml.YAMLError, StoreError) as exc:
