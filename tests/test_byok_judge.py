@@ -201,14 +201,14 @@ def test_school_notices_are_judged_with_the_same_key_and_saved_like_internships(
     school = [{"notice_id": "sw/1", "title": "졸업요건 안내", "body": "소프트웨어학과 재학생 대상"}]
     reply = Reply(
         '{"items": [{"id": "sw/1", "verdict": "relevant", "reason": "소프트웨어학과 재학생이 대상이에요", '
-        '"summary": "소프트웨어학과 재학생이 졸업요건을 확인해요.\\n12월 5일까지 제출해요."}]}'
+        '"summary": "소프트웨어학과 재학생이 졸업요건을 확인해요.\\n12월 5일까지 내요."}]}'
     )
     store = FakeStore([key_row("user-a")], pending=[], school=school)
     counts = judge.run_judging(store, MASTER, NOW, factory(reply))
     assert counts["judged"] == 1
     assert store.saved == [{"user_id": "user-a", "notice_id": "sw/1", "verdict": "relevant",
                             "reason": "소프트웨어학과 재학생이 대상이에요", "model": "gemini-3.1-flash-lite",
-                            "summary": "소프트웨어학과 재학생이 졸업요건을 확인해요.\n12월 5일까지 제출해요."}]
+                            "summary": "소프트웨어학과 재학생이 졸업요건을 확인해요.\n12월 5일까지 내요."}]
     assert store.updates[-1][1]["used_today"] == 1
 
 
