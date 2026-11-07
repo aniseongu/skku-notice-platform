@@ -145,11 +145,11 @@ test('notification settings show each device state and call the right actions', 
   const screen = page.locator('platform-settings-screen');
   await expect(screen.getByText('로그인하면 이 기기로 알림을 받을 수 있어요')).toBeVisible();
   await withApp(page, { authUserId: 'account-a', pushStatus: 'off', subscriptions: [], enablePush: 'fn:enable', disablePush: 'fn:disable', testNotification: 'fn:test' });
-  await expect(screen.locator('.setting-state')).toHaveText('꺼짐');
+  await expect(screen.locator('.setting-state')).toContainText('꺼져 있어요');
   await screen.getByRole('button', { name: '알림 받기' }).click();
   expect(await calls(page)).toEqual([['enable']]);
   await withApp(page, { pushStatus: 'on' });
-  await expect(screen.locator('.setting-state')).toHaveText('켜짐');
+  await expect(screen.locator('.setting-state')).toContainText('켜져 있어요');
   await expect(screen.getByText('받을 게시판을 고르면 새 공지를 알려드려요')).toBeVisible();
   await screen.getByRole('button', { name: '테스트 알림 띄우기' }).click();
   await screen.getByRole('button', { name: '알림 끄기' }).click();

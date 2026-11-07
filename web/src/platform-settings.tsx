@@ -171,11 +171,11 @@ function Overview({ model }: { model: SettingsModel }) {
         </div>
         <SettingsLink model={model} label="프로필 설정" help={profileSummary(model.profile)} section="profile" />
         <SettingsLink model={model} label="연결 키" help="Gemini 키와 아이캠퍼스 토큰" section="keys" />
-        <DeleteAccount model={model} />
         <Setting name="로그아웃" help="이 기기에서만 나가요. 구독과 저장은 계정에 남아요">
           <button type="button" className="ghost-button" disabled={model.authBusy} onClick={model.signOut}>이 기기에서 로그아웃</button>
           {model.authError ? <p className="field-note error" role="alert">{model.authError}</p> : null}
         </Setting>
+        <DeleteAccount model={model} />
       </> : <Setting name="계정" help="로그인하면 구독과 저장이 계정에 남아요">
         {!model.configured ? <p className="field-note">지금은 로그인할 수 없어요. 잠시 뒤 다시 열어 주세요</p>
           : <button type="button" className="solid-button" disabled={model.authBusy} onClick={model.signIn}>Google 계정으로 계속하기</button>}
@@ -190,9 +190,11 @@ function Overview({ model }: { model: SettingsModel }) {
         <Choice label="목록 보기" value={model.subscriptionsOnly ? 'mine' : 'all'} disabled={model.loading || !!model.error}
           options={[['all', '모든 게시판'], ['mine', '받는 게시판만']]} onPick={(value) => model.setSubscriptionsOnly(value === 'mine')} />
       </Setting> : null}
-      <Setting name="개인정보 처리방침" help="어떤 정보를 어디에 쓰고 어떻게 지우는지 알려 드려요">
-        <a className="settings-link inline-link" href="privacy.html" target="_blank" rel="noopener">처리방침 보기</a>
-      </Setting>
+      <a className="settings-link" href="privacy.html" target="_blank" rel="noopener">
+        <span><span className="setting-name">개인정보 처리방침</span>
+          <span className="setting-help">어떤 정보를 어디에 쓰고 어떻게 지우는지 알려 드려요</span></span>
+        <span className="settings-chevron" aria-hidden="true" />
+      </a>
       {model.canInstall ? <Setting name="앱 설치" help="바탕화면이나 홈 화면에서 바로 열어요">
         <button type="button" className="ghost-button" onClick={model.install}>앱으로 설치하기</button>
       </Setting> : null}
@@ -319,11 +321,10 @@ function Notifications({ model }: { model: SettingsModel }) {
   const thisDevice = info?.devices.find((device) => device.id === info.thisId) ?? null;
   return <div className="settings">
     <Back model={model} />
-    <Section id="s-notify" title="알림 받을 곳">
-      <Setting name="이 기기 알림" help="앱과 탭을 닫아도 브라우저가 켜져 있으면 휴대폰이나 PC 알림으로 받아요. 소리는 기기의 알림 설정을 따라요">
+    <Section id="s-notify" title="이 기기">
+      <Setting name="이 기기 알림" help="앱을 닫아도 브라우저가 켜져 있으면 알림으로 받아요">
         {!model.userId ? <p className="field-note">로그인하면 이 기기로 알림을 받을 수 있어요</p> : <>
-          <span className="setting-state">{on ? '켜짐' : '꺼짐'}</span>
-          <p className="field-note">브라우저 알림 권한: {permissionText(model.pushStatus)}</p>
+          <span className="setting-state">{on ? '켜져 있어요' : '꺼져 있어요'} · 브라우저 권한 {permissionText(model.pushStatus)}</span>
           <div className="inline">
             {on
               ? <><button type="button" className="ghost-button" onClick={model.disablePush}>알림 끄기</button>
@@ -479,12 +480,12 @@ function CalendarPage({ model }: { model: SettingsModel }) {
       </Setting>
     </Section>
     <Section id="s-calendar-help" title="알아 두세요">
-      <ul className="rule-list">
+      <div className="setting"><ul className="rule-list">
         <li>구글 로그인으로 허용한 권한은 이 앱이 만든 "성대 공지" 캘린더 안의 일정만 다뤄요. 내 다른 캘린더는 읽지도 쓰지도 못해요</li>
         <li>허용 화면이 "확인되지 않은 앱"이라고 나올 수 있어요. 이 앱이 아직 구글의 검증을 받지 않아서예요</li>
-        <li>자동으로 맞추려고 구글이 주는 장기 열쇠를 암호화해서 서버에 보관해요. 연결을 끊거나 계정을 지우면 그 열쇠도 지워지고, 구글 계정의 연결된 앱에서 권한을 거두면 서버도 더는 쓰지 못해요</li>
+        <li>자동으로 맞추려고 구글이 주는 열쇠를 암호화해서 서버에 보관해요. 연결을 끊거나 계정을 지우면 열쇠도 지워져요</li>
         <li>연결을 끊어도 구글 캘린더의 "성대 공지"는 남아요. 필요 없으면 구글 캘린더에서 지워 주세요</li>
-      </ul>
+      </ul></div>
     </Section>
   </div>;
 }
