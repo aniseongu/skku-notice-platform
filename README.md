@@ -32,12 +32,7 @@
 
 ## 시스템 아키텍처
 
-![성공 시스템 아키텍처: 공지 출처 → 서버의 타이머(수집, OCR, Gemini 판정, 아이캠퍼스 확인, 푸시 발송) → Supabase(PostgreSQL·Auth·Edge Function) → 웹앱과 기기 알림, 사용한 기술 아이콘](assets/readme/architecture.svg)
-
-1. 서버(Oracle Cloud)의 타이머가 30분마다 학교 게시판과 외부 인턴 공고를 읽어 Supabase에 저장하고, 첨부 이미지는 OCR로 글자를 뽑습니다.
-2. 사용자가 Gemini 키를 넣었다면 그 키로 나에게 맞는 공지인지 판정하고, 아이캠퍼스 토큰이 있으면 마감이 가까운 과제를 알림 대기열에 넣습니다.
-3. 푸시 워커가 관심 키워드와 판정 결과에 따라 소리 또는 무음으로 웹 푸시를 보냅니다.
-4. 웹앱은 Supabase에서 자기 계정의 데이터만 읽습니다. 키와 토큰은 Edge Function이 확인하고 암호화해 저장하며, 복호화는 서버의 해당 워커만 합니다.
+![성공 시스템 아키텍처: 공지 출처 → 서버의 타이머(수집, OCR, Gemini 판정, 아이캠퍼스 확인, 푸시 발송) → Supabase(PostgreSQL·Auth·Edge Function) → 웹앱과 기기 알림](assets/readme/architecture.svg)
 
 ## 기술 구성
 
@@ -54,15 +49,6 @@
 [![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-F80000?style=flat-square)](https://www.oracle.com/cloud/free/)
 [![Playwright](https://img.shields.io/badge/Playwright-2EAD33?style=flat-square)](https://playwright.dev/)
 [![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/aniseongu/skku-notice-platform/actions)
-
-| 영역 | 기술 |
-|---|---|
-| 웹 | React, TypeScript, Vite, PWA(Workbox), Cloudflare Pages(푸시하면 자동 배포) |
-| 인증·DB | Supabase Auth(Google), PostgreSQL, RLS, Edge Function(`byok`) |
-| 서버 API | NestJS(서버 내부용, 공개 HTTPS 주소는 아직 없음) |
-| 수집·OCR·알림 | Python, systemd 타이머(Oracle Cloud 서버), RapidOCR(한국어 ONNX) |
-
-OCI의 타이머는 수집(30분), OCR, Gemini 판정, 아이캠퍼스 확인, 푸시 발송으로 나뉘며 권한이 다른 사용자로 실행합니다. GitHub Actions는 CI에만 씁니다.
 
 ## 로컬 확인
 
