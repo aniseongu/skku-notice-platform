@@ -214,6 +214,8 @@ def run_collection(
                 }
                 if needs_detail and details_left <= 0:
                     # 이번 실행의 본문 한도를 넘었다. 본문 없이 저장하고 다음 실행에서 이어 받는다.
+                    if title_changed:
+                        row["fetched_at"] = None
                     needs_detail = False
                 if needs_detail:
                     details_left -= 1
