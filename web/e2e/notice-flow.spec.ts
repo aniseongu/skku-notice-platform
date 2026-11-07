@@ -640,3 +640,32 @@ test('core settings tasks finish within their click budget and in the expected o
   expect(log.length).toBe(3);
   expect((await calls(page)).some((call) => call[0] === 'toggle' && call[2] === true)).toBe(true);
 });
+
+test('google calendar page: connect first, then sync and disconnect, with plain explanations', async ({ page }) => {
+  await settingsAt(page);
+  const screen = page.locator('platform-settings-screen');
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, calendarId: null,
+    connectCalendar: 'fn:connect', syncCalendarNow: 'fn:sync', disconnectCalendar: 'fn:disconnect' });
+  await screen.getByRole('link', { name: /구글 캘린더/ }).click();
+  await expect(page).toHaveURL(/section=calendar/);
+  await expect(screen.getByRole('heading', { name: '구글 캘린더' })).toBeVisible();
+  await expect(screen.getByText('연결 안 됨')).toBeVisible();
+  await expect(screen.getByText(/확인되지 않은 앱/)).toBeVisible();
+  await screen.getByRole('button', { name: '구글 캘린더에 연결하기' }).click();
+  expect(await calls(page)).toEqual([['connect']]);
+  await withApp(page, { calendarId: 'abc123@group.calendar.google.com', calendarSyncedAt: '2026-11-08T03:00:00Z' });
+  await expect(screen.getByText(/연결됨/)).toBeVisible();
+  await expect(screen.getByRole('button', { name: '구글 캘린더에 연결하기' })).toHaveCount(0);
+  await screen.getByRole('button', { name: '지금 맞추기' }).click();
+  await screen.getByRole('button', { name: '연결 끊기' }).click();
+  expect(await calls(page)).toEqual([['sync'], ['disconnect']]);
+  await withApp(page, { calendarError: '구글 연결이 만료됐어요. 다시 연결해 주세요' });
+  await expect(screen.getByRole('alert')).toContainText('다시 연결');
+});
+
+test('google calendar page asks to sign in first when signed out', async ({ page }) => {
+  await settingsAt(page, '&section=calendar');
+  const screen = page.locator('platform-settings-screen');
+  await expect(screen.getByRole('heading', { name: '로그인이 필요해요' }).or(screen.getByText(/로그인/).first())).toBeVisible();
+  await expect(screen.getByRole('button', { name: '구글 캘린더에 연결하기' })).toHaveCount(0);
+});

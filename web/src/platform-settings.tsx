@@ -55,6 +55,17 @@ export interface SettingsModel {
   profileError: string;
   saveProfile: (profile: UserProfile) => void;
   openOnboarding: () => void;
+  calendar?: {
+    id: string | null;
+    syncedAt: string | null;
+    busy: boolean;
+    message: string;
+    error: string;
+    savedCount: number;
+    connect: () => void;
+    sync: () => void;
+    disconnect: () => void;
+  };
   byok?: {
     available: boolean;
     loading: boolean;
@@ -132,6 +143,7 @@ function Overview({ model }: { model: SettingsModel }) {
   return <div className="settings settings-overview">
     <Section id="s-preferences" title="내 설정">
       <SettingsLink model={model} label="알림" help="받을 게시판과 이 기기 알림" section="notifications" />
+      <SettingsLink model={model} label="구글 캘린더" help={model.calendar?.id ? '저장한 공지의 마감을 캘린더에 넣고 있어요' : '저장한 공지의 마감을 구글 캘린더에 넣어요'} section="calendar" />
       <SettingsLink model={model} label="관심 키워드" help={model.keywords.length ? `${model.keywords.length}개 키워드를 쓰고 있어요` : '관심 있는 공지를 골라 봐요'} section="keywords" />
     </Section>
     <Section id="s-account" title="계정">
@@ -321,6 +333,39 @@ function AboutMe({ model }: { model: SettingsModel }) {
   </Section>;
 }
 
+function CalendarPage({ model }: { model: SettingsModel }) {
+  const calendar = model.calendar;
+  if (!model.userId) return <div className="settings"><Back model={model} /><Section id="s-calendar" title="구글 캘린더"><LoginNote model={model} what="구글 캘린더" /></Section></div>;
+  if (!calendar) return null;
+  const connected = !!calendar.id;
+  const syncedAt = calendar.syncedAt ? new Date(calendar.syncedAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
+  return <div className="settings">
+    <Back model={model} />
+    <Section id="s-calendar" title="구글 캘린더">
+      <Setting name="저장한 공지의 마감" help={'저장한 공지 중 마감이 남은 것을 구글 캘린더의 "성대 공지"에 넣어요. 마감 30분 전부터 보여서 알림이 마감 전에 울려요'}>
+        <div className="connection-summary"><span className="setting-state">{connected ? `연결됨${syncedAt ? ` · ${syncedAt}에 맞춤` : ''}` : '연결 안 됨'}</span></div>
+        <div className="inline">
+          {connected
+            ? <button type="button" className="solid-button" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '맞추고 있어요' : '지금 맞추기'}</button>
+            : <button type="button" className="solid-button" disabled={calendar.busy} onClick={calendar.connect}>구글 캘린더에 연결하기</button>}
+          {connected ? <button type="button" className="ghost-button" disabled={calendar.busy} onClick={calendar.disconnect}>연결 끊기</button> : null}
+        </div>
+        {calendar.message ? <p className="field-note ok" role="status">{calendar.message}</p> : null}
+        {calendar.error ? <p className="field-note error" role="alert">{calendar.error}</p> : null}
+        <p className="field-note">현재 저장한 공지 {calendar.savedCount}개</p>
+      </Setting>
+    </Section>
+    <Section id="s-calendar-help" title="알아 두세요">
+      <ul className="rule-list">
+        <li>구글 로그인으로 허용한 권한은 이 앱이 만든 "성대 공지" 캘린더 안의 일정만 다뤄요. 내 다른 캘린더는 읽지도 쓰지도 못해요</li>
+        <li>허용 화면이 "확인되지 않은 앱"이라고 나올 수 있어요. 이 앱이 아직 구글의 검증을 받지 않아서예요</li>
+        <li>구글이 주는 열쇠는 1시간쯤 뒤에 만료돼요. 저장한 공지를 바꾼 뒤에는 "지금 맞추기"를 눌러 주세요. 만료됐으면 구글에서 한 번 더 허용하면 돼요</li>
+        <li>연결을 끊어도 구글 캘린더의 "성대 공지"는 남아요. 필요 없으면 구글 캘린더에서 지워 주세요</li>
+      </ul>
+    </Section>
+  </div>;
+}
+
 function Profile({ model }: { model: SettingsModel }) {
   const { profile } = model;
   const save = (patch: Partial<UserProfile>) => model.saveProfile({ ...profile, ...patch });
@@ -469,6 +514,7 @@ export function PlatformSettings({ model }: { model: SettingsModel }) {
   switch (model.section) {
     case 'notifications': return <Notifications model={model} />;
     case 'keywords': return <Keywords model={model} />;
+    case 'calendar': return <CalendarPage model={model} />;
     case 'profile': return <Profile model={model} />;
     case 'keys': return <Keys model={model} />;
     default: return <Overview model={model} />;

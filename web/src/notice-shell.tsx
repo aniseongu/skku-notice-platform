@@ -202,6 +202,8 @@ function settingsModel(app: AppController) {
       register: (apiKey: string) => { void app.registerKey(apiKey); }, remove: () => { void app.removeKey(); },
       canvas: app.canvasStatus, canvasBusy: app.canvasBusy, canvasError: app.canvasError,
       registerCanvas: (token: string) => { void app.registerCanvas(token); }, removeCanvas: () => { void app.removeCanvas(); } },
+    calendar: { id: app.calendarId, syncedAt: app.calendarSyncedAt, busy: app.calendarBusy, message: app.calendarMessage, error: app.calendarError, savedCount: app.saved.length,
+      connect: () => { void app.connectCalendar(); }, sync: () => { void app.syncCalendarNow(); }, disconnect: () => { void app.disconnectCalendar(); } },
   };
 }
 

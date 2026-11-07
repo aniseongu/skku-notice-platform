@@ -14,6 +14,7 @@ import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from './preferences';
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
+import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
 import { byokAvailable, loadByokStatus, loadCanvasStatus, loadNoticeSummary, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import type { Draft } from './onboarding-flow';
@@ -54,7 +55,7 @@ export function settingsSectionFromUrl(): string | null {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'keys';
   const section = params.get('section');
-  return section && ['notifications', 'keywords', 'profile'].includes(section) ? section : null;
+  return section && ['notifications', 'keywords', 'calendar', 'profile'].includes(section) ? section : null;
 }
 
 /** 설정 머리의 부제. 쪽마다 그 쪽에서 하는 일을 말한다. */
@@ -62,6 +63,7 @@ export function settingsSubtitle(): string {
   switch (settingsSectionFromUrl()) {
     case 'notifications': return '받을 게시판과 이 기기 알림을 정해요';
     case 'keywords': return '관심 있는 공지를 골라 봐요';
+    case 'calendar': return '저장한 공지의 마감을 구글 캘린더에 넣어요';
     case 'profile': return '내 정보와 Gemini에 알려줄 내용을 적어요';
     case 'keys': return '키와 지원 자격 정보를 관리해요';
     default: return '알림과 연결을 정해요';
@@ -71,7 +73,7 @@ export function settingsSubtitle(): string {
 export function settingsTitle(): string {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return '연결 키';
-  return ({ notifications: '알림', keywords: '관심 키워드', profile: '프로필 설정' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
+  return ({ notifications: '알림', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
 }
 
 export interface InstallPrompt extends Event { prompt(): Promise<void> }
@@ -140,6 +142,7 @@ export class AppController extends Reactive {
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, authName: { state: true }, authAvatar: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
     byokOn: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true }, canvasStatus: { state: true }, canvasBusy: { state: true }, canvasError: { state: true },
+    calendarId: { state: true }, calendarBusy: { state: true }, calendarMessage: { state: true }, calendarError: { state: true }, calendarSyncedAt: { state: true },
     profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, profileError: { state: true }, settingsSection: { state: true },
     onboardingOpen: { state: true }, onboardingManual: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
     keywordNote: { state: true },
@@ -174,6 +177,12 @@ export class AppController extends Reactive {
   canvasStatus: CanvasStatus | null = null;
   canvasBusy = false;
   canvasError = '';
+  /** 구글 캘린더: 앱이 만든 "성대 공지" 캘린더 id와 마지막으로 맞춘 시각 */
+  calendarId: string | null = null;
+  calendarBusy = false;
+  calendarMessage = '';
+  calendarError = '';
+  calendarSyncedAt: string | null = null;
   profile: UserProfile = EMPTY_PROFILE;
   profileStatus: 'idle' | 'loading' | 'ready' | 'unavailable' = 'idle';
   profileMessage = '';
@@ -260,7 +269,7 @@ export class AppController extends Reactive {
           const previousUserId = this.authUserId;
           this.authUserId = userId;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.summaries = new Map(); this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.summaries = new Map(); this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -273,7 +282,7 @@ export class AppController extends Reactive {
           this.preferencesLoading = !!userId;
           this.preferencesError = '';
           this.preferencesUnavailable = false;
-          if (userId) setTimeout(() => { void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshPush(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch); }, 0);
+          if (userId) setTimeout(() => { void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch); }, 0);
           setLocalOwner(userId);
           this.onboardingDismissed = !!userId && remember('onboarding-dismissed') === '1';
           this.saved = loadSaved();
@@ -289,6 +298,12 @@ export class AppController extends Reactive {
           this.selecting = false; this.selectedReads = [];
         }
         this.authEmail = session?.user.email ?? null;
+        // 구글 로그인 직후에만 접근 토큰이 온다. 캘린더 연결을 누르고 돌아온 경우에만 받아 두고 곧바로 일정을 맞춘다.
+        const providerToken = (session as { provider_token?: string | null } | null)?.provider_token;
+        if (providerToken && userId && this.takeCalendarPending()) {
+          this.rememberGoogleToken(providerToken);
+          setTimeout(() => { void this.syncCalendarNow(); }, 0);
+        }
         const meta = (session?.user.user_metadata ?? {}) as Record<string, unknown>;
         const name = meta.full_name ?? meta.name;
         this.authName = typeof name === 'string' && name.trim() ? name.trim().slice(0, 60) : null;
@@ -669,6 +684,101 @@ export class AppController extends Reactive {
       if (epoch === this.subscriptionsEpoch) this.canvasError = error instanceof Error ? error.message : '토큰을 지우지 못했어요.';
     } finally {
       if (epoch === this.subscriptionsEpoch) this.canvasBusy = false;
+    }
+  }
+
+  // ----- 구글 캘린더 -----
+  private takeCalendarPending(): boolean {
+    try { const on = sessionStorage.getItem('google-calendar-pending') === '1'; sessionStorage.removeItem('google-calendar-pending'); return on; } catch { return false; }
+  }
+
+  private rememberGoogleToken(value: string): void {
+    try { sessionStorage.setItem('google-calendar-token', JSON.stringify({ value, at: Date.now() })); } catch { /* 이 탭의 메모리에는 없으므로 다시 허용을 받는다 */ }
+  }
+
+  private forgetGoogleToken(): void {
+    try { sessionStorage.removeItem('google-calendar-token'); sessionStorage.removeItem('google-calendar-pending'); } catch { /* 없어도 된다 */ }
+  }
+
+  /** 구글 접근 토큰은 1시간 안에 만료돼서 50분까지만 쓴다. 서버에는 보내지 않고 이 탭에만 둔다. */
+  private googleToken(): string | null {
+    try {
+      const raw = sessionStorage.getItem('google-calendar-token');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { value?: unknown; at?: unknown };
+      return typeof parsed.value === 'string' && typeof parsed.at === 'number' && Date.now() - parsed.at < 50 * 60 * 1000 ? parsed.value : null;
+    } catch { return null; }
+  }
+
+  async refreshCalendar(userId: string, epoch: number): Promise<void> {
+    if (!authClient) return;
+    try {
+      const { data, error } = await authClient.from('user_calendar').select('calendar_id,synced_at').eq('user_id', userId).maybeSingle();
+      if (error) throw error;
+      if (epoch !== this.subscriptionsEpoch) return;
+      this.calendarId = typeof data?.calendar_id === 'string' ? data.calendar_id : null;
+      this.calendarSyncedAt = typeof data?.synced_at === 'string' ? data.synced_at : null;
+    } catch { /* 표가 아직 없으면 연결 전으로 보인다 */ }
+  }
+
+  /** 구글에서 캘린더 권한을 허용받는다. 허용하면 이 화면으로 돌아와 곧바로 일정을 맞춘다. */
+  async connectCalendar(): Promise<void> {
+    if (!authClient || !this.authUserId || this.calendarBusy) return;
+    this.calendarError = '';
+    try {
+      sessionStorage.setItem('google-calendar-pending', '1');
+      const { error } = await authClient.auth.signInWithOAuth({
+        provider: 'google',
+        options: { scopes: CALENDAR_SCOPE, redirectTo: new URL('./?view=settings&section=calendar', location.href).href, queryParams: { include_granted_scopes: 'true' } },
+      });
+      if (error) throw error;
+    } catch {
+      this.calendarError = '구글 연결을 시작하지 못했어요. 잠시 뒤 다시 눌러 주세요';
+    }
+  }
+
+  /** 저장한 공지의 마감을 캘린더에 맞춘다. 토큰이 없거나 만료됐으면 구글에서 다시 허용받는다. */
+  async syncCalendarNow(): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.calendarBusy) return;
+    const token = this.googleToken();
+    if (!token) { this.calendarMessage = '구글에서 다시 허용하면 바로 맞춰요'; await this.connectCalendar(); return; }
+    this.calendarBusy = true; this.calendarError = ''; this.calendarMessage = '';
+    try {
+      const notRelevant = new Set(this.saved.filter((item) => this.judgement(item as unknown as Notice)?.ai?.verdict === 'not_relevant').map((item) => item.id));
+      const events = await desiredEvents(this.saved, new Date(), notRelevant);
+      const calendar = await ensureCalendar(token, this.calendarId);
+      await syncCalendar(token, calendar, events);
+      const syncedAt = new Date().toISOString();
+      const { error } = await authClient.from('user_calendar').upsert({ user_id: userId, calendar_id: calendar, synced_at: syncedAt }, { onConflict: 'user_id' });
+      if (error) throw error;
+      if (epoch !== this.subscriptionsEpoch) return;
+      this.calendarId = calendar; this.calendarSyncedAt = syncedAt;
+      this.calendarMessage = events.size ? `저장한 공지의 마감 ${events.size}개를 캘린더에 맞췄어요` : '마감이 남은 저장 공지가 없어서 넣을 일정이 없어요';
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) {
+        this.calendarError = error instanceof GoogleError ? error.message : '캘린더에 맞추지 못했어요. 잠시 뒤 다시 눌러 주세요';
+        if (error instanceof GoogleError && /만료|허용/.test(error.message)) this.forgetGoogleToken();
+      }
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.calendarBusy = false;
+    }
+  }
+
+  /** 연결만 끊는다. 구글에 만든 캘린더와 일정은 사용자가 구글 캘린더에서 직접 지운다. */
+  async disconnectCalendar(): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.calendarBusy) return;
+    this.calendarBusy = true; this.calendarError = ''; this.calendarMessage = '';
+    try {
+      const { error } = await authClient.from('user_calendar').delete().eq('user_id', userId);
+      if (error) throw error;
+      this.forgetGoogleToken();
+      if (epoch === this.subscriptionsEpoch) { this.calendarId = null; this.calendarSyncedAt = null; this.calendarMessage = '연결을 끊었어요. 구글 캘린더의 "성대 공지"는 직접 지워 주세요'; }
+    } catch {
+      if (epoch === this.subscriptionsEpoch) this.calendarError = '연결을 끊지 못했어요. 잠시 뒤 다시 눌러 주세요';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.calendarBusy = false;
     }
   }
 
