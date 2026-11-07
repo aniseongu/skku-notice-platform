@@ -143,7 +143,7 @@ export class AppController extends Reactive {
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, authName: { state: true }, authAvatar: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
     byokOn: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true }, canvasStatus: { state: true }, canvasBusy: { state: true }, canvasError: { state: true },
     calendarId: { state: true }, calendarBusy: { state: true }, calendarMessage: { state: true }, calendarError: { state: true }, calendarSyncedAt: { state: true },
-    summarizing: { state: true }, summaryError: { state: true },
+    summarizing: { state: true }, summaryError: { state: true }, summaryErrorId: { state: true },
     profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, profileError: { state: true }, settingsSection: { state: true },
     onboardingOpen: { state: true }, onboardingManual: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
     keywordNote: { state: true },
@@ -187,6 +187,7 @@ export class AppController extends Reactive {
   /** 요약을 만드는 중인 공지 id와 마지막 오류 */
   summarizing: string | null = null;
   summaryError = '';
+  summaryErrorId: string | null = null;
   profile: UserProfile = EMPTY_PROFILE;
   profileStatus: 'idle' | 'loading' | 'ready' | 'unavailable' = 'idle';
   profileMessage = '';
@@ -273,7 +274,7 @@ export class AppController extends Reactive {
           const previousUserId = this.authUserId;
           this.authUserId = userId;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.summaries = new Map(); this.summarizing = null; this.summaryError = ''; this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.summaries = new Map(); this.autoSummaries = new Set(); this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -1249,17 +1250,26 @@ export class AppController extends Reactive {
     return null;
   }
 
+  /** 열어 본 공지에 요약이 없으면 내 Gemini 키로 자동으로 만든다. 공지마다 한 번만 시도하고, 실패하면 "다시 만들기"로 사용자가 누른다. */
+  private autoSummaries = new Set<string>();
+  autoSummary(notice: Notice): void {
+    if (this.summaries.get(notice.id) !== null || this.autoSummaries.has(notice.id)) return;   // 아직 불러오는 중이거나 이미 있다
+    if (!this.authUserId || !this.byokStatus || this.byokStatus.disabled || this.summarizing) return;
+    this.autoSummaries.add(notice.id);
+    setTimeout(() => { void this.makeSummary(notice); }, 0);
+  }
+
   /** 상세 화면의 "요약 만들기". 내 Gemini 키가 있어야 하고, 만든 요약은 저장돼서 다시 만들지 않는다. */
   async makeSummary(notice: Notice): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     if (!authClient || !userId || this.summarizing) return;
-    this.summarizing = notice.id; this.summaryError = '';
+    this.summarizing = notice.id; this.summaryError = ''; this.summaryErrorId = null;
     try {
       const text = await requestNoticeSummary(authClient, notice.id);
       if (epoch !== this.subscriptionsEpoch) return;
       this.summaries.set(notice.id, text);
     } catch (error) {
-      if (epoch === this.subscriptionsEpoch) this.summaryError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '요약을 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.';
+      if (epoch === this.subscriptionsEpoch) { this.summaryErrorId = notice.id; this.summaryError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '요약을 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.'; }
     } finally {
       if (epoch === this.subscriptionsEpoch) this.summarizing = null;
     }

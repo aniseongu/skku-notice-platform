@@ -9,8 +9,6 @@ export interface NoticeDetailModel {
   body: NoticeBody | null | 'loading';
   /** 내 Gemini 키로 만든 요약(없으면 null) */
   mySummary?: string | null;
-  /** 내 Gemini 키가 있어서 "요약 만들기"를 보일 수 있는지 */
-  summaryAvailable?: boolean;
   summarizing?: boolean;
   summaryError?: string;
   makeSummary?: () => void;
@@ -64,21 +62,16 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
     {reason ? <p className="detail-reason">{reason}</p> : null}
     {notice.deadline ? <p className="detail-deadline">{notice.deadline_kind ?? '마감'} {deadlineDetail(notice.deadline)} <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''}`}>{deadlineText(notice.deadline, model.today)}</span></p> : null}
     {notice.changed_at ? <p className="detail-change">{koreanDate(notice.changed_at.slice(0, 10))}에 원문 {notice.change_kind === '제목' ? '제목이' : '본문이'} 바뀌었어요</p> : null}
-    {summary ? <section className="detail-section summary callout" aria-labelledby="sec-summary">
-      <h3 id="sec-summary">요약 <span className="tag">{model.mySummary ? '내 Gemini' : 'AI'}</span></h3>
-      {summary.split('\n').filter(Boolean).map((line, index) => <p key={index}>{line}</p>)}</section>
-      : model.summaryAvailable && model.makeSummary ? <section className="detail-section" aria-labelledby="sec-summary">
-        <h3 id="sec-summary">요약</h3>
-        <button type="button" className="ghost-button" disabled={model.summarizing} onClick={model.makeSummary}>{model.summarizing ? '요약을 만들고 있어요' : '내 Gemini로 요약 만들기'}</button>
-        {model.summaryError ? <p className="field-note error" role="alert">{model.summaryError}</p> : null}</section>
+    {summary ? <section className="detail-section summary" aria-labelledby="sec-summary"><h3 id="sec-summary">요약</h3>{summary.split('\n').filter(Boolean).map((line, index) => <p key={index}>{line}</p>)}</section>
+      : model.summarizing ? <section className="detail-section" aria-labelledby="sec-summary"><h3 id="sec-summary">요약</h3><p className="detail-note first" role="status">요약을 만들고 있어요</p></section>
+      : model.summaryError && model.makeSummary ? <section className="detail-section" aria-labelledby="sec-summary"><h3 id="sec-summary">요약</h3><p className="detail-note first" role="status">{model.summaryError}</p><button type="button" className="text-button" onClick={model.makeSummary}>다시 만들기</button></section>
       : loaded?.summary_status === 'failed' ? <section className="detail-section" aria-labelledby="sec-summary"><h3 id="sec-summary">요약</h3><p className="detail-note first" role="status">요약을 만들지 못했어요. 나중에 다시 만들어 볼게요</p></section> : null}
     {body === 'loading' ? <p className="detail-note">본문을 불러오고 있어요</p> : !loaded ? <><p className="detail-note" role="status">본문을 불러오지 못했어요. 다시 불러오거나 원문을 확인해 주세요</p><button type="button" className="text-button" onClick={model.retry}>본문 다시 불러오기</button></>
       : loaded.translation?.body ? <><section className="detail-section body-text" aria-label="한국어로 옮긴 본문"><h3>본문 (한국어로 옮긴 글)</h3><p className="detail-note first">Gemini 번역이에요. 정확한 내용은 아래 영어 원문을 확인해 주세요</p>{loaded.translation.body.split(/\n+/).filter(Boolean).map((para, index) => <p key={index}>{para}</p>)}</section><div className="original-body" lang="en"><Body body={loaded} heading="영어 원문" /></div></> : <Body body={loaded} />}
-    {loaded?.ocr_text?.length ? <details className="detail-section ocr">
-      <summary>그림에서 읽은 글 보기</summary>
-      <p className="detail-note first">그림 속 글자를 자동으로 읽어서 틀릴 수 있어요. 그림과 원문이 정확해요</p>
+    {loaded?.ocr_text?.length ? <section className="detail-section body-text" aria-labelledby="sec-ocr">
+      <h3 id="sec-ocr">그림에서 읽은 글</h3><p className="detail-note first">그림 속 글자를 자동으로 읽어서 틀릴 수 있어요. 그림과 원문이 정확해요</p>
       {loaded.ocr_text.flatMap((text) => text.split(/\n+/).filter(Boolean)).map((line, index) => <p key={index}>{line}</p>)}
-    </details> : null}
+    </section> : null}
     {loaded?.attachments?.length ? <section className="detail-section" aria-labelledby="sec-files"><h3 id="sec-files">첨부 {loaded.attachments.length}개</h3><ul className="attachments">{loaded.attachments.map((file, index) => <li key={index}><a className="file" href={safeUrl(file.url)} target="_blank" rel="noopener"><span className="file-type">{fileType(file.name, file.type)}</span><span className="file-name">{file.name}</span>{file.size ? <span className="file-size">{file.size}</span> : null}</a></li>)}</ul><p className="detail-note first">누르면 학교 공지 사이트의 원본 파일을 받아요</p></section> : null}
     <dl className="facts" aria-label="글 정보"><div><dt>게시일</dt><dd>{koreanDate(notice.posted_on)}</dd></div>
       {notice.previous_title ? <div><dt>이전 제목</dt><dd>{cleanTitle(notice.previous_title)}</dd></div> : null}

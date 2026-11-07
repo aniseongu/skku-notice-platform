@@ -400,9 +400,10 @@ function SaveButton({ app, notice }: { app: AppController; notice: Notice }) {
 
 function Detail({ app, notice }: { app: AppController; notice: Notice }) {
   const judgement = app.judgement(notice);
+  app.autoSummary(notice);
   return <notice-detail-screen model={{
     notice, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
-    today: todayKst(), body: app.body(notice), mySummary: app.summary(notice), summaryAvailable: !!app.authUserId && !!app.byokStatus && !app.byokStatus.disabled, summarizing: app.summarizing === notice.id, summaryError: app.summarizing ? '' : app.summaryError, makeSummary: () => { void app.makeSummary(notice); }, interests: app.interests(notice),
+    today: todayKst(), body: app.body(notice), mySummary: app.summary(notice), summarizing: app.summarizing === notice.id, summaryError: app.summaryErrorId === notice.id && !app.summarizing ? app.summaryError : '', makeSummary: () => { void app.makeSummary(notice); }, interests: app.interests(notice),
     ai: judgement?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
     retry: () => { app.bodies.delete(notice.id); app.requestUpdate(); },
   }} />;

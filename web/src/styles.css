@@ -168,16 +168,8 @@
   .detail-title { font-size: 20px; line-height: 28px; font-weight: 700; letter-spacing: -0.02em; }
   .detail-reason { margin-top: 10px; font-size: 14px; line-height: 21px; color: var(--text-2); }
   .detail-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
-  .detail-section h3 { margin: 0 0 8px; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--text-2); }
+  .detail-section h3 { margin: 0 0 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
   .summary p { margin: 0 0 4px; font-size: 15px; line-height: 24px; }
-  /* 요약은 본문보다 먼저 눈에 들어오게 강조 상자로 보인다. */
-  .detail-section.callout { padding: 14px 16px; border: 0; border-left: 3px solid var(--accent); border-radius: 10px; background: var(--sunken); }
-  .detail-section.callout h3 { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 14px; }
-  .tag { padding: 1px 7px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; line-height: 16px; }
-  /* 자동으로 읽은 글은 참고용이라 접어 둔다. 키보드로 열고 닫을 수 있다. */
-  details.ocr > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: 14px; font-weight: 600; color: var(--text-2); }
-  details.ocr > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
-  details.ocr[open] > summary { margin-bottom: 6px; }
   .body-text p { margin: 0 0 10px; font-size: 15px; line-height: 26px; color: var(--text); white-space: pre-line; }
   .body-text img { display: block; max-width: 100%; height: auto; margin: 0 0 12px; border-radius: var(--r-sm); background: var(--sunken); }
   .detail-deadline { margin-top: 6px; font-size: 14px; line-height: 21px; font-weight: 600; font-variant-numeric: tabular-nums; }

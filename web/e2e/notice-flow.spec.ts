@@ -25,14 +25,11 @@ test('notice HTML is sanitized in React detail', async ({ page }) => {
   });
   await expect(page.locator('#xss-check .rich')).toBeVisible();
   await expect(page.locator('#xss-check [onerror], #xss-check a[href^="javascript:"], #xss-check script')).toHaveCount(0);
-  // 자동으로 읽은 글은 접힌 상자 안에 있고, 열면 글자 그대로(태그가 아닌 글자로) 보인다.
-  const ocr = page.locator('#xss-check details.ocr');
-  await expect(ocr.locator('summary')).toHaveText('그림에서 읽은 글 보기');
-  await ocr.locator('summary').click();
-  await expect(ocr).toContainText('<script>악성 내용</script>');
+  // 자동으로 읽은 글은 글자 그대로(태그가 아닌 글자로) 보인다.
+  await expect(page.locator('#xss-check [aria-labelledby="sec-ocr"]')).toContainText('<script>악성 내용</script>');
 });
 
-test('detail shows my Gemini summary first as a labelled callout and describes pictures by their text', async ({ page }) => {
+test('detail shows my Gemini summary first in the plain original style and describes pictures by their text', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   await page.waitForFunction(() => !!customElements.get('notice-detail-screen'));
   await page.evaluate(() => {
@@ -45,11 +42,14 @@ test('detail shows my Gemini summary first as a labelled callout and describes p
       body: { body: '본문', body_html: null, images: ['https://www.skku.edu/a.png'], ocr_text: ['졸업 요건 안내', '제출 기한 12월 5일'], attachments: [], fetched_at: 'x', body_from_image: false } };
   });
   const detail = page.locator('#summary-check');
-  const summary = detail.getByRole('region', { name: /요약/ });
-  await expect(summary).toContainText('내 Gemini');
+  const summary = detail.getByRole('region', { name: '요약' });
+  await expect(summary).not.toContainText('내 Gemini');                       // 별도 딱지 없이 원본처럼 글만 보인다
+  const style = await summary.evaluate((el) => { const st = getComputedStyle(el); return { left: st.borderLeftWidth, radius: st.borderTopLeftRadius }; });
+  expect(style.left).toBe('0px');                                              // 왼쪽 굵은 줄이 없다
+  expect(style.radius).toBe('0px');
   await expect(summary).toContainText('12월 5일까지 제출해요.');
   // 요약이 본문보다 앞에 있다.
-  const order = await detail.evaluate((root) => [...root.querySelectorAll('section, details')].map((n) => n.id || n.className));
+  const order = await detail.evaluate((root) => [...root.querySelectorAll('section')].map((n) => n.id || n.getAttribute('aria-labelledby') || n.className));
   expect(order[0]).toContain('summary');
   const alt = await detail.locator('img').getAttribute('alt');
   expect(alt).toContain('본문 그림 1');
@@ -721,4 +721,35 @@ test('side menu scrollbar: absent when everything fits, thin when it overflows',
   const hoverThumb = await thumb('');
   if (short.thin === 'auto') { expect(restThumb).toBe('rgba(0, 0, 0, 0)'); expect(hoverThumb).not.toBe(restThumb); }
   else { expect(rest).toContain('rgba(0, 0, 0, 0)'); expect(hover).not.toBe(rest); }
+});
+
+test('summary is made automatically: progress text, a retry button on failure, nothing without a key', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.waitForFunction(() => !!customElements.get('notice-detail-screen'));
+  await page.evaluate(() => {
+    const el = document.createElement('notice-detail-screen') as HTMLElement & { model: unknown };
+    el.id = 'auto-summary';
+    document.body.append(el);
+    const w = window as unknown as { asked: number; setModel: (patch: object) => void };
+    w.asked = 0;
+    const base = { notice: { id: 'a/3', source_id: 'a', article_no: '3', title: '장학 안내', category: null, url: 'https://www.skku.edu/x', posted_on: '2026-11-01', pinned: false, deadline: null, first_seen: null },
+      source: '학교', today: '2026-11-08', interests: [], ai: null, rule: null, notified: false, retry: () => {},
+      body: { body: '본문', body_html: null, images: [], attachments: [], fetched_at: 'x', body_from_image: false },
+      makeSummary: () => { w.asked += 1; } };
+    w.setModel = (patch) => { el.model = { ...base, ...patch }; };
+    w.setModel({});
+  });
+  const detail = page.locator('#auto-summary');
+  const set = (patch: object) => page.evaluate((p) => (window as unknown as { setModel: (x: object) => void }).setModel(p), patch);
+  await expect(detail.getByRole('region', { name: '요약' })).toHaveCount(0);   // 키가 없으면 요약 구역도 없다
+  await expect(detail.getByRole('button', { name: /요약 만들기/ })).toHaveCount(0);
+  await set({ summarizing: true });
+  await expect(detail.getByRole('region', { name: '요약' })).toContainText('요약을 만들고 있어요');
+  await set({ summaryError: '오늘 쓸 수 있는 요약을 모두 썼어요. 내일 다시 눌러 주세요.' });
+  await expect(detail.getByRole('region', { name: '요약' })).toContainText('내일 다시');
+  await detail.getByRole('button', { name: '다시 만들기' }).click();
+  expect(await page.evaluate(() => (window as unknown as { asked: number }).asked)).toBe(1);
+  await set({ mySummary: '재학생이 12월 5일까지 신청해요.' });
+  await expect(detail.getByRole('button', { name: '다시 만들기' })).toHaveCount(0);
+  await expect(detail.getByRole('region', { name: '요약' })).toContainText('12월 5일까지');
 });
