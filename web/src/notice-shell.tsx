@@ -226,7 +226,7 @@ function SideGroup({ app, id, title, count, children }: { app: AppController; id
 }
 
 function UpdatedLine({ app, count }: { app: AppController; count?: number }) {
-  if (app.loading && !app.generatedAt) return <p className="updated">불러오는 중</p>;
+  if (app.loading && !app.generatedAt) return <p className="updated">공지를 불러오고 있어요</p>;
   if (!app.generatedAt) return <p className="updated">받은 시각을 알 수 없어요</p>;
   const stale = Date.now() - Date.parse(app.generatedAt) > STALE_MS;
   const time = new Intl.DateTimeFormat('ko-KR', {
