@@ -671,7 +671,11 @@ test('google calendar page: connect first, then sync and disconnect, with plain 
   await expect(page).toHaveURL(/section=calendar/);
   await expect(screen.getByRole('heading', { name: '구글 캘린더' })).toBeVisible();
   await expect(screen.getByText('연결 안 됨')).toBeVisible();
-  await expect(screen.getByText(/확인되지 않은 앱/)).toBeVisible();
+  await expect(screen.getByText(/아직 구글의 검증을 받지 않아서예요/)).toBeVisible();
+  // 단계 안내: 누르면 무슨 일이 생기는지, "확인되지 않은 앱"이 나오면 어떻게 하는지 알려 준다.
+  await screen.getByText('연결하는 방법').click();
+  await expect(screen.getByText(/고급.*을 누른 뒤.*계속/)).toBeVisible();
+  await expect(screen.getByText(/"성대 공지" 캘린더가 생기고/)).toBeVisible();
   await screen.getByRole('button', { name: '구글 캘린더에 연결하기' }).click();
   expect(await calls(page)).toEqual([['connect']]);
   await withApp(page, { calendarId: 'abc123@group.calendar.google.com', calendarSyncedAt: '2026-11-08T03:00:00Z' });

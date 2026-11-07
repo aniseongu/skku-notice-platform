@@ -421,6 +421,12 @@ function CalendarPage({ model }: { model: SettingsModel }) {
         {calendar.message ? <p className="field-note ok" role="status">{calendar.message}</p> : null}
         {calendar.error ? <p className="field-note error" role="alert">{calendar.error}</p> : null}
         <p className="field-note">현재 저장한 공지 {calendar.savedCount}개</p>
+        <Guide label="연결하는 방법" steps={[
+          '"구글 캘린더에 연결하기"를 누르면 구글 허용 화면으로 가요',
+          '구글 계정을 고르고 "성공이 캘린더를 만들고 일정을 넣는 것"을 허용해요. "확인되지 않은 앱"이라고 나오면 "고급"을 누른 뒤 "계속"을 눌러요',
+          '허용하고 돌아오면 구글 캘린더에 "성대 공지" 캘린더가 생기고 저장한 공지의 마감이 바로 들어가요',
+          '저장한 공지를 바꾼 뒤에는 이 화면에서 "지금 맞추기"를 눌러요',
+        ]} />
       </Setting>
     </Section>
     <Section id="s-calendar-help" title="알아 두세요">
@@ -532,7 +538,7 @@ function GeminiRow({ model }: { model: SettingsModel }) {
     '만들어진 키를 붙여 넣고 "저장하기"를 눌러요. 저장하면 Gemini에 확인한 뒤 암호화해 서버에만 보관해요',
     '무료 등급은 보낸 내용이 Google 제품 개선에 쓰일 수 있어요. 키는 나에게 맞는 공지와 인턴 공고를 고르는 데만 써요',
   ]} />;
-  const help = '성대 공지와 인턴 공고 중 나에게 맞는 것을 소리로 알려드리는 데 써요';
+  const help = '나에게 맞는 공지를 소리로 알리고, 공지 요약과 영어 공지 번역을 만드는 데 써요';
   if (!byok?.available) {
     return <KeyRow name="Gemini 키" help={help} state="준비 중" guide={null}>
       <span className="field-note">지금은 키를 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
