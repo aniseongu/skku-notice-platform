@@ -703,3 +703,23 @@
   }
   @media (prefers-reduced-motion: reduce) { .switch, .switch::after, .onb-bar > span { transition: none; } }
 }
+
+/* 스크롤바: 내용이 넘칠 때만 생기고(overflow-y: auto), 얇게 그린다. 평소에는 보이지 않다가 마우스를 올리거나 키보드로 들어오면 나타난다. */
+@layer platform {
+  .sidebar, .list-pane, .detail-pane, .onb-main {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  .sidebar:hover, .sidebar:focus-within, .list-pane:hover, .list-pane:focus-within,
+  .detail-pane:hover, .detail-pane:focus-within, .onb-main:hover, .onb-main:focus-within {
+    scrollbar-color: color-mix(in srgb, var(--text-3) 55%, transparent) transparent;
+  }
+  /* 표준 속성을 모르는 오래된 브라우저(WebKit)용: 위아래 화살표 없이 6px 막대만 보인다. */
+  @supports not (scrollbar-color: auto) {
+    .sidebar::-webkit-scrollbar, .list-pane::-webkit-scrollbar, .detail-pane::-webkit-scrollbar, .onb-main::-webkit-scrollbar { width: 6px; height: 6px; }
+    .sidebar::-webkit-scrollbar-button, .list-pane::-webkit-scrollbar-button, .detail-pane::-webkit-scrollbar-button, .onb-main::-webkit-scrollbar-button { display: none; }
+    .sidebar::-webkit-scrollbar-track, .list-pane::-webkit-scrollbar-track, .detail-pane::-webkit-scrollbar-track, .onb-main::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb, .list-pane::-webkit-scrollbar-thumb, .detail-pane::-webkit-scrollbar-thumb, .onb-main::-webkit-scrollbar-thumb { border-radius: 999px; background: transparent; }
+    .sidebar:hover::-webkit-scrollbar-thumb, .list-pane:hover::-webkit-scrollbar-thumb, .detail-pane:hover::-webkit-scrollbar-thumb, .onb-main:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text-3) 55%, transparent); }
+  }
+}

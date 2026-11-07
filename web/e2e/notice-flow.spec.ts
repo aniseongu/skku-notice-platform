@@ -688,3 +688,29 @@ test('google calendar page asks to sign in first when signed out', async ({ page
   await expect(screen.getByRole('heading', { name: '로그인이 필요해요' }).or(screen.getByText(/로그인/).first())).toBeVisible();
   await expect(screen.getByRole('button', { name: '구글 캘린더에 연결하기' })).toHaveCount(0);
 });
+
+test('side menu scrollbar: absent when everything fits, thin when it overflows', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '왼쪽 메뉴는 넓은 화면에만 있다');
+  await page.setViewportSize({ width: 1280, height: 1400 });
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  const sidebar = page.locator('.sidebar');
+  const measure = () => sidebar.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { overflowY: style.overflowY, thin: style.scrollbarWidth, gutter: el.offsetWidth - el.clientWidth - parseFloat(style.borderRightWidth), overflowing: el.scrollHeight > el.clientHeight };
+  });
+  const tall = await measure();
+  expect(tall.overflowY).toBe('auto');
+  expect(tall.thin).toBe('thin');
+  expect(tall.overflowing).toBe(false);
+  expect(tall.gutter).toBeLessThanOrEqual(0.5);                 // 넘치지 않으면 막대 자리도 없다(헤드리스는 막대를 그리지 않아 이 값은 참고용이다)
+  await page.setViewportSize({ width: 1280, height: 360 });
+  const short = await measure();
+  expect(short.overflowing).toBe(true);
+  expect(short.thin).toBe('thin');                              // 넘쳐도 막대는 얇은 모양이다(실제 두께는 웨일에서 확인)
+  // 평소에는 막대 색이 투명하고, 마우스를 올리면 색이 생긴다.
+  const rest = await sidebar.evaluate((el) => getComputedStyle(el).scrollbarColor);
+  await sidebar.hover();
+  const hover = await sidebar.evaluate((el) => getComputedStyle(el).scrollbarColor);
+  expect(rest).not.toBe(hover);
+});
