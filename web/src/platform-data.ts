@@ -19,10 +19,22 @@ export async function loadPublicFeed(client: SupabaseClient): Promise<NoticesFil
 }
 
 export async function loadPublicBody(client: SupabaseClient, sourceId: string, articleNo: string): Promise<NoticeBody | null> {
-  const { data, error } = await client.from('platform_notices')
-    .select('id,body,body_html,attachments,images,fetched_at').eq('id', `${sourceId}/${articleNo}`).maybeSingle();
+  const id = `${sourceId}/${articleNo}`;
+  const [bodyResult, ocrResult] = await Promise.all([
+    client.from('platform_notices').select('id,body,body_html,attachments,images,fetched_at').eq('id', id).maybeSingle(),
+    Promise.resolve(client.from('platform_notice_images').select('image_url,platform_ocr_cache(extracted_text)')
+      .eq('notice_id', id).eq('status', 'ready').limit(3)).catch(() => null),
+  ]);
+  const { data, error } = bodyResult;
   if (error || !data || !data.fetched_at) return null;
+  const rows = (ocrResult?.error ? [] : ocrResult?.data ?? []) as unknown as
+    { image_url: string; platform_ocr_cache: { extracted_text?: unknown } | null }[];
+  const images: unknown[] = Array.isArray(data.images) ? data.images : [];
+  const ocrText = [...new Set(rows.filter((row) => images.includes(row.image_url))
+    .map((row) => row.platform_ocr_cache?.extracted_text)
+    .filter((text): text is string => typeof text === 'string' && !!text.trim())
+    .map((text) => text.slice(0, 100_000)))];
   return { version: 1, id: data.id, summary: null, body: data.body, body_html: data.body_html,
     body_status: 'ready', attachments: data.attachments, images: data.images,
-    body_from_image: false, fetched_at: data.fetched_at };
+    body_from_image: false, ocr_text: ocrText, fetched_at: data.fetched_at };
 }

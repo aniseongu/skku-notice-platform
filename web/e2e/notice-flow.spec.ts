@@ -21,10 +21,11 @@ test('notice HTML is sanitized in React detail', async ({ page }) => {
     const el = document.createElement('notice-detail-screen') as HTMLElement & { model: unknown };
     el.id = 'xss-check';
     document.body.append(el);
-    el.model = { notice: { id: 'a/1', source_id: 'a', article_no: '1', title: 'test', category: null, url: 'https://example.com', posted_on: '2026-11-01', pinned: false, deadline: null, first_seen: null }, source: 'test', today: '2026-11-07', body: { version: 1, id: 'a/1', summary: null, body: null, body_html: '<p>안전</p><img src=x onerror="window.__xss=1"><a href="javascript:alert(1)">bad</a>', attachments: [], fetched_at: '2026-11-01' }, interests: [], ai: null, rule: null, notified: false, retry() {} };
+    el.model = { notice: { id: 'a/1', source_id: 'a', article_no: '1', title: 'test', category: null, url: 'https://example.com', posted_on: '2026-11-01', pinned: false, deadline: null, first_seen: null }, source: 'test', today: '2026-11-07', body: { version: 1, id: 'a/1', summary: null, body: null, body_html: '<p>안전</p><img src=x onerror="window.__xss=1"><a href="javascript:alert(1)">bad</a>', attachments: [], ocr_text: ['<script>악성 내용</script>'], fetched_at: '2026-11-01' }, interests: [], ai: null, rule: null, notified: false, retry() {} };
   });
   await expect(page.locator('#xss-check .rich')).toBeVisible();
-  await expect(page.locator('#xss-check [onerror], #xss-check a[href^="javascript:"]')).toHaveCount(0);
+  await expect(page.locator('#xss-check [onerror], #xss-check a[href^="javascript:"], #xss-check script')).toHaveCount(0);
+  await expect(page.locator('#xss-check [aria-label="그림에서 읽은 글"]')).toContainText('<script>악성 내용</script>');
 });
 
 test('keyword editor saves input and clears a previous account on account change', async ({ page }) => {

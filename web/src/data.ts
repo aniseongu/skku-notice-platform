@@ -52,6 +52,8 @@ export interface NoticeBody {
   body_html?: string | null;
   // 본문 영역 안 그림 주소(본문이 그림으로만 올라온 글이 있다). 없을 수 있다.
   images?: string[];
+  // Shared OCR is supplemental and may contain recognition errors.
+  ocr_text?: string[];
   // 그림에서 기계가 읽어 옮긴 본문인지(D-014, D-015). 틀릴 수 있어 화면에 밝힌다.
   body_from_image?: boolean;
   // 영어 공지의 한국어 번역(translate.py). 원문은 body, body_html 그대로 있다.
