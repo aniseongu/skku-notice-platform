@@ -1,6 +1,5 @@
-// 화면 전체. 규칙은 docs/DESIGN.md, docs/design/ux-rules.md, docs/design/platforms.md.
-// 그림자 DOM을 쓰지 않는다(전역 토큰과 글꼴을 그대로 받으려고). 학교 글자는 Lit 템플릿으로만 넣어 자동 이스케이프한다.
-import { LitElement, html, nothing, type TemplateResult } from 'lit';
+// 앱의 상태와 동작. 화면은 notice-shell.tsx가 이 컨트롤러를 구독해 그린다(그림자 DOM 없이 전역 토큰과 글꼴을 그대로 받는다).
+// 규칙은 docs/DESIGN.md, docs/design/ux-rules.md, docs/design/platforms.md.
 import {
   type IconName, type Judgement, type MatchedFile, type Notice, type NoticeBody, type NoticesFile, type Source,
   boardName, cleanTitle, deadlineGroup, deadlinePassed, fetchBody, fetchJson, keywordMatches, postedGroup, safeUrl, todayKst,
@@ -13,26 +12,24 @@ import { APP_NAME } from './brand';
 import { authClient } from './auth';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from './preferences';
-import './platform-settings';
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
 import { byokAvailable, EMPTY_PROFILE, loadByokStatus, loadJudgeProfile, registerByokKey, removeByokKey, saveJudgeProfile, type ByokStatus, type JudgeProfile } from './byok';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
-import './notice-rows';
-import './notice-detail';
 import { localKey, setLocalOwner } from './local-scope.ts';
 import type { Subscription } from '@supabase/supabase-js';
 import { orderNotices, type Sort } from './notice-order';
+import { Reactive, defineReactive } from './reactive';
 
-type Tab = 'all' | 'intern' | 'saved';
-type View = Tab | 'settings';
-const TABS: { id: Tab; label: string; icon: IconName }[] = [
+export type Tab = 'all' | 'intern' | 'saved';
+export type View = Tab | 'settings';
+export const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'all', label: '성대 공지', icon: 'list' },
   // 전체는 성균관대 공지만, 인턴 공고는 링커리어와 자소설닷컴(사용자 결정 2026-11-03, D-026).
   { id: 'intern', label: '인턴 공고', icon: 'briefcase' },
   { id: 'saved', label: '저장', icon: 'bookmark' },
 ];
-const STALE_MS = 2 * 3600_000;
+export const STALE_MS = 2 * 3600_000;
 // 화면을 켜 둔 채로 있어도 1시간 주기의 새 공지와 D-day가 바뀌도록 5분마다 다시 받는다.
 const REFRESH_MS = 5 * 60_000;
 const isTab = (value: string | null): value is Tab => TABS.some((t) => t.id === value);
@@ -41,15 +38,15 @@ const INTERACTIVE = 'a, button, input, textarea, select, [contenteditable]';
 const wide = matchMedia('(min-width: 1080px)');
 const browserTab = matchMedia('(display-mode: browser)');
 
-function settingsTitle(): string {
+export function settingsTitle(): string {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return '연결 키';
   return ({ notifications: '알림', keywords: '관심 키워드', connection: '기기 연결', calendar: '캘린더' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
 }
 
-interface InstallPrompt extends Event { prompt(): Promise<void> }
+export interface InstallPrompt extends Event { prompt(): Promise<void> }
 
-function remember(key: string, value?: string): string | null {
+export function remember(key: string, value?: string): string | null {
   try {
     const storageKey = ['keywords', 'board', 'view-unread', 'subscriptions-only'].includes(key) ? localKey(key) : key;
     if (value === undefined) return localStorage.getItem(storageKey);
@@ -98,20 +95,12 @@ function applyTheme(theme: Theme) {
 // 자동 모드에서 기기 설정이 바뀌어도 맞춘다.
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => requestAnimationFrame(syncThemeColor));
 
-// 단축키 표시(Primer KeybindingHint 방식: 키 하나에 kbd 하나, 사방 1px 테두리). 화면 낭독기에는 aria-keyshortcuts로 알린다.
-const kbd = (...keys: string[]) => html`<span class="kbd-group" aria-hidden="true">${keys.map((k) => html`<kbd class="kbd">${k}</kbd>`)}</span>`;
 
-const SHORTCUTS: { group: string; items: [string, string[]][] }[] = [
-  { group: '목록', items: [['다음 공지', ['J']], ['이전 공지', ['K']], ['원문 열기', ['Enter']], ['저장하기', ['S']], ['상세 칸 닫기', ['Esc']]] },
-  { group: '이동', items: [['성대 공지', ['1']], ['인턴 공고', ['2']], ['저장', ['3']], ['검색', ['/']]] },
-  { group: '그 밖', items: [['공지 다시 가져오기', ['R']], ['설정 닫기', ['Esc']], ['단축키 보기', ['?']]] },
-];
+// 앱 루트 안의 요소를 찾는다. 화면은 한 문서에 하나뿐이다.
+const qs = <T extends Element>(selector: string) => document.querySelector<T>(selector);
+const qsel = (selector: string) => document.querySelector(selector);
 
-const icon = (name: IconName) => html`<svg class="i" aria-hidden="true"><use href="icons/sprite.svg#${name}"></use></svg>`;
-const gearIcon = html`<svg class="i" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/>
-  <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>`;
-
-export class NoticeApp extends LitElement {
+export class AppController extends Reactive {
   static properties = {
     notices: { state: true }, sources: { state: true }, matched: { state: true }, generatedAt: { state: true },
     view: { state: true }, board: { state: true }, keyword: { state: true }, keywords: { state: true }, query: { state: true },
@@ -134,16 +123,16 @@ export class NoticeApp extends LitElement {
   subscriptions: string[] = [];
   subscriptionsLoading = false;
   subscriptionsError = '';
-  private subscriptionsEpoch = 0;
+  subscriptionsEpoch = 0;
   pushStatus: 'unsupported' | 'checking' | 'off' | 'on' | 'busy' | 'denied' = 'checking';
   pushError = '';
   // 클릭 안에서 권한 요청을 바로 부르려면 등록과 공개키를 미리 받아 둔다.
-  private pushRegistration: ServiceWorkerRegistration | null = null;
-  private pushVapidKey: string | null = null;
-  private stateSyncedEpoch = -1;
-  private stateChain: { run: () => Promise<void>; epoch: number } | null = null;
+  pushRegistration: ServiceWorkerRegistration | null = null;
+  pushVapidKey: string | null = null;
+  stateSyncedEpoch = -1;
+  stateChain: { run: () => Promise<void>; epoch: number } | null = null;
   // 실패한 켜기 작업을 이어서 실행하기 위해 사용자와 epoch마다 하나만 보관한다.
-  private pushChain: { chain: ReturnType<typeof createEnableChain>; userId: string; epoch: number } | null = null;
+  pushChain: { chain: ReturnType<typeof createEnableChain>; userId: string; epoch: number } | null = null;
   pushRetry = false;
   byokOn = false;
   byokStatus: ByokStatus | null = null;
@@ -157,7 +146,7 @@ export class NoticeApp extends LitElement {
   authError = '';
   authBusy = false;
   authUserId: string | null = null;
-  private authSubscription: Subscription | null = null;
+  authSubscription: Subscription | null = null;
   notices: Notice[] = [];
   sources: Source[] = [];
   matched: MatchedFile | null = null;
@@ -176,8 +165,8 @@ export class NoticeApp extends LitElement {
   saved: SavedNotice[] = loadSaved();
   collapsed: string[] = (() => { try { const v = JSON.parse(remember('side-collapsed') ?? '[]'); return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []; } catch { return []; } })();
   // 읽은 글 id(최근 것만). null이면 이 기기에서 처음 연 것이라 지금 글을 모두 읽은 것으로 둔다.
-  private readState = loadReadState();
-  private needsReadBaseline = this.readState === null;
+  readState = loadReadState();
+  needsReadBaseline = this.readState === null;
   read: string[] | null = this.readState ? readIds(this.readState) : null;
   query = '';
   loading = true;
@@ -197,15 +186,13 @@ export class NoticeApp extends LitElement {
   boardMenuOpen = false;
   sortMenuOpen = false;
   // 글별 본문(D-013). 'loading'이면 받는 중, null이면 아직 서버가 받지 않은 글.
-  private bodies = new Map<string, NoticeBody | null | 'loading'>();
-  private toastTimer = 0;
+  bodies = new Map<string, NoticeBody | null | 'loading'>();
+  toastTimer = 0;
   // 상세 칸에 실제로 보이는 글(고른 글이 없으면 첫 글). 목록 행 표시와 맞춘다.
-  private shownId: string | null = null;
+  shownId: string | null = null;
 
-  createRenderRoot() { return this; }
-
-  connectedCallback() {
-    super.connectedCallback();
+  /** 화면에 붙을 때 한 번 부른다. 이벤트 구독과 첫 데이터 읽기를 시작한다. */
+  start() {
     // 새 문서는 목록에서 시작한다. 이전 문서의 상세 history 상태가 설정 닫기에서 되살아나지 않게 맞춘다.
     if (history.state?.notice) history.replaceState(null, '');
     remember('notice-sort', this.sort);
@@ -262,14 +249,13 @@ export class NoticeApp extends LitElement {
     window.addEventListener('appinstalled', () => { this.install = null; });
   }
 
-  disconnectedCallback() {
+  stop() {
     this.authSubscription?.unsubscribe();
     this.authSubscription = null;
     document.removeEventListener('pointerdown', this.closeBoardMenuOutside);
-    super.disconnectedCallback();
   }
 
-  private closeBoardMenuOutside = (event: PointerEvent) => {
+  closeBoardMenuOutside = (event: PointerEvent) => {
     if (this.boardMenuOpen && !(event.target as Element).closest('.board-picker')) this.boardMenuOpen = false;
     if (this.sortMenuOpen && !(event.target as Element).closest('.sort-picker')) this.sortMenuOpen = false;
   };
@@ -305,7 +291,7 @@ export class NoticeApp extends LitElement {
     }
   }
 
-  private async signIn() {
+  async signIn() {
     if (!authClient || this.authBusy) return;
     this.authBusy = true; this.authError = '';
     try {
@@ -317,7 +303,7 @@ export class NoticeApp extends LitElement {
     }
   }
 
-  private async signOut() {
+  async signOut() {
     if (!authClient || this.authBusy) return;
     this.authBusy = true; this.authError = '';
     try {
@@ -332,11 +318,11 @@ export class NoticeApp extends LitElement {
     } finally { this.authBusy = false; }
   }
 
-  private async collectNow() {
+  async collectNow() {
     await this.refresh();
   }
 
-  private updateRead(ids: string[], read: boolean) {
+  updateRead(ids: string[], read: boolean) {
     const selected = new Set(ids);
     const latestChange = read ? Math.max(0, ...this.notices.filter((notice) => selected.has(notice.id))
       .map((notice) => Date.parse(notice.changed_at ?? '') || 0)) : 0;
@@ -347,17 +333,17 @@ export class NoticeApp extends LitElement {
     if (syncable.length) this.uploadStates((guard) => pushRead(authClient!, syncable.map((id) => ({ id, read })), guard));
   }
 
-  private markRead(notice: Notice) {
+  markRead(notice: Notice) {
     if (this.isRead(notice)) return;
     this.updateRead([notice.id], true);
   }
 
-  private toggleReadSelection(id: string) {
+  toggleReadSelection(id: string) {
     this.selectedReads = this.selectedReads.includes(id)
       ? this.selectedReads.filter((selected) => selected !== id) : [...this.selectedReads, id];
   }
 
-  private markSelectedRead(read: boolean) {
+  markSelectedRead(read: boolean) {
     const selected = new Set(this.selectedReads);
     const changed = this.visible().filter((notice) => selected.has(notice.id) && this.isRead(notice) !== read);
     if (!changed.length) return;
@@ -366,17 +352,17 @@ export class NoticeApp extends LitElement {
     this.showToast(`${changed.length}개를 ${read ? '읽음' : '읽지 않음'}으로 표시했어요`);
   }
 
-  private closeSelection() {
+  closeSelection() {
     this.selecting = false;
     this.selectedReads = [];
-    this.updateComplete.then(() => this.querySelector<HTMLButtonElement>('.select-trigger')?.focus({ preventScroll: true }));
+    this.updateComplete.then(() => qs<HTMLButtonElement>('.select-trigger')?.focus({ preventScroll: true }));
   }
 
-  private isRead(notice: Notice): boolean { return this.readState === null || isNoticeRead(this.readState, notice.id, notice.changed_at); }
+  isRead(notice: Notice): boolean { return this.readState === null || isNoticeRead(this.readState, notice.id, notice.changed_at); }
 
-  private isSaved(notice: Notice): boolean { return this.saved.some((item) => item.id === notice.id); }
+  isSaved(notice: Notice): boolean { return this.saved.some((item) => item.id === notice.id); }
 
-  private toggleSave(notice: Notice) {
+  toggleSave(notice: Notice) {
     const next = toggleSaved(this.saved, notice);
     if (!next) { this.showToast('저장할 수 있는 공지가 가득 찼어요. 안 쓰는 저장을 지워 주세요'); return; }
     const added = next.length > this.saved.length;
@@ -387,14 +373,14 @@ export class NoticeApp extends LitElement {
   }
 
   /** 저장한 글. 지금 목록에 있으면 최신 정보로, 밀려났으면 저장할 때 정보로 보여 준다. */
-  private savedNotices(): Notice[] {
+  savedNotices(): Notice[] {
     return orderSaved(this.saved, this.notices, this.savedSort);
   }
 
-  private judgement(notice: Notice): Judgement | undefined { return this.matched?.items[notice.id]; }
+  judgement(notice: Notice): Judgement | undefined { return this.matched?.items[notice.id]; }
 
   /** 이 글에 맞는 관심 키워드: 이 기기의 글자 매칭 + 서버의 글자 매칭 + Gemini가 뜻으로 맞춘 것 */
-  private interests(notice: Notice): string[] {
+  interests(notice: Notice): string[] {
     // 제목과 분류(이 기기에서) + 서버가 본문과 그림 글자에서 찾은 것. 판정 이유 문장은 보지 않는다(D-024).
     const judgement = this.judgement(notice);
     const text = `${notice.title} ${notice.title_ko ?? ''} ${notice.category ?? ''}`;
@@ -405,7 +391,7 @@ export class NoticeApp extends LitElement {
     return [...found];
   }
 
-  private filtered(notices = this.notices): Notice[] {
+  filtered(notices = this.notices): Notice[] {
     const query = this.query.trim().toLowerCase();
     return notices.filter((n) => {
       const board = this.activeBoard();
@@ -417,7 +403,7 @@ export class NoticeApp extends LitElement {
   }
 
   // 지금 탭에 맞는 게시판들. 인턴 공고 탭은 외부 게시판, 그 밖은 학교 게시판.
-  private async refreshPreferences(userId: string, epoch: number): Promise<void> {
+  async refreshPreferences(userId: string, epoch: number): Promise<void> {
     if (!authClient) return;
     try {
       const keywords = await loadKeywordsPreference(authClient, userId);
@@ -436,12 +422,12 @@ export class NoticeApp extends LitElement {
   }
 
   // 외부 인턴 공고는 서버 공지 테이블에 없어 계정에 올리지 않는다.
-  private isSyncable(id: string): boolean {
+  isSyncable(id: string): boolean {
     const notice = this.notices.find((item) => item.id === id);
     return !!notice && !this.sources.find((source) => source.id === notice.source_id)?.external;
   }
 
-  private uploadStates(run: (guard: () => Promise<boolean>) => Promise<boolean>): void {
+  uploadStates(run: (guard: () => Promise<boolean>) => Promise<boolean>): void {
     if (!authClient || !this.authUserId) return;
     const client = authClient, userId = this.authUserId, epoch = this.subscriptionsEpoch;
     const guard = async () => epoch === this.subscriptionsEpoch && this.authUserId === userId && await sessionIs(client, userId);
@@ -450,7 +436,7 @@ export class NoticeApp extends LitElement {
 
   // 로그인 사용자의 저장·읽음을 서버와 맞춘다. 공지 목록이 있어야 서버에만 있는 저장의 글 정보를 찾을 수 있다.
   // 병합 → 저장 업로드 → 읽음 업로드 순서의 체인이며, 업로드가 일부 실패하면 다음 새로고침에서 실패한 단계부터 이어 간다.
-  private async syncStates(): Promise<void> {
+  async syncStates(): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     if (!authClient || !userId || !this.notices.length || this.stateSyncedEpoch === epoch) return;
     if (!this.stateChain || this.stateChain.epoch !== epoch) {
@@ -482,7 +468,7 @@ export class NoticeApp extends LitElement {
     }
   }
 
-  private async refreshByok(userId: string, epoch: number): Promise<void> {
+  async refreshByok(userId: string, epoch: number): Promise<void> {
     if (!authClient || !this.byokOn) { if (epoch === this.subscriptionsEpoch) this.byokLoading = false; return; }
     try {
       const [status, profile] = await Promise.all([loadByokStatus(authClient, userId), loadJudgeProfile(authClient, userId)]);
@@ -496,7 +482,7 @@ export class NoticeApp extends LitElement {
   }
 
   // 키는 요청 한 번에만 쓰고 앱 상태에는 두지 않는다. 계정이 바뀌면 결과를 버린다.
-  private async registerKey(apiKey: string): Promise<void> {
+  async registerKey(apiKey: string): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     if (!authClient || !userId || this.byokBusy) return;
     this.byokBusy = true; this.byokError = '';
@@ -511,7 +497,7 @@ export class NoticeApp extends LitElement {
     }
   }
 
-  private async removeKey(): Promise<void> {
+  async removeKey(): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     if (!authClient || !userId || this.byokBusy) return;
     this.byokBusy = true; this.byokError = '';
@@ -525,7 +511,7 @@ export class NoticeApp extends LitElement {
     }
   }
 
-  private async saveProfile(profile: JudgeProfile): Promise<void> {
+  async saveProfile(profile: JudgeProfile): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     if (!authClient || !userId || this.byokBusy) return;
     this.byokBusy = true; this.byokError = ''; this.profileMessage = '';
@@ -539,14 +525,14 @@ export class NoticeApp extends LitElement {
     }
   }
 
-  private async releasePush(userId: string): Promise<void> {
+  async releasePush(userId: string): Promise<void> {
     try {
       const registration = this.pushRegistration ?? await navigator.serviceWorker?.getRegistration() ?? null;
       if (registration) await releaseDevicePush(userId, registration, localStorage);
     } catch { /* 다음 로그인에서 소유자 표시로 다시 정리한다 */ }
   }
 
-  private async refreshPush(userId: string, epoch: number): Promise<void> {
+  async refreshPush(userId: string, epoch: number): Promise<void> {
     if (!authClient) return;
     const supported = isSecureContext && 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
     if (!supported) { if (epoch === this.subscriptionsEpoch) this.pushStatus = 'unsupported'; return; }
@@ -568,7 +554,7 @@ export class NoticeApp extends LitElement {
 
   // 클릭 핸들러에서 직접 불린다. 첫 await가 권한 요청이어야 브라우저가 사용자 동작으로 인정한다.
   // 실패하면 체인을 남겨 두어 "다시 시도"가 끝난 단계는 건너뛰고 실패한 단계부터 이어 가게 한다.
-  private async enablePush(): Promise<void> {
+  async enablePush(): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch, registration = this.pushRegistration;
     if (!authClient || !userId || this.pushStatus !== 'off') return;
     if (!registration || !this.pushVapidKey) { this.pushError = '알림 설정을 아직 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.'; return; }
@@ -599,7 +585,7 @@ export class NoticeApp extends LitElement {
     }
   }
 
-  private async disablePush(): Promise<void> {
+  async disablePush(): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch, registration = this.pushRegistration;
     if (!authClient || !userId || !registration || this.pushStatus !== 'on') return;
     this.pushStatus = 'busy'; this.pushError = '';
@@ -617,7 +603,7 @@ export class NoticeApp extends LitElement {
     }
   }
 
-  private async saveKeywords(input: string): Promise<void> {
+  async saveKeywords(input: string): Promise<void> {
     const userId = this.authUserId;
     const epoch = this.subscriptionsEpoch;
     if (!authClient || !userId || this.preferencesLoading || this.preferencesUnavailable) return;
@@ -641,7 +627,7 @@ export class NoticeApp extends LitElement {
     }
   }
 
-  private async refreshSubscriptions(userId: string, epoch: number): Promise<void> {
+  async refreshSubscriptions(userId: string, epoch: number): Promise<void> {
     if (!authClient) return;
     try {
       const sources = await loadSubscriptions(authClient, userId);
@@ -653,7 +639,7 @@ export class NoticeApp extends LitElement {
     }
   }
 
-  private async toggleSubscription(sourceId: string, enabled: boolean): Promise<void> {
+  async toggleSubscription(sourceId: string, enabled: boolean): Promise<void> {
     const userId = this.authUserId;
     const epoch = this.subscriptionsEpoch;
     if (!authClient || !userId || this.subscriptionsLoading) return;
@@ -671,14 +657,14 @@ export class NoticeApp extends LitElement {
     }
   }
 
-  private tabSources(): Source[] { return this.sources.filter((s) => Boolean(s.external) === (this.tab() === 'intern')); }
+  tabSources(): Source[] { return this.sources.filter((s) => Boolean(s.external) === (this.tab() === 'intern')); }
 
   // 고른 게시판이 지금 탭에 없으면 모든 게시판으로 본다(탭을 오가도 빈 목록이 되지 않게).
-  private activeBoard(): string { return this.tabSources().some((s) => s.id === this.board) ? this.board : 'all'; }
+  activeBoard(): string { return this.tabSources().some((s) => s.id === this.board) ? this.board : 'all'; }
 
-  private isExternal(notice: Notice): boolean { return Boolean(this.sources.find((s) => s.id === notice.source_id)?.external); }
+  isExternal(notice: Notice): boolean { return Boolean(this.sources.find((s) => s.id === notice.source_id)?.external); }
 
-  private byTab(list: Notice[], tab: Tab): Notice[] {
+  byTab(list: Notice[], tab: Tab): Notice[] {
     if (tab === 'saved') return list;
     const external = tab === 'intern';
     // 출처: https://freshrss.github.io/FreshRSS/en/users/10_filter.html (읽음 상태 필터)
@@ -691,14 +677,14 @@ export class NoticeApp extends LitElement {
     return orderNotices(scoped, this.sortFor(tab));
   }
 
-  private sortFor(tab: Tab): Sort { return tab === 'saved' ? this.savedSort : tab === 'intern' ? this.internSort : this.sort; }
+  sortFor(tab: Tab): Sort { return tab === 'saved' ? this.savedSort : tab === 'intern' ? this.internSort : this.sort; }
 
-  private tab(): Tab { return this.view === 'settings' ? 'all' : this.view; }
-  private visible(): Notice[] {
+  tab(): Tab { return this.view === 'settings' ? 'all' : this.view; }
+  visible(): Notice[] {
     return this.tab() === 'saved' ? this.filtered(this.savedNotices()) : this.byTab(this.filtered(), this.tab());
   }
 
-  private setView(view: View) {
+  setView(view: View) {
     const entering = view === 'settings' && this.view !== 'settings';
     this.selecting = false; this.selectedReads = [];
     this.view = view;
@@ -711,11 +697,11 @@ export class NoticeApp extends LitElement {
     else if (view !== 'settings') history.replaceState(null, '', `${location.pathname}?tab=${view}`);
     this.selectedId = null;
     window.scrollTo({ top: 0 });
-    this.querySelector('.list-pane')?.scrollTo({ top: 0 });
+    qsel('.list-pane')?.scrollTo({ top: 0 });
   }
 
   // 설정을 닫으면 들어오기 전에 보던 보기로 돌아간다.
-  private leaveSettings = () => {
+  leaveSettings = () => {
     const params = new URLSearchParams(location.search);
     if (params.has('keys') || params.has('section')) { location.assign('?view=settings'); return; }
     // 이 화면에서 설정을 열었으면 기록을 하나 되돌린다(주소에서 view=settings가 빠진다). 바로 설정 주소로 들어왔으면 바꿔 쓴다.
@@ -724,7 +710,7 @@ export class NoticeApp extends LitElement {
     this.setView(isTab(last) ? last : 'all');
   };
 
-  private onPopState = () => {
+  onPopState = () => {
     this.openedId = typeof history.state?.notice === 'string' ? history.state.notice : null;
     this.boardMenuOpen = false;
     this.sortMenuOpen = false;
@@ -742,29 +728,29 @@ export class NoticeApp extends LitElement {
     if (view !== this.view) { this.view = view; this.selectedId = null; this.selecting = false; this.selectedReads = []; }
   };
 
-  private setBoard(board: string) {
+  setBoard(board: string) {
     this.board = board; this.boardMenuOpen = false; this.selectedId = null; this.selectedReads = []; remember('board', board);
   }
-  private setKeyword(word: string | null) {
+  setKeyword(word: string | null) {
     this.keyword = word;
     this.selectedReads = [];
     this.selectedId = null;
     if (this.view === 'settings') this.setView('all');
   }
 
-  private setKeywords(words: string[]) {
+  setKeywords(words: string[]) {
     this.keywords = words;
     remember('keywords', JSON.stringify(words));
     if (this.keyword && !words.includes(this.keyword)) this.keyword = null;
   }
 
-  private setTheme(theme: Theme) {
+  setTheme(theme: Theme) {
     this.theme = theme;
     remember('theme', theme);
     applyTheme(theme);
   }
 
-  private async copyLink(notice: Notice) {
+  async copyLink(notice: Notice) {
     try {
       await navigator.clipboard.writeText(safeUrl(notice.url));
       this.showToast('원문 링크를 복사했어요');
@@ -774,12 +760,12 @@ export class NoticeApp extends LitElement {
   }
 
   // 휴대폰은 카카오톡 같은 앱으로 바로 보내는 공유 창을 쓴다. 없으면 링크를 복사한다.
-  private async share(notice: Notice) {
+  async share(notice: Notice) {
     if (!navigator.share) { this.copyLink(notice); return; }
     try { await navigator.share({ title: cleanTitle(notice.title_ko || notice.title), url: safeUrl(notice.url) }); } catch { /* 닫으면 그대로 둔다 */ }
   }
 
-  private showToast(text: string, link: string | null = null, linkLabel = '') {
+  showToast(text: string, link: string | null = null, linkLabel = '') {
     this.toast = text;
     this.toastLink = link;
     this.toastLinkLabel = linkLabel;
@@ -787,24 +773,24 @@ export class NoticeApp extends LitElement {
     if (!link) this.toastTimer = window.setTimeout(() => { this.toast = ''; }, 3500);
   }
 
-  private async runInstall() {
+  async runInstall() {
     if (!this.install) return;
     await this.install.prompt();
     this.install = null;
   }
 
-  private onKey(event: KeyboardEvent) {
+  onKey(event: KeyboardEvent) {
     const target = event.target as Element | null;
     if (event.key === 'Escape' && this.sortMenuOpen) {
       event.preventDefault();
       this.sortMenuOpen = false;
-      this.updateComplete.then(() => this.querySelector<HTMLButtonElement>('.sort-trigger')?.focus());
+      this.updateComplete.then(() => qs<HTMLButtonElement>('.sort-trigger')?.focus());
       return;
     }
     if (event.key === 'Escape' && this.boardMenuOpen) {
       event.preventDefault();
       this.boardMenuOpen = false;
-      this.updateComplete.then(() => this.querySelector<HTMLButtonElement>('.board-picker .board-trigger')?.focus());
+      this.updateComplete.then(() => qs<HTMLButtonElement>('.board-picker .board-trigger')?.focus());
       return;
     }
     if (this.selecting && event.key === 'Escape' && !(target instanceof HTMLInputElement && target.type === 'search')) {
@@ -826,10 +812,10 @@ export class NoticeApp extends LitElement {
       if (!next) return;
       this.selectedId = next.id;
       if (this.isWide) { this.setDetail(true); this.markRead(next); }
-      this.updateComplete.then(() => this.querySelector(`[data-id="${CSS.escape(next.id)}"]`)?.scrollIntoView({ block: 'nearest' }));
+      this.updateComplete.then(() => qsel(`[data-id="${CSS.escape(next.id)}"]`)?.scrollIntoView({ block: 'nearest' }));
     };
     const actions: Record<string, () => void> = {
-      '/': () => this.querySelector<HTMLInputElement>('.search input')?.focus(),
+      '/': () => qs<HTMLInputElement>('.search input')?.focus(),
       j: () => move(1), ArrowDown: () => move(1), k: () => move(-1), ArrowUp: () => move(-1),
       Enter: () => { const notice = list[index]; if (notice) { this.markRead(notice); window.open(safeUrl(notice.url), '_blank', 'noopener'); } },
       r: () => this.collectNow(), 1: () => this.setView('all'), 2: () => this.setView('intern'), 3: () => this.setView('saved'),
@@ -839,7 +825,7 @@ export class NoticeApp extends LitElement {
     if (action) { event.preventDefault(); action(); }
   }
 
-  private onRow(event: MouseEvent, notice: Notice) {
+  onRow(event: MouseEvent, notice: Notice) {
     if (this.selecting) { event.preventDefault(); this.toggleReadSelection(notice.id); return; }
     // 행을 누르면 앱 안 상세를 먼저 보여 주고, 원문은 "원문 열기"로 연다(D-013, ux-rules 1절).
     // Ctrl이나 Cmd를 누르고 누르면 브라우저 기본대로 원문을 새 탭에 연다.
@@ -855,13 +841,13 @@ export class NoticeApp extends LitElement {
     window.scrollTo({ top: 0 });
   }
 
-  private setDetail(open: boolean) {
+  setDetail(open: boolean) {
     this.detailOpen = open;
     if (!open && this.unreadOnly) this.selectedId = null;
     remember('detail', open ? '1' : '0');
   }
 
-  private body(notice: Notice): NoticeBody | null | 'loading' {
+  body(notice: Notice): NoticeBody | null | 'loading' {
     const cached = this.bodies.get(notice.id);
     if (cached !== undefined) return cached;
     this.bodies.set(notice.id, 'loading');
@@ -873,399 +859,6 @@ export class NoticeApp extends LitElement {
     });
     return 'loading';
   }
-
-  updated() {
-    // 단축키 창은 네이티브 dialog로 연다(포커스 가두기와 Esc 닫기를 브라우저가 맡는다).
-    const dialog = this.querySelector<HTMLDialogElement>('dialog.shortcuts');
-    if (dialog && this.shortcutsOpen && !dialog.open) dialog.showModal();
-    if (this.view === 'settings') {
-      document.title = `${settingsTitle()} - ${APP_NAME}`;
-      return;
-    }
-    document.title = APP_NAME;
-  }
-
-  render() {
-    if (!this.authReady) return html`<p role="status" class="platform-preview">로그인 상태를 확인하고 있어요.</p>`;
-    const filtered = this.filtered();
-    const tabs = TABS;
-    const counts = Object.fromEntries(tabs.map((t) => [t.id, t.id === 'saved'
-      ? this.filtered(this.savedNotices()).length : this.byTab(filtered, t.id).length]));
-    const list = this.visible();
-    const settings = this.view === 'settings';
-    const keywordScope = this.tab() === 'saved' ? this.savedNotices() : this.notices.filter((notice) =>
-      this.isExternal(notice) === (this.tab() === 'intern') && (!notice.deadline || !deadlinePassed(notice.deadline)));
-    const board = this.activeBoard();
-    const keywordTotals = keywordCounts(keywordScope.filter((notice) => board === 'all' || notice.source_id === board),
-      this.keywords, (notice) => this.interests(notice));
-    const title = settings ? settingsTitle()
-      : this.keyword ? this.keyword : TABS.find((t) => t.id === this.view)!.label;
-    const selected = settings ? undefined
-      : list.find((n) => n.id === this.selectedId) ?? (this.isWide ? list[0] : undefined);
-    this.shownId = selected?.id ?? null;
-    const reading = !this.isWide && !settings
-      ? this.notices.find((n) => n.id === this.openedId) ?? list.find((n) => n.id === this.openedId) : undefined;
-    const classes = [settings ? 'is-settings' : '', this.isWide && (!this.detailOpen || !selected) ? 'no-detail' : '', reading ? 'is-reading' : ''].join(' ');
-    const mobileNav = html`<nav class="tabbar glass" aria-label="보기" ?hidden=${settings || Boolean(reading)}>
-      ${tabs.map((t) => html`<button type="button" aria-current=${this.view === t.id ? 'page' : 'false'}
-        @click=${() => this.setView(t.id)}>${icon(t.icon)}<span>${t.label}</span></button>`)}
-    </nav>`;
-    return html`
-      <div class="wco-bar" aria-hidden="true"><svg class="brand-mark" aria-hidden="true"><use href="icons/sprite.svg#brand"></use></svg>${APP_NAME}</div>
-      <div class="app ${classes}">
-        <aside class="sidebar" aria-label="탐색">
-          <div class="pane-head brand"><svg class="brand-mark" aria-hidden="true"><use href="icons/sprite.svg#brand"></use></svg>${APP_NAME}</div>
-          <nav class="side-group" aria-label="보기">
-            ${tabs.map((t) => this.sideItem(t.label, counts[t.id], this.view === t.id, () => this.setView(t.id),
-              String(TABS.findIndex((x) => x.id === t.id) + 1), undefined, t.icon))}
-          </nav>
-          ${this.sideGroup('keywords', '관심 키워드', html`
-            ${this.keywords.map((word) => this.sideItem(word, keywordTotals.counts[word],
-              this.keyword === word && !settings, () => this.setKeyword(this.keyword === word ? null : word), undefined,
-              `${word}, 공지 ${keywordTotals.counts[word]}개`))}
-            <button type="button" class="side-item add" @click=${() => this.setView('settings')}>${this.keywords.length ? '키워드 관리하기' : '키워드 추가하기'}</button>`, keywordTotals.total)}
-          ${this.sideGroup('boards', this.tab() === 'intern' ? '인턴 공고 사이트' : '게시판', html`
-            ${[{ id: 'all', label: this.tab() === 'intern' ? '모든 사이트' : '모든 게시판' },
-              ...this.tabSources().map((s) => ({ id: s.id, label: boardName(s, s.id) }))]
-              .map((b) => this.sideItem(b.label, null, this.activeBoard() === b.id && !settings, () => { this.setBoard(b.id); if (settings) this.leaveSettings(); }))}`, this.tabSources().length)}
-          <div class="side-foot">
-            ${this.sideItem('설정', null, settings, () => this.setView('settings'))}
-          </div>
-        </aside>
-
-        <main class="list-pane">
-          <p class="platform-preview" role="status">미리보기예요. 공지는 한 시간 간격으로 확인해요. 알림은 준비하고 있어요.</p>
-          ${reading ? this.readingView(reading) : html`
-          <div class="navigation-head">
-          <header class="pane-head topbar glass ${settings ? '' : 'feed-topbar'}">
-            ${settings ? html`<button type="button" class="icon-button narrow-only back" aria-label="설정 닫기"
-              @click=${this.leaveSettings}>${icon('back')}</button>` : nothing}
-            ${settings ? nothing : html`<svg class="brand-mark narrow-only" aria-hidden="true"><use href="icons/sprite.svg#brand"></use></svg>`}
-            <div class="topbar-text">
-              <h1>${title}</h1>
-              ${settings ? html`<p class="updated">알림과 연결을 정해요</p>` : this.updatedLine(list.length)}
-            </div>
-            ${settings ? nothing : html`
-              <label class="search wide-only">${icon('search')}
-                <input type="search" placeholder="공지 찾기" autocomplete="off" aria-label="공지 검색" aria-keyshortcuts="/" .value=${this.query}
-                  @input=${(e: Event) => { this.query = (e.target as HTMLInputElement).value; this.selectedId = null; this.selectedReads = []; }}>${this.query ? nothing : kbd('/')}</label>
-              ${this.detailOpen || !selected ? nothing : html`<button type="button" class="icon-button wide-only" aria-label="상세 칸 열기" title="상세 칸 열기"
-                @click=${() => this.setDetail(true)}>${icon('panel')}</button>`}
-              <button type="button" class="icon-button" aria-label="공지 다시 가져오기" title="공지 다시 가져오기 (R)" aria-keyshortcuts="r"
-                ?disabled=${this.loading} @click=${this.collectNow}>${icon('refresh')}</button>`}
-            ${settings ? nothing : html`<button type="button" class="icon-button narrow-only" aria-label="설정"
-              @click=${() => this.setView('settings')}>${gearIcon}</button>`}
-            ${settings ? html`<button type="button" class="icon-button wide-only" aria-label="설정 닫기" title="설정 닫기 (Esc)"
-              aria-keyshortcuts="Escape" @click=${this.leaveSettings}>${icon('close')}</button>` : nothing}
-          </header>
-          </div>
-
-          ${settings ? html`<platform-settings-screen .model=${{
-            configured: !!authClient, userId: this.authUserId, email: this.authEmail,
-            authBusy: this.authBusy, authError: this.authError,
-            sources: this.sources.filter((source) => !source.external).map((source) => ({ id: source.id, label: boardName(source, source.id) })),
-            subscriptions: this.subscriptions, loading: this.subscriptionsLoading, error: this.subscriptionsError,
-            subscriptionsOnly: this.subscriptionsOnly, setSubscriptionsOnly: (enabled: boolean) => { this.subscriptionsOnly = enabled; this.selectedId = null; this.selectedReads = []; remember('subscriptions-only', enabled ? '1' : '0'); },
-            keywords: this.keywords, preferencesLoading: this.preferencesLoading, preferencesError: this.preferencesError, preferencesUnavailable: this.preferencesUnavailable,
-            retryPreferences: () => { if (this.authUserId) { this.preferencesLoading = true; this.preferencesError = ''; void this.refreshPreferences(this.authUserId, this.subscriptionsEpoch); } },
-            saveKeywords: (input: string) => { void this.saveKeywords(input); },
-            signIn: () => { void this.signIn(); }, signOut: () => { void this.signOut(); },
-            pushStatus: this.pushStatus, pushError: this.pushError, pushRetry: this.pushRetry,
-            byok: { available: this.byokOn, loading: this.byokLoading, busy: this.byokBusy, error: this.byokError, status: this.byokStatus,
-              profile: this.judgeProfile, profileMessage: this.profileMessage,
-              register: (apiKey: string) => { void this.registerKey(apiKey); }, remove: () => { void this.removeKey(); },
-              saveProfile: (profile: JudgeProfile) => { void this.saveProfile(profile); } },
-            enablePush: () => { void this.enablePush(); }, disablePush: () => { void this.disablePush(); },
-            toggle: (id: string, enabled: boolean) => { void this.toggleSubscription(id, enabled); },
-            retry: () => {
-              if (this.authUserId) { this.subscriptionsLoading = true; this.subscriptionsError = ''; void this.refreshSubscriptions(this.authUserId, this.subscriptionsEpoch); }
-            },
-          }}></platform-settings-screen>` : html`
-            <div class="tools narrow-only">
-              <label class="search">${icon('search')}
-                <input type="search" placeholder="제목, 분류, 판정 이유로 찾기" autocomplete="off" aria-label="공지 검색" .value=${this.query}
-                  @input=${(e: Event) => { this.query = (e.target as HTMLInputElement).value; this.selectedId = null; this.selectedReads = []; }}></label>
-              <div class="chips" role="group" aria-label="관심 키워드">
-                ${this.keywords.length ? html`<button type="button" class="chip" aria-pressed=${String(!this.keyword)} @click=${() => this.setKeyword(null)}>모두</button>` : nothing}
-                ${this.keywords.map((word) => html`<button type="button" class="chip" aria-pressed=${String(this.keyword === word)}
-                  aria-label=${`${word}, 공지 ${keywordTotals.counts[word]}개`}
-                  @click=${() => this.setKeyword(this.keyword === word ? null : word)}>${word} ${keywordTotals.counts[word]}</button>`)}
-                <button type="button" class="chip-add" @click=${() => this.setView('settings')}>${icon('plus')}키워드 추가하기</button>
-              </div>
-            </div>
-            ${this.viewFilters()}
-            <div class="list" aria-live="polite" aria-busy=${this.loading ? 'true' : 'false'}>${this.listBody(list)}</div>`}`}
-        </main>
-
-        <aside class="detail-pane" aria-label="공지 상세">
-          <div class="pane-head detail-head">
-            ${selected ? html`<button type="button" class="icon-button" aria-label="상세 칸 닫기" title="상세 칸 닫기 (Esc)" aria-keyshortcuts="Escape"
-              @click=${() => this.setDetail(false)}>${icon('close')}</button>` : nothing}
-            ${selected ? html`<div class="detail-actions">
-              ${this.saveButton(selected)}
-              <button type="button" class="ghost-button" @click=${() => this.copyLink(selected)}>링크 복사하기</button>
-              <a class="solid-button" href=${safeUrl(selected.url)} target="_blank" rel="noopener" aria-keyshortcuts="Enter">원문 열기${kbd('Enter')}</a></div>` : nothing}
-          </div>
-          ${selected ? this.detail(selected) : html`<p class="detail-note detail-empty">공지를 고르면 여기에 보여요</p>`}
-        </aside>
-      </div>
-
-      ${mobileNav}
-      <div class="toast" role="status" ?hidden=${!this.toast}>${this.toast}${this.toastLink ? html`
-        <div class="toast-actions"><a href=${this.toastLink} target=${this.toastLink.startsWith('?') ? '_self' : '_blank'} rel="noopener noreferrer">${this.toastLinkLabel}</a>
-          <button type="button" @click=${() => { this.toast = ''; this.toastLink = null; }}>닫기</button></div>` : nothing}</div>
-      ${this.shortcutsOpen ? this.shortcutsDialog() : nothing}
-    `;
-  }
-
-  /** 휴대폰 앱 안 상세 화면: 뒤로 가기, 상세, 바닥의 원문 열기 */
-  private readingView(notice: Notice) {
-    return html`
-      <header class="pane-head topbar glass">
-        <button type="button" class="icon-button back" aria-label="목록으로" @click=${() => history.back()}>${icon('back')}</button>
-        <div class="topbar-text"><h1>공지</h1></div>
-      </header>
-      <div class="reading">${this.detail(notice)}</div>
-      <div class="read-actions glass">
-        ${this.saveButton(notice)}
-        ${'share' in navigator
-          ? html`<button type="button" class="ghost-button" @click=${() => this.share(notice)}>공유하기</button>`
-          : html`<button type="button" class="ghost-button" @click=${() => this.copyLink(notice)}>링크 복사하기</button>`}
-        <a class="solid-button" href=${safeUrl(notice.url)} target="_blank" rel="noopener">원문 열기</a>
-      </div>`;
-  }
-
-  private shortcutsDialog() {
-    const close = () => { this.shortcutsOpen = false; };
-    return html`<dialog class="shortcuts" aria-labelledby="shortcuts-title" @close=${close}
-      @click=${(e: MouseEvent) => { if (e.target === e.currentTarget) (e.currentTarget as HTMLDialogElement).close(); }}>
-      <div class="dialog-head">
-        <h2 id="shortcuts-title">단축키</h2>
-        <button type="button" class="icon-button" aria-label="닫기" @click=${(e: Event) => (e.currentTarget as HTMLElement).closest('dialog')?.close()}>${icon('close')}</button>
-      </div>
-      ${SHORTCUTS.map((section) => html`<section class="shortcut-group">
-        <h3>${section.group}</h3>
-        <dl>${section.items.map(([label, keys]) => html`<div><dt>${label}</dt><dd>${kbd(...keys)}</dd></div>`)}</dl>
-      </section>`)}
-      <p class="dialog-foot">위아래 화살표로도 공지를 옮길 수 있어요</p>
-    </dialog>`;
-  }
-
-  // 사이드바 묶음은 머리를 눌러 접고 편다. 접은 묶음은 기억한다(사용자 요청 2026-11-03).
-  private sideGroup(id: string, title: string, items: TemplateResult, count?: number) {
-    const open = !this.collapsed.includes(id);
-    return html`<button type="button" class="side-head" aria-expanded=${String(open)} aria-controls="side-${id}"
-        @click=${() => {
-          this.collapsed = open ? [...this.collapsed, id] : this.collapsed.filter((x) => x !== id);
-          remember('side-collapsed', JSON.stringify(this.collapsed));
-        }}><span>${title}${!open && count ? html`<span class="side-count">${count}</span>` : nothing}</span><span class="side-chevron" aria-hidden="true"></span></button>
-      <div class="side-group" id="side-${id}" ?hidden=${!open}>${items}</div>`;
-  }
-
-  private sideItem(label: string, count: number | null, active: boolean, onClick: () => void, shortcut?: string, ariaLabel?: string, itemIcon?: IconName) {
-    return html`<button type="button" class="side-item" aria-current=${active ? 'page' : 'false'} @click=${onClick}
-      aria-label=${ariaLabel ?? nothing}
-      aria-keyshortcuts=${shortcut ?? nothing} title=${shortcut ? `${label} (${shortcut})` : nothing}>
-      <span class="side-label">${itemIcon ? icon(itemIcon) : nothing}<span>${label}</span></span>${count === null ? nothing : html`<span class="count">${count}</span>`}</button>`;
-  }
-
-  private updatedLine(count?: number) {
-    if (this.loading && !this.generatedAt) return html`<p class="updated">불러오는 중</p>`;
-    if (!this.generatedAt) return html`<p class="updated">받은 시각을 알 수 없어요</p>`;
-    const stale = Date.now() - Date.parse(this.generatedAt) > STALE_MS;
-    const time = new Intl.DateTimeFormat('ko-KR', {
-      timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-    }).format(new Date(this.generatedAt));
-    const total = count === undefined ? '' : `${count}건, `;
-    // "확인 필요"(판정)와 겹치지 않게 수집 지연은 다른 말로 쓴다.
-    return html`<p class="updated ${stale ? 'stale' : ''}">${stale ? `${time} 수집 지연` : `${total}${time} 기준`}</p>`;
-  }
-
-  private listBody(list: Notice[]): TemplateResult | TemplateResult[] {
-    if (this.loading && !this.notices.length) {
-      return html`<ol class="rows">${Array.from({ length: 6 }, () => html`
-        <li class="row skeleton" aria-hidden="true"><span></span><span></span><span></span></li>`)}</ol>`;
-    }
-    if (this.failed && !this.notices.length) {
-      return this.empty('목록을 불러오지 못했어요', '공지 데이터를 연결하는 중이에요. 잠시 뒤 다시 확인해 주세요', '다시 불러오기', () => this.refresh());
-    }
-    if (!list.length) {
-      if (this.tab() === 'all' && this.authUserId && this.subscriptionsOnly && this.subscriptionsLoading) {
-        return html`<p class="detail-note" role="status">구독한 게시판을 불러오고 있어요.</p>`;
-      }
-      if (this.tab() === 'all' && this.authUserId && this.subscriptionsOnly && this.subscriptionsError) {
-        return this.empty('구독을 불러오지 못했어요', '설정에서 다시 불러와 주세요', '설정 열기', () => this.setView('settings'));
-      }
-      if (this.tab() === 'all' && this.authUserId && this.subscriptionsOnly && !this.subscriptions.length) {
-        return this.empty('구독한 게시판이 없어요', '설정에서 게시판을 선택해 주세요', '설정 열기', () => this.setView('settings'));
-      }
-      const boardPicker = html`<div class="group-head empty-head"><span></span>${this.boardSelect()}</div>`;
-      if (this.query) return html`${boardPicker}${this.empty(`'${this.query}'에 맞는 공지가 없어요`, '다른 단어로 찾아보세요', '검색어 지우기', () => { this.query = ''; })}`;
-      if (this.keyword && this.view !== 'saved' && this.unreadOnly) return html`${boardPicker}${this.empty(
-        `'${this.keyword}'에 맞는 읽지 않은 공지가 없어요`, '읽지 않은 공지만 보기를 끄면 모든 공지를 볼 수 있어요')}`;
-      if (this.keyword) return html`${boardPicker}${this.empty(`'${this.keyword}'에 맞는 공지가 아직 없어요`, '새 글이 오면 여기에 모여요')}`;
-      if (this.view !== 'saved' && this.unreadOnly) return html`${boardPicker}${this.empty('읽지 않은 공지가 없어요', '읽지 않은 공지만 보기를 끄면 모든 공지를 볼 수 있어요')}`;
-      const empty = {
-        all: ['이 게시판에 공지가 없어요', '다른 게시판을 골라 보세요'],
-        intern: ['이 사이트에 공고가 없어요', '다른 사이트를 골라 보세요'],
-        saved: ['저장한 공지가 없어요', '공지를 열어 저장하면 여기에 모여요'],
-      }[this.tab()];
-      return html`${boardPicker}${this.empty(empty[0], empty[1])}`;
-    }
-    const today = todayKst();
-    const groups = new Map<string, Notice[]>();
-    for (const notice of list) {
-      const key = this.sortFor(this.tab()) === 'deadline'
-        ? !notice.deadline ? '마감일 미정' : deadlinePassed(notice.deadline) ? '마감 지난 글' : deadlineGroup(notice.deadline, today)
-        : this.view === 'saved' ? '저장한 공지' : postedGroup(notice.posted_on, today);
-      groups.set(key, [...(groups.get(key) ?? []), notice]);
-    }
-    return [...groups].map(([title, items], index) => html`
-      <section class="group" aria-label=${title}>
-        <div class="group-head"><h2>${title}</h2>${index === 0 ? this.boardSelect() : nothing}</div>
-        <notice-rows-screen .model=${{
-          rows: items.map((notice) => {
-            const ai = this.judgement(notice)?.ai ?? null;
-            const interests = this.interests(notice);
-            return { notice, source: boardName(this.sources.find((source) => source.id === notice.source_id), notice.source_id),
-              read: this.isRead(notice), saved: this.isSaved(notice), current: this.isWide && this.detailOpen && this.shownId === notice.id,
-              selected: this.selectedReads.includes(notice.id), dim: ai?.verdict === 'not_relevant' && !interests.length,
-              interests, ai, rule: this.judgement(notice)?.rule_name ?? null };
-          }),
-          today, selecting: this.selecting, savedView: this.view === 'saved',
-          open: (event: MouseEvent, notice: Notice) => this.onRow(event, notice),
-          toggleSelection: (id: string) => this.toggleReadSelection(id),
-        }}></notice-rows-screen>
-      </section>`);
-  }
-
-  private viewFilters() {
-    const list = this.visible();
-    if (this.selecting) {
-      const selected = new Set(this.selectedReads);
-      const selectedVisible = list.filter((notice) => selected.has(notice.id));
-      const selectedUnread = selectedVisible.filter((notice) => !this.isRead(notice)).length;
-      const selectedRead = selectedVisible.length - selectedUnread;
-      return html`<div class="view-options select-options" role="group" aria-label="공지 선택">
-        <label class="select-all"><input type="checkbox" .checked=${list.length > 0 && selectedVisible.length === list.length}
-          .indeterminate=${selectedVisible.length > 0 && selectedVisible.length < list.length}
-          ?disabled=${!list.length} @change=${(event: Event) => {
-            this.selectedReads = (event.target as HTMLInputElement).checked ? list.map((notice) => notice.id) : [];
-          }}>전체 선택</label>
-        <div class="view-actions"><button type="button" class="read-all" ?disabled=${!selectedUnread}
-          aria-label=${`선택한 읽지 않은 공지 ${selectedUnread}개 읽음으로 표시`}
-          @click=${() => this.markSelectedRead(true)}>읽음 표시</button>
-          <button type="button" class="read-all" ?disabled=${!selectedRead}
-            aria-label=${`선택한 읽은 공지 ${selectedRead}개 읽지 않음으로 표시`}
-            @click=${() => this.markSelectedRead(false)}>안 읽음 표시</button>
-          <button type="button" class="read-all" @click=${() => this.closeSelection()}>닫기</button></div>
-      </div>`;
-    }
-    const select = html`<button type="button" class="read-all select-trigger" ?disabled=${!list.length}
-      @click=${(event: MouseEvent) => {
-        this.selecting = true; this.selectedReads = [];
-        if (event.detail === 0) this.updateComplete.then(() => this.querySelector<HTMLInputElement>('.select-all input')?.focus({ preventScroll: true }));
-      }}>${icon('select-list')}선택</button>`;
-    if (this.view === 'saved') return html`<div class="view-options saved-options"><div class="view-actions">${select}${this.sortSelect()}</div></div>`;
-    return html`<div class="view-options" role="group" aria-label="공지 보기 조건">
-      <button type="button" class="view-toggle" aria-pressed=${String(this.unreadOnly)} @click=${() => {
-        this.unreadOnly = !this.unreadOnly;
-        this.selectedId = null;
-        remember('view-unread', this.unreadOnly ? '1' : '0');
-      }}><span class="filter-check" aria-hidden="true"></span>읽지 않은 공지만</button>
-      <div class="view-actions">${select}${this.sortSelect()}</div>
-    </div>`;
-  }
-
-  private sortSelect() {
-    const sort = this.sortFor(this.tab());
-    const options = [{ id: 'latest', label: this.view === 'saved' ? '저장한 순' : '최신순' }, { id: 'deadline', label: '마감순' }] as const;
-    const label = options.find((option) => option.id === sort)!.label;
-    return html`<div class="sort-picker">
-      <button type="button" class="board-trigger sort-trigger" aria-label="정렬: ${label}"
-        aria-expanded=${String(this.sortMenuOpen)} aria-controls="sort-options" @click=${() => {
-          this.sortMenuOpen = !this.sortMenuOpen;
-          if (this.sortMenuOpen) this.updateComplete.then(() => this.querySelector<HTMLButtonElement>('.sort-option[aria-pressed="true"]')?.focus());
-        }}>${label}<span class="board-chevron" aria-hidden="true"></span></button>
-      ${this.sortMenuOpen ? html`<div id="sort-options" class="board-options sort-options" role="group" aria-label="정렬 선택"
-        @keydown=${(event: KeyboardEvent) => {
-          const buttons = [...this.querySelectorAll<HTMLButtonElement>('.sort-option')];
-          const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-          const next = event.key === 'ArrowDown' ? (index + 1) % buttons.length
-            : event.key === 'ArrowUp' ? (index + buttons.length - 1) % buttons.length
-              : event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : -1;
-          if (next >= 0) { event.preventDefault(); buttons[next]?.focus(); }
-        }} @focusout=${(event: FocusEvent) => {
-          if (!(event.currentTarget as HTMLElement).parentElement?.contains(event.relatedTarget as Node | null)) this.sortMenuOpen = false;
-        }}>
-        ${options.map((option) => html`<button type="button" class="board-option sort-option" aria-pressed=${String(sort === option.id)}
-          @click=${() => {
-            if (this.view === 'saved') this.savedSort = option.id;
-            else if (this.view === 'intern') this.internSort = option.id;
-            else this.sort = option.id;
-            remember(this.view === 'saved' ? 'saved-sort' : this.view === 'intern' ? 'intern-sort' : 'notice-sort', option.id);
-            this.selectedId = null;
-            this.sortMenuOpen = false;
-            history.replaceState(null, '', `${location.pathname}?tab=${this.tab()}&sort=${option.id}`);
-            this.updateComplete.then(() => this.querySelector<HTMLButtonElement>('.sort-trigger')?.focus());
-          }}><span>${option.label}</span>${sort === option.id ? html`<span class="board-check" aria-hidden="true"></span>` : nothing}</button>`)}
-      </div>` : nothing}
-    </div>`;
-  }
-
-  private boardSelect() {
-    const boards = [{ id: 'all', label: this.tab() === 'intern' ? '모든 사이트' : '모든 게시판' },
-      ...this.tabSources().map((s) => ({ id: s.id, label: boardName(s, s.id) }))];
-    const current = boards.find((b) => b.id === this.activeBoard())?.label ?? boards[0].label;
-    return html`<div class="board-picker narrow-only" @focusout=${(event: FocusEvent) => {
-      if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) this.boardMenuOpen = false;
-    }}>
-      <button type="button" class="board-trigger" aria-label="게시판: ${current}" aria-expanded=${String(this.boardMenuOpen)}
-        aria-controls="board-options" @click=${() => {
-          this.boardMenuOpen = !this.boardMenuOpen;
-          if (this.boardMenuOpen) this.updateComplete.then(() => this.querySelector<HTMLButtonElement>('.board-option[aria-pressed="true"]')?.focus());
-        }}>
-        ${current}<span class="board-chevron" aria-hidden="true"></span>
-      </button>
-      ${this.boardMenuOpen ? html`<div id="board-options" class="board-options" role="group" aria-label="게시판 선택"
-        @keydown=${(event: KeyboardEvent) => {
-          const options = [...this.querySelectorAll<HTMLButtonElement>('.board-option')];
-          const index = options.indexOf(document.activeElement as HTMLButtonElement);
-          const next = event.key === 'ArrowDown' ? (index + 1) % options.length
-            : event.key === 'ArrowUp' ? (index + options.length - 1) % options.length
-              : event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : -1;
-          if (next >= 0) { event.preventDefault(); options[next]?.focus(); }
-        }}>
-        ${boards.map((b) => html`<button type="button" class="board-option" aria-pressed=${String(this.activeBoard() === b.id)}
-          @click=${() => { this.setBoard(b.id); this.updateComplete.then(() => this.querySelector<HTMLButtonElement>('.board-picker .board-trigger')?.focus()); }}>
-          <span>${b.label}</span>${this.activeBoard() === b.id ? html`<span class="board-check" aria-hidden="true"></span>` : nothing}</button>`)}
-      </div>` : nothing}
-    </div>`;
-  }
-
-  private empty(title: string, body: string, action?: string, onAction?: () => void) {
-    return html`<div class="empty">${icon('ginkgo')}<strong>${title}</strong><p>${body}</p>
-      ${action ? html`<button type="button" class="ghost-button" @click=${onAction}>${action}</button>` : nothing}</div>`;
-  }
-
-  private detail(notice: Notice) {
-    const judgement = this.judgement(notice);
-    return html`<notice-detail-screen .model=${{
-      notice, source: boardName(this.sources.find((source) => source.id === notice.source_id), notice.source_id),
-      today: todayKst(), body: this.body(notice), interests: this.interests(notice),
-      ai: judgement?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
-      retry: () => { this.bodies.delete(notice.id); this.requestUpdate(); },
-    }}></notice-detail-screen>`;
-  }
-
-  private saveButton(notice: Notice) {
-    const saved = this.isSaved(notice);
-    return html`<button type="button" class="icon-button save-button" aria-pressed=${String(saved)}
-      aria-label=${saved ? '저장 지우기' : '저장하기'} title=${saved ? '저장 지우기 (S)' : '저장하기 (S)'} aria-keyshortcuts="s"
-      @click=${() => this.toggleSave(notice)}>${icon(saved ? 'bookmark-on' : 'bookmark')}</button>`;
-  }
-
-
 }
 
-customElements.define('notice-app', NoticeApp);
+defineReactive(AppController, Object.keys(AppController.properties));
