@@ -1,0 +1,22 @@
+[Unit]
+Description=Process one shared notice image with RapidOCR
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=skku
+Group=skku
+WorkingDirectory=/opt/skku-notice-platform
+Environment=PYTHONPATH=/opt/skku-notice-platform/src
+Environment=OMP_NUM_THREADS=1
+EnvironmentFile=/etc/skku-notice/worker.env
+RuntimeDirectory=skku-notice-ocr
+RuntimeDirectoryMode=0755
+ExecStart=/usr/bin/flock -n /run/skku-notice-ocr/ocr.lock /opt/skku-notice-ocr/bin/python -m skku_notice.ocr_collection
+TimeoutStartSec=300
+MemoryMax=512M
+MemorySwapMax=768M
+CPUQuota=70%
+NoNewPrivileges=true
+PrivateTmp=true

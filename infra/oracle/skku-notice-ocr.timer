@@ -1,0 +1,11 @@
+[Unit]
+Description=Process shared notice OCR twice an hour
+
+[Timer]
+OnCalendar=*-*-* *:05,35:00
+Persistent=true
+RandomizedDelaySec=15
+Unit=skku-notice-ocr.service
+
+[Install]
+WantedBy=timers.target
