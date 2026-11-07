@@ -186,7 +186,7 @@ function settingsModel(app: AppController) {
     pushStatus: app.pushStatus, pushError: app.pushError, pushRetry: app.pushRetry,
     enablePush: () => { void app.enablePush(); }, disablePush: () => { void app.disablePush(); },
     testNotification: () => { void app.testNotification(); },
-    profile: app.profile, profileStatus: app.profileStatus, profileMessage: app.profileMessage,
+    profile: app.profile, profileStatus: app.profileStatus, profileMessage: app.profileMessage, profileError: app.profileError,
     saveProfile: (profile: UserProfile) => { void app.saveProfile(profile); },
     openOnboarding: () => app.openOnboarding(),
     byok: { available: app.byokOn, loading: app.byokLoading, busy: app.byokBusy, error: app.byokError, status: app.byokStatus,

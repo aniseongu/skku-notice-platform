@@ -119,7 +119,7 @@ export class AppController extends Reactive {
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
     byokOn: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true },
-    profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, settingsSection: { state: true },
+    profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, profileError: { state: true }, settingsSection: { state: true },
     onboardingOpen: { state: true }, onboardingManual: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
     keywordNote: { state: true },
     subscriptions: { state: true }, subscriptionsLoading: { state: true }, subscriptionsError: { state: true }, subscriptionsOnly: { state: true },
@@ -153,6 +153,7 @@ export class AppController extends Reactive {
   profile: UserProfile = EMPTY_PROFILE;
   profileStatus: 'idle' | 'loading' | 'ready' | 'unavailable' = 'idle';
   profileMessage = '';
+  profileError = '';
   // 설정 화면의 하위 쪽(원본과 같은 ?view=settings&section=... 주소). keys=1은 연결 키 쪽이다.
   settingsSection: string | null = settingsSectionFromUrl();
   onboardingOpen = false;
@@ -231,7 +232,7 @@ export class AppController extends Reactive {
           const previousUserId = this.authUserId;
           this.authUserId = userId;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.keywordNote = '';
+          this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -627,12 +628,12 @@ export class AppController extends Reactive {
   async saveProfile(profile: UserProfile): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     if (!authClient || !userId || this.byokBusy) return;
-    this.byokBusy = true; this.byokError = ''; this.profileMessage = '';
+    this.byokBusy = true; this.byokError = ''; this.profileMessage = ''; this.profileError = '';
     try {
       await storeProfile(authClient, userId, profile);
       if (epoch === this.subscriptionsEpoch) { this.profile = profile; this.profileMessage = '저장했어요.'; }
     } catch (error) {
-      if (epoch === this.subscriptionsEpoch) this.byokError = error instanceof Error ? error.message : '저장하지 못했어요.';
+      if (epoch === this.subscriptionsEpoch) this.profileError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.';
     } finally {
       if (epoch === this.subscriptionsEpoch) this.byokBusy = false;
     }

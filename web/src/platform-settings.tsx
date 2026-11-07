@@ -50,6 +50,7 @@ export interface SettingsModel {
   profile: UserProfile;
   profileStatus: 'idle' | 'loading' | 'ready' | 'unavailable';
   profileMessage: string;
+  profileError: string;
   saveProfile: (profile: UserProfile) => void;
   openOnboarding: () => void;
   byok?: {
@@ -274,11 +275,12 @@ function Profile({ model }: { model: SettingsModel }) {
           </dl>
           <button type="button" className="ghost-button" onClick={model.openOnboarding}>전공과 게시판 다시 고르기</button>
         </Setting>
-        <Setting name="학년"><Choice label="학년" value={profile.year}
+        <Setting name="학년"><Choice label="학년" value={profile.year} disabled={model.profileStatus !== 'ready'}
           options={YEARS.map((year) => [year, year === 5 ? '5학년 이상' : `${year}학년`] as const)} onPick={(year) => save({ year })} /></Setting>
-        <Setting name="재학 상태"><Choice label="재학 상태" value={profile.enrollmentStatus}
+        <Setting name="재학 상태"><Choice label="재학 상태" value={profile.enrollmentStatus} disabled={model.profileStatus !== 'ready'}
           options={ENROLLMENT.map((value) => [value, value] as const)} onPick={(enrollmentStatus) => save({ enrollmentStatus })} /></Setting>
         {model.profileMessage ? <p className="field-note ok" role="status">{model.profileMessage}</p> : null}
+        {model.profileError ? <p className="field-note error" role="alert">{model.profileError}</p> : null}
         {model.profileStatus === 'unavailable' ? <p className="field-note">지금은 내 정보를 불러올 수 없어요. 잠시 뒤 다시 열어 주세요</p> : null}
       </>}
     </Section>
@@ -309,12 +311,14 @@ function Keys({ model }: { model: SettingsModel }) {
     </Section> : null}
     <Section id="s-eligibility" title="지원 자격 확인용 정보">
       <Setting name="학기" help="공고의 지원 자격을 가릴 때만 써요. 이름이나 학번은 받지 않아요">
-        <Choice label="학기" value={profile.semester} options={SEMESTERS.map((value) => [value, `${value}학기`] as const)} onPick={(semester) => save({ semester })} />
+        <Choice label="학기" value={profile.semester} disabled={model.profileStatus !== 'ready'} options={SEMESTERS.map((value) => [value, `${value}학기`] as const)} onPick={(semester) => save({ semester })} />
       </Setting>
       <Setting name="병역">
-        <Choice label="병역" value={profile.militaryService} options={MILITARY.map((value) => [value, value] as const)} onPick={(militaryService) => save({ militaryService })} />
+        <Choice label="병역" value={profile.militaryService} disabled={model.profileStatus !== 'ready'} options={MILITARY.map((value) => [value, value] as const)} onPick={(militaryService) => save({ militaryService })} />
       </Setting>
       {model.profileMessage ? <p className="field-note ok" role="status">{model.profileMessage}</p> : null}
+      {model.profileError ? <p className="field-note error" role="alert">{model.profileError}</p> : null}
+      {model.profileStatus === 'unavailable' ? <p className="field-note">지금은 내 정보를 불러올 수 없어요. 잠시 뒤 다시 열어 주세요</p> : null}
     </Section>
   </div>;
 }

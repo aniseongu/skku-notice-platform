@@ -164,6 +164,12 @@ test('profile page edits year and status in place and can reopen the first-run s
     year: 3, semester: null, enrollmentStatus: '재학', militaryService: null, onboardedAt: '2026-11-07T00:00:00Z' };
   await withApp(page, { authUserId: 'account-a', profile, profileStatus: 'ready', saveProfile: 'fn:save', openOnboarding: 'fn:open' });
   await expect(screen.getByText('소프트웨어학과 (소프트웨어융합대학)')).toBeVisible();
+  await withApp(page, { profileStatus: 'unavailable' });
+  await expect(screen.getByRole('radio', { name: '4학년' })).toBeDisabled();
+  await expect(screen.getByText('지금은 내 정보를 불러올 수 없어요. 잠시 뒤 다시 열어 주세요')).toBeVisible();
+  await withApp(page, { profileStatus: 'ready', profileError: '저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.' });
+  await expect(screen.getByRole('alert')).toContainText('다시 시도');
+  await withApp(page, { profileError: '', saveProfile: 'fn:save', openOnboarding: 'fn:open' });
   await expect(screen.getByText('경영학과', { exact: true })).toBeVisible();
   await expect(screen.getByRole('radio', { name: '3학년' })).toHaveAttribute('aria-checked', 'true');
   await screen.getByRole('radio', { name: '4학년' }).click();
