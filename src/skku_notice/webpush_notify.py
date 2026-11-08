@@ -128,10 +128,14 @@ def send_web_push(
     except ValueError:
         return False
     if config is None:
+        if canvas_summary is not None:
+            print("웹 푸시: 연결된 기기가 없어 아이캠퍼스 알림을 보내지 않았어요", file=sys.stderr)
         return canvas_summary is not None
     subscriptions = [subscription for subscription in config.subscriptions
                      if canvas_summary is None or _accepts_canvas(subscription, canvas_summary)]
     if not subscriptions:
+        # 기기별로 아캠 알림을 끈 경우다. 성공으로 보지만 왜 안 갔는지 로그에 남긴다.
+        print("웹 푸시: 이 알림을 받도록 설정한 기기가 없어 보내지 않았어요", file=sys.stderr)
         return True
     payload = json.dumps({"title": title[:180], "body": body[:600], "url": url, "tag": tag,
                           "silent": priority == "low"}, ensure_ascii=False)

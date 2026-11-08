@@ -5,6 +5,7 @@
 import json
 import sys
 import time
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
@@ -173,20 +174,33 @@ def _lecture_completion(value: object) -> bool | None:
     return None
 
 
+def _lecture_skip(row: dict, now: datetime) -> str | None:
+    """Why a lecture row is not alerted, or None when it is. Names only, never titles."""
+    info = row.get("content_data") or {}
+    if info.get("use_attendance") is not True:
+        return "출석 안 씀"
+    due = _dt(info.get("due_at"))
+    if row.get("published") is False or info.get("published") is False:
+        return "비공개"
+    completed = _lecture_completion(row.get("completed"))
+    if completed is not False:
+        return "완료" if completed else "완료 여부 모름"
+    if not due:
+        return "마감 없음"
+    if due <= now:
+        return "마감 지남"
+    if row.get("attendance_status") == "attendance":
+        return "출석 처리됨"
+    if _dt(info.get("unlock_at")) and _dt(info["unlock_at"]) > now:
+        return "아직 안 열림"
+    return None
+
+
 def _lecture(course: dict, row: dict, now: datetime) -> CanvasItem | None:
     info = row.get("content_data") or {}
-    due = _dt(info.get("due_at"))
-    if (
-        info.get("use_attendance") is not True
-        or row.get("published") is False
-        or info.get("published") is False
-        or _lecture_completion(row.get("completed")) is not False
-        or not due
-        or due <= now
-        or row.get("attendance_status") == "attendance"
-        or (_dt(info.get("unlock_at")) and _dt(info["unlock_at"]) > now)
-    ):
+    if _lecture_skip(row, now):
         return None
+    due = _dt(info.get("due_at"))
     item_id = row.get("module_item_id") or row.get("id")
     if not item_id or not row.get("title"):
         return None
@@ -258,6 +272,7 @@ def read_canvas(
 def _read_courses(courses: list[dict], now: datetime, get, gap: float, network: bool,
                   lecture_session=None, on_incomplete=None) -> list[CanvasItem]:
     found: dict[str, CanvasItem] = {}
+    skipped: Counter[str] = Counter()
     for course in courses:
         if not isinstance(course, dict) or not str(course.get("id", "")).isdigit() or not course.get("name"):
             continue
@@ -304,7 +319,12 @@ def _read_courses(courses: list[dict], now: datetime, get, gap: float, network: 
                 found[item.key] = item
         for module in modules:
             for row in module.get("module_items") or []:
+                if network and lecture_session:
+                    skipped[_lecture_skip(row, now) or "알림 대상"] += 1
                 item = _lecture(course, row, now)
                 if item and item.key not in found:
                     found[item.key] = item
+    if skipped:
+        # 강의가 0개일 때 어느 조건에서 빠졌는지 알 수 있게 분류별 개수만 남긴다(제목과 과목명은 쓰지 않는다).
+        print("강의 항목 분류: " + ", ".join(f"{key} {count}" for key, count in sorted(skipped.items())))
     return sorted(found.values(), key=lambda item: (item.due, item.key))

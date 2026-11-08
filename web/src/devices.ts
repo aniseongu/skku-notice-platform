@@ -83,3 +83,11 @@ export async function saveDeviceName(client: SupabaseClient, userId: string, dev
   const { error } = await client.from('user_push_subscriptions').update({ device_name: name.trim() }).eq('id', deviceId).eq('user_id', userId);
   if (error) throw error;
 }
+
+/** 같은 이름이 둘 이상이면 등록 순서대로 "이름 (1)", "이름 (2)"로 보여 준다. 저장된 이름은 그대로 둔다. */
+export function displayDeviceName(device: Device, devices: Device[]): string {
+  if (!device.name) return '이름 없는 기기';
+  const same = devices.filter((other) => other.name === device.name)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+  return same.length > 1 ? `${device.name} (${same.findIndex((other) => other.id === device.id) + 1})` : device.name;
+}

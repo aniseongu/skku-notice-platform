@@ -3,7 +3,7 @@
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import type { ByokStatus, CanvasStatus } from './byok';
-import { CANVAS_MODES, composeSummaryTime, summaryParts, validDeviceName, type CanvasMode, type Device } from './devices';
+import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, validDeviceName, type CanvasMode, type Device } from './devices';
 import { ENROLLMENT, MILITARY, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
 import { programLabel } from './skku-programs';
 import { BOARD_CATALOG, COLLEGE_BOARD, DEPARTMENT_BOARD, OTHER_BOARDS } from './skku-boards';
@@ -293,7 +293,7 @@ function DeleteAccount({ model }: { model: SettingsModel }) {
 function DeviceRow({ device, info }: { device: Device; info: NonNullable<SettingsModel['devicesInfo']> }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(device.name ?? '');
-  const name = device.name ?? '이름 없는 기기';
+  const name = displayDeviceName(device, info.devices);
   const save = async () => { if (validDeviceName(draft) && await info.rename(device.id, draft)) setEditing(false); };
   return <li>
     {editing

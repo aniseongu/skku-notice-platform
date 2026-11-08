@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { composeSummaryTime, loadDevices, loadSummaryTime, saveCanvasMode, saveDeviceName, saveSummaryTime, suggestDeviceName, summaryParts, validDeviceName } from '../src/devices.ts';
+import { composeSummaryTime, displayDeviceName, loadDevices, loadSummaryTime, saveCanvasMode, saveDeviceName, saveSummaryTime, suggestDeviceName, summaryParts, validDeviceName } from '../src/devices.ts';
 
 test('device names suggest the model when the browser tells it, otherwise a plain kind of device', async () => {
   const name = (ua) => suggestDeviceName(ua, false);
@@ -61,4 +61,13 @@ test('devices and summary time are read and written only for my own rows', async
   assert.deepEqual(c.calls.at(-1).values, { summary_time: '07:30' });
   await assert.rejects(saveSummaryTime(c, 'user-a', '25:00'), /형식/);
   await assert.rejects(saveSummaryTime(fake({ updated: [] }), 'u', '07:30'), /토큰을 먼저/);
+});
+
+test('devices with the same name are numbered in the order they were registered', () => {
+  const device = (id, name, createdAt) => ({ id, endpoint: id, name, canvasMode: 'off', createdAt });
+  const list = [device('b', 'Windows PC', '2026-11-08'), device('a', 'Windows PC', '2026-11-06'), device('c', 'SM-S948N', '2026-11-07'), device('d', null, '2026-11-07')];
+  assert.equal(displayDeviceName(list[1], list), 'Windows PC (1)');
+  assert.equal(displayDeviceName(list[0], list), 'Windows PC (2)');
+  assert.equal(displayDeviceName(list[2], list), 'SM-S948N');
+  assert.equal(displayDeviceName(list[3], list), '이름 없는 기기');
 });

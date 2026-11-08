@@ -710,9 +710,12 @@
    마우스가 없는 칸에 막대가 남지 않게 하려는 규칙이다. 모든 브라우저에서 표준 속성(scrollbar-width·scrollbar-color)만 쓴다.
    크롬은 ::-webkit-scrollbar-thumb에 건 :hover 스타일을 마우스가 떠난 뒤에도 다시 그리지 않아 막대가 남았다. */
 @layer platform {
-  .sidebar, .list-pane, .detail-pane, .onb-main { scrollbar-width: thin; scrollbar-color: transparent transparent; }
-  .sidebar:hover, .list-pane:hover, .detail-pane:hover, .onb-main:hover {
-    scrollbar-color: color-mix(in srgb, var(--text-3) 55%, transparent) transparent;
+  /* 마우스를 올릴 수 없는 터치 기기는 막대를 숨기면 스크롤되는 칸인지 알 수 없어 기본 모양을 둔다. */
+  @media (hover: hover) {
+    .sidebar, .list-pane, .detail-pane, .onb-main { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+    .sidebar:hover, .list-pane:hover, .detail-pane:hover, .onb-main:hover {
+      scrollbar-color: color-mix(in srgb, var(--text-3) 55%, transparent) transparent;
+    }
   }
 }
 
