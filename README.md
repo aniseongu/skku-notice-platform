@@ -6,8 +6,8 @@
 
 성균관대 공지와 인턴 공고를 모아 보고, 나에게 맞는 공지만 알림으로 받는 다중 사용자 웹 앱
 
-![version](https://img.shields.io/badge/version-0.1.0-124532?logo=semver&logoColor=white)
-![PWA](https://img.shields.io/badge/PWA-installable-124532?logo=pwa&logoColor=white)
+![version](https://img.shields.io/badge/version-0.1.0-124532)
+![PWA](https://img.shields.io/badge/PWA-installable-124532)
 [![Cloudflare Pages](https://img.shields.io/badge/Cloudflare%20Pages-F38020?logo=cloudflarepages&logoColor=white)](https://pages.cloudflare.com/)
 
 [![Open Cloudflare](https://img.shields.io/badge/Open%20Cloudflare-F38020?style=for-the-badge&logo=cloudflarepages&logoColor=white)](https://skku-notice-platform.pages.dev/)
