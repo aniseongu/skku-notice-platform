@@ -705,33 +705,14 @@
   @media (prefers-reduced-motion: reduce) { .switch, .switch::after, .onb-bar > span { transition: none; } }
 }
 
-/* 스크롤바: 내용이 넘칠 때만 생기고(overflow-y: auto), 얇게 그린다. 평소에는 보이지 않다가 마우스를 올리거나 키보드로 들어오면 나타난다.
-   크로미움·사파리는 ::-webkit-scrollbar로 8px 자리에 4px 막대를 그리고, 파이어폭스는 표준 속성(thin)을 쓴다.
-   표준 속성을 같이 쓰면 최신 크롬이 ::-webkit-scrollbar를 무시하므로 두 방식을 나눈다. */
+/* 스크롤바: 내용이 넘칠 때만 생기고(overflow-y: auto), 얇게 그린다. 평소에는 보이지 않고 마우스를 올린 칸에서만 나타난다.
+   키보드·클릭으로 생기는 포커스(:focus-within, :focus-visible)로는 나타나지 않는다. 포커스가 있는 칸과 마우스가 있는 칸이 달라도
+   마우스가 없는 칸에 막대가 남지 않게 하려는 규칙이다. 모든 브라우저에서 표준 속성(scrollbar-width·scrollbar-color)만 쓴다.
+   크롬은 ::-webkit-scrollbar-thumb에 건 :hover 스타일을 마우스가 떠난 뒤에도 다시 그리지 않아 막대가 남았다. */
 @layer platform {
-  /* 표준 속성은 ::-webkit-scrollbar를 지원하지 않는 브라우저(파이어폭스)에만 준다. :hover 규칙이 초기화(auto)보다 우선순위가 높아
-     크롬에도 적용되면, 마우스를 올린 칸만 윈도우 기본 스크롤바(위아래 화살표 버튼 포함)로 바뀐다. */
-  @supports not selector(::-webkit-scrollbar) {
-    .sidebar, .list-pane, .detail-pane, .onb-main { scrollbar-width: thin; scrollbar-color: transparent transparent; }
-    .sidebar:hover, .sidebar:focus-within, .list-pane:hover, .list-pane:focus-within,
-    .detail-pane:hover, .detail-pane:focus-within, .onb-main:hover, .onb-main:focus-within {
-      scrollbar-color: color-mix(in srgb, var(--text-3) 55%, transparent) transparent;
-    }
-  }
-  @supports selector(::-webkit-scrollbar) {
-    .sidebar::-webkit-scrollbar, .list-pane::-webkit-scrollbar, .detail-pane::-webkit-scrollbar, .onb-main::-webkit-scrollbar { width: 8px; height: 8px; }
-    .sidebar::-webkit-scrollbar-button, .list-pane::-webkit-scrollbar-button, .detail-pane::-webkit-scrollbar-button, .onb-main::-webkit-scrollbar-button { display: none; }
-    .sidebar::-webkit-scrollbar-track, .list-pane::-webkit-scrollbar-track, .detail-pane::-webkit-scrollbar-track, .onb-main::-webkit-scrollbar-track { background: transparent; }
-    .sidebar::-webkit-scrollbar-thumb, .list-pane::-webkit-scrollbar-thumb, .detail-pane::-webkit-scrollbar-thumb, .onb-main::-webkit-scrollbar-thumb {
-      border: 2px solid transparent; border-radius: 999px; background: transparent; background-clip: padding-box;
-    }
-    .sidebar:hover::-webkit-scrollbar-thumb, .sidebar:focus-within::-webkit-scrollbar-thumb, .list-pane:hover::-webkit-scrollbar-thumb, .list-pane:focus-within::-webkit-scrollbar-thumb,
-    .detail-pane:hover::-webkit-scrollbar-thumb, .detail-pane:focus-within::-webkit-scrollbar-thumb, .onb-main:hover::-webkit-scrollbar-thumb, .onb-main:focus-within::-webkit-scrollbar-thumb {
-      background: color-mix(in srgb, var(--text-3) 55%, transparent); background-clip: padding-box;
-    }
-    .sidebar::-webkit-scrollbar-thumb:hover, .list-pane::-webkit-scrollbar-thumb:hover, .detail-pane::-webkit-scrollbar-thumb:hover, .onb-main::-webkit-scrollbar-thumb:hover {
-      background: var(--text-3); background-clip: padding-box;
-    }
+  .sidebar, .list-pane, .detail-pane, .onb-main { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  .sidebar:hover, .list-pane:hover, .detail-pane:hover, .onb-main:hover {
+    scrollbar-color: color-mix(in srgb, var(--text-3) 55%, transparent) transparent;
   }
 }
 

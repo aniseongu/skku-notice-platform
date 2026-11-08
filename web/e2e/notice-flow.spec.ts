@@ -748,8 +748,6 @@ test('side menu scrollbar: absent when everything fits, thin when it overflows',
   await page.mouse.move(900, 200);
   const restThumb = await thumb('');
   await sidebar.hover();
-  // 크롬은 scrollbar-color가 auto가 아니면 ::-webkit-scrollbar를 무시하고 위아래 화살표가 있는 기본 막대를 그린다. 올려도 auto여야 한다.
-  if (short.thin === 'auto') expect(hover).toBe('auto');
   // 호버 때의 막대 색은 헤드리스 크롬이 계산값을 제때 갱신하지 않아 여기서 재지 않는다(웨일에서 확인한다).
   if (short.thin === 'auto') expect(restThumb).toBe('rgba(0, 0, 0, 0)');
   else { expect(rest).toContain('rgba(0, 0, 0, 0)'); expect(hover).not.toBe(rest); }
