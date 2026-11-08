@@ -16,6 +16,29 @@
 
 기존 [개인용 성공](https://github.com/aniseongu/skku-notice-alert)의 화면 구조와 알림 규칙을 로그인한 여러 사용자가 각자 쓰도록 옮긴 공지 플랫폼입니다. 웹은 Cloudflare Pages에서 서비스합니다. 새 공지가 올라왔을 때의 자동 알림 수신과 장기 부하는 계속 검증하고 있습니다.
 
+## 화면
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/readme/web-desktop-dark.jpg">
+    <img src="assets/readme/web-desktop-light.jpg" alt="데스크톱 화면: 왼쪽 메뉴, 성대 공지 목록, 선택한 공지의 본문" width="900">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/readme/web-mobile-list-dark.jpg">
+    <img src="assets/readme/web-mobile-list-light.jpg" alt="모바일 공지 목록" width="260">
+  </picture>
+  &nbsp;&nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/readme/web-mobile-detail-dark.jpg">
+    <img src="assets/readme/web-mobile-detail-light.jpg" alt="모바일 공지 상세" width="260">
+  </picture>
+</p>
+
+<p align="center"><sub>샘플 공지 데이터로 캡처한 화면이며 GitHub 화면 설정(라이트·다크)에 맞춰 바뀝니다. 로그인 뒤에 보이는 키워드·마감·알림 설정 화면은 담지 않았습니다.</sub></p>
+
 ## 할 수 있는 것
 
 - **공지 보기**: 성균관대 공지, 단과대학·학과 게시판(60여 개), 부트캠프, 외부 인턴 공고(링커리어, 자소설닷컴, 학생인재개발팀)를 한곳에서 봅니다. 게시판은 로그인한 사용자가 고른 것만 수집합니다.
