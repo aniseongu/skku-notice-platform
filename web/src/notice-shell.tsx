@@ -99,7 +99,7 @@ export function NoticeShell({ app }: { app: AppController }) {
         {reading ? <ReadingView app={app} notice={reading} /> : <>
           <div className="navigation-head">
             <header className={`pane-head topbar glass ${settings ? '' : 'feed-topbar'}`}>
-              {settings ? <button type="button" className="icon-button narrow-only back" aria-label={app.settingsSection ? '설정으로 돌아가기' : '설정 닫기'} onClick={app.backSettings}><Icon name="back" /></button> : null}
+              {settings ? <button type="button" className="icon-button narrow-only back" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} onClick={app.backSettings}><Icon name="back" /></button> : null}
               {settings ? null : <Brand className="brand-mark narrow-only" />}
               <div className="topbar-text">
                 <h1>{title}</h1>
@@ -116,7 +116,7 @@ export function NoticeShell({ app }: { app: AppController }) {
                   disabled={app.loading} onClick={() => { void app.collectNow(); }}><Icon name="refresh" /></button>
               </>}
               {settings ? null : <button type="button" className="icon-button narrow-only" aria-label="설정" onClick={app.openSettingsHome}><GearIcon /></button>}
-              {settings ? <button type="button" className="icon-button wide-only" aria-label={app.settingsSection ? '설정으로 돌아가기' : '설정 닫기'} title={app.settingsSection ? '설정으로 (Esc)' : '설정 닫기 (Esc)'}
+              {settings ? <button type="button" className="icon-button wide-only" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} title={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 (Esc)' : '설정 닫기 (Esc)'}
                 aria-keyshortcuts="Escape" onClick={app.backSettings}><Icon name="close" /></button> : null}
             </header>
           </div>

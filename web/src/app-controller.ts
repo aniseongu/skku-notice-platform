@@ -1201,6 +1201,11 @@ export class AppController extends Reactive {
     qsel('.list-pane')?.scrollTo({ top: 0 });
   }
 
+  /** 설정 첫 쪽을 거치지 않고 하위 쪽으로 바로 들어왔는지. 이때 X는 설정을 닫는다. */
+  get settingsLeavesDirectly(): boolean {
+    return history.state?.direct === true && this.settingsDepth() <= 1;
+  }
+
   /** 설정 쪽 이동으로 쌓은 기록의 칸 수. 설정을 한 번에 닫을 때 그만큼 되돌린다. 바로 설정 주소로 들어왔으면 0이다. */
   private settingsDepth(): number {
     return history.state?.view === 'settings' ? Number(history.state.depth) || 1 : 0;
@@ -1235,7 +1240,8 @@ export class AppController extends Reactive {
     if (this.view === 'settings') { this.openSettingsSection(section); return; }
     this.setView('settings');
     if (section) {
-      history.replaceState({ view: 'settings', depth: 1 }, '', this.settingsUrl(section));
+      // direct: 설정 첫 쪽을 거치지 않고 바로 들어왔다. 이때 X와 뒤로 가기는 첫 쪽이 아니라 원래 보던 곳으로 나간다.
+      history.replaceState({ view: 'settings', depth: 1, direct: true }, '', this.settingsUrl(section));
       this.settingsSection = section;
     }
   }
@@ -1244,6 +1250,7 @@ export class AppController extends Reactive {
   backSettings = () => {
     if (!this.settingsSection) { this.closeSettings(); return; }
     if (this.settingsDepth() > 1) { history.back(); return; }
+    if (history.state?.direct) { this.closeSettings(); return; }
     history.replaceState({ view: 'settings', depth: 1 }, '', this.settingsUrl(null));
     this.settingsSection = null;
     window.scrollTo({ top: 0 });
