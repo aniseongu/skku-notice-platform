@@ -17,7 +17,6 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # (id, 이름, 주소). 이미 운영 중인 4개(skku-notice01, cse-notice, sw-notice, futurecar-notice)는 sources.yaml에 따로 있다.
 BOARDS: list[tuple[str, str, str]] = [
-    ("futurecar-inform", "미래차 부트캠프 소식", "https://swb.skku.edu/futurecar/inform.do"),
     ("liberalarts-notice", "문과대학 공지", "https://liberalarts.skku.edu/liberal/community/under_notice.do"),
     ("sscience-notice", "사회과학대학 공지", "https://sscience.skku.edu/sscience/community/under_notice.do"),
     ("ecostat-notice", "경제대학 공지", "https://ecostat.skku.edu/ecostat/notice_total.do"),
@@ -118,7 +117,6 @@ DEPARTMENT_BOARD = {
 # 디스플레이 부트캠프 사업단은 공개 공지 게시판을 찾지 못했고, 인공지능·반도체 사업단은 주소가 확인되지 않아 넣지 않았다.
 OTHER_BOARDS: list[tuple[str, str, str]] = [
     ("futurecar-notice", "부트캠프", "수강 모집과 행사 안내"),
-    ("futurecar-inform", "부트캠프", "견학, 대회, 수상 소식"),
 ]
 
 # 이미 운영 중인 기본 게시판(모든 사용자에게 추천). sources.yaml의 앞쪽 4개는 이 스크립트가 건드리지 않는다.

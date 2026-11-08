@@ -5,7 +5,6 @@ import type { Program } from './skku-programs.ts';
 export interface BoardRef { id: string; name: string; url: string }
 export const DEFAULT_BOARD = 'skku-notice01';
 export const BOARD_CATALOG: readonly BoardRef[] = [
-  { id: 'futurecar-inform', name: '미래차 부트캠프 소식', url: 'https://swb.skku.edu/futurecar/inform.do' },
   { id: 'liberalarts-notice', name: '문과대학 공지', url: 'https://liberalarts.skku.edu/liberal/community/under_notice.do' },
   { id: 'sscience-notice', name: '사회과학대학 공지', url: 'https://sscience.skku.edu/sscience/community/under_notice.do' },
   { id: 'ecostat-notice', name: '경제대학 공지', url: 'https://ecostat.skku.edu/ecostat/notice_total.do' },
@@ -70,7 +69,6 @@ export const BOARD_CATALOG: readonly BoardRef[] = [
 export interface OtherBoard { id: string; group: string; help: string }
 export const OTHER_BOARDS: readonly OtherBoard[] = [
   { id: 'futurecar-notice', group: '부트캠프', help: '수강 모집과 행사 안내' },
-  { id: 'futurecar-inform', group: '부트캠프', help: '견학, 대회, 수상 소식' },
 ];
 
 export const COLLEGE_BOARD: Readonly<Record<string, string>> = {

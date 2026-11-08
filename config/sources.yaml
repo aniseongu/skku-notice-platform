@@ -54,12 +54,6 @@ sources:
 # BEGIN catalog
 # scripts/board_catalog.py가 만든다. 직접 고치지 않는다. 구독자가 있는 게시판만 수집한다(on_demand).
 
-  - id: futurecar-inform
-    name: 미래차 부트캠프 소식
-    kind: skku-cms
-    url: https://swb.skku.edu/futurecar/inform.do
-    on_demand: true
-
   - id: liberalarts-notice
     name: 문과대학 공지
     kind: skku-cms
