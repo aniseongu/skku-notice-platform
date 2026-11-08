@@ -709,13 +709,16 @@
    크로미움·사파리는 ::-webkit-scrollbar로 8px 자리에 4px 막대를 그리고, 파이어폭스는 표준 속성(thin)을 쓴다.
    표준 속성을 같이 쓰면 최신 크롬이 ::-webkit-scrollbar를 무시하므로 두 방식을 나눈다. */
 @layer platform {
-  .sidebar, .list-pane, .detail-pane, .onb-main { scrollbar-width: thin; scrollbar-color: transparent transparent; }
-  .sidebar:hover, .sidebar:focus-within, .list-pane:hover, .list-pane:focus-within,
-  .detail-pane:hover, .detail-pane:focus-within, .onb-main:hover, .onb-main:focus-within {
-    scrollbar-color: color-mix(in srgb, var(--text-3) 55%, transparent) transparent;
+  /* 표준 속성은 ::-webkit-scrollbar를 지원하지 않는 브라우저(파이어폭스)에만 준다. :hover 규칙이 초기화(auto)보다 우선순위가 높아
+     크롬에도 적용되면, 마우스를 올린 칸만 윈도우 기본 스크롤바(위아래 화살표 버튼 포함)로 바뀐다. */
+  @supports not selector(::-webkit-scrollbar) {
+    .sidebar, .list-pane, .detail-pane, .onb-main { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+    .sidebar:hover, .sidebar:focus-within, .list-pane:hover, .list-pane:focus-within,
+    .detail-pane:hover, .detail-pane:focus-within, .onb-main:hover, .onb-main:focus-within {
+      scrollbar-color: color-mix(in srgb, var(--text-3) 55%, transparent) transparent;
+    }
   }
   @supports selector(::-webkit-scrollbar) {
-    .sidebar, .list-pane, .detail-pane, .onb-main { scrollbar-width: auto; scrollbar-color: auto; }
     .sidebar::-webkit-scrollbar, .list-pane::-webkit-scrollbar, .detail-pane::-webkit-scrollbar, .onb-main::-webkit-scrollbar { width: 8px; height: 8px; }
     .sidebar::-webkit-scrollbar-button, .list-pane::-webkit-scrollbar-button, .detail-pane::-webkit-scrollbar-button, .onb-main::-webkit-scrollbar-button { display: none; }
     .sidebar::-webkit-scrollbar-track, .list-pane::-webkit-scrollbar-track, .detail-pane::-webkit-scrollbar-track, .onb-main::-webkit-scrollbar-track { background: transparent; }
