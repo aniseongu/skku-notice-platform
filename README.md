@@ -18,23 +18,25 @@
 
 ## 사용 화면
 
-PC에서는 목록과 공지 상세를 함께 봅니다. 목록에는 관심 키워드와 내 Gemini 판정 이유, 마감 D-day가 보이고, 공지를 누르면 오른쪽에 판정 이유와 본문이 열립니다. 열린 공지를 다시 누르면 상세 칸이 닫힙니다.
+PC에서는 목록과 공지 상세를 함께 봅니다. 목록에는 관심 키워드와 내 Gemini 판정 이유, 마감 D-day가 보이고, 공지를 누르면 오른쪽에 판정 이유와 본문이 열립니다. 열린 공지를 다시 누르면 상세 칸이 닫힙니다. 라이트·다크·자동 모드를 설정에서 고를 수 있습니다.
 
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/me-desktop-dark.jpg"><img src="assets/readme/me-desktop-light.jpg" alt="PC 화면: 왼쪽 메뉴의 관심 키워드, 판정 이유와 D-day가 붙은 공지 목록, 오른쪽의 공지 상세" width="900"></picture></p>
+| PC: 라이트 | PC: 다크 |
+|:---:|:---:|
+| <img src="assets/readme/me-desktop-light.jpg" alt="PC 라이트 모드: 관심 키워드, 판정 이유와 D-day가 붙은 공지 목록과 오른쪽 상세" width="440"> | <img src="assets/readme/me-desktop-dark.jpg" alt="PC 다크 모드: 같은 화면" width="440"> |
 
 휴대폰에서는 아래 탭으로 성대 공지, 인턴 공고, 저장한 공지를 오가고, 공지를 눌러 상세와 원문을 확인합니다.
 
-| 모바일: 공지 목록 | 모바일: 공지 상세 |
-|:---:|:---:|
-| <picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/me-mobile-list-dark.jpg"><img src="assets/readme/me-mobile-list-light.jpg" alt="모바일 공지 목록" width="260"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/me-mobile-detail-dark.jpg"><img src="assets/readme/me-mobile-detail-light.jpg" alt="모바일 공지 상세" width="260"></picture> |
+| 목록: 라이트 | 목록: 다크 | 상세: 라이트 | 상세: 다크 |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/readme/me-mobile-list-light.jpg" alt="모바일 라이트 공지 목록" width="200"> | <img src="assets/readme/me-mobile-list-dark.jpg" alt="모바일 다크 공지 목록" width="200"> | <img src="assets/readme/me-mobile-detail-light.jpg" alt="모바일 라이트 공지 상세" width="200"> | <img src="assets/readme/me-mobile-detail-dark.jpg" alt="모바일 다크 공지 상세" width="200"> |
 
 설정의 알림에서는 이 기기의 알림을 켜고 끄며, 등록된 기기 이름을 바꾸거나 다른 기기를 지우고, 받을 게시판을 고릅니다.
 
-| 알림 설정 | 알림 기기와 받을 게시판 |
-|:---:|:---:|
-| <picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/me-mobile-notifications-dark.jpg"><img src="assets/readme/me-mobile-notifications-light.jpg" alt="모바일 알림 설정" width="260"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/me-mobile-devices-dark.jpg"><img src="assets/readme/me-mobile-devices-light.jpg" alt="모바일 알림 기기 목록과 받을 게시판" width="260"></picture> |
+| 알림: 라이트 | 알림: 다크 | 기기: 라이트 | 기기: 다크 |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/readme/me-mobile-notifications-light.jpg" alt="모바일 라이트 알림 설정" width="200"> | <img src="assets/readme/me-mobile-notifications-dark.jpg" alt="모바일 다크 알림 설정" width="200"> | <img src="assets/readme/me-mobile-devices-light.jpg" alt="모바일 라이트 알림 기기 목록" width="200"> | <img src="assets/readme/me-mobile-devices-dark.jpg" alt="모바일 다크 알림 기기 목록" width="200"> |
 
-위 화면은 예시 계정과 예시 공지 데이터로 캡처했습니다. 키워드, 판정 이유, 마감, 기기 이름은 보여 주기 위해 넣은 값이며 실제 사용자 정보가 아닙니다. 보는 사람의 GitHub 화면 설정(라이트·다크)에 맞춰 그림이 바뀝니다.
+위 화면은 예시 계정과 예시 공지 데이터로 캡처했습니다. 키워드, 판정 이유, 마감, 기기 이름은 보여 주기 위해 넣은 값이며 실제 사용자 정보가 아닙니다.
 
 ## 할 수 있는 것
 
