@@ -395,6 +395,42 @@ test('first-run setup can be skipped and then stays out of the way; it can be re
   await expect(dialog).toHaveCount(0);
 });
 
+test('refresh button and R refetch the notice list, lock while loading, and keep the list with a message on failure', async ({ page }) => {
+  let hits = 0;
+  let mode: 'ok' | 'slow' | 'fail' = 'ok';
+  await page.route('**/notices.json', async (route) => {
+    hits++;
+    if (mode === 'fail') { await route.fulfill({ status: 500, body: 'error' }); return; }
+    const res = await route.fetch();
+    const data = await res.json();
+    if (hits >= 2 && mode === 'ok') data.notices[0].title = `[새로 가져옴] ${data.notices[0].title}`;
+    if (mode === 'slow') await new Promise((resolve) => setTimeout(resolve, 800));
+    await route.fulfill({ response: res, json: data });
+  });
+  await page.goto('/?api=sample/api/v1');
+  const rows = page.locator('notice-rows-screen a.row');
+  await rows.first().waitFor();
+  const button = page.getByRole('button', { name: '공지 다시 가져오기' });
+  const first = hits;
+  await button.click();
+  await expect.poll(() => hits).toBeGreaterThan(first);
+  await expect(rows.first()).toContainText('[새로 가져옴]');           // 새로 받은 내용으로 바뀐다
+  mode = 'slow';
+  await button.click();
+  await expect(button).toBeDisabled();                                // 받는 동안은 다시 누를 수 없다
+  await expect(button).toBeEnabled();
+  mode = 'ok';
+  const beforeKey = hits;
+  await page.locator('.list-pane').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('r');                                     // R 키도 같은 일을 한다
+  await expect.poll(() => hits).toBeGreaterThan(beforeKey);
+  mode = 'fail';
+  const count = await rows.count();
+  await button.click();
+  await expect(page.getByText('새 목록을 받지 못했어요')).toBeVisible();
+  expect(await rows.count()).toBe(count);                             // 실패해도 지금 목록은 그대로다
+});
+
 test('settings opened straight from the side menu shortcut closes with one X instead of showing the settings home', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '왼쪽 메뉴는 넓은 화면에만 있다');
   const list = page.locator('notice-rows-screen a.row').first();
