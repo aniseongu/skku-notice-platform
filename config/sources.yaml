@@ -3,7 +3,7 @@
 
 user_agent: "skku-notice-platform/0.1 (+https://github.com/aniseongu/skku-notice-platform)"
 request_gap_seconds: 1.5    # 게시판 사이 쉬는 시간
-timeout_seconds: 10
+timeout_seconds: 20
 
 sources:
   - id: skku-notice01

@@ -85,10 +85,13 @@ def _validate_notice_url(
         raise
 
 
+LIST_ATTEMPTS = 4  # 학교 서버의 일시 지연으로 수집이 실패 처리되지 않게 목록만 한 번 더 시도한다.
+
+
 def fetch_list(url: str, user_agent: str, timeout_seconds: float) -> str:
     headers = {"User-Agent": user_agent, "Accept-Language": "ko"}
     with httpx.Client(headers=headers, timeout=timeout_seconds, follow_redirects=True) as client:
-        for attempt in range(3):
+        for attempt in range(LIST_ATTEMPTS):
             try:
                 response = client.get(url)
             except httpx.TransportError as exc:
@@ -100,9 +103,9 @@ def fetch_list(url: str, user_agent: str, timeout_seconds: float) -> str:
                 if response.status_code not in RETRY_STATUS:
                     raise FetchError(f"{url}: HTTP {response.status_code}")
                 error = FetchError(f"{url}: HTTP {response.status_code}")
-            if attempt < 2:
+            if attempt < LIST_ATTEMPTS - 1:
                 time.sleep(2**attempt)
-    raise FetchError(f"{url}: failed after 3 attempts ({error})") from error
+    raise FetchError(f"{url}: failed after {LIST_ATTEMPTS} attempts ({error})") from error
 
 
 def fetch_detail(url: str, user_agent: str, timeout_seconds: float) -> str:
