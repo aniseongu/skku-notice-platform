@@ -233,7 +233,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   return <>
     {mine.length ? mine.map((source) => <SwitchRow key={source.id} label={source.label} checked disabled={busy} onChange={() => model.toggle(source.id, false)} />)
       : <p className="field-note">아직 받는 게시판이 없어요. 아래에서 골라 주세요</p>}
-    <details className="connection-manual" open={mine.length === 0}>
+    <details className="connection-manual board-more-list" open={mine.length === 0}>
       <summary>게시판 더 보기 ({others.length}개)</summary>
       <input className="input" type="search" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off" value={query}
         onChange={(event) => setQuery(event.currentTarget.value)} />

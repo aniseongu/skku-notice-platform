@@ -574,6 +574,10 @@ test('left board list shows only chosen boards, falls back to boards with notice
   // "게시판 더 고르기"는 설정의 알림 쪽으로 바로 간다.
   await page.locator('#side-boards').getByRole('button', { name: '게시판 더 고르기' }).click();
   await expect(page).toHaveURL(/section=notifications/);
+  // 누르자마자 접힌 게시판 목록이 펼쳐지고 화면 안으로 스크롤된다.
+  const more = page.locator('details.board-more-list');
+  await expect(more).toHaveJSProperty('open', true);
+  await expect(more.getByRole('searchbox', { name: '게시판 검색' })).toBeInViewport();
 });
 
 test('account shows an icon, name and email and leads to profile settings where free text for Gemini is written and saved', async ({ page }) => {

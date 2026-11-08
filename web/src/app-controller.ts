@@ -1237,13 +1237,26 @@ export class AppController extends Reactive {
 
   /** 어느 화면에서든 설정의 해당 쪽으로 바로 간다(키워드 관리하기, 게시판 고르기 같은 단축). */
   openSettings(section: string | null) {
-    if (this.view === 'settings') { this.openSettingsSection(section); return; }
+    if (this.view === 'settings') { this.openSettingsSection(section); this.revealBoards(section); return; }
     this.setView('settings');
     if (section) {
       // direct: 설정 첫 쪽을 거치지 않고 바로 들어왔다. 이때 X와 뒤로 가기는 첫 쪽이 아니라 원래 보던 곳으로 나간다.
       history.replaceState({ view: 'settings', depth: 1, direct: true }, '', this.settingsUrl(section));
       this.settingsSection = section;
+      this.revealBoards(section);
     }
+  }
+
+  /** "게시판 더 고르기"를 누르면 접힌 게시판 목록을 펼치고 그 자리로 스크롤한다. 화면이 그려질 때까지 잠깐 기다린다. */
+  private revealBoards(section: string | null) {
+    if (section !== 'notifications') return;
+    let tries = 0;
+    const run = () => {
+      const details = document.querySelector<HTMLDetailsElement>('details.board-more-list');
+      if (details) { details.open = true; details.scrollIntoView({ block: 'start' }); return; }
+      if (++tries < 30) requestAnimationFrame(run);
+    };
+    requestAnimationFrame(run);
   }
 
   /** 뒤로 가기 화살표와 "설정으로": 하위 쪽에서는 첫 쪽으로 한 단계, 첫 쪽에서는 설정을 닫는다. */
