@@ -28,7 +28,7 @@ function ProgramPicker({ onPick, onCancel, current, title }: {
   useEffect(() => { document.querySelector('.onb-main')?.scrollTo({ top: 0 }); }, [college]);
   if (!found) {
     return <div className="onb-group">
-      <p className="onb-lead">{title}: 대학을 먼저 골라요.</p>
+      <p className="onb-lead">대학을 먼저 고르면 학과가 나와요</p>
       <ChoiceList label="대학 선택" selected={current?.college ?? null}
         items={COLLEGES.map((item) => ({ id: item.name, label: item.name }))}
         onSelect={(name) => {
@@ -156,7 +156,8 @@ export function Onboarding({ app }: { app: AppController }) {
   } else if (step === 'etc') {
     title = '전공과 상관없는 게시판도 받을까요?';
     lead = '부트캠프처럼 누구나 들을 수 있는 공지예요. 건너뛰어도 돼요.';
-    const nameOf = (id: string) => sources.find((source) => source.id === id)?.name ?? BOARD_CATALOG.find((board) => board.id === id)?.name ?? id;
+    // 서버 이름을 받기 전에도 내부 id가 보이지 않게 목록의 한글 이름으로 채운다.
+    const nameOf = (id: string) => sources.find((source) => source.id === id)?.name ?? BOARD_CATALOG.find((board) => board.id === id)?.name ?? OTHER_BOARDS.find((board) => board.id === id)?.name ?? id;
     const groups = [...new Set(OTHER_BOARDS.map((board) => board.group))];
     body = <div className="onb-group">
       {groups.map((group) => <Card key={group} id={`etc-${group}`} title={group}>

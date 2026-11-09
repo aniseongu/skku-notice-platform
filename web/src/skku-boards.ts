@@ -66,9 +66,9 @@ export const BOARD_CATALOG: readonly BoardRef[] = [
 ];
 
 /** 전공과 상관없이 고르는 게시판(부트캠프 등). */
-export interface OtherBoard { id: string; group: string; help: string }
+export interface OtherBoard { id: string; name: string; group: string; help: string }
 export const OTHER_BOARDS: readonly OtherBoard[] = [
-  { id: 'futurecar-notice', group: '부트캠프', help: '수강 모집과 행사 안내' },
+  { id: 'futurecar-notice', name: '미래차 부트캠프 공지', group: '부트캠프', help: '수강 모집과 행사 안내' },
 ];
 
 export const COLLEGE_BOARD: Readonly<Record<string, string>> = {
