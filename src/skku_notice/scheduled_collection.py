@@ -166,16 +166,24 @@ def run_collection(
             store.upsert("platform_sources", [source_row])
             updates = []
             # Recheck at most one old body per board per run, including edits with unchanged titles.
+            # 새 글은 작성자가 곧바로 고치고 포스터를 바꾸므로 먼저, 더 자주 다시 읽는다.
             due = []
             for notice in notices:
                 old = previous.get(f"{source['id']}/{notice.article_no}", {})
                 try:
                     checked = datetime.fromisoformat(old.get("fetched_at") or "")
-                    if checked.tzinfo and now - checked >= timedelta(hours=24):
-                        due.append((checked, notice.article_no))
+                    if not checked.tzinfo:
+                        continue
+                    age = now - checked
+                    recent = False
+                    if old.get("first_seen"):
+                        seen = datetime.fromisoformat(old["first_seen"])
+                        recent = bool(seen.tzinfo) and now - seen < RECHECK_RECENT_WINDOW
+                    if age >= RECHECK_INTERVAL or (recent and age >= RECHECK_RECENT_INTERVAL):
+                        due.append((not recent, checked, notice.article_no))
                 except (TypeError, ValueError):
                     pass
-            recheck_number = min(due)[1] if due else None
+            recheck_number = min(due)[2] if due else None
             for notice in notices:
                 notice_id = f"{source['id']}/{notice.article_no}"
                 old = previous.get(notice_id, {})
@@ -260,6 +268,10 @@ def run_collection(
     return total, failed
 
 
+# 오래된 글은 하루에 한 번, 새 글은 3시간마다 본문을 다시 읽는다(포스터 교체 대응, 보드당 1건은 그대로).
+RECHECK_INTERVAL = timedelta(hours=24)
+RECHECK_RECENT_INTERVAL = timedelta(hours=3)
+RECHECK_RECENT_WINDOW = timedelta(hours=48)
 EXTERNAL_INTERVAL = timedelta(minutes=55)
 EXTERNAL_DETAILS_PER_RUN = 5
 EXTERNAL_DETAIL_WINDOW = timedelta(days=45)

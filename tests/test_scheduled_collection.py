@@ -263,6 +263,50 @@ def test_rechecks_only_oldest_body_per_board(monkeypatch):
     assert store.rows["school/124"]["fetched_at"] == "2026-11-02T00:00:00+09:00"
 
 
+def _recheck_requests(monkeypatch, specs):
+    """specs: [(article_no, first_seen_hours_ago, fetched_hours_ago)] -> requested detail URLs."""
+    from dataclasses import replace
+    from datetime import timedelta
+
+    store = MemoryStore()
+    notices = []
+    for no, seen_h, fetched_h in specs:
+        n = replace(NOTICE, article_no=no, title=f"공지{no}", url=f"https://www.skku.edu/notice?articleNo={no}")
+        notices.append(n)
+        store.rows[f"school/{no}"] = {
+            "id": f"school/{no}", "source_id": "school", "article_no": no, "title": n.title,
+            "category": n.category, "url": n.url, "posted_on": n.posted_on.isoformat(),
+            "pinned": False, "deadline": None,
+            "first_seen": (NOW - timedelta(hours=seen_h)).isoformat(),
+            "fetched_at": (NOW - timedelta(hours=fetched_h)).isoformat(),
+            "body": "본문", "body_html": "<p>본문</p>", "attachments": [], "images": [],
+        }
+    requested = []
+    monkeypatch.setattr(job.time, "sleep", lambda _: None)
+    monkeypatch.setattr(job, "fetch_list", lambda *_: "list")
+    monkeypatch.setattr(job, "parse_list", lambda *_: notices)
+    monkeypatch.setattr(job, "fetch_detail", lambda url, *_: requested.append(url) or "detail")
+    monkeypatch.setattr(
+        job, "parse_detail",
+        lambda *_: SimpleNamespace(body_text="본문", body_html="<p>본문</p>", attachments=(), images=()),
+    )
+    job.run_collection(SETTINGS, store, NOW)
+    return requested
+
+
+def test_recent_notice_is_rechecked_after_three_hours(monkeypatch):
+    assert len(_recheck_requests(monkeypatch, [("1", 10, 4)])) == 1
+
+
+def test_non_recent_notice_is_not_rechecked_after_three_hours(monkeypatch):
+    assert _recheck_requests(monkeypatch, [("1", 72, 4)]) == []
+
+
+def test_recent_notice_is_preferred_over_older_due_notice(monkeypatch):
+    requested = _recheck_requests(monkeypatch, [("1", 100, 30), ("2", 10, 4)])
+    assert requested == ["https://www.skku.edu/notice?articleNo=2"]
+
+
 def test_freshness_gate_skips_only_when_all_school_boards_were_recently_collected():
     from datetime import timedelta
 
