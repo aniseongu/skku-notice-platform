@@ -106,10 +106,10 @@ const THEMES: [Theme, string][] = [['auto', '자동'], ['light', '밝게'], ['da
 const YEARS = [1, 2, 3, 4, 5];
 const SEMESTERS = [1, 2];
 
-function Section({ id, title, action, boxClass = '', children }: { id: string; title: string; action?: ReactNode; boxClass?: string; children: ReactNode }) {
+function Section({ id, title, action, children }: { id: string; title: string; action?: ReactNode; children: ReactNode }) {
   return <section aria-labelledby={id}>
     {action ? <div className="settings-head-row"><h2 id={id} className="settings-head">{title}</h2>{action}</div> : <h2 id={id} className="settings-head">{title}</h2>}
-    <div className={`box ${boxClass}`.trim()}>{children}</div></section>;
+    <div className="box">{children}</div></section>;
 }
 
 function Setting({ name, help, children, className = '' }: { name: string; help?: ReactNode; children?: ReactNode; className?: string }) {
@@ -379,19 +379,25 @@ function Notifications({ model }: { model: SettingsModel }) {
 }
 
 function BoardsSection({ model }: { model: SettingsModel }) {
+  return <>
+    <Section id="s-boards" title="받을 게시판">
+      {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <Setting name="게시판" help="알림을 받고 목록에 모아 볼 게시판이에요">
+        {model.error ? <><p className="field-note error" role="alert">{model.error}</p>
+          <button type="button" className="ghost-button" onClick={model.retry}>다시 불러오기</button></> : null}
+        <BoardGroups model={model} />
+      </Setting>}
+    </Section>
+    <BoardOrderSection order={model.boardOrder} />
+  </>;
+}
+
+// 받을 게시판 고르기와 섞이지 않게 순서는 따로 묶는다. 로그인하지 않아도 이 기기에서 바꿀 수 있다.
+function BoardOrderSection({ order }: { order: SettingsModel['boardOrder'] }) {
   const [editing, setEditing] = useState(false);
-  const order = model.boardOrder;
-  const canOrder = order.boards.length > 1;
-  return <Section id="s-boards" title="받을 게시판" boxClass={editing && canOrder ? 'is-editing' : ''} action={canOrder
-    ? <button type="button" className="head-action" onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : null}>
-    {editing && canOrder ? <BoardOrderList order={order} editing /> : !model.userId ? <>
-      <LoginNote model={model} what="게시판 구독" />
-      {canOrder ? <BoardOrderList order={order} editing={false} /> : null}
-    </> : <Setting name="게시판" help="알림을 받고 목록에 모아 볼 게시판이에요">
-      {model.error ? <><p className="field-note error" role="alert">{model.error}</p>
-        <button type="button" className="ghost-button" onClick={model.retry}>다시 불러오기</button></> : null}
-      <BoardGroups model={model} />
-    </Setting>}
+  if (order.boards.length < 2) return null;
+  return <Section id="s-board-order" title="게시판 순서"
+    action={<button type="button" className="head-action" onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button>}>
+    <BoardOrderList order={order} editing={editing} />
   </Section>;
 }
 
@@ -457,7 +463,7 @@ function BoardOrderList({ order, editing }: { order: SettingsModel['boardOrder']
         </span> : null}
       </li>)}
     </ul>
-    {editing ? <p className="field-note order-help">끌거나 위아래 단추로 옮겨요. 왼쪽 목록에 바로 반영돼요</p> : null}
+    {editing ? <p className="field-note order-help">끌거나 위아래 단추로 옮기면 게시판 목록에 바로 바뀌어요</p> : null}
     {editing && order.status ? <p className="field-note" role="status">{order.status === 'saved' ? '저장했어요' : '저장하지 못했어요. 다시 옮기면 또 저장해요'}</p> : null}
     <p className="visually-hidden" role="status" aria-live="polite">{message}</p>
   </div>;
