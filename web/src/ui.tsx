@@ -22,10 +22,10 @@ export function SwitchRow({ checked, onChange, label, description, badge, disabl
 }
 
 /** 몇 개 안 되는 값 중 하나를 고른다(학년, 재학 상태 등). */
-export function Segmented<T extends string | number>({ label, options, value, onChange }: {
-  label: string; options: readonly { value: T; label: string }[]; value: T | null; onChange: (next: T) => void;
+export function Segmented<T extends string | number>({ label, options, value, onChange, columns }: {
+  label: string; options: readonly { value: T; label: string }[]; value: T | null; onChange: (next: T) => void; columns?: number;
 }) {
-  return <div className="seg" role="group" aria-label={label}>
+  return <div className="seg" data-columns={columns} role="group" aria-label={label}>
     {options.map((option) => <button type="button" key={String(option.value)} aria-pressed={value === option.value}
       onClick={() => onChange(option.value)}>{option.label}</button>)}
   </div>;
@@ -33,11 +33,11 @@ export function Segmented<T extends string | number>({ label, options, value, on
 
 /** 목록에서 하나를 고른다. 누르면 바로 다음 단계로 가는 용도라 항목이 크다. */
 export function ChoiceList({ label, items, selected, onSelect }: {
-  label: string; items: readonly { id: string; label: string; note?: string }[]; selected?: string | null; onSelect: (id: string) => void;
+  label: string; items: readonly { id: string; label: string; note?: string; description?: string }[]; selected?: string | null; onSelect: (id: string) => void;
 }) {
   return <div className="choice-list" role="radiogroup" aria-label={label}>
     {items.map((item) => <button type="button" className="choice" role="radio" key={item.id} aria-checked={selected === item.id} onClick={() => onSelect(item.id)}>
-      <span>{item.label}{item.note ? <span className="choice-note">{item.note}</span> : null}</span>
+      <span>{item.label}{item.note ? <span className="choice-note">{item.note}</span> : null}{item.description ? <span className="choice-desc">{item.description}</span> : null}</span>
       <span className="choice-check" aria-hidden="true" />
     </button>)}
   </div>;

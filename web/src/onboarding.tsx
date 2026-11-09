@@ -112,7 +112,7 @@ export function Onboarding({ app }: { app: AppController }) {
     foot = primary && !changingPrimary ? <button type="button" className="solid-button" onClick={() => go('double')}>다음</button> : null;
   } else if (step === 'double') {
     title = '복수전공이 있나요?';
-    lead = '그 학과의 공지도 함께 받을 수 있어요';
+    lead = '고르면 다음으로 넘어가요';
     body = addingDouble
       ? <ProgramPicker title="복수전공" onPick={addDouble} onCancel={() => setAddingDouble(false)} />
       : <div className="onb-group">
@@ -124,9 +124,9 @@ export function Onboarding({ app }: { app: AppController }) {
           </div>)}</dl>
         </Card> : null}
         {draft.programs.length < MAX_PROGRAMS
-          ? <ChoiceList label="복수전공 선택" selected={null} items={[{ id: 'add', label: doubles.length ? '복수전공 더 추가하기' : '복수전공이 있어요' }]} onSelect={() => setAddingDouble(true)} /> : null}
-        {doubles.length === 0
-          ? <ChoiceList label="복수전공 없음" selected={null} items={[{ id: 'none', label: '복수전공이 없어요' }]} onSelect={() => go('status')} /> : null}
+          ? <ChoiceList label="복수전공 선택" selected={null}
+            items={doubles.length ? [{ id: 'add', label: '복수전공 더 추가하기' }] : [{ id: 'add', label: '복수전공이 있어요', description: '그 학과의 공지도 함께 받을 수 있어요' }, { id: 'none', label: '복수전공이 없어요' }]}
+            onSelect={(id) => { if (id === 'none') go('status'); else setAddingDouble(true); }} /> : null}
       </div>;
     foot = !addingDouble && doubles.length ? <button type="button" className="solid-button" onClick={() => go('status')}>다음</button> : null;
   } else if (step === 'status') {
@@ -134,7 +134,7 @@ export function Onboarding({ app }: { app: AppController }) {
     lead = '지원 자격을 가릴 때만 써요';
     body = <div className="onb-group">
       <h2>학년</h2>
-      <Segmented label="학년" options={YEARS} value={draft.year} onChange={(year) => setDraft({ ...draft, year })} />
+      <Segmented label="학년" options={YEARS} columns={3} value={draft.year} onChange={(year) => setDraft({ ...draft, year })} />
       <h2>재학 상태</h2>
       <Segmented label="재학 상태" options={STATUS} value={draft.enrollmentStatus} onChange={(enrollmentStatus) => setDraft({ ...draft, enrollmentStatus })} />
     </div>;
@@ -149,13 +149,13 @@ export function Onboarding({ app }: { app: AppController }) {
         {orderedSources.length === 0 ? <p className="hint" role="status">게시판 목록을 불러오지 못했어요. 잠시 뒤 설정에서 다시 골라 주세요.</p> : null}
       </Card>
       <h2>관심 키워드</h2>
-      <p className="card-note">고르지 않아도 돼요. 고른 키워드와 맞는 공지는 소리로 알려 줘요</p>
+      <p className="card-note">관심 있는 키워드만 골라요</p>
       <ChipGroup label="관심 키워드" options={keywordOptions} selected={draft.keywords} onToggle={(word) => setDraft({ ...draft, keywords: toggleValue(draft.keywords, word) })} />
     </div>;
     foot = <button type="button" className="solid-button" onClick={() => go('etc')}>다음</button>;
   } else if (step === 'etc') {
     title = '전공과 상관없는 게시판도 받을까요?';
-    lead = '누구나 들을 수 있는 공지예요';
+    lead = '전공과 상관없이 들을 수 있는 공지예요';
     // 서버 이름을 받기 전에도 내부 id가 보이지 않게 목록의 한글 이름으로 채운다.
     const nameOf = (id: string) => sources.find((source) => source.id === id)?.name ?? BOARD_CATALOG.find((board) => board.id === id)?.name ?? OTHER_BOARDS.find((board) => board.id === id)?.name ?? id;
     const groups = [...new Set(OTHER_BOARDS.map((board) => board.group))];

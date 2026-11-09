@@ -655,12 +655,14 @@
   .badge { padding: 1px 8px; border-radius: var(--r-pill); background: var(--sunken); color: var(--text-2); font-size: 12px; font-weight: 600; }
   .seg { display: flex; flex-wrap: wrap; gap: 8px; }
   .seg button { flex: 1 1 4.5rem; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); color: var(--text); font-weight: 500; }
-  .seg button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in oklch, var(--accent) 12%, var(--surface)); font-weight: 700; }
+  .seg button[aria-pressed="true"] { background: var(--sunken); font-weight: 700; }
+  .seg[data-columns="3"] { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .choice-list { display: grid; overflow: hidden; border-radius: var(--r-lg); background: var(--surface); }
   .choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 8px 16px; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--text); text-align: left; font-size: 15px; }
   .choice:first-child { border-top: 0; }
   .choice[aria-checked="true"] { font-weight: 700; }
   .choice-note { display: block; font-size: 13px; font-weight: 400; color: var(--text-3); }
+  .choice-desc { display: block; font-size: 13px; font-weight: 400; color: var(--text-2); }
   .choice-check { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--text-3); display: grid; place-items: center; }
   .choice[aria-checked="true"] .choice-check { border-color: var(--text); }
   .choice[aria-checked="true"] .choice-check::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--text); }
@@ -687,7 +689,7 @@
   .onb-progress > span[data-done="true"] { background: var(--text); }
   /* 건너뛰기·닫기: 얇은 테두리의 알약 버튼. 글자만 덩그러니 있으면 눌러지는 것으로 보이지 않는다. */
   .onb-skip, .onb-x { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 44px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); color: var(--text); font-size: 14px; font-weight: 600; white-space: nowrap; }
-  .onb-skip { padding: 0 16px; }
+  .onb-skip { padding: 0 16px; border-radius: var(--r-md); }
   .onb-x { width: 44px; padding: 0; }
   .onb-skip:hover, .onb-x:hover { background: var(--sunken); }
   .onb-skip:active, .onb-x:active { background: var(--sunken); }
@@ -701,6 +703,8 @@
   .onb-foot { position: sticky; bottom: 0; z-index: 2; background: linear-gradient(to bottom, transparent, var(--bg) 14px); padding: 18px 0 0; }
   .onb-foot-inner { width: min(100%, 36rem); margin-inline: auto; padding: 0 16px calc(12px + env(safe-area-inset-bottom)); display: grid; gap: 8px; }
   .onb-foot .solid-button, .onb-foot .ghost-button { width: 100%; }
+  .onb .text-button { min-height: 44px; }
+  .onb .card-note { margin: 0; color: var(--text-2); font-size: 14px; }
   .onb-search { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); }
   /* 왼쪽 브랜드 칸(넓은 화면에서만). 앱 아이콘과 이름, 한 줄 설명, 지금 몇 번째 질문인지 보여 주는 단계 목록. */
   .onb-brand-lockup { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
