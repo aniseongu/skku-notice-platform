@@ -680,7 +680,7 @@
   .onb-brand { display: none; }
   .onb-main { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
   .onb-top { position: sticky; top: 0; z-index: 2; background: var(--bg); padding-top: env(safe-area-inset-top); }
-  .onb-top-inner { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; column-gap: 12px; width: min(100%, 36rem); margin-inline: auto; padding: 8px 12px 4px 8px; }
+  .onb-top-inner { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; column-gap: 12px; width: min(100%, 36rem); margin-inline: auto; padding: 8px 12px 4px 4px; }
   .onb-top .icon-button { width: 44px; height: 44px; margin: 0; }
   /* 첫 단계에도 뒤로 가기 칸(44px)을 비워 두어 단계가 바뀌어도 진행 막대의 폭과 위치가 같다. */
   .onb-top-slot { display: block; width: 44px; height: 44px; }

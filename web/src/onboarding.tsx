@@ -149,7 +149,7 @@ export function Onboarding({ app }: { app: AppController }) {
     foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('boards')}>다음</button>;
   } else if (step === 'boards') {
     title = '어떤 공지를 받을까요?';
-    lead = '내 전공에 맞춰 골라 뒀어요';
+    lead = '고른 전공을 기준으로 켜 뒀어요';
     body = <div className="onb-group">
       <Card id="boards" title="게시판">
         {orderedSources.filter((source) => !OTHER_BOARDS.some((board) => board.id === source.id)).map((source) => <SwitchRow key={source.id} label={source.name}
@@ -163,7 +163,7 @@ export function Onboarding({ app }: { app: AppController }) {
     foot = <button type="button" className="solid-button" onClick={() => go('etc')}>다음</button>;
   } else if (step === 'etc') {
     title = '전공과 상관없는 게시판도 받을까요?';
-    lead = '수강 모집과 행사 소식이에요';
+    lead = '필요한 것만 켜요';
     // 서버 이름을 받기 전에도 내부 id가 보이지 않게 목록의 한글 이름으로 채운다.
     const nameOf = (id: string) => sources.find((source) => source.id === id)?.name ?? BOARD_CATALOG.find((board) => board.id === id)?.name ?? OTHER_BOARDS.find((board) => board.id === id)?.name ?? id;
     body = <div className="onb-group">
