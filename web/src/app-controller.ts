@@ -81,6 +81,16 @@ export function settingsTitle(): string {
 
 export interface InstallPrompt extends Event { prompt(): Promise<void> }
 
+// 고른 공지는 이 탭에만 기억한다. 새로고침하면 보던 공지로 돌아오고, 새 탭은 맨 위에서 시작한다.
+function rememberSelected(id?: string | null): string | null {
+  try {
+    if (id === undefined) return sessionStorage.getItem('selected');
+    if (id) sessionStorage.setItem('selected', id);
+    else sessionStorage.removeItem('selected');
+  } catch { /* 저장소를 못 쓰면 기억하지 않는다 */ }
+  return id ?? null;
+}
+
 export function remember(key: string, value?: string): string | null {
   try {
     const storageKey = ['keywords', 'board', 'view-unread', 'subscriptions-only', 'onboarding-dismissed'].includes(key) ? localKey(key) : key;
@@ -252,9 +262,27 @@ export class AppController extends Reactive {
   needsReadBaseline = this.readState === null;
   read: string[] | null = this.readState ? readIds(this.readState) : null;
   query = '';
+  /** 화면 반영 뒤: 고른 공지를 기억하고, 되살린 공지 줄을 한 번 보이게 한다. */
+  commit(): void {
+    super.commit();
+    if (this.selectedId !== this.lastSelected) {
+      // 사용자가 다른 공지를 고르면 되살리기 스크롤은 하지 않는다.
+      if (this.lastSelected !== undefined) this.restoreScroll = false;
+      this.lastSelected = this.selectedId;
+      rememberSelected(this.selectedId);
+    }
+    if (this.restoreScroll && this.selectedId) {
+      const row = document.querySelector(`[data-id="${CSS.escape(this.selectedId)}"]`);
+      if (row) { this.restoreScroll = false; row.scrollIntoView({ block: 'center' }); }
+    }
+  }
+
   loading = true;
   failed = false;
-  selectedId: string | null = null;
+  selectedId: string | null = rememberSelected();
+  // 새로고침으로 되살린 공지 줄을 목록에서 한 번만 보이게 내린다.
+  private restoreScroll = Boolean(this.selectedId);
+  private lastSelected: string | null | undefined = undefined;
   install: InstallPrompt | null = null;
   toast = '';
   toastLink: string | null = null;
