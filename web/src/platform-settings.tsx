@@ -395,6 +395,11 @@ function BoardsSection({ model }: { model: SettingsModel }) {
   </Section>;
 }
 
+// 휴대폰에는 방향키가 없어서 끌기만 알려 준다.
+function orderHelp(): string {
+  return matchMedia('(pointer: coarse)').matches ? '손잡이를 끌어서 옮겨요' : '손잡이를 끌거나 방향키로 옮겨요';
+}
+
 function BoardOrderList({ order, editing }: { order: SettingsModel['boardOrder']; editing: boolean }) {
   const listRef = useRef<HTMLUListElement>(null);
   const latest = useRef(order);
@@ -430,7 +435,6 @@ function BoardOrderList({ order, editing }: { order: SettingsModel['boardOrder']
     focusId.current = null;
   });
   return <div className="order-box">
-    {editing ? <p className="field-note">손잡이를 끌거나 방향키로 옮겨요</p> : null}
     <ul className="order-list" ref={listRef}>
       {order.boards.map((board, index) => <li key={board.id} data-board-id={board.id}>
         <span className="order-name">{board.label}</span>
@@ -445,6 +449,7 @@ function BoardOrderList({ order, editing }: { order: SettingsModel['boardOrder']
         </button> : null}
       </li>)}
     </ul>
+    {editing ? <p className="field-note order-help">{orderHelp()}</p> : null}
     {editing && order.status ? <p className="field-note" role="status">{order.status === 'saved' ? '저장했어요' : '저장하지 못했어요. 다시 옮기면 또 저장해요'}</p> : null}
     <p className="visually-hidden" role="status" aria-live="polite">{message}</p>
   </div>;

@@ -504,6 +504,7 @@
   .settings-head-row .settings-head { margin: 0; }
   .text-button { min-height: 44px; margin: -13px 0; padding: 0 4px; border: 0; background: none; color: var(--text-2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
   .order-box { padding: 4px 0; }
+  .order-help { margin: 0; padding: 10px 0; border-top: 1px solid var(--line); }
   .order-list { list-style: none; margin: 0; padding: 0; }
   .order-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; border-top: 1px solid var(--line); }
   .order-list li:first-child { border-top: 0; }
