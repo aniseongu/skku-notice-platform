@@ -456,7 +456,8 @@ export class AppController extends Reactive {
     if (!authClient || this.authBusy) return;
     this.authBusy = true; this.authError = '';
     try {
-      const { error } = await authClient.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: cleanReturnUrl() } });
+      // 매번 Google 계정 고르기를 띄운다. 이미 로그인된 계정으로 바로 넘어가지 않게(다른 계정으로 새로 가입할 수 있게).
+      const { error } = await authClient.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: cleanReturnUrl(), queryParams: { prompt: 'select_account' } } });
       if (error) throw error;
     } catch (error) {
       // 영어 오류나 제공자 코드는 보이지 않는다. 연결 문제인지만 나눠 알린다.
