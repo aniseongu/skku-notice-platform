@@ -328,13 +328,13 @@ test('first-run setup: choices only, department list follows the college, double
   expect((await title.boundingBox())!.height).toBeGreaterThan(20);
   await expect(dialog.getByRole('radio', { name: '소프트웨어학과', exact: true })).toBeVisible();
   await expect(dialog.getByRole('radio', { name: '국어국문학과', exact: true })).toHaveCount(0);
-  await dialog.getByRole('button', { name: '대학 다시 고르기' }).click();
+  await dialog.getByRole('button', { name: '다른 대학 고르기' }).click();
   await dialog.getByRole('button', { name: '문과대학', exact: true }).click();
   await expect(dialog.getByRole('searchbox', { name: '학과 검색' })).toBeVisible();
   await dialog.getByRole('searchbox', { name: '학과 검색' }).fill('철학');
   await expect(dialog.getByRole('radio', { name: '철학과', exact: true })).toBeVisible();
   await expect(dialog.getByRole('radio', { name: '사학과', exact: true })).toHaveCount(0);
-  await dialog.getByRole('button', { name: '대학 다시 고르기' }).click();
+  await dialog.getByRole('button', { name: '다른 대학 고르기' }).click();
   await dialog.getByRole('button', { name: '소프트웨어융합대학', exact: true }).click();
   // 학과는 고르기만 하고 아래 다음이 확정한다(자동으로 넘어가지 않는다).
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();

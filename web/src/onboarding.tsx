@@ -48,7 +48,7 @@ function ProgramPicker({ onPick, onCancel, current }: {
         ? <ChoiceList label={`${found.name} 학과 선택`} selected={current?.college === found.name ? current.department : null}
           items={departments.map((name) => ({ id: name, label: name }))} onSelect={(name) => onPick({ college: found.name, department: name })} />
         : <p className="hint" role="status">'{query}'에 맞는 학과가 없어요. 다른 단어로 찾아보세요.</p>}
-    <button type="button" className="text-button" onClick={() => setCollege(null)}>대학 다시 고르기</button>
+    <button type="button" className="text-button" onClick={() => setCollege(null)}>다른 대학 고르기</button>
   </div>;
 }
 
@@ -157,7 +157,7 @@ export function Onboarding({ app }: { app: AppController }) {
         {orderedSources.length === 0 ? <p className="hint" role="status">게시판 목록을 불러오지 못했어요. 잠시 뒤 설정에서 다시 골라 주세요.</p> : null}
       </Card>
       <h2>관심 키워드</h2>
-      <p className="card-note">안 골라도 공지는 모두 받아요</p>
+      <p className="card-note">안 골라도 모든 공지를 받아요</p>
       <ChipGroup label="관심 키워드" options={keywordOptions} selected={draft.keywords} onToggle={(word) => setDraft({ ...draft, keywords: toggleValue(draft.keywords, word) })} />
     </div>;
     foot = <button type="button" className="solid-button" onClick={() => go('etc')}>다음</button>;
