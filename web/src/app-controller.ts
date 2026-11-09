@@ -1279,7 +1279,7 @@ export class AppController extends Reactive {
 
   /** 설정 첫 쪽을 거치지 않고 하위 쪽으로 바로 들어왔는지. 이때 X는 설정을 닫는다. */
   get settingsLeavesDirectly(): boolean {
-    return history.state?.direct === true && this.settingsDepth() <= 1;
+    return history.state?.direct === true;
   }
 
   /** 설정 쪽 이동으로 쌓은 기록의 칸 수. 설정을 한 번에 닫을 때 그만큼 되돌린다. 바로 설정 주소로 들어왔으면 0이다. */
@@ -1313,7 +1313,15 @@ export class AppController extends Reactive {
 
   /** 어느 화면에서든 설정의 해당 쪽으로 바로 간다(키워드 관리하기, 게시판 고르기 같은 단축). */
   openSettings(section: string | null) {
-    if (this.view === 'settings') { this.openSettingsSection(section); this.revealBoards(section); return; }
+    if (this.view === 'settings') {
+      if (!section) { this.openSettingsSection(section); return; }
+      // 설정 안에서 왼쪽 바로가기를 눌러도 X 한 번에 설정에 들어오기 전 화면으로 나간다(사용자 요청 2026-11-09).
+      history.pushState({ view: 'settings', depth: this.settingsDepth() + 1, direct: true }, '', this.settingsUrl(section));
+      this.settingsSection = section;
+      window.scrollTo({ top: 0 });
+      this.revealBoards(section);
+      return;
+    }
     this.setView('settings');
     if (section) {
       // direct: 설정 첫 쪽을 거치지 않고 바로 들어왔다. 이때 X와 뒤로 가기는 첫 쪽이 아니라 원래 보던 곳으로 나간다.
@@ -1338,8 +1346,8 @@ export class AppController extends Reactive {
   /** 뒤로 가기 화살표와 "설정으로": 하위 쪽에서는 첫 쪽으로 한 단계, 첫 쪽에서는 설정을 닫는다. */
   backSettings = () => {
     if (!this.settingsSection) { this.closeSettings(); return; }
-    if (this.settingsDepth() > 1) { history.back(); return; }
     if (history.state?.direct) { this.closeSettings(); return; }
+    if (this.settingsDepth() > 1) { history.back(); return; }
     history.replaceState({ view: 'settings', depth: 1 }, '', this.settingsUrl(null));
     this.settingsSection = null;
     window.scrollTo({ top: 0 });

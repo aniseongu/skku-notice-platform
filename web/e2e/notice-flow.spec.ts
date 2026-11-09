@@ -444,6 +444,20 @@ test('settings opened straight from the side menu shortcut closes with one X ins
   await expect(page.locator('platform-settings-screen')).toHaveCount(0);
 });
 
+test('sidebar keyword shortcut opened from inside settings still closes back to the list with one X', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '왼쪽 메뉴는 PC에만 있다');
+  const list = page.locator('notice-rows-screen a.row').first();
+  await page.goto('/?api=sample/api/v1');
+  await list.waitFor();
+  await page.locator('.side-foot .side-item').click();
+  await page.locator('platform-settings-screen').getByRole('link', { name: /알림/ }).first().click();
+  await page.getByRole('button', { name: /키워드 (관리|추가)하기/ }).first().click();
+  await expect(page).toHaveURL(/section=keywords/);
+  await page.getByRole('button', { name: '설정 닫기' }).first().click();
+  await expect(page).not.toHaveURL(/view=settings/);
+  await expect(list).toBeVisible();
+});
+
 test('settings X goes up one level and leaves settings only from the first page, every time settings is entered', async ({ page }, testInfo) => {
   const mobile = testInfo.project.name === 'mobile';
   const screen = page.locator('platform-settings-screen');
