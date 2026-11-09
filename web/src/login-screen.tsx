@@ -21,18 +21,19 @@ export function LoginScreen({ app }: { app: AppController }) {
     <div className="login-column">
       <div className="login-top">
         <svg className="login-mark" aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg>
-        <h1>성균관대 공지,<br />놓치지 않게 알려 드려요</h1>
-        <p className="login-sub">내 학과와 관심 키워드에 맞는 공지만 골라서 알려 줘요</p>
+        <h1>성균관대 공지,<br />나에게 맞는 것만 알려 드려요</h1>
+        <p className="login-sub">학과와 관심 키워드에 맞춰 골라서 보내 드려요</p>
       </div>
-      <div className="login-preview" role="img" aria-label="알림 예시: 소프트웨어학과 겨울방학 인턴 모집 안내, 마감 12월 5일">
-        <div className="login-note" aria-hidden="true">
+      <div className="login-preview">
+        <p className="login-preview-label" id="login-preview-label">이런 알림이 와요</p>
+        <div className="login-note" role="img" aria-labelledby="login-preview-label" aria-describedby="login-note-text">
           <div className="login-note-head">
-            <svg className="login-note-mark"><use href="icons/sprite.svg#brand" /></svg>
+            <svg className="login-note-mark" aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg>
             <span className="login-note-app">{APP_NAME}</span>
             <span className="login-note-time">지금</span>
           </div>
-          <p className="login-note-title">[소프트웨어학과] 겨울방학 인턴 모집 안내</p>
-          <p className="login-note-body">마감 12월 5일, 관심 키워드 인턴과 맞아요</p>
+          <div id="login-note-text"><p className="login-note-title">[소프트웨어학과] 겨울방학 인턴 모집 안내</p>
+          <p className="login-note-body">관심 키워드 인턴이 들어 있어요. 마감은 12월 5일이에요</p></div>
         </div>
       </div>
       <div className="login-bottom">

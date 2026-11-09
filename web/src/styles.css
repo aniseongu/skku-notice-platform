@@ -755,38 +755,41 @@
   .login-status { margin: 0; font-size: 14px; line-height: 20px; color: var(--text-2); }
   .login-column { display: flex; flex: 1; flex-direction: column; width: 100%; padding: 0 20px; }
   .login-top { padding-top: calc(64px + env(safe-area-inset-top)); }
-  .login-mark { display: block; width: 52px; height: 52px; margin-bottom: 24px; }
+  .login-mark { display: block; width: 60px; height: 60px; margin-bottom: 24px; }
   .login-top h1 { margin: 0; font-size: 28px; line-height: 38px; font-weight: 700; letter-spacing: -0.02em; overflow: visible; text-overflow: clip; white-space: normal; word-break: keep-all; }
   .login-sub { margin: 12px 0 0; font-size: 17px; line-height: 26px; font-weight: 500; color: var(--text-2); word-break: keep-all; }
   /* 알림 예시: 실제 휴대폰 알림처럼 한 장만. 목록 묶음과 같은 반경, 떠 있는 요소의 그림자 토큰을 쓴다. */
-  .login-preview { display: flex; flex: 1; align-items: center; padding: 32px 0; }
-  .login-note { width: 100%; padding: 14px 16px; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-pop); }
+  /* 예시는 제목 묶음 바로 아래에 붙이고 남는 공간은 단추 위로 보낸다(위 묶음과 아래 단추 두 덩어리). */
+  .login-preview { margin-top: 36px; }
+  .login-preview-label { margin: 0 0 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
+  .login-note { width: 100%; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-pop); }
   .login-note-head { display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 18px; color: var(--text-2); }
   .login-note-mark { width: 18px; height: 18px; flex: none; }
   .login-note-app { font-weight: 600; color: var(--text); }
   .login-note-time { margin-left: auto; color: var(--text-3); }
   .login-note-title { margin: 8px 0 0; font-size: 15px; line-height: 22px; font-weight: 600; color: var(--text); }
   .login-note-body { margin: 2px 0 0; font-size: 14px; line-height: 20px; color: var(--text-2); }
-  .login-bottom { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+  .login-bottom { margin-top: auto; padding-top: 32px; padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
   /* 구글 로그인 단추: Google 브랜드 지침의 색을 그대로 쓴다(G 로고는 원색 유지). 크기는 토스의 가장 큰 단추에 맞춘다. */
   .google-button {
     display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 56px;
     border: 1px solid light-dark(#747775, #8E918F); border-radius: var(--r-lg);
     background: light-dark(#FFFFFF, #131314); color: light-dark(#1F1F1F, #E3E3E3); font-size: 17px; font-weight: 600;
   }
+  .google-button:active:not(:disabled) { background: light-dark(#F2F2F2, #1E1F20); }
   .google-button:disabled { opacity: 0.7; }
   .google-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .google-button .login-g { flex: none; width: 20px; height: 20px; }
   .login-live:empty { display: none; }
   .login-live { margin-top: 12px; }
   .login-error { margin: 0; font-size: 14px; line-height: 20px; text-align: center; color: var(--danger); }
-  .login-legal { margin: 14px 0 0; font-size: 13px; line-height: 20px; text-align: center; color: var(--text-3); }
-  .login-legal a { display: inline-block; padding: 12px 0; margin: -12px 0; color: var(--text-2); }
+  .login-legal { margin: 14px 0 0; font-size: 13px; line-height: 20px; text-align: center; color: var(--text-2); }
+  .login-legal a { display: inline-block; padding: 12px 4px; margin: -12px -4px; color: var(--text); }
   @media (min-width: 720px) {
     .login-screen { align-items: center; justify-content: center; }
-    .login-column { flex: none; max-width: 400px; padding: 48px 0; }
+    .login-column { flex: none; max-width: 420px; padding: 48px 0; }
     .login-top { padding-top: 0; }
-    .login-preview { flex: none; padding: 36px 0; }
-    .login-bottom { padding-bottom: 0; }
+    .login-preview { margin-top: 32px; }
+    .login-bottom { margin-top: 0; padding-bottom: 0; }
   }
 }
