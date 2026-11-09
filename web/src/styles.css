@@ -199,6 +199,7 @@
   .rich ul, .rich ol { margin: 0 0 10px; padding-left: 20px; }
   .rich a { color: var(--accent); }
   .rich img { display: block; max-width: 100%; height: auto; margin: 0 0 12px; border-radius: var(--r-sm); }
+  .image-missing { display: block; margin: 0 0 12px; padding: 12px 14px; border-radius: var(--r-sm); background: var(--sunken); font-size: 13px; line-height: 19px; color: var(--text-2); }
   .rich hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
   .rich blockquote { margin: 0 0 10px; padding: 0 0 0 12px; color: var(--text-2); }
   /* 넓은 표는 상자 안에서만 가로로 밀린다(화면 전체가 밀리지 않게) */

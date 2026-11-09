@@ -1,6 +1,7 @@
 import { createRoot, type Root } from 'react-dom/client';
 import { cleanTitle, deadlineDetail, deadlinePassed, deadlineText, daysLeft, koreanDate, safeUrl, VERDICT_LABEL, type Notice, type NoticeBody, type Verdict } from './data';
-import { cleanHtml, fileType } from './rich';
+import { useState } from 'react';
+import { cleanHtml, fileType, IMAGE_MISSING, replaceBrokenImage } from './rich';
 
 export interface NoticeDetailModel {
   notice: Notice;
@@ -25,6 +26,18 @@ function imageAlt(index: number, body: NoticeBody): string {
   return text ? `본문 그림 ${index + 1}. 자동으로 읽은 글: ${text.slice(0, 120)}` : `본문 그림 ${index + 1}`;
 }
 
+/** innerHTML 그림의 error는 React가 못 보므로 직접 capture로 받는다. 같은 함수라 중복 등록되지 않는다. */
+function watchBrokenImages(node: HTMLDivElement | null) {
+  node?.addEventListener('error', replaceBrokenImage, true);
+}
+
+/** React가 관리하는 그림: DOM을 바꾸지 않고 상태로 안내 글을 보여 준다. */
+function BodyImage({ src, alt }: { src: string; alt: string }) {
+  const [broken, setBroken] = useState(false);
+  if (broken) return <span className="image-missing">{IMAGE_MISSING}</span>;
+  return <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} />;
+}
+
 function Body({ body, heading = '본문' }: { body: NoticeBody; heading?: string }) {
   if (!body.body && !body.body_html && !body.images?.length && body.body_status !== 'ready') {
     const status = body.body_status ?? (body.fetched_at ? 'ready' : 'pending');
@@ -32,7 +45,7 @@ function Body({ body, heading = '본문' }: { body: NoticeBody; heading?: string
     return <p className="detail-note" role="status">{messages[status]}</p>;
   }
   if (body.body_html && !body.body_from_image) return <section className="detail-section body-text" aria-label={heading}>
-    <h3>{heading}</h3><div className="rich" dangerouslySetInnerHTML={{ __html: cleanHtml(body.body_html) }} />
+    <h3>{heading}</h3><div className="rich" ref={watchBrokenImages} dangerouslySetInnerHTML={{ __html: cleanHtml(body.body_html) }} />
   </section>;
   const paragraphs = (body.body ?? '').split(/\n+/).filter(Boolean);
   const images = (body.images ?? []).map(safeUrl).filter((url) => url !== '#');
@@ -41,7 +54,7 @@ function Body({ body, heading = '본문' }: { body: NoticeBody; heading?: string
     <h3>{body.body_from_image ? `${heading} (그림에서 읽은 글)` : heading}</h3>
     {body.body_from_image && paragraphs.length > 0 ? <p className="detail-note first">그림 속 글자를 자동으로 읽어서 틀릴 수 있어요. 아래 그림과 원문이 정확해요</p> : null}
     {paragraphs.map((para, index) => <p key={index}>{para}</p>)}
-    {images.map((src, index) => <img key={`${src}-${index}`} src={src} alt={imageAlt(index, body)} loading="lazy" referrerPolicy="no-referrer" />)}
+    {images.map((src, index) => <BodyImage key={`${src}-${index}`} src={src} alt={imageAlt(index, body)} />)}
   </section>;
 }
 
