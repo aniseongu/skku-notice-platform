@@ -12,6 +12,11 @@ GOOD = "AIza" + "G" * 35
 ITEMS = [{"notice_id": "ext/1", "title": "[회사] 개발 인턴", "body": "서버 개발"}]
 
 
+@pytest.fixture(autouse=True)
+def no_pacing(monkeypatch):
+    monkeypatch.setattr(judge, "PACE_SECONDS", 0)
+
+
 def key_row(user, secret=GOOD, used_today=0, used_on="2026-11-07"):
     return {
         "user_id": user,
@@ -274,3 +279,50 @@ def test_school_deadline_read_from_the_body_is_kept_only_when_it_is_believable()
     assert found["event"].deadline_kind == "일정" and found["event"].deadline
     for key in ("none", "old", "far", "junk"):
         assert found[key].deadline is None and found[key].deadline_kind is None, key
+
+
+class BacklogStore(FakeStore):
+    """학교 공지가 26개 밀려 있고, 판정이 저장되면 목록에서 빠지는 저장소."""
+
+    def __init__(self, rows, total):
+        super().__init__(rows, pending=[])
+        self.todo = [f"sw/{i}" for i in range(total)]
+
+    def pending_school(self, user_id):
+        return [{"notice_id": n, "title": "t", "body": "b"} for n in self.todo[:6]]
+
+    def save_judgments(self, rows):
+        super().save_judgments(rows)
+        done = {r["notice_id"] for r in rows}
+        self.todo = [n for n in self.todo if n not in done]
+
+
+class EchoModels(FakeModels):
+    def generate_content(self, **kwargs):
+        self.calls.append(kwargs)
+        import json
+        ids = [n["id"] for n in json.loads(kwargs["contents"][0].text)["notices"]]
+        return Reply(json.dumps({"items": [{"id": i, "verdict": "maybe", "reason": "확인해 보세요"} for i in ids]}))
+
+
+def echo_factory(api_key):
+    client = FakeClient(None)
+    client.models = EchoModels(None)
+    return client
+
+
+def test_a_backlog_is_worked_through_in_several_paced_batches_in_one_run():
+    store = BacklogStore([key_row("user-a")], 26)
+    naps = []
+    counts = judge.run_judging(store, MASTER, NOW, echo_factory, sleep=naps.append)
+    assert counts["judged"] == 24  # ROUNDS_PER_PHASE(4) x 6
+    assert len(store.todo) == 2
+    assert len(naps) == 3  # 첫 호출 뒤 호출마다 쉰다
+    assert store.updates[-1][1]["used_today"] == 4
+
+
+def test_the_run_budget_stops_further_batches_and_users():
+    store = BacklogStore([key_row("user-a"), key_row("user-b")], 26)
+    ticks = iter([0, 0, 10_000, 10_000, 10_000, 10_000])
+    counts = judge.run_judging(store, MASTER, NOW, echo_factory, sleep=lambda _s: None, clock=lambda: next(ticks))
+    assert counts["judged"] == 6 and counts["users"] == 1

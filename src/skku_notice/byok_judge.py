@@ -7,6 +7,7 @@ are recorded on the key row without any secret material.
 
 import os
 import re
+import time
 from datetime import UTC, datetime
 
 from skku_notice.byok_crypto import ByokCryptoError, decrypt_api_key
@@ -18,6 +19,11 @@ from skku_notice.translate import translate_notice
 
 DAILY_CALLS = 60
 MAX_USERS_PER_RUN = 20
+# 새 키 사용자의 밀린 공지를 빨리 채우려고, 한 실행에서 사용자당 같은 종류를 최대 이만큼 이어서 판정한다.
+# 무료 Gemini 분당 한도를 넘지 않게 호출 사이에 쉬고, 서비스 제한 420초 안에 끝나도록 시간 예산을 둔다.
+ROUNDS_PER_PHASE = 4
+PACE_SECONDS = 5.0
+RUN_BUDGET_SECONDS = 330.0
 # 원본은 학년·학기·재학 상태·병역 5개만 Gemini에 보냈다.
 # 사용자가 직접 적은 관심 분야 설명도 보내되 길이와 문자를 제한한다.
 PROFILE_COLUMNS = (
@@ -126,12 +132,16 @@ class _RecordingClient:
 
 
 def run_judging(
-    store: JudgeStore, master_key: str, now: datetime, client_factory=gemini_client
+    store: JudgeStore, master_key: str, now: datetime, client_factory=gemini_client,
+    sleep=time.sleep, clock=time.monotonic,
 ) -> dict[str, int]:
     counts = {"users": 0, "judged": 0, "translated": 0, "translation_failed": 0,
               "rejected": 0, "limited": 0, "errors": 0}
     today = now.astimezone(UTC).date().isoformat()
+    started = clock()
     for row in store.keys():
+        if clock() - started > RUN_BUDGET_SECONDS:
+            break
         user_id = row["user_id"]
         used = row["used_today"] if row.get("used_on") == today else 0
         if used >= DAILY_CALLS:
@@ -154,52 +164,67 @@ def run_judging(
         client = _RecordingClient(client_factory(api_key))
         profile = store.profile(user_id)
         phases = (
-            (pending, judge_internships),
-            (school, judge_school_notices),
+            (pending, judge_internships, store.pending),
+            (school, judge_school_notices, store.pending_school),
         )
-        for batch, judge in phases:
-            if not batch or used >= DAILY_CALLS:
-                continue
-            items = [{"id": p["notice_id"], "title": p["title"], "body": p["body"]} for p in batch]
-            found = judge(items, row["model"], api_key, profile=profile, client=client)
-            used += 1
-            usage = {"used_on": today, "used_today": used}
-            if client.failed and client.error_code in REJECTED_CODES:
-                stamp = now.isoformat()
-                store.update_key(
-                    user_id,
-                    {**usage, "disabled_at": stamp, "error_at": stamp,
-                     "last_error": "Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요."},
+        calls = 0
+        for first_batch, judge, refill in phases:
+            batch = first_batch
+            for round_no in range(ROUNDS_PER_PHASE):
+                if round_no:
+                    if clock() - started > RUN_BUDGET_SECONDS:
+                        break
+                    batch = refill(user_id)
+                if not batch or used >= DAILY_CALLS:
+                    break
+                if calls:
+                    sleep(PACE_SECONDS)
+                calls += 1
+                items = [{"id": p["notice_id"], "title": p["title"], "body": p["body"]} for p in batch]
+                found = judge(items, row["model"], api_key, profile=profile, client=client)
+                used += 1
+                usage = {"used_on": today, "used_today": used}
+                if client.failed and client.error_code in REJECTED_CODES:
+                    stamp = now.isoformat()
+                    store.update_key(
+                        user_id,
+                        {**usage, "disabled_at": stamp, "error_at": stamp,
+                         "last_error": "Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요."},
+                    )
+                    counts["rejected"] += 1
+                    break
+                if client.failed:
+                    message = (
+                        "Gemini 사용 한도를 넘었어요. 잠시 뒤 다시 시도해요."
+                        if client.error_code == 429
+                        else "Gemini 판정을 잠시 못 했어요. 다시 시도해요."
+                    )
+                    store.update_key(user_id, {**usage, "last_error": message, "error_at": now.isoformat()})
+                    counts["errors"] += 1
+                    break
+                store.save_judgments(
+                    [
+                        {
+                            "user_id": user_id,
+                            "notice_id": key,
+                            "verdict": j.verdict,
+                            "reason": j.reason[:300],
+                            "model": j.model,
+                            "summary": j.summary,
+                            "deadline": j.deadline,
+                            "deadline_kind": j.deadline_kind,
+                            "deadline_checked": judge is judge_school_notices,
+                        }
+                        for key, j in found.items()
+                    ]
                 )
-                counts["rejected"] += 1
-                break
+                store.update_key(user_id, {**usage, "last_error": None, "error_at": None})
+                counts["judged"] += len(found)
+                # 가득 차지 않았거나 하나도 못 받았으면 더 이을 것이 없다.
+                if len(batch) < BATCH or not found:
+                    break
             if client.failed:
-                message = (
-                    "Gemini 사용 한도를 넘었어요. 잠시 뒤 다시 시도해요."
-                    if client.error_code == 429
-                    else "Gemini 판정을 잠시 못 했어요. 다시 시도해요."
-                )
-                store.update_key(user_id, {**usage, "last_error": message, "error_at": now.isoformat()})
-                counts["errors"] += 1
                 break
-            store.save_judgments(
-                [
-                    {
-                        "user_id": user_id,
-                        "notice_id": key,
-                        "verdict": j.verdict,
-                        "reason": j.reason[:300],
-                        "model": j.model,
-                        "summary": j.summary,
-                        "deadline": j.deadline,
-                        "deadline_kind": j.deadline_kind,
-                        "deadline_checked": judge is judge_school_notices,
-                    }
-                    for key, j in found.items()
-                ]
-            )
-            store.update_key(user_id, {**usage, "last_error": None, "error_at": None})
-            counts["judged"] += len(found)
         if client.failed:
             continue
         for item in translations:

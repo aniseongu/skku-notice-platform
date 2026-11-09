@@ -146,6 +146,17 @@ export async function loadByokStatus(client: SupabaseClient, userId: string): Pr
   return { keyHint: data.key_hint, model: data.model, disabled: !!data.disabled_at, lastError: data.last_error, usedToday: data.used_today };
 }
 
+/** 내 키로 아직 판정하지 못한, 마감이 지나지 않은 공지 수. 값을 못 읽으면 0으로 보고 화면에 아무것도 띄우지 않는다. */
+export async function loadByokBackfillCount(client: SupabaseClient): Promise<number> {
+  const { data, error } = await client.rpc('my_byok_backfill_count');
+  return !error && typeof data === 'number' && data > 0 ? Math.trunc(data) : 0;
+}
+
+/** 키 상태 아래에 보일 안내. 키가 꺼져 있거나 남은 공지가 없으면 null. */
+export function backfillNote(count: number, disabled: boolean): string | null {
+  return count > 0 && !disabled ? `공지 ${count}개를 내 기준으로 다시 보고 있어요` : null;
+}
+
 async function failure(error: unknown, fallback: string): Promise<Error> {
   if (error instanceof FunctionsHttpError) {
     try {

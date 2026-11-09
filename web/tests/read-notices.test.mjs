@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { READ_LIMIT, addRead, isNoticeRead, mergeRead, parseRead, parseReadState, readIds,
-  mergeReadStates, serializeReadState, setReadState } from '../src/read-notices.ts';
+  mergeReadStates, serializeReadState, setReadState, initialReadState } from '../src/read-notices.ts';
 
 test('editing a read notice makes it unread until a device reads the edit', () => {
   const edit = '2026-11-06T12:00:00+09:00';
@@ -74,4 +74,23 @@ test('malformed states are ignored without modifying object prototypes', () => {
   assert.equal(state.entries.__proto__, -10);
   assert.deepEqual(readIds(state), ['b']);
   assert.equal({}.polluted, undefined);
+});
+
+test('a brand-new account starts with every notice unread, a guest keeps the first-open baseline', () => {
+  const account = initialReadState(null, true);
+  assert.equal(account.needsBaseline, false);
+  assert.deepEqual(readIds(account.state), []);
+  assert.equal(isNoticeRead(account.state, 'school/1', null), false);
+  const guest = initialReadState(null, false);
+  assert.equal(guest.state, null);
+  assert.equal(guest.needsBaseline, true);
+});
+
+test('stored read state is never replaced at start', () => {
+  const stored = setReadState(parseReadState(null), ['school/1'], true, 1000);
+  for (const loggedIn of [true, false]) {
+    const start = initialReadState(stored, loggedIn);
+    assert.equal(start.state, stored);
+    assert.equal(start.needsBaseline, false);
+  }
 });

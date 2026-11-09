@@ -1,8 +1,8 @@
 [Unit]
-Description=Judge external internship postings between collection and push
+Description=Judge postings and school notices with each user's own Gemini key (every 10 minutes so a new key is applied soon)
 
 [Timer]
-OnCalendar=*-*-* *:07,37:00
+OnCalendar=*-*-* *:07,17,27,37,47,57:00
 Persistent=true
 RandomizedDelaySec=15
 Unit=skku-notice-judge.service

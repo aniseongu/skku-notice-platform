@@ -5,7 +5,7 @@ import {
   boardName, cleanTitle, deadlineGroup, deadlinePassed, fetchBody, fetchJson, keywordMatches, postedGroup, safeUrl, todayKst,
 } from './data';
 import { type SavedNotice, loadSaved, orderSaved, storeSaved, toggleSaved } from './saved-notices';
-import { isNoticeRead, loadReadState, mergeReadStates, parseReadState, readIds, setReadState, storeReadState } from './read-notices';
+import { initialReadState, isNoticeRead, loadReadState, mergeReadStates, parseReadState, readIds, setReadState, storeReadState } from './read-notices';
 import { keywordCounts } from './keyword-counts';
 import type { Theme } from './theme';
 import { APP_NAME } from './brand';
@@ -18,7 +18,7 @@ import { connectionChain } from './connection-chain';
 import { composeSummaryTime, deleteDevice, loadDevices, loadSummaryTime, saveCanvasMode, saveDeviceName, saveSummaryTime, suggestDeviceName, type CanvasMode, type Device } from './devices';
 import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from './my-notices';
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
-import { byokAvailable, loadByokStatus, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
+import { byokAvailable, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import type { Draft } from './onboarding-flow';
@@ -167,7 +167,7 @@ export class AppController extends Reactive {
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, authName: { state: true }, authAvatar: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
-    byokOn: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true }, canvasStatus: { state: true }, canvasBusy: { state: true }, canvasError: { state: true },
+    byokOn: { state: true }, byokBackfill: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true }, canvasStatus: { state: true }, canvasBusy: { state: true }, canvasError: { state: true },
     calendarId: { state: true }, calendarBusy: { state: true }, calendarMessage: { state: true }, calendarError: { state: true }, calendarSyncedAt: { state: true },
     myJudgments: { state: true }, myInterests: { state: true },
     devices: { state: true }, thisDeviceId: { state: true }, devicesBusy: { state: true }, devicesError: { state: true }, summaryTime: { state: true },
@@ -208,6 +208,8 @@ export class AppController extends Reactive {
   pushRetry = false;
   byokOn = false;
   byokStatus: ByokStatus | null = null;
+  byokBackfill = 0;
+  private byokPoll: ReturnType<typeof setTimeout> | null = null;
   byokLoading = false;
   byokBusy = false;
   byokError = '';
@@ -341,7 +343,7 @@ export class AppController extends Reactive {
           this.authUserId = userId;
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.devices = []; this.thisDeviceId = null; this.devicesError = ''; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.devices = []; this.thisDeviceId = null; this.devicesError = ''; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -362,8 +364,9 @@ export class AppController extends Reactive {
           this.boardOrder = loadBoardOrder();
           this.boardOrderStatus = '';
           this.boardOrderAccount = false;
-          this.readState = loadReadState();
-          this.needsReadBaseline = this.readState === null;
+          const startRead = initialReadState(loadReadState(), !!userId);
+          this.readState = startRead.state;
+          this.needsReadBaseline = startRead.needsBaseline;
           this.read = this.readState ? readIds(this.readState) : null;
           this.keyword = null;
           this.query = '';
@@ -430,7 +433,7 @@ export class AppController extends Reactive {
       // 개인용 서비스의 판정 결과는 플랫폼에서 읽지 않는다.
       this.matched = null;
       this.failed = false;
-      // 처음 열면 이미 있던 글이 모두 굵게 보이지 않게, 그때 있던 글은 읽은 것으로 시작한다.
+      // 로그인하지 않고 처음 열면 이미 있던 글이 모두 굵게 보이지 않게 읽은 것으로 시작한다. 계정은 안 읽음으로 시작한다.
       if (this.needsReadBaseline) {
         const baseline = parseReadState(JSON.stringify(this.notices.map((n) => n.id)));
         this.readState = mergeReadStates(baseline, this.readState ?? parseReadState(null));
@@ -776,10 +779,28 @@ export class AppController extends Reactive {
       const [status, canvas] = await Promise.all([loadByokStatus(authClient, userId), loadCanvasStatus(authClient, userId).catch(() => null)]);
       if (epoch !== this.subscriptionsEpoch) return;
       this.byokStatus = status; this.canvasStatus = canvas; this.byokError = '';
+      await this.refreshByokBackfill(userId, epoch);
     } catch {
       if (epoch === this.subscriptionsEpoch) this.byokError = '키 정보를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.';
     } finally {
       if (epoch === this.subscriptionsEpoch) this.byokLoading = false;
+    }
+  }
+
+  // 키를 등록한 뒤 워커가 이미 모인 공지를 채우는 동안 남은 수를 1분마다 다시 읽는다. 0이 되거나 계정이 바뀌면 멈춘다.
+  async refreshByokBackfill(userId: string, epoch: number): Promise<void> {
+    if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; }
+    if (!authClient || !this.byokStatus || this.byokStatus.disabled) { this.byokBackfill = 0; return; }
+    const count = await loadByokBackfillCount(authClient);
+    if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
+    this.byokBackfill = count;
+    if (count > 0) {
+      this.byokPoll = setTimeout(() => {
+        this.byokPoll = null;
+        if (epoch === this.subscriptionsEpoch && this.authUserId === userId) {
+          void this.refreshByokBackfill(userId, epoch).then(() => this.refreshMine(userId, epoch));
+        }
+      }, 60_000);
     }
   }
 
@@ -792,6 +813,7 @@ export class AppController extends Reactive {
       await registerByokKey(authClient, apiKey);
       const status = await loadByokStatus(authClient, userId);
       if (epoch === this.subscriptionsEpoch) this.byokStatus = status;
+      await this.refreshByokBackfill(userId, epoch);
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) this.byokError = error instanceof Error ? error.message : '키를 저장하지 못했어요.';
     } finally {
@@ -1046,7 +1068,8 @@ export class AppController extends Reactive {
     this.byokBusy = true; this.byokError = '';
     try {
       await removeByokKey(authClient);
-      if (epoch === this.subscriptionsEpoch) this.byokStatus = null;
+      if (epoch === this.subscriptionsEpoch) { this.byokStatus = null; this.byokBackfill = 0; }
+      if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; }
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) this.byokError = error instanceof Error ? error.message : '키를 지우지 못했어요.';
     } finally {

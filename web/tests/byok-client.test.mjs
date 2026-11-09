@@ -109,3 +109,18 @@ test('my notice info merges what I asked for with the judgment, and always filte
   const odd = await loadMyNoticeInfo(summaryClient({ user_notice_judgments: { summary: 's', verdict: 'weird', reason: 'x', model: 'm' } }), 'user-a', 'a/1');
   assert.equal(odd.ai, null);
 });
+
+import { backfillNote, loadByokBackfillCount } from '../src/byok.ts';
+
+test('backfill note appears only while notices are waiting and the key works', () => {
+  assert.equal(backfillNote(12, false), '공지 12개를 내 기준으로 다시 보고 있어요');
+  assert.equal(backfillNote(0, false), null);
+  assert.equal(backfillNote(5, true), null);
+});
+
+test('backfill count falls back to zero on errors or odd values', async () => {
+  const client = (result) => ({ rpc: async () => result });
+  assert.equal(await loadByokBackfillCount(client({ data: 7, error: null })), 7);
+  assert.equal(await loadByokBackfillCount(client({ data: null, error: new Error('x') })), 0);
+  assert.equal(await loadByokBackfillCount(client({ data: 'many', error: null })), 0);
+});

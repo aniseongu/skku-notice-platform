@@ -87,6 +87,15 @@ export function loadReadState(): ReadState | null {
   } catch { return emptyState(); }
 }
 
+/**
+ * 저장된 읽음이 없을 때의 시작 상태. 로그인하지 않은 방문자만 "그때 있던 글은 읽은 것"으로 시작한다(needsBaseline).
+ * 새 계정은 빈 상태로 시작해 이미 모인 공지가 모두 안 읽음으로 보이고, 이미 있는 계정의 읽음 기록은 건드리지 않는다.
+ */
+export function initialReadState(stored: ReadState | null, loggedIn: boolean): { state: ReadState | null; needsBaseline: boolean } {
+  if (stored !== null) return { state: stored, needsBaseline: false };
+  return loggedIn ? { state: emptyState(), needsBaseline: false } : { state: null, needsBaseline: true };
+}
+
 export function storeReadState(state: ReadState): void {
   try { localStorage.setItem(localKey(KEY), serializeReadState(state)); } catch { /* keep in memory */ }
 }

@@ -12,7 +12,7 @@ const MIGRATIONS = ['20261107030000_public_notices.sql', '20261107031000_notice_
   '20261107111000_source_external_flag.sql', '20261107112000_byok_judging.sql', '20261107113000_push_ai_candidates.sql',
   '20261108110000_school_judging.sql', '20261108160000_notice_summaries.sql', '20261108180000_school_summary_backfill.sql',
   '20261108190000_judgment_deadline.sql', '20261108200000_automatic_deadlines.sql', '20261108210000_ocr_image_only.sql',
-  '20261108220000_user_notice_translations.sql'];
+  '20261108220000_user_notice_translations.sql', '20261109100000_byok_backfill.sql'];
 
 async function database() {
   const db = new PGlite();
@@ -142,5 +142,26 @@ test('my_notice_interests lists only my own keyword hits on my boards and is clo
     assert.deepEqual(theirs.map((r) => [r.notice_id, r.words]), [['s2/1', ['인턴']]]);
     await db.exec('reset role; set role anon; reset request.jwt.claim.sub');
     await assert.rejects(db.exec('select * from public.my_notice_interests()'), /permission denied/);
+  } finally { await db.close(); }
+});
+
+test('backfill picks only notices that have not expired, newest first, and the screen count matches', async () => {
+  const db = await database();
+  try {
+    await seed(db);
+    await db.exec(`reset role; insert into platform_notices(id,source_id,article_no,title,url,posted_on,first_seen,fetched_at,body,images,deadline) values
+      ('school/10','school','10','마감 남은 글','https://www.skku.edu/10',current_date,now()-interval '60 days',now(),'본문','[]',now()+interval '3 days'),
+      ('school/11','school','11','마감 지난 글','https://www.skku.edu/11',current_date,now()-interval '3 days',now(),'본문','[]',now()-interval '1 day'),
+      ('school/12','school','12','마감 없는 오래된 글','https://www.skku.edu/12',current_date,now()-interval '45 days',now(),'본문','[]',null)`);
+    await db.exec('set role service_role');
+    const ids = (await db.query(`select notice_id from public.list_byok_pending_school('${A}', 6)`)).rows.map((r) => r.notice_id);
+    assert.ok(ids.includes('school/10'), 'a far-future deadline keeps an old notice');
+    assert.ok(!ids.includes('school/11'), 'expired notices are skipped');
+    assert.ok(!ids.includes('school/12'), 'notices without a deadline older than 30 days are skipped');
+    await db.exec(`reset role; set role authenticated; set request.jwt.claim.sub = '${A}'`);
+    const count = (await db.query('select public.my_byok_backfill_count() as n')).rows[0].n;
+    assert.equal(count, 6); // other/1, school/1~4, school/10
+    await db.exec(`reset role; set role authenticated; set request.jwt.claim.sub = '${B}'`);
+    assert.equal((await db.query('select public.my_byok_backfill_count() as n')).rows[0].n, 0);
   } finally { await db.close(); }
 });
