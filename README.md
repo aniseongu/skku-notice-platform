@@ -121,7 +121,7 @@ uv run ruff check src tests
 
 ## 데이터와 마이그레이션
 
-테이블, 함수, RLS 정책은 `supabase/migrations/`에 있습니다. 지금은 SQL Editor로 순서대로 적용하며 Supabase CLI 마이그레이션 이력에는 자동으로 등록되지 않습니다. 새 환경에서는 파일 이름 순서대로 적용하세요. 키와 토큰의 암호문 열은 서비스 역할만 읽을 수 있습니다(`supabase/functions/byok/`).
+테이블, 함수, RLS 정책은 `supabase/migrations/`에 있습니다. 운영 DB에는 Supabase CLI로 새 파일 하나씩 적용합니다(`supabase db query --remote=<ref> -f <파일>`). 처음 파일들은 SQL Editor로 적용해서 CLI 마이그레이션 이력이 없으므로 `supabase db push`는 쓰지 않습니다. 새 환경에서는 파일 이름 순서대로 적용하세요. 키와 토큰의 암호문 열은 서비스 역할만 읽을 수 있습니다(`supabase/functions/byok/`).
 
 수집 워커의 `SUPABASE_SECRET_KEY`, 푸시 `VAPID_PRIVATE_KEY`, 키 암호화용 `BYOK_MASTER_KEY`는 서버의 제한된 환경 파일에만 두고 프론트 환경 변수와 로그에 넣지 않습니다. 비밀과 개인 데이터는 커밋하지 않습니다.
 
