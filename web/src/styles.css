@@ -749,34 +749,44 @@
 }
 
 @layer platform {
-  /* 로그인 전에는 이 화면만 보인다. 평평한 바탕 하나에 위(소개)와 아래(단추)만 두고, 장식과 움직임은 쓰지 않는다. */
+  /* 로그인 전에는 이 화면만 보인다. 토스 첫 화면처럼 위에 그림과 큰 제목, 가운데 제품 예시 하나, 엄지가 닿는 아래에 단추 하나. 움직임과 장식은 없다. */
   .login-screen { display: flex; flex-direction: column; min-height: 100dvh; background: var(--bg); }
   .login-screen.is-status { align-items: center; justify-content: center; }
   .login-status { margin: 0; font-size: 14px; line-height: 20px; color: var(--text-2); }
-  .login-column { display: flex; flex: 1; flex-direction: column; width: 100%; padding: 0 var(--gutter); }
-  .login-top { padding-top: calc(18vh + env(safe-area-inset-top)); }
-  .login-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; font-size: 20px; line-height: 28px; font-weight: 700; }
-  .login-mark { width: 40px; height: 40px; flex: none; }
-  .login-top h1 { margin: 0; font-size: 24px; line-height: 32px; font-weight: 700; letter-spacing: -0.02em; overflow: visible; text-overflow: clip; white-space: normal; text-wrap: balance; word-break: keep-all; }
-  .login-sub { margin: 8px 0 0; font-size: 15px; line-height: 22px; color: var(--text-2); }
-  .login-bottom { margin-top: auto; padding-top: 32px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
-  /* 구글 로그인 단추: Google 브랜드 지침의 색을 그대로 쓴다(G 로고는 원색 유지). */
+  .login-column { display: flex; flex: 1; flex-direction: column; width: 100%; padding: 0 20px; }
+  .login-top { padding-top: calc(64px + env(safe-area-inset-top)); }
+  .login-mark { display: block; width: 52px; height: 52px; margin-bottom: 24px; }
+  .login-top h1 { margin: 0; font-size: 28px; line-height: 38px; font-weight: 700; letter-spacing: -0.02em; overflow: visible; text-overflow: clip; white-space: normal; word-break: keep-all; }
+  .login-sub { margin: 12px 0 0; font-size: 17px; line-height: 26px; font-weight: 500; color: var(--text-2); word-break: keep-all; }
+  /* 알림 예시: 실제 휴대폰 알림처럼 한 장만. 목록 묶음과 같은 반경, 떠 있는 요소의 그림자 토큰을 쓴다. */
+  .login-preview { display: flex; flex: 1; align-items: center; padding: 32px 0; }
+  .login-note { width: 100%; padding: 14px 16px; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-pop); }
+  .login-note-head { display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 18px; color: var(--text-2); }
+  .login-note-mark { width: 18px; height: 18px; flex: none; }
+  .login-note-app { font-weight: 600; color: var(--text); }
+  .login-note-time { margin-left: auto; color: var(--text-3); }
+  .login-note-title { margin: 8px 0 0; font-size: 15px; line-height: 22px; font-weight: 600; color: var(--text); }
+  .login-note-body { margin: 2px 0 0; font-size: 14px; line-height: 20px; color: var(--text-2); }
+  .login-bottom { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+  /* 구글 로그인 단추: Google 브랜드 지침의 색을 그대로 쓴다(G 로고는 원색 유지). 크기는 토스의 가장 큰 단추에 맞춘다. */
   .google-button {
-    display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 52px; height: 52px;
-    border: 1px solid light-dark(#747775, #8E918F); border-radius: 12px;
-    background: light-dark(#FFFFFF, #131314); color: light-dark(#1F1F1F, #E3E3E3); font-size: 16px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 56px;
+    border: 1px solid light-dark(#747775, #8E918F); border-radius: var(--r-lg);
+    background: light-dark(#FFFFFF, #131314); color: light-dark(#1F1F1F, #E3E3E3); font-size: 17px; font-weight: 600;
   }
   .google-button:disabled { opacity: 0.7; }
-  .google-button .login-g { flex: none; }
-  .login-live { min-height: 20px; margin-top: 12px; }
+  .google-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .google-button .login-g { flex: none; width: 20px; height: 20px; }
+  .login-live:empty { display: none; }
+  .login-live { margin-top: 12px; }
   .login-error { margin: 0; font-size: 14px; line-height: 20px; text-align: center; color: var(--danger); }
-  .login-legal { margin: 8px 0 0; font-size: 13px; line-height: 20px; text-align: center; color: var(--text-3); }
+  .login-legal { margin: 14px 0 0; font-size: 13px; line-height: 20px; text-align: center; color: var(--text-3); }
   .login-legal a { display: inline-block; padding: 12px 0; margin: -12px 0; color: var(--text-2); }
   @media (min-width: 720px) {
     .login-screen { align-items: center; justify-content: center; }
-    .login-column { flex: none; max-width: 400px; padding: 0; }
+    .login-column { flex: none; max-width: 400px; padding: 48px 0; }
     .login-top { padding-top: 0; }
-    .login-top h1 { font-size: 26px; line-height: 34px; }
-    .login-bottom { margin-top: 0; padding: 32px 0 0; }
+    .login-preview { flex: none; padding: 36px 0; }
+    .login-bottom { padding-bottom: 0; }
   }
 }
