@@ -1045,7 +1045,7 @@ test('delete account needs two steps, says what goes away, and shows a failure w
   await row.getByRole('button', { name: '계정 삭제' }).click();                      // 1단계: 결과 설명과 확인 문구가 나온다
   expect(await calls(page)).toEqual([]);
   const confirm = row.getByRole('group', { name: '계정을 삭제할까요?' });              // 질문이 제목이고 지워지는 것을 알려 준다
-  await expect(confirm).toContainText('계정의 모든 정보가 지워져요');
+  await expect(confirm).toContainText('계정 정보가 모두 삭제돼요');
   await expect(confirm).toContainText('되돌릴 수 없어요');
   await expect(row.getByRole('alert')).toHaveCount(0);                               // 오류가 아니므로 경고로 읽히지 않는다
   await expect(row.getByRole('button', { name: '닫기' })).toBeFocused();              // Enter로 바로 지워지지 않게 안전한 단추에 포커스

@@ -295,7 +295,7 @@ function DeleteAccount({ model }: { model: SettingsModel }) {
   return <div className="delete-account">
     {confirming ? <div className="delete-confirm" role="group" aria-labelledby="delete-account-title" aria-describedby="delete-account-help" aria-busy={account.busy}>
       <p id="delete-account-title" className="delete-title">계정을 삭제할까요?</p>
-      <p id="delete-account-help" className="setting-help">구독, 키워드, 저장한 공지 등 계정의 모든 정보가 지워져요. 지운 뒤에는 되돌릴 수 없어요</p>
+      <p id="delete-account-help" className="setting-help">구독, 키워드, 저장한 공지까지 계정 정보가 모두 삭제돼요. 삭제한 뒤에는 되돌릴 수 없어요</p>
       <div className="inline">
         <button type="button" className="ghost-button" ref={closeRef} disabled={account.busy} onClick={() => setConfirming(false)}>닫기</button>
         <button type="button" className="solid-button danger" disabled={account.busy} onClick={account.remove}>{account.busy ? '삭제하고 있어요' : '삭제하기'}</button>
