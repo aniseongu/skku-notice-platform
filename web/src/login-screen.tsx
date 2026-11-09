@@ -19,13 +19,14 @@ export function LoginScreen({ app }: { app: AppController }) {
   // 토스 첫 화면 구성(TDS Top: 위 그림, 28px 제목, 17px 설명, 아래 고정 단추 하나)을 따른다. 가운데에는 이 앱이 하는 일을 알림 예시 하나로 보여 준다.
   return <div className="login-screen">
     <div className="login-column">
+      <div className="login-main">
       <div className="login-top">
         <svg className="login-mark" aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg>
-        <h1>성균관대 공지,<br />나에게 맞는 것만 알려 드려요</h1>
-        <p className="login-sub">학과와 관심 키워드에 맞춰 골라서 보내 드려요</p>
+        <h1>내게 맞는 성균관대 공지만<br />골라서 알려 줘요</h1>
+        <p className="login-sub">학과와 관심 키워드를 정하면 마감 전에 알려 줘요</p>
       </div>
       <div className="login-preview">
-        <p className="login-preview-label" id="login-preview-label">이런 알림이 와요</p>
+        <p className="login-preview-label" id="login-preview-label">알림 예시</p>
         <div className="login-note" role="img" aria-labelledby="login-preview-label" aria-describedby="login-note-text">
           <div className="login-note-head">
             <svg className="login-note-mark" aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg>
@@ -33,8 +34,9 @@ export function LoginScreen({ app }: { app: AppController }) {
             <span className="login-note-time">지금</span>
           </div>
           <div id="login-note-text"><p className="login-note-title">[소프트웨어학과] 겨울방학 인턴 모집 안내</p>
-          <p className="login-note-body">관심 키워드 인턴이 들어 있어요. 마감은 12월 5일이에요</p></div>
+          <p className="login-note-body">관심 키워드 인턴, <span className="nowrap">12월 5일까지</span> 신청해요</p></div>
         </div>
+      </div>
       </div>
       <div className="login-bottom">
         <button type="button" className="google-button" disabled={busy} aria-busy={busy} onClick={() => { void app.signIn(); }}>
