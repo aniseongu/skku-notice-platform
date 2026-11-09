@@ -17,7 +17,7 @@
     --on-accent: light-dark(oklch(0.99 0.005 var(--h)), oklch(0.2 0.03 var(--h)));
     --danger: light-dark(oklch(0.55 0.19 25), oklch(0.74 0.15 25));
     /* 위험 단추 면: 어두운 화면에서 글자색 --danger(밝은 살구)를 면으로 쓰면 가장 튀어서, 면은 두 모드 모두 흰 글자가 읽히는 진한 빨강으로 둔다. */
-    --danger-fill: light-dark(oklch(0.55 0.19 25), oklch(0.56 0.17 25));
+    --danger-fill: light-dark(oklch(0.55 0.19 25), oklch(0.5 0.16 25));
     --soon: light-dark(oklch(0.54 0.12 65), oklch(0.8 0.12 75));
     /* 유리는 불투명 94%(DESIGN 6절 92% 이상). 아래 글이 비쳐 읽기 어렵지 않게. */
     --glass: light-dark(oklch(0.996 0.002 var(--h) / 0.94), oklch(0.215 0.008 var(--h) / 0.94));
@@ -779,12 +779,13 @@
   .delete-account { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; margin-top: 8px; padding: 8px 0 24px; }
   .delete-account .text-button { color: var(--text-3); font-size: 13px; font-weight: 500; }
   /* 확인은 다른 설정 묶음과 같은 면으로 감싸 한 층에 둔다. 휴대폰은 두 단추를 같은 폭으로 나누고 실행을 오른쪽(엄지 쪽)에 둔다. */
-  .delete-confirm { display: flex; flex-direction: column; gap: 8px; align-items: stretch; width: 100%; padding: 16px var(--gutter); border-radius: var(--r-lg); background: var(--surface); }
+  .delete-confirm { display: flex; flex-direction: column; gap: 8px; align-items: stretch; width: 100%; margin-top: 16px; padding: 16px var(--gutter); border-radius: var(--r-lg); background: var(--surface); }
   .delete-confirm .inline { display: grid; grid-template-columns: 1fr 1fr; }
   @media (min-width: 720px) {
-    .delete-confirm { padding: 16px 0 0; border-top: 1px solid var(--line); border-radius: 0; background: none; align-items: flex-start; }
+    .delete-confirm { margin-top: 8px; padding: 16px 0 0; border-top: 1px solid var(--line); border-radius: 0; background: none; align-items: flex-start; }
+    .delete-confirm .setting-help { max-width: 34rem; }
     .delete-confirm .inline { display: flex; }
-    .delete-confirm .inline button { min-width: 88px; }
+    .delete-confirm .inline button { min-width: 120px; }
   }
   .delete-title { margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; color: var(--text); }
   .delete-confirm .inline { margin-top: 4px; }
