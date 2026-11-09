@@ -139,7 +139,7 @@ export function Onboarding({ app }: { app: AppController }) {
       : <button type="button" className="solid-button" disabled={!canContinue('double', draft, doubleAnswer)} onClick={() => go('status')}>다음</button>;
   } else if (step === 'status') {
     title = '학년과 재학 상태가 어떻게 되나요?';
-    lead = '지원 자격을 가릴 때만 써요';
+    lead = '지원 자격에 맞는 공지를 고를 때 써요';
     body = <div className="onb-group">
       <h2>학년</h2>
       <Segmented label="학년" options={YEARS} columns={3} value={draft.year} onChange={(year) => setDraft({ ...draft, year })} />
@@ -149,7 +149,7 @@ export function Onboarding({ app }: { app: AppController }) {
     foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('boards')}>다음</button>;
   } else if (step === 'boards') {
     title = '어떤 공지를 받을까요?';
-    lead = '내 전공에 맞춰 추천했어요. 언제든 바꿀 수 있어요.';
+    lead = '내 전공에 맞춰 골라 뒀어요';
     body = <div className="onb-group">
       <Card id="boards" title="게시판">
         {orderedSources.filter((source) => !OTHER_BOARDS.some((board) => board.id === source.id)).map((source) => <SwitchRow key={source.id} label={source.name}
@@ -157,7 +157,7 @@ export function Onboarding({ app }: { app: AppController }) {
         {orderedSources.length === 0 ? <p className="hint" role="status">게시판 목록을 불러오지 못했어요. 잠시 뒤 설정에서 다시 골라 주세요.</p> : null}
       </Card>
       <h2>관심 키워드</h2>
-      <p className="card-note">고르지 않아도 공지는 모두 받아요</p>
+      <p className="card-note">안 골라도 공지는 모두 받아요</p>
       <ChipGroup label="관심 키워드" options={keywordOptions} selected={draft.keywords} onToggle={(word) => setDraft({ ...draft, keywords: toggleValue(draft.keywords, word) })} />
     </div>;
     foot = <button type="button" className="solid-button" onClick={() => go('etc')}>다음</button>;
