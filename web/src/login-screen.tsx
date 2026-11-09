@@ -20,7 +20,8 @@ export function LoginScreen({ app }: { app: AppController }) {
   return <div className="login-screen">
     <div className="login-column">
       <div className="login-main">
-        {/* TDS Top의 위 그림 자리에 이 앱이 보내는 알림 예시를 둔다. 앱 이름이 카드 안에 있어 로고는 따로 두지 않는다. */}
+        {/* 맨 위에 앱 아이콘과 이름(사용자 요청: 아이콘은 보여야 한다), 그 아래 TDS Top의 그림 자리에 알림 예시를 둔다. */}
+        <div className="login-brand"><svg className="login-mark" aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg><span>{APP_NAME}</span></div>
         <div className="login-preview">
           <p className="login-preview-label" id="login-preview-label">알림 예시</p>
           <div className="login-note" role="img" aria-labelledby="login-preview-label" aria-describedby="login-note-text">

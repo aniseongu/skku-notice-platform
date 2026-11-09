@@ -755,12 +755,14 @@
   .login-status { margin: 0; font-size: 14px; line-height: 20px; color: var(--text-2); }
   .login-column { display: flex; flex: 1; flex-direction: column; width: 100%; padding: 0 20px; }
   /* TDS Top처럼 위 그림(알림 예시), 제목, 설명을 한 묶음으로 위에 두고 단추만 아래에 둔다. */
-  .login-main { display: flex; flex: 1; flex-direction: column; padding-top: calc(56px + env(safe-area-inset-top)); }
+  .login-main { display: flex; flex: 1; flex-direction: column; padding-top: calc(48px + env(safe-area-inset-top)); }
   .login-top { padding-top: 32px; }
   .login-top h1 { margin: 0; font-size: 28px; line-height: 38px; font-weight: 700; letter-spacing: -0.02em; overflow: visible; text-overflow: clip; white-space: normal; word-break: keep-all; }
   .login-sub { margin: 8px 0 0; font-size: 17px; line-height: 26px; font-weight: 500; color: var(--text-2); word-break: keep-all; }
   /* 알림 예시: 실제 휴대폰 알림처럼 한 장만. 목록 묶음과 같은 반경, 그림자 없이 테두리로 구분한다. */
   /* 예시는 제목 묶음 바로 아래에 붙이고 남는 공간은 단추 위로 보낸다(위 묶음과 아래 단추 두 덩어리). */
+  .login-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; font-size: 22px; line-height: 30px; font-weight: 700; color: var(--text); }
+  .login-mark { width: 48px; height: 48px; flex: none; }
   .login-preview { pointer-events: none; }
   .login-preview-label { margin: 0 0 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-2); }
   .login-note { width: 100%; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
