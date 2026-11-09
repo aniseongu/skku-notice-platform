@@ -20,23 +20,23 @@ export function LoginScreen({ app }: { app: AppController }) {
   return <div className="login-screen">
     <div className="login-column">
       <div className="login-main">
-      <div className="login-top">
-        <svg className="login-mark" aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg>
-        <h1>필요한 성균관대 공지만<br />알려 줘요</h1>
-        <p className="login-sub">학과와 관심 키워드를 정하면 마감 전에 챙겨 줘요</p>
-      </div>
-      <div className="login-preview">
-        <p className="login-preview-label" id="login-preview-label">알림 예시</p>
-        <div className="login-note" role="img" aria-labelledby="login-preview-label" aria-describedby="login-note-text">
-          <div className="login-note-head">
-            <svg className="login-note-mark" aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg>
-            <span className="login-note-app">{APP_NAME}</span>
-            <span className="login-note-time">지금</span>
+        {/* TDS Top의 위 그림 자리에 이 앱이 보내는 알림 예시를 둔다. 앱 이름이 카드 안에 있어 로고는 따로 두지 않는다. */}
+        <div className="login-preview">
+          <p className="login-preview-label" id="login-preview-label">알림 예시</p>
+          <div className="login-note" role="img" aria-labelledby="login-preview-label" aria-describedby="login-note-text">
+            <div className="login-note-head">
+              <svg className="login-note-mark" aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg>
+              <span className="login-note-app">{APP_NAME}</span>
+              <span className="login-note-time">지금</span>
+            </div>
+            <div id="login-note-text"><p className="login-note-title">[소프트웨어학과] 겨울방학 인턴 모집 안내</p>
+            <p className="login-note-body">관심 키워드 인턴, <span className="nowrap">12월 5일까지</span> 신청해요</p></div>
           </div>
-          <div id="login-note-text"><p className="login-note-title">[소프트웨어학과] 겨울방학 인턴 모집 안내</p>
-          <p className="login-note-body">관심 키워드 인턴, <span className="nowrap">12월 5일까지</span> 신청해요</p></div>
         </div>
-      </div>
+        <div className="login-top">
+          <h1>필요한 성균관대 공지만<br />알려 줘요</h1>
+          <p className="login-sub">학과와 관심 키워드를 정하면 마감일도 함께 챙길 수 있어요</p>
+        </div>
       </div>
       <div className="login-bottom">
         <button type="button" className="google-button" disabled={busy} aria-busy={busy} onClick={() => { void app.signIn(); }}>
@@ -46,7 +46,7 @@ export function LoginScreen({ app }: { app: AppController }) {
         <div aria-live="polite" className="login-live">
           {app.authError ? <p className="login-error" role="alert">{app.authError}</p> : null}
         </div>
-        <p className="login-legal">계속하면 <a href="./privacy.html">개인정보처리방침</a>에 동의한 것으로 봐요</p>
+        <p className="login-legal">계속하면 <a href="./privacy.html">개인정보처리방침</a>에 동의하는 거예요</p>
       </div>
     </div>
   </div>;

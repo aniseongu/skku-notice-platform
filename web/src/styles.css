@@ -754,15 +754,14 @@
   .login-screen.is-status { align-items: center; justify-content: center; }
   .login-status { margin: 0; font-size: 14px; line-height: 20px; color: var(--text-2); }
   .login-column { display: flex; flex: 1; flex-direction: column; width: 100%; padding: 0 20px; }
-  /* TDS Top처럼 제목 묶음은 위에, 알림 예시는 단추 바로 위에 붙여 위와 아래 두 덩어리로 나눈다. */
-  .login-main { display: flex; flex: 1; flex-direction: column; padding-top: calc(64px + env(safe-area-inset-top)); }
-  .login-top { padding-top: 0; }
-  .login-mark { display: block; width: 64px; height: 64px; margin-bottom: 20px; }
+  /* TDS Top처럼 위 그림(알림 예시), 제목, 설명을 한 묶음으로 위에 두고 단추만 아래에 둔다. */
+  .login-main { display: flex; flex: 1; flex-direction: column; padding-top: calc(56px + env(safe-area-inset-top)); }
+  .login-top { padding-top: 32px; }
   .login-top h1 { margin: 0; font-size: 28px; line-height: 38px; font-weight: 700; letter-spacing: -0.02em; overflow: visible; text-overflow: clip; white-space: normal; word-break: keep-all; }
   .login-sub { margin: 8px 0 0; font-size: 17px; line-height: 26px; font-weight: 500; color: var(--text-2); word-break: keep-all; }
   /* 알림 예시: 실제 휴대폰 알림처럼 한 장만. 목록 묶음과 같은 반경, 그림자 없이 테두리로 구분한다. */
   /* 예시는 제목 묶음 바로 아래에 붙이고 남는 공간은 단추 위로 보낸다(위 묶음과 아래 단추 두 덩어리). */
-  .login-preview { margin-top: auto; padding-top: 32px; pointer-events: none; }
+  .login-preview { pointer-events: none; }
   .login-preview-label { margin: 0 0 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-2); }
   .login-note { width: 100%; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
   .login-note-head { display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 18px; color: var(--text-2); }
@@ -793,7 +792,6 @@
     .login-column { flex: none; max-width: 420px; padding: 48px 0; }
     .login-main { flex: none; padding-top: 0; }
     .login-top h1 { font-size: 30px; line-height: 40px; }
-    .login-preview { margin-top: 0; }
     .login-bottom { margin-top: 0; padding-bottom: 0; }
     .login-legal { font-size: 14px; }
   }
