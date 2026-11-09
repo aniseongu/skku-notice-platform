@@ -477,6 +477,8 @@ export class AppController extends Reactive {
       }
       const { error } = await authClient.auth.signOut({ scope: 'local' });
       if (error) throw error;
+      // 다시 로그인하면 설정이 아니라 공지 목록에서 시작하게 주소를 첫 화면으로 돌려놓는다.
+      history.replaceState(null, '', location.pathname);
     } catch {
       this.authError = '로그아웃을 완료하지 못했어요. 다시 확인해 주세요.';
     } finally { this.authBusy = false; }
