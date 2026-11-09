@@ -379,9 +379,8 @@ function Notifications({ model }: { model: SettingsModel }) {
 }
 
 function BoardsSection({ model }: { model: SettingsModel }) {
-  // 로그인 전에는 바로 쓸 수 있는 순서 바꾸기를 로그인 안내보다 먼저 둔다.
+  // 고르기(받을 게시판)가 먼저, 순서는 그다음 보조 기능이다.
   return <>
-    {!model.userId ? <BoardOrderSection order={model.boardOrder} /> : null}
     <Section id="s-boards" title="받을 게시판">
       {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <Setting name="게시판" help="알림을 받고 목록에 모아 볼 게시판이에요">
         {model.error ? <><p className="field-note error" role="alert">{model.error}</p>
@@ -389,7 +388,7 @@ function BoardsSection({ model }: { model: SettingsModel }) {
         <BoardGroups model={model} />
       </Setting>}
     </Section>
-    {model.userId ? <BoardOrderSection order={model.boardOrder} /> : null}
+    <BoardOrderSection order={model.boardOrder} />
   </>;
 }
 
