@@ -758,7 +758,7 @@
   .login-main { display: flex; flex: 1; flex-direction: column; padding-top: calc(48px + env(safe-area-inset-top)); }
   .login-top { padding-top: 32px; }
   .login-top h1 { margin: 0; font-size: 28px; line-height: 38px; font-weight: 700; letter-spacing: -0.02em; overflow: visible; text-overflow: clip; white-space: normal; word-break: keep-all; }
-  .login-sub { margin: 8px 0 0; font-size: 17px; line-height: 26px; font-weight: 500; color: var(--text-2); word-break: keep-all; }
+  .login-sub { margin: 8px 0 0; font-size: 17px; line-height: 26px; font-weight: 500; color: var(--text-2); word-break: keep-all; text-wrap: balance; }
   /* 알림 예시: 실제 휴대폰 알림처럼 한 장만. 목록 묶음과 같은 반경, 그림자 없이 테두리로 구분한다. */
   /* 예시는 제목 묶음 바로 아래에 붙이고 남는 공간은 단추 위로 보낸다(위 묶음과 아래 단추 두 덩어리). */
   .login-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; font-size: 22px; line-height: 30px; font-weight: 700; color: var(--text); }
