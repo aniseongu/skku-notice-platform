@@ -512,10 +512,10 @@
   .order-list li:first-child { border-top: 0; }
   .order-name { min-width: 0; overflow-wrap: anywhere; }
   .order-controls { display: flex; flex: none; align-items: center; margin-right: -10px; }
-  .order-move, .order-handle { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--text-2); }
+  .order-move, .order-handle { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--text); }
   .order-move:disabled { color: var(--text-3); opacity: 0.6; cursor: default; }
   /* 손잡이는 끌기 전용이라 위아래 단추보다 한 단계 연하게, 앞에 간격을 둔다. */
-  .order-handle { margin-left: 4px; color: var(--text-3); cursor: grab; touch-action: none; }
+  .order-handle { margin-left: 4px; color: var(--text-2); cursor: grab; touch-action: none; }
   .settings-lead { margin: -2px 0 8px; font-size: 13px; line-height: 19px; color: var(--text-2); }
   .box { border-radius: var(--r-lg); background: var(--surface); padding: 0 var(--gutter); }
   .setting { display: flex; flex-direction: column; gap: 10px; padding: 16px 0; }
