@@ -262,26 +262,18 @@ export class AppController extends Reactive {
   needsReadBaseline = this.readState === null;
   read: string[] | null = this.readState ? readIds(this.readState) : null;
   query = '';
-  /** 화면 반영 뒤: 고른 공지를 기억하고, 되살린 공지 줄을 한 번 보이게 한다. */
+  /** 화면 반영 뒤: 고른 공지를 이 탭에 기억한다. */
   commit(): void {
     super.commit();
     if (this.selectedId !== this.lastSelected) {
-      // 사용자가 다른 공지를 고르면 되살리기 스크롤은 하지 않는다.
-      if (this.lastSelected !== undefined) this.restoreScroll = false;
       this.lastSelected = this.selectedId;
       rememberSelected(this.selectedId);
-    }
-    if (this.restoreScroll && this.selectedId) {
-      const row = document.querySelector(`[data-id="${CSS.escape(this.selectedId)}"]`);
-      if (row) { this.restoreScroll = false; row.scrollIntoView({ block: 'center' }); }
     }
   }
 
   loading = true;
   failed = false;
   selectedId: string | null = rememberSelected();
-  // 새로고침으로 되살린 공지 줄을 목록에서 한 번만 보이게 내린다.
-  private restoreScroll = Boolean(this.selectedId);
   private lastSelected: string | null | undefined = undefined;
   install: InstallPrompt | null = null;
   toast = '';
