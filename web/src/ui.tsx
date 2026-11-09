@@ -31,14 +31,18 @@ export function Segmented<T extends string | number>({ label, options, value, on
   </div>;
 }
 
-/** 목록에서 하나를 고른다. 누르면 바로 다음 단계로 가는 용도라 항목이 크다. */
-export function ChoiceList({ label, items, selected, onSelect }: {
-  label: string; items: readonly { id: string; label: string; note?: string; description?: string }[]; selected?: string | null; onSelect: (id: string) => void;
+/**
+ * 목록 한 줄을 고른다. 기본은 라디오(고르기만 하고 아래 "다음"이 확정한다).
+ * nav이면 누르면 다음 목록으로 들어가는 이동 줄이라 오른쪽에 ›를 두고 버튼으로 읽힌다.
+ */
+export function ChoiceList({ label, items, selected, onSelect, nav }: {
+  label: string; items: readonly { id: string; label: string; note?: string; description?: string }[]; selected?: string | null; onSelect: (id: string) => void; nav?: boolean;
 }) {
-  return <div className="choice-list" role="radiogroup" aria-label={label}>
-    {items.map((item) => <button type="button" className="choice" role="radio" key={item.id} aria-checked={selected === item.id} onClick={() => onSelect(item.id)}>
+  return <div className="choice-list" role={nav ? 'group' : 'radiogroup'} aria-label={label}>
+    {items.map((item) => <button type="button" className="choice" key={item.id} onClick={() => onSelect(item.id)}
+      {...(nav ? {} : { role: 'radio', 'aria-checked': selected === item.id })}>
       <span>{item.label}{item.note ? <span className="choice-note">{item.note}</span> : null}{item.description ? <span className="choice-desc">{item.description}</span> : null}</span>
-      <span className="choice-check" aria-hidden="true" />
+      {nav ? <span className="choice-chevron" aria-hidden="true" /> : <span className="choice-check" aria-hidden="true" />}
     </button>)}
   </div>;
 }

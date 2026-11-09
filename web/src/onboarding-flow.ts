@@ -43,10 +43,13 @@ export function toggleValue(list: readonly string[], value: string): string[] {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
 }
 
-export function canContinue(step: Step, draft: Draft): boolean {
+/** doubleAnswer는 복수전공 단계에서 '있어요'/'없어요'를 골랐는지(고르기 전에는 null)다. */
+export type DoubleAnswer = 'yes' | 'no' | null;
+
+export function canContinue(step: Step, draft: Draft, doubleAnswer: DoubleAnswer = null): boolean {
   switch (step) {
     case 'primary': return draft.programs.length >= 1;
-    case 'double': return true;
+    case 'double': return doubleAnswer === 'no' || draft.programs.length >= 2;
     case 'status': return draft.year !== null && draft.enrollmentStatus !== null;
     case 'etc': return true;
     case 'boards': return true;

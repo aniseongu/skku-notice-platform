@@ -320,30 +320,38 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('heading', { name: '주전공이 어디예요?' })).toBeFocused();
   await expect(dialog.getByRole('heading', { name: '주전공이 어디예요?' })).toBeVisible();
   await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
+  const barWidth1 = (await dialog.getByRole('progressbar').boundingBox())!.width;
   // 대학 → 학과: 고른 대학의 학과만 보인다.
-  await dialog.getByRole('radio', { name: '소프트웨어융합대학', exact: true }).click();
+  await dialog.getByRole('button', { name: '소프트웨어융합대학', exact: true }).click();
   // 질문 제목이 접히지 않고 보여야 한다(전역 h1 규칙이 제목 높이를 0으로 만들던 결함의 재발 방지).
   const title = dialog.getByRole('heading', { name: '주전공이 어디예요?' });
   expect((await title.boundingBox())!.height).toBeGreaterThan(20);
   await expect(dialog.getByRole('radio', { name: '소프트웨어학과', exact: true })).toBeVisible();
   await expect(dialog.getByRole('radio', { name: '국어국문학과', exact: true })).toHaveCount(0);
   await dialog.getByRole('button', { name: '대학 다시 고르기' }).click();
-  await dialog.getByRole('radio', { name: '문과대학', exact: true }).click();
+  await dialog.getByRole('button', { name: '문과대학', exact: true }).click();
   await expect(dialog.getByRole('searchbox', { name: '학과 검색' })).toBeVisible();
   await dialog.getByRole('searchbox', { name: '학과 검색' }).fill('철학');
   await expect(dialog.getByRole('radio', { name: '철학과', exact: true })).toBeVisible();
   await expect(dialog.getByRole('radio', { name: '사학과', exact: true })).toHaveCount(0);
   await dialog.getByRole('button', { name: '대학 다시 고르기' }).click();
-  await dialog.getByRole('radio', { name: '소프트웨어융합대학', exact: true }).click();
-  await dialog.getByRole('radio', { name: '소프트웨어학과', exact: true }).click();      // 목록 항목이 곧 다음 단계
+  await dialog.getByRole('button', { name: '소프트웨어융합대학', exact: true }).click();
+  // 학과는 고르기만 하고 아래 다음이 확정한다(자동으로 넘어가지 않는다).
+  await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
+  await dialog.getByRole('radio', { name: '소프트웨어학과', exact: true }).click();
+  await expect(dialog.getByRole('heading', { name: '주전공이 어디예요?' })).toBeVisible();
+  await expect(dialog.getByRole('radio', { name: '소프트웨어학과', exact: true })).toHaveAttribute('aria-checked', 'true');
+  await dialog.getByRole('button', { name: '다음' }).click();
   // 복수전공은 선택이다.
   await expect(dialog.getByRole('heading', { name: '복수전공이 있나요?' })).toBeFocused();
   await expect(dialog.getByRole('radiogroup', { name: '복수전공 선택' }).getByRole('radio')).toHaveCount(2);
+  await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '6단계 중 2단계');
-  await dialog.getByRole('radio', { name: '복수전공이 있어요' }).click();
-  await dialog.getByRole('radio', { name: '경영대학', exact: true }).click();
+  expect(Math.abs((await dialog.getByRole('progressbar').boundingBox())!.width - barWidth1)).toBeLessThanOrEqual(0.5);
+  await dialog.getByRole('radio', { name: '있어요', exact: true }).click();
+  await dialog.getByRole('button', { name: '경영대학', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('radio', { name: '경영학과', exact: true }).click();
-  await expect(dialog.getByText('경영학과', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: '다음' }).click();
   // 학년·재학 상태: 재학이 미리 골라져 있고 학년을 골라야 넘어간다.
   await expect(dialog.getByRole('button', { name: '재학', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -351,9 +359,11 @@ test('first-run setup: choices only, department list follows the college, double
   await dialog.getByRole('button', { name: '3학년' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   // 게시판·키워드: 내 전공에 맞춰 추천이 켜져 있다.
-  await expect(dialog.getByRole('heading', { name: '받을 공지를 골라 주세요' })).toBeFocused();
-  await expect(dialog.getByRole('switch', { name: /^성균관대 공지 추천/ })).toHaveAttribute('aria-checked', 'true');
-  await expect(dialog.getByRole('switch', { name: /^소프트웨어학과 공지 추천/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(dialog.getByRole('heading', { name: '어떤 공지를 받을까요?' })).toBeFocused();
+  await expect(dialog.getByText('추천', { exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole('switch', { name: /^성균관대 공지/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(dialog.getByRole('switch', { name: /^소프트웨어학과 공지/ })).toHaveAttribute('aria-checked', 'true');
+  expect((await dialog.getByRole('button', { name: '장학' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await dialog.getByRole('button', { name: '장학' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   // 기타 게시판은 전공 게시판 다음에 나온다. 부트캠프 게시판을 고를 수 있고, 건너뛰어도 된다.
@@ -530,7 +540,7 @@ test('first-run setup layout: header and body share one column, the close contro
     await open(manual);
     const dialog = page.getByRole('dialog');
     await dialog.waitFor();
-    await dialog.getByRole('radio', { name: '문과대학', exact: true }).scrollIntoViewIfNeeded();   // 아래로 스크롤된 상태에서도 어긋나지 않아야 한다
+    await dialog.getByRole('button', { name: '문과대학', exact: true }).scrollIntoViewIfNeeded();   // 아래로 스크롤된 상태에서도 어긋나지 않아야 한다
     const top = await box('.onb-top-inner'), body = await box('.onb-body');
     expect(Math.abs(top.x - body.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(top.width - body.width)).toBeLessThanOrEqual(1);

@@ -655,17 +655,20 @@
   .badge { padding: 1px 8px; border-radius: var(--r-pill); background: var(--sunken); color: var(--text-2); font-size: 12px; font-weight: 600; }
   .seg { display: flex; flex-wrap: wrap; gap: 8px; }
   .seg button { flex: 1 1 4.5rem; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); color: var(--text); font-weight: 500; }
-  .seg button[aria-pressed="true"] { background: var(--sunken); font-weight: 700; }
+  /* 고른 칸은 DESIGN 2절대로 --text로 채운다(초록 없음). */
+  .seg button[aria-pressed="true"] { border-color: var(--text); background: var(--text); color: var(--bg); font-weight: 700; }
   .seg[data-columns="3"] { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .choice-list { display: grid; overflow: hidden; border-radius: var(--r-lg); background: var(--surface); }
-  .choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 8px 16px; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--text); text-align: left; font-size: 15px; }
-  .choice:first-child { border-top: 0; }
+  /* 칸 사이 구분선은 스위치 줄처럼 왼쪽 16px 안쪽에서 시작한다(칸 끝까지 닿지 않는다). */
+  .choice { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 8px 16px; border: 0; border-radius: 0; background: var(--surface); color: var(--text); text-align: left; font-size: 15px; font-weight: 400; }
+  .choice + .choice::before { content: ""; position: absolute; top: 0; left: 16px; right: 16px; height: 1px; background: var(--line); }
   .choice[aria-checked="true"] { font-weight: 700; }
   .choice-note { display: block; font-size: 13px; font-weight: 400; color: var(--text-3); }
   .choice-desc { display: block; font-size: 13px; font-weight: 400; color: var(--text-2); }
   .choice-check { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--text-3); display: grid; place-items: center; }
   .choice[aria-checked="true"] .choice-check { border-color: var(--text); }
   .choice[aria-checked="true"] .choice-check::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--text); }
+  .choice-chevron { flex: none; width: 8px; height: 8px; margin-right: 4px; border-top: 1.5px solid var(--text-3); border-right: 1.5px solid var(--text-3); transform: rotate(45deg); }
   .chip-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
   .hint { padding: 10px 12px; border-radius: var(--r-md); background: var(--sunken); color: var(--text-2); font-size: 14px; }
   .error-text { color: var(--danger); font-size: 14px; }
@@ -679,8 +682,8 @@
   .onb-top { position: sticky; top: 0; z-index: 2; background: var(--bg); padding-top: env(safe-area-inset-top); }
   .onb-top-inner { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; column-gap: 12px; width: min(100%, 36rem); margin-inline: auto; padding: 8px 12px 4px 8px; }
   .onb-top .icon-button { width: 44px; height: 44px; margin: 0; }
-  /* 첫 단계처럼 뒤로 갈 곳이 없으면 그 칸을 없애 진행 막대의 왼쪽 끝이 본문 왼쪽 끝과 맞게 한다. */
-  .onb-top-inner[data-back="false"] { grid-template-columns: minmax(0, 1fr) auto; padding-left: 16px; }
+  /* 첫 단계에도 뒤로 가기 칸(44px)을 비워 두어 단계가 바뀌어도 진행 막대의 폭과 위치가 같다. */
+  .onb-top-slot { display: block; width: 44px; height: 44px; }
   /* 제목으로 옮기는 포커스는 읽어 주기 위한 것이라 눈에 보이는 링을 그리지 않는다(눌러지는 요소가 아니다). */
   .onb-body h1:focus { outline: none; }
   /* 진행: 5개로 끊긴 막대(끝낸 구간과 지금 구간이 채워진다). 숫자는 화면 낭독기용 속성으로만 둔다. */
@@ -699,12 +702,18 @@
   .onb-body h1 { margin: 8px 0 0; font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: -0.02em; overflow: visible; white-space: normal; text-overflow: clip; }
   .onb-body > p, .onb-lead { margin: 0; color: var(--text-2); }
   .onb-group { display: grid; gap: 8px; }
-  .onb-group h2, .onb .settings-head { margin: 0 0 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
+  .onb .settings-head { margin: 0 0 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
+  /* 라벨은 자기 칩·목록과 한 덩어리다. 위 24px(앞에 다른 묶음이 있으면 32px), 아래 8px. 묶음의 gap이 8px이라 위 여백은 그만큼 뺀다. */
+  .onb-group > h2 { margin: 16px 0 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
+  .onb-group > h2:first-child { margin-top: 0; }
+  .onb-group > * + h2 { margin-top: 24px; }
   .onb-foot { position: sticky; bottom: 0; z-index: 2; background: linear-gradient(to bottom, transparent, var(--bg) 14px); padding: 18px 0 0; }
   .onb-foot-inner { width: min(100%, 36rem); margin-inline: auto; padding: 0 16px calc(12px + env(safe-area-inset-bottom)); display: grid; gap: 8px; }
   .onb-foot .solid-button, .onb-foot .ghost-button { width: 100%; }
   .onb .text-button { min-height: 44px; }
   .onb .card-note { margin: 0; color: var(--text-2); font-size: 14px; }
+  .onb .chip { min-height: 44px; }
+  .onb .chip::before { inset: 0; }
   .onb-search { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); }
   /* 왼쪽 브랜드 칸(넓은 화면에서만). 앱 아이콘과 이름, 한 줄 설명, 지금 몇 번째 질문인지 보여 주는 단계 목록. */
   .onb-brand-lockup { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }

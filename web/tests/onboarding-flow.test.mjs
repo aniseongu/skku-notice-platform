@@ -75,7 +75,11 @@ test('steps move forward and back in order and required answers gate the next bu
   assert.equal(nextStep('notify'), null);
   const draft = initialDraft(EMPTY_PROFILE, [], []);
   assert.equal(canContinue('primary', draft), false);
-  assert.equal(canContinue('double', draft), true, 'a double major is optional');
+  assert.equal(canContinue('double', draft), false, 'the double major question needs an answer before 다음');
+  assert.equal(canContinue('double', draft, 'no'), true, 'no double major is a valid answer');
+  assert.equal(canContinue('double', draft, 'yes'), false, 'yes without a chosen department cannot continue');
+  assert.equal(canContinue('double', withPrograms(draft, [sw, biz]), 'yes'), true);
+  assert.equal(canContinue('primary', withPrograms(draft, [sw])), true);
   assert.equal(canContinue('status', withPrograms(draft, [sw])), false, 'year is required');
   assert.equal(canContinue('status', { ...draft, year: 2 }), true);
 });

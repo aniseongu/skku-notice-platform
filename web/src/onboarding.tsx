@@ -7,7 +7,7 @@ import { COLLEGES, MAX_PROGRAMS, findCollege, programKey, programLabel, type Pro
 import { BOARD_CATALOG, boardsForPrograms, OTHER_BOARDS } from './skku-boards';
 import {
   KEYWORD_SUGGESTIONS, SEARCH_THRESHOLD, STEPS, canContinue, filterDepartments, initialDraft, nextStep, previousStep,
-  stepIndex, toggleValue, withPrograms, type Draft, type Step,
+  stepIndex, toggleValue, withPrograms, type Draft, type DoubleAnswer, type Step,
 } from './onboarding-flow';
 import { APP_NAME } from './brand';
 import { Card, ChipGroup, ChoiceList, Segmented, SwitchRow } from './ui';
@@ -17,9 +17,9 @@ const STEP_LABELS = ['주전공', '복수전공', '학년·재학 상태', '받�
 const YEARS = [1, 2, 3, 4, 5].map((year) => ({ value: year, label: year === 5 ? '5학년 이상' : `${year}학년` }));
 const STATUS = ENROLLMENT.map((value) => ({ value, label: value }));
 
-/** 대학을 고른 뒤 그 대학의 학과만 보여 준다. 주전공과 복수전공이 같은 선택기를 쓴다. */
-function ProgramPicker({ onPick, onCancel, current, title }: {
-  onPick: (program: Program) => void; onCancel?: () => void; current?: Program; title: string;
+/** 대학을 고른 뒤 그 대학의 학과만 보여 준다. 대학 줄은 학과 목록으로 들어가는 이동 줄이고, 학과는 고르기만 한다(확정은 아래 "다음"). */
+function ProgramPicker({ onPick, onCancel, current }: {
+  onPick: (program: Program) => void; onCancel?: () => void; current?: Program | null;
 }) {
   const [college, setCollege] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -29,27 +29,25 @@ function ProgramPicker({ onPick, onCancel, current, title }: {
   if (!found) {
     return <div className="onb-group">
       <p className="onb-lead">대학을 먼저 고르면 학과가 나와요</p>
-      <ChoiceList label="대학 선택" selected={current?.college ?? null}
-        items={COLLEGES.map((item) => ({ id: item.name, label: item.name }))}
-        onSelect={(name) => {
-          const picked = findCollege(name)!;
-          // 학과가 없는 대학(학부대학)은 바로 확정한다. 나머지는 그 대학의 학과 목록으로 넘어간다.
-          if (picked.departments.length === 0) onPick({ college: picked.name, department: null });
-          else { setCollege(name); setQuery(''); }
-        }} />
+      <ChoiceList nav label="대학 선택" items={COLLEGES.map((item) => ({ id: item.name, label: item.name }))}
+        onSelect={(name) => { setCollege(name); setQuery(''); }} />
       {onCancel ? <button type="button" className="text-button" onClick={onCancel}>복수전공 고르기를 취소할게요</button> : null}
     </div>;
   }
+  // 학과가 없는 대학(학부대학)은 그 대학 하나만 고르는 목록이다.
+  const noDepartments = found.departments.length === 0;
   const departments = filterDepartments(found.departments, query);
   return <div className="onb-group">
-    <p className="onb-lead">{title === '주전공' ? '학과를 고르면 다음으로 넘어가요' : '학과를 고르면 복수전공에 추가돼요'}</p>
     {found.departments.length > SEARCH_THRESHOLD
       ? <input type="search" className="onb-search" aria-label="학과 검색" placeholder="학과 이름으로 찾기" autoComplete="off"
         value={query} onChange={(event) => setQuery(event.currentTarget.value)} /> : null}
-    {departments.length
-      ? <ChoiceList label={`${found.name} 학과 선택`} selected={current?.college === found.name ? current.department : null}
-        items={departments.map((name) => ({ id: name, label: name }))} onSelect={(name) => onPick({ college: found.name, department: name })} />
-      : <p className="hint" role="status">'{query}'에 맞는 학과가 없어요. 다른 단어로 찾아보세요.</p>}
+    {noDepartments
+      ? <ChoiceList label={`${found.name} 선택`} selected={current?.college === found.name ? found.name : null}
+        items={[{ id: found.name, label: found.name }]} onSelect={() => onPick({ college: found.name, department: null })} />
+      : departments.length
+        ? <ChoiceList label={`${found.name} 학과 선택`} selected={current?.college === found.name ? current.department : null}
+          items={departments.map((name) => ({ id: name, label: name }))} onSelect={(name) => onPick({ college: found.name, department: name })} />
+        : <p className="hint" role="status">'{query}'에 맞는 학과가 없어요. 다른 단어로 찾아보세요.</p>}
     <button type="button" className="text-button" onClick={() => setCollege(null)}>대학 다시 고르기</button>
   </div>;
 }
@@ -59,6 +57,8 @@ export function Onboarding({ app }: { app: AppController }) {
   const [step, setStep] = useState<Step>('primary');
   const [draft, setDraft] = useState<Draft>(() => initialDraft(app.profile, app.subscriptions, app.keywords));
   const [addingDouble, setAddingDouble] = useState(false);
+  const [pendingDouble, setPendingDouble] = useState<Program | null>(null);
+  const [doubleAnswer, setDoubleAnswer] = useState<DoubleAnswer>(() => (draft.programs.length > 1 ? 'yes' : null));
   const [changingPrimary, setChangingPrimary] = useState(() => app.profile.programs.length === 0);
   const [saved, setSaved] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -79,16 +79,20 @@ export function Onboarding({ app }: { app: AppController }) {
   const go = (to: Step | null) => { if (to) setStep(to); };
   const setPrimary = (program: Program) => {
     setDraft(withPrograms(draft, [program, ...doubles.filter((other) => programKey(other) !== programKey(program))]));
-    setChangingPrimary(false);
-    go('double');
   };
   const addDouble = (program: Program) => {
     setDraft(withPrograms(draft, [...draft.programs.filter((other) => programKey(other) !== programKey(program)), program]));
     setAddingDouble(false);
+    setPendingDouble(null);
+  };
+  const cancelDouble = () => {
+    setAddingDouble(false);
+    setPendingDouble(null);
+    if (draft.programs.length < 2) setDoubleAnswer(null);
   };
   const removeDouble = (program: Program) => setDraft(withPrograms(draft, draft.programs.filter((other) => programKey(other) !== programKey(program))));
   const back = () => {
-    if (addingDouble) { setAddingDouble(false); return; }
+    if (addingDouble) { cancelDouble(); return; }
     if (step === 'primary' && !changingPrimary) { setChangingPrimary(true); return; }
     go(previousStep(step));
   };
@@ -104,17 +108,17 @@ export function Onboarding({ app }: { app: AppController }) {
   if (step === 'primary') {
     title = '주전공이 어디예요?';
     body = changingPrimary || !primary
-      ? <ProgramPicker title="주전공" current={primary} onPick={setPrimary} />
+      ? <ProgramPicker current={primary} onPick={setPrimary} />
       : <div className="onb-group">
-        <ChoiceList label="선택한 주전공" selected={programKey(primary)} items={[{ id: programKey(primary), label: programLabel(primary), note: primary.department ? primary.college : undefined }]} onSelect={() => go('double')} />
+        <ChoiceList label="선택한 주전공" selected={programKey(primary)} items={[{ id: programKey(primary), label: programLabel(primary), note: primary.department ? primary.college : undefined }]} onSelect={() => undefined} />
         <button type="button" className="text-button" onClick={() => setChangingPrimary(true)}>주전공 바꾸기</button>
       </div>;
-    foot = primary && !changingPrimary ? <button type="button" className="solid-button" onClick={() => go('double')}>다음</button> : null;
+    foot = <button type="button" className="solid-button" disabled={!canContinue('primary', draft)} onClick={() => { setChangingPrimary(false); go('double'); }}>다음</button>;
   } else if (step === 'double') {
     title = '복수전공이 있나요?';
-    lead = '고르면 다음으로 넘어가요';
+    lead = addingDouble ? '' : '있으면 그 학과 공지도 함께 받아요';
     body = addingDouble
-      ? <ProgramPicker title="복수전공" onPick={addDouble} onCancel={() => setAddingDouble(false)} />
+      ? <ProgramPicker current={pendingDouble} onPick={setPendingDouble} onCancel={cancelDouble} />
       : <div className="onb-group">
         {doubles.length ? <Card id="doubles" title="복수전공">
           <dl className="info-list">{doubles.map((program) => <div key={programKey(program)}>
@@ -124,13 +128,17 @@ export function Onboarding({ app }: { app: AppController }) {
           </div>)}</dl>
         </Card> : null}
         {draft.programs.length < MAX_PROGRAMS
-          ? <ChoiceList label="복수전공 선택" selected={null}
-            items={doubles.length ? [{ id: 'add', label: '복수전공 더 추가하기' }] : [{ id: 'add', label: '복수전공이 있어요', description: '그 학과의 공지도 함께 받을 수 있어요' }, { id: 'none', label: '복수전공이 없어요' }]}
-            onSelect={(id) => { if (id === 'none') go('status'); else setAddingDouble(true); }} /> : null}
+          ? doubles.length
+            ? <ChoiceList nav label="복수전공 추가" items={[{ id: 'add', label: '복수전공 더 추가하기' }]} onSelect={() => setAddingDouble(true)} />
+            : <ChoiceList label="복수전공 선택" selected={doubleAnswer}
+              items={[{ id: 'yes', label: '있어요' }, { id: 'no', label: '없어요' }]}
+              onSelect={(id) => { if (id === 'no') setDoubleAnswer('no'); else { setDoubleAnswer('yes'); setAddingDouble(true); } }} /> : null}
       </div>;
-    foot = !addingDouble && doubles.length ? <button type="button" className="solid-button" onClick={() => go('status')}>다음</button> : null;
+    foot = addingDouble
+      ? <button type="button" className="solid-button" disabled={!pendingDouble} onClick={() => { if (pendingDouble) { addDouble(pendingDouble); go('status'); } }}>다음</button>
+      : <button type="button" className="solid-button" disabled={!canContinue('double', draft, doubleAnswer)} onClick={() => go('status')}>다음</button>;
   } else if (step === 'status') {
-    title = '학년과 재학 상태를 알려 주세요';
+    title = '학년과 재학 상태가 어떻게 되나요?';
     lead = '지원 자격을 가릴 때만 써요';
     body = <div className="onb-group">
       <h2>학년</h2>
@@ -140,30 +148,29 @@ export function Onboarding({ app }: { app: AppController }) {
     </div>;
     foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('boards')}>다음</button>;
   } else if (step === 'boards') {
-    title = '받을 공지를 골라 주세요';
+    title = '어떤 공지를 받을까요?';
     lead = '내 전공에 맞춰 추천했어요. 언제든 바꿀 수 있어요.';
     body = <div className="onb-group">
       <Card id="boards" title="게시판">
-        {orderedSources.filter((source) => !OTHER_BOARDS.some((board) => board.id === source.id)).map((source) => <SwitchRow key={source.id} label={source.name} badge={recommended.includes(source.id) ? '추천' : undefined}
+        {orderedSources.filter((source) => !OTHER_BOARDS.some((board) => board.id === source.id)).map((source) => <SwitchRow key={source.id} label={source.name}
           checked={draft.boards.includes(source.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, source.id), boardsTouched: true })} />)}
         {orderedSources.length === 0 ? <p className="hint" role="status">게시판 목록을 불러오지 못했어요. 잠시 뒤 설정에서 다시 골라 주세요.</p> : null}
       </Card>
       <h2>관심 키워드</h2>
-      <p className="card-note">관심 있는 키워드만 골라요</p>
+      <p className="card-note">고르지 않아도 공지는 모두 받아요</p>
       <ChipGroup label="관심 키워드" options={keywordOptions} selected={draft.keywords} onToggle={(word) => setDraft({ ...draft, keywords: toggleValue(draft.keywords, word) })} />
     </div>;
     foot = <button type="button" className="solid-button" onClick={() => go('etc')}>다음</button>;
   } else if (step === 'etc') {
     title = '전공과 상관없는 게시판도 받을까요?';
-    lead = '전공과 상관없이 들을 수 있는 공지예요';
+    lead = '수강 모집과 행사 소식이에요';
     // 서버 이름을 받기 전에도 내부 id가 보이지 않게 목록의 한글 이름으로 채운다.
     const nameOf = (id: string) => sources.find((source) => source.id === id)?.name ?? BOARD_CATALOG.find((board) => board.id === id)?.name ?? OTHER_BOARDS.find((board) => board.id === id)?.name ?? id;
-    const groups = [...new Set(OTHER_BOARDS.map((board) => board.group))];
     body = <div className="onb-group">
-      {groups.map((group) => <Card key={group} id={`etc-${group}`} title={group}>
-        {OTHER_BOARDS.filter((board) => board.group === group).map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
+      <div className="box" role="group" aria-label="기타 게시판">
+        {OTHER_BOARDS.map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
           checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
-      </Card>)}
+      </div>
       {app.onboardingError ? <p className="error-text" role="alert">{app.onboardingError}</p> : null}
     </div>;
     foot = <button type="button" className="solid-button" disabled={app.onboardingBusy} onClick={() => { void save(); }}>
@@ -198,10 +205,10 @@ export function Onboarding({ app }: { app: AppController }) {
     </aside>
     <div className="onb-main" ref={bodyRef}>
       <div className="onb-top">
-        <div className="onb-top-inner" data-back={showBack}>
+        <div className="onb-top-inner">
           {showBack
             ? <button type="button" className="icon-button" aria-label="이전 단계" onClick={back}><svg className="i" aria-hidden="true"><use href="icons/sprite.svg#back" /></svg></button>
-            : null}
+            : <span className="onb-top-slot" aria-hidden="true" />}
           <div className="onb-progress" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={index + 1}
             aria-valuetext={`${STEPS.length}단계 중 ${index + 1}단계`} aria-label="첫 설정 진행">
             {STEPS.map((name, i) => <span key={name} data-done={i <= index} />)}
