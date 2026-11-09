@@ -279,20 +279,28 @@ function SummaryTime({ info }: { info: NonNullable<SettingsModel['devicesInfo']>
   </div>;
 }
 
-/** 계정 삭제: 되돌릴 수 없어서 설정 맨 아래에 작게 따로 두고, 누르면 무엇이 지워지는지 알려 준 뒤 한 번 더 확인한다. */
+/** 계정 삭제: 되돌릴 수 없어서 설정 맨 아래에 작게 따로 두고, 누르면 질문과 지워지는 것을 보여 준 뒤 한 번 더 확인한다.
+ * 토스 확인창처럼 질문이 먼저, 안전한 "닫기"가 왼쪽, 실행이 오른쪽이다. 열면 "닫기"에 포커스를 둬서 Enter로 바로 지워지지 않게 한다. */
 function DeleteAccount({ model }: { model: SettingsModel }) {
   const account = model.account;
   const [confirming, setConfirming] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const opened = useRef(false);
+  useEffect(() => {
+    if (confirming) { opened.current = true; closeRef.current?.focus(); }
+    else if (opened.current) { opened.current = false; triggerRef.current?.focus(); }
+  }, [confirming]);
   if (!account) return null;
   return <div className="delete-account">
-    {confirming ? <>
-      <p className="setting-help">계정과 구독, 키워드, 저장한 공지, 프로필, 연결한 키와 토큰을 모두 삭제해요. 되돌릴 수 없어요</p>
-      <p className="field-note error" role="alert">정말 삭제할까요?</p>
+    {confirming ? <div className="delete-confirm" role="group" aria-labelledby="delete-account-title" aria-describedby="delete-account-help">
+      <p id="delete-account-title" className="delete-title">계정을 삭제할까요?</p>
+      <p id="delete-account-help" className="setting-help">구독, 키워드, 저장한 공지, 프로필, 알림 기기, 연결한 키와 토큰이 모두 지워져요. 지운 뒤에는 되돌릴 수 없어요</p>
       <div className="inline">
-        <button type="button" className="solid-button danger" disabled={account.busy} onClick={account.remove}>{account.busy ? '삭제하고 있어요' : '계정 삭제하기'}</button>
-        <button type="button" className="ghost-button" disabled={account.busy} onClick={() => setConfirming(false)}>그만둘게요</button>
+        <button type="button" className="ghost-button" ref={closeRef} disabled={account.busy} onClick={() => setConfirming(false)}>닫기</button>
+        <button type="button" className="solid-button danger" disabled={account.busy} onClick={account.remove}>{account.busy ? '삭제하고 있어요' : '삭제하기'}</button>
       </div>
-    </> : <button type="button" className="text-button" onClick={() => setConfirming(true)}>계정 삭제</button>}
+    </div> : <button type="button" className="text-button" ref={triggerRef} onClick={() => setConfirming(true)}>계정 삭제</button>}
     {account.error ? <p className="field-note error" role="alert">{account.error}</p> : null}
   </div>;
 }

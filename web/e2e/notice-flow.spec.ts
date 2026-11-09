@@ -1044,13 +1044,18 @@ test('delete account needs two steps, says what goes away, and shows a failure w
   await expect(row).not.toContainText('되돌릴 수 없어요');                            // 평소에는 작은 글자 버튼 하나만 보인다
   await row.getByRole('button', { name: '계정 삭제' }).click();                      // 1단계: 결과 설명과 확인 문구가 나온다
   expect(await calls(page)).toEqual([]);
-  await expect(row).toContainText('구독, 키워드, 저장한 공지, 프로필, 연결한 키와 토큰');
-  await expect(row).toContainText('되돌릴 수 없어요');
-  await expect(row.getByRole('alert')).toContainText('정말 삭제할까요');
-  await row.getByRole('button', { name: '그만둘게요' }).click();                       // 그만두면 아무 일도 없다
+  const confirm = row.getByRole('group', { name: '계정을 삭제할까요?' });              // 질문이 제목이고 지워지는 것을 알려 준다
+  await expect(confirm).toContainText('구독, 키워드, 저장한 공지, 프로필, 알림 기기, 연결한 키와 토큰');
+  await expect(confirm).toContainText('되돌릴 수 없어요');
+  await expect(row.getByRole('alert')).toHaveCount(0);                               // 오류가 아니므로 경고로 읽히지 않는다
+  await expect(row.getByRole('button', { name: '닫기' })).toBeFocused();              // Enter로 바로 지워지지 않게 안전한 단추에 포커스
+  const order = await confirm.getByRole('button').allTextContents();
+  expect(order).toEqual(['닫기', '삭제하기']);                                        // 안전한 단추가 왼쪽, 실행이 오른쪽
+  await row.getByRole('button', { name: '닫기' }).click();                            // 닫으면 아무 일도 없고 포커스가 돌아온다
+  await expect(row.getByRole('button', { name: '계정 삭제' })).toBeFocused();
   expect(await calls(page)).toEqual([]);
   await row.getByRole('button', { name: '계정 삭제' }).click();
-  await row.getByRole('button', { name: '계정 삭제하기' }).click();                // 2단계: 실제로 지운다
+  await row.getByRole('button', { name: '삭제하기' }).click();                      // 2단계: 실제로 지운다
   expect(await calls(page)).toEqual([['delete']]);
   await withApp(page, { accountError: '계정을 지우지 못했어요. 잠시 뒤 다시 눌러 주세요.' });
   await expect(row.getByRole('alert').last()).toContainText('다시 눌러 주세요');
