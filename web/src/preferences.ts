@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { parseBoardOrder } from './board-order.ts';
 
 export function parseKeywords(input: string): string[] {
   const values = [...new Set(input.split(/[\n,]+/).map((word) => word.trim()).filter(Boolean))];
@@ -18,5 +19,17 @@ export async function loadKeywordsPreference(client: SupabaseClient, userId: str
 
 export async function saveKeywordsPreference(client: SupabaseClient, userId: string, keywords: string[]): Promise<void> {
   const { error } = await client.from('user_preferences').upsert({ user_id: userId, keywords }, { onConflict: 'user_id' });
+  if (error) throw error;
+}
+
+/** 계정에 저장된 게시판 순서. 열이 아직 없으면(마이그레이션 전) 조용히 null을 돌려준다. */
+export async function loadBoardOrderPreference(client: SupabaseClient, userId: string): Promise<{ available: boolean; order: string[] }> {
+  const { data, error } = await client.from('user_preferences').select('board_order').eq('user_id', userId).maybeSingle();
+  if (error) return { available: false, order: [] };
+  return { available: true, order: parseBoardOrder(data?.board_order) };
+}
+
+export async function saveBoardOrderPreference(client: SupabaseClient, userId: string, order: string[]): Promise<void> {
+  const { error } = await client.from('user_preferences').upsert({ user_id: userId, board_order: order }, { onConflict: 'user_id' });
   if (error) throw error;
 }

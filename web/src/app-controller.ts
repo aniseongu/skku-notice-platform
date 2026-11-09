@@ -11,7 +11,8 @@ import type { Theme } from './theme';
 import { APP_NAME } from './brand';
 import { authClient } from './auth';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
-import { loadKeywordsPreference, parseKeywords, saveKeywordsPreference } from './preferences';
+import { loadBoardOrderPreference, loadKeywordsPreference, parseKeywords, saveBoardOrderPreference, saveKeywordsPreference } from './preferences';
+import { applyBoardOrder, BOARD_ORDER_LIMIT, parseBoardOrder } from './board-order';
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
 import { composeSummaryTime, deleteDevice, loadDevices, loadSummaryTime, saveCanvasMode, saveDeviceName, saveSummaryTime, suggestDeviceName, type CanvasMode, type Device } from './devices';
@@ -93,7 +94,7 @@ function rememberSelected(id?: string | null): string | null {
 
 export function remember(key: string, value?: string): string | null {
   try {
-    const storageKey = ['keywords', 'board', 'view-unread', 'subscriptions-only', 'onboarding-dismissed'].includes(key) ? localKey(key) : key;
+    const storageKey = ['keywords', 'board', 'board-order', 'view-unread', 'subscriptions-only', 'onboarding-dismissed'].includes(key) ? localKey(key) : key;
     if (value === undefined) return localStorage.getItem(storageKey);
     localStorage.setItem(storageKey, value);
   } catch { /* 사생활 보호 모드에서는 기억하지 않는다 */ }
@@ -107,6 +108,10 @@ function loadSort(tab: 'all' | 'intern'): Sort {
   if (normalizeTab(params.get('tab') ?? remember('tab')) === tab && (requested === 'latest' || requested === 'deadline')) return requested;
   const saved = remember(tab === 'intern' ? 'intern-sort' : 'notice-sort');
   return saved === 'latest' || saved === 'deadline' ? saved : 'latest';
+}
+
+function loadBoardOrder(): string[] {
+  try { return parseBoardOrder(JSON.parse(remember('board-order') ?? '[]')); } catch { return []; }
 }
 
 function loadKeywords(): string[] {
@@ -165,11 +170,17 @@ export class AppController extends Reactive {
     onboardingOpen: { state: true }, onboardingManual: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
     keywordNote: { state: true },
     subscriptions: { state: true }, subscriptionsLoading: { state: true }, subscriptionsError: { state: true }, subscriptionsOnly: { state: true },
+    boardOrder: { state: true }, boardOrderStatus: { state: true },
     preferencesLoading: { state: true }, preferencesError: { state: true }, preferencesUnavailable: { state: true },
     unreadOnly: { state: true }, selecting: { state: true }, selectedReads: { state: true },
   };
 
   preferencesLoading = false;
+  boardOrder: string[] = loadBoardOrder();
+  /** 계정에 저장한 결과. 열이 없으면(아직 적용 전) 아무것도 보이지 않는다. */
+  boardOrderStatus: '' | 'saved' | 'failed' = '';
+  boardOrderAccount = false;
+  boardOrderChain: Promise<void> = Promise.resolve();
   preferencesError = '';
   preferencesUnavailable = false;
   subscriptionsOnly = remember('subscriptions-only') === '1';
@@ -332,11 +343,14 @@ export class AppController extends Reactive {
           this.preferencesLoading = !!userId;
           this.preferencesError = '';
           this.preferencesUnavailable = false;
-          if (userId) setTimeout(() => { void this.refreshMyDeadlines(userId, epoch); void this.refreshMyTranslations(userId, epoch); void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.refreshMine(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch); }, 0);
+          if (userId) setTimeout(() => { void this.refreshMyDeadlines(userId, epoch); void this.refreshMyTranslations(userId, epoch); void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshBoardOrder(userId, epoch); void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.refreshMine(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch); }, 0);
           setLocalOwner(userId);
           this.onboardingDismissed = !!userId && remember('onboarding-dismissed') === '1';
           this.saved = loadSaved();
           this.keywords = loadKeywords();
+          this.boardOrder = loadBoardOrder();
+          this.boardOrderStatus = '';
+          this.boardOrderAccount = false;
           this.readState = loadReadState();
           this.needsReadBaseline = this.readState === null;
           this.read = this.readState ? readIds(this.readState) : null;
@@ -546,6 +560,44 @@ export class AppController extends Reactive {
   }
 
   // 지금 탭에 맞는 게시판들. 인턴 공고 탭은 외부 게시판, 그 밖은 학교 게시판.
+  async refreshBoardOrder(userId: string, epoch: number): Promise<void> {
+    if (!authClient) return;
+    try {
+      const { available, order } = await loadBoardOrderPreference(authClient, userId);
+      if (epoch !== this.subscriptionsEpoch) return;
+      this.boardOrderAccount = available;
+      if (!available) return;
+      if (order.length) { this.boardOrder = order; remember('board-order', JSON.stringify(order)); }
+      else if (this.boardOrder.length) void this.saveBoardOrderToAccount(this.boardOrder, false);
+    } catch { /* 계정에 못 읽으면 이 기기의 순서를 그대로 쓴다 */ }
+  }
+
+  setBoardOrder(ids: string[]) {
+    const order = parseBoardOrder(ids).slice(0, BOARD_ORDER_LIMIT);
+    this.boardOrder = order;
+    remember('board-order', JSON.stringify(order));
+    if (this.authUserId && this.boardOrderAccount) void this.saveBoardOrderToAccount(order, true);
+  }
+
+  private saveBoardOrderToAccount(order: string[], report: boolean): Promise<void> {
+    const userId = this.authUserId;
+    const epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId) return Promise.resolve();
+    const client = authClient;
+    this.boardOrderChain = this.boardOrderChain.then(async () => {
+      // 더 새 순서가 이미 있으면 이 저장은 건너뛴다.
+      if (report && this.boardOrder !== order) return;
+      try {
+        await saveBoardOrderPreference(client, userId, order);
+        if (report && epoch === this.subscriptionsEpoch && this.boardOrder === order) this.boardOrderStatus = 'saved';
+      } catch {
+        if (report && epoch === this.subscriptionsEpoch && this.boardOrder === order) this.boardOrderStatus = 'failed';
+      }
+    });
+    if (report) this.boardOrderStatus = '';
+    return this.boardOrderChain;
+  }
+
   async refreshPreferences(userId: string, epoch: number): Promise<void> {
     if (!authClient) return;
     try {
@@ -1166,8 +1218,12 @@ export class AppController extends Reactive {
    */
   tabSources(): Source[] {
     const external = this.tab() === 'intern';
-    const all = this.sources.filter((s) => Boolean(s.external) === external);
-    if (external) return all;
+    return external ? this.sources.filter((s) => Boolean(s.external)) : applyBoardOrder(this.schoolSources(), this.boardOrder);
+  }
+
+  /** 학교 게시판 중 사이드바에 보일 것(순서 적용 전, 서버 목록 순서). */
+  schoolSources(): Source[] {
+    const all = this.sources.filter((s) => !s.external);
     const subscribed = this.authUserId && !this.subscriptionsLoading && this.subscriptions.length > 0;
     const withNotices = new Set(this.notices.map((n) => n.source_id));
     const chosen = all.filter((s) => (subscribed ? this.subscriptions.includes(s.id) : withNotices.has(s.id)));

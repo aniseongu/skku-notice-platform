@@ -1,12 +1,14 @@
 // 설정 화면. 구조와 문구는 원본(첫 쪽 → 하위 쪽)을 따르고, 계정·게시판·내 정보는 다중 사용자 구조에 맞췄다.
 // 스위치는 바로 반영되는 설정에만 쓰고(role="switch"), 켜짐·꺼짐을 글자로도 알린다(색에만 의존하지 않는다).
 import { createRoot, type Root } from 'react-dom/client';
-import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import type { ByokStatus, CanvasStatus } from './byok';
 import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, validDeviceName, type CanvasMode, type Device } from './devices';
 import { ENROLLMENT, MILITARY, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
 import { programLabel } from './skku-programs';
 import { BOARD_CATALOG, COLLEGE_BOARD, DEPARTMENT_BOARD, OTHER_BOARDS } from './skku-boards';
+import Sortable from 'sortablejs';
+import { moveBoardId } from './board-order';
 import { Avatar, SwitchRow } from './ui';
 
 export interface SettingsModel {
@@ -29,6 +31,7 @@ export interface SettingsModel {
   install: () => void;
   showShortcuts: () => void;
   // 게시판
+  boardOrder: { boards: { id: string; label: string }[]; status: '' | 'saved' | 'failed'; move: (ids: string[]) => void };
   sources: { id: string; label: string }[];
   subscriptions: string[];
   subscriptionsOnly: boolean;
@@ -103,8 +106,10 @@ const THEMES: [Theme, string][] = [['auto', '자동'], ['light', '밝게'], ['da
 const YEARS = [1, 2, 3, 4, 5];
 const SEMESTERS = [1, 2];
 
-function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
-  return <section aria-labelledby={id}><h2 id={id} className="settings-head">{title}</h2><div className="box">{children}</div></section>;
+function Section({ id, title, action, children }: { id: string; title: string; action?: ReactNode; children: ReactNode }) {
+  return <section aria-labelledby={id}>
+    {action ? <div className="settings-head-row"><h2 id={id} className="settings-head">{title}</h2>{action}</div> : <h2 id={id} className="settings-head">{title}</h2>}
+    <div className="box">{children}</div></section>;
 }
 
 function Setting({ name, help, children, className = '' }: { name: string; help?: ReactNode; children?: ReactNode; className?: string }) {
@@ -369,15 +374,79 @@ function Notifications({ model }: { model: SettingsModel }) {
         </ul>
       </Setting>
     </Section> : null}
-    <Section id="s-boards" title="받을 게시판">
-      {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <>
-        <Setting name="게시판" help="알림을 받고 목록에 모아 볼 게시판이에요">
-          {model.error ? <><p className="field-note error" role="alert">{model.error}</p>
-            <button type="button" className="ghost-button" onClick={model.retry}>다시 불러오기</button></> : null}
-          <BoardGroups model={model} />
-        </Setting>
-      </>}
-    </Section>
+    <BoardsSection model={model} />
+  </div>;
+}
+
+function BoardsSection({ model }: { model: SettingsModel }) {
+  const [editing, setEditing] = useState(false);
+  const order = model.boardOrder;
+  const canOrder = order.boards.length > 1;
+  return <Section id="s-boards" title="받을 게시판" action={canOrder
+    ? <button type="button" className="text-button" onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : null}>
+    {editing && canOrder ? <BoardOrderList order={order} editing /> : !model.userId ? <>
+      <LoginNote model={model} what="게시판 구독" />
+      {canOrder ? <BoardOrderList order={order} editing={false} /> : null}
+    </> : <Setting name="게시판" help="알림을 받고 목록에 모아 볼 게시판이에요">
+      {model.error ? <><p className="field-note error" role="alert">{model.error}</p>
+        <button type="button" className="ghost-button" onClick={model.retry}>다시 불러오기</button></> : null}
+      <BoardGroups model={model} />
+    </Setting>}
+  </Section>;
+}
+
+function BoardOrderList({ order, editing }: { order: SettingsModel['boardOrder']; editing: boolean }) {
+  const listRef = useRef<HTMLUListElement>(null);
+  const latest = useRef(order);
+  latest.current = order;
+  const focusId = useRef<string | null>(null);
+  const [message, setMessage] = useState('');
+  const ids = order.boards.map((board) => board.id);
+  const move = (from: number, to: number) => {
+    const boards = latest.current.boards;
+    if (to < 0 || to >= boards.length || from === to) return;
+    latest.current.move(moveBoardId(boards.map((board) => board.id), from, to));
+    setMessage(`${boards[from].label}, ${to + 1}번째로 옮겼어요`);
+  };
+  useEffect(() => {
+    const list = listRef.current;
+    if (!editing || !list) return;
+    let anchor: ChildNode | null = null;
+    const sortable = new Sortable(list, {
+      handle: '.order-handle', animation: 0,
+      onStart: (event) => { anchor = event.item.nextSibling; },
+      onEnd: (event) => {
+        // SortableJS가 옮긴 DOM을 처음 자리로 되돌려 React가 DOM을 계속 소유하게 한다.
+        const { item, from, oldIndex, newIndex } = event;
+        from.insertBefore(item, anchor);
+        if (oldIndex !== undefined && newIndex !== undefined) move(oldIndex, newIndex);
+      },
+    });
+    return () => sortable.destroy();
+  }, [editing]);
+  useEffect(() => {
+    if (!focusId.current) return;
+    listRef.current?.querySelector<HTMLButtonElement>(`[data-board-id="${CSS.escape(focusId.current)}"] .order-handle`)?.focus();
+    focusId.current = null;
+  });
+  return <div className="order-box">
+    {editing ? <p className="field-note">손잡이를 끌거나 방향키로 옮겨요</p> : null}
+    <ul className="order-list" ref={listRef}>
+      {order.boards.map((board, index) => <li key={board.id} data-board-id={board.id}>
+        <span className="order-name">{board.label}</span>
+        {editing ? <button type="button" className="order-handle" aria-label={`${board.label} 순서 옮기기`}
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+            event.preventDefault();
+            focusId.current = board.id;
+            move(ids.indexOf(board.id), index + (event.key === 'ArrowUp' ? -1 : 1));
+          }}>
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20"><path d="M5 8h14M5 12h14M5 16h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+        </button> : null}
+      </li>)}
+    </ul>
+    {editing && order.status ? <p className="field-note" role="status">{order.status === 'saved' ? '저장했어요' : '저장하지 못했어요. 다시 옮기면 또 저장해요'}</p> : null}
+    <p className="visually-hidden" role="status" aria-live="polite">{message}</p>
   </div>;
 }
 

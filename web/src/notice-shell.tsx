@@ -1,6 +1,7 @@
 // 앱 화면. 상태와 동작은 AppController가 맡고, 이 파일은 구독해서 그리기만 한다.
 // 그림자 DOM을 쓰지 않아 전역 토큰과 글꼴을 그대로 받는다. 학교 글자는 React가 자동으로 이스케이프한다.
 import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
+import { applyBoardOrder } from './board-order';
 import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, deadlinePassed, postedGroup, safeUrl, todayKst } from './data';
 import { APP_NAME } from './brand';
 import { authClient } from './auth';
@@ -177,6 +178,8 @@ function settingsModel(app: AppController) {
     theme: app.theme, setTheme: (theme: 'auto' | 'light' | 'dark') => app.setTheme(theme),
     canInstall: !!app.install, install: () => { void app.runInstall(); }, showShortcuts: () => { app.shortcutsOpen = true; },
     sources: app.sources.filter((source) => !source.external).map((source) => ({ id: source.id, label: boardName(source, source.id) })),
+    boardOrder: { boards: applyBoardOrder(app.schoolSources(), app.boardOrder).map((source) => ({ id: source.id, label: boardName(source, source.id) })),
+      status: app.authUserId && app.boardOrderAccount ? app.boardOrderStatus : '' as const, move: (ids: string[]) => app.setBoardOrder(ids) },
     subscriptions: app.subscriptions, loading: app.subscriptionsLoading, error: app.subscriptionsError,
     subscriptionsOnly: app.subscriptionsOnly,
     setSubscriptionsOnly: (enabled: boolean) => { app.subscriptionsOnly = enabled; app.selectedId = null; app.selectedReads = []; remember('subscriptions-only', enabled ? '1' : '0'); },
