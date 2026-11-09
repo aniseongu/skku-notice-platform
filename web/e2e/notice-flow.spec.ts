@@ -321,26 +321,26 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('heading', { name: '주전공이 어디예요?' })).toBeVisible();
   await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
   // 대학 → 학과: 고른 대학의 학과만 보인다.
-  await dialog.getByRole('button', { name: '소프트웨어융합대학', exact: true }).click();
+  await dialog.getByRole('radio', { name: '소프트웨어융합대학', exact: true }).click();
   // 질문 제목이 접히지 않고 보여야 한다(전역 h1 규칙이 제목 높이를 0으로 만들던 결함의 재발 방지).
   const title = dialog.getByRole('heading', { name: '주전공이 어디예요?' });
   expect((await title.boundingBox())!.height).toBeGreaterThan(20);
-  await expect(dialog.getByRole('button', { name: '소프트웨어학과', exact: true })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '국어국문학과', exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole('radio', { name: '소프트웨어학과', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('radio', { name: '국어국문학과', exact: true })).toHaveCount(0);
   await dialog.getByRole('button', { name: '대학 다시 고르기' }).click();
-  await dialog.getByRole('button', { name: '문과대학', exact: true }).click();
+  await dialog.getByRole('radio', { name: '문과대학', exact: true }).click();
   await expect(dialog.getByRole('searchbox', { name: '학과 검색' })).toBeVisible();
   await dialog.getByRole('searchbox', { name: '학과 검색' }).fill('철학');
-  await expect(dialog.getByRole('button', { name: '철학과', exact: true })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '사학과', exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole('radio', { name: '철학과', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('radio', { name: '사학과', exact: true })).toHaveCount(0);
   await dialog.getByRole('button', { name: '대학 다시 고르기' }).click();
-  await dialog.getByRole('button', { name: '소프트웨어융합대학', exact: true }).click();
-  await dialog.getByRole('button', { name: '소프트웨어학과', exact: true }).click();      // 목록 항목이 곧 다음 단계
+  await dialog.getByRole('radio', { name: '소프트웨어융합대학', exact: true }).click();
+  await dialog.getByRole('radio', { name: '소프트웨어학과', exact: true }).click();      // 목록 항목이 곧 다음 단계
   // 복수전공은 선택이다.
   await expect(dialog.getByRole('heading', { name: '복수전공이 있나요?' })).toBeFocused();
-  await dialog.getByRole('button', { name: '복수전공이 있어요' }).click();
-  await dialog.getByRole('button', { name: '경영대학', exact: true }).click();
-  await dialog.getByRole('button', { name: '경영학과', exact: true }).click();
+  await dialog.getByRole('radio', { name: '복수전공이 있어요' }).click();
+  await dialog.getByRole('radio', { name: '경영대학', exact: true }).click();
+  await dialog.getByRole('radio', { name: '경영학과', exact: true }).click();
   await expect(dialog.getByText('경영학과', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: '다음' }).click();
   // 학년·재학 상태: 재학이 미리 골라져 있고 학년을 골라야 넘어간다.
@@ -358,7 +358,7 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('heading', { name: '전공과 상관없는 게시판도 받을까요?' })).toBeVisible();
   await expect(dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ })).toHaveAttribute('aria-checked', 'false');
   await dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ }).click();
-  await dialog.getByRole('button', { name: '저장하고 다음' }).click();
+  await dialog.getByRole('button', { name: '다음' }).click();
   const saved = (await calls(page)).find((call) => call[0] === 'finish')![1] as Record<string, unknown>;
   expect(saved).toMatchObject({
     programs: [{ college: '소프트웨어융합대학', department: '소프트웨어학과' }, { college: '경영대학', department: '경영학과' }],
@@ -528,7 +528,7 @@ test('first-run setup layout: header and body share one column, the close contro
     await open(manual);
     const dialog = page.getByRole('dialog');
     await dialog.waitFor();
-    await dialog.getByRole('button', { name: '문과대학', exact: true }).scrollIntoViewIfNeeded();   // 아래로 스크롤된 상태에서도 어긋나지 않아야 한다
+    await dialog.getByRole('radio', { name: '문과대학', exact: true }).scrollIntoViewIfNeeded();   // 아래로 스크롤된 상태에서도 어긋나지 않아야 한다
     const top = await box('.onb-top-inner'), body = await box('.onb-body');
     expect(Math.abs(top.x - body.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(top.width - body.width)).toBeLessThanOrEqual(1);

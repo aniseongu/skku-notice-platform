@@ -35,8 +35,8 @@ export function Segmented<T extends string | number>({ label, options, value, on
 export function ChoiceList({ label, items, selected, onSelect }: {
   label: string; items: readonly { id: string; label: string; note?: string }[]; selected?: string | null; onSelect: (id: string) => void;
 }) {
-  return <div className="choice-list" role="group" aria-label={label}>
-    {items.map((item) => <button type="button" className="choice" key={item.id} aria-pressed={selected === item.id} onClick={() => onSelect(item.id)}>
+  return <div className="choice-list" role="radiogroup" aria-label={label}>
+    {items.map((item) => <button type="button" className="choice" role="radio" key={item.id} aria-checked={selected === item.id} onClick={() => onSelect(item.id)}>
       <span>{item.label}{item.note ? <span className="choice-note">{item.note}</span> : null}</span>
       <span className="choice-check" aria-hidden="true" />
     </button>)}
