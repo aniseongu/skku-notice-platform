@@ -38,6 +38,14 @@ export const TABS: { id: Tab; label: string; icon: IconName }[] = [
 ];
 export const STALE_MS = 2 * 3600_000;
 // 화면을 켜 둔 채로 있어도 1시간 주기의 새 공지와 D-day가 바뀌도록 5분마다 다시 받는다.
+/** 로그인 뒤 같은 자리로 돌아오게 현재 주소를 쓴다. 로그인 결과가 남긴 code, error, 해시만 뺀다(딥링크와 ?view=settings는 유지). */
+function cleanReturnUrl(): string {
+  const url = new URL(location.href);
+  for (const key of ['code', 'error', 'error_code', 'error_description']) url.searchParams.delete(key);
+  url.hash = '';
+  return url.href;
+}
+
 const REFRESH_MS = 5 * 60_000;
 const isTab = (value: string | null): value is Tab => TABS.some((t) => t.id === value);
 const normalizeTab = (value: string | null) => value === 'mine' || value === 'deadline' ? 'all' : value;
@@ -322,9 +330,12 @@ export class AppController extends Reactive {
       this.byokOn = available;
       if (available && this.authUserId) { this.byokLoading = true; void this.refreshByok(this.authUserId, this.subscriptionsEpoch); }
     });
+    // 구글 화면에서 취소하고 돌아오면 주소에 오류가 붙는다. 조용히 지운다(오류 문구 없음).
+    if (authClient && /[?&#](error|error_description)=/.test(location.search + location.hash)) history.replaceState(history.state, '', cleanReturnUrl());
     if (authClient) {
       this.authSubscription = authClient.auth.onAuthStateChange((_event, session) => {
         const userId = session?.user.id ?? null;
+        const loggedIn = !!userId && !this.authUserId && this.authReady;
         if (!this.authReady || userId !== this.authUserId) {
           const previousUserId = this.authUserId;
           this.authUserId = userId;
@@ -376,6 +387,7 @@ export class AppController extends Reactive {
         this.authName = typeof name === 'string' && name.trim() ? name.trim().slice(0, 60) : null;
         this.authAvatar = safeAvatarUrl(meta.avatar_url ?? meta.picture);
         if (!this.authReady) { this.authReady = true; void this.refresh(); }
+        else if (loggedIn) void this.refresh();
       }).data.subscription;
     } else { void this.refresh(); }
     wide.addEventListener('change', () => { this.isWide = wide.matches; });
@@ -399,7 +411,11 @@ export class AppController extends Reactive {
     if (this.sortMenuOpen && !(event.target as Element).closest('.sort-picker')) this.sortMenuOpen = false;
   };
 
+  /** 로그인 전에는 앱 어느 데이터도 받지 않는다. 로그인 화면만 보인다. */
+  get gated() { return !!authClient && this.authReady && !this.authUserId; }
+
   async refresh() {
+    if (this.gated) return;
     this.loading = true;
     try {
       const notices = await fetchJson<NoticesFile>('notices.json');
@@ -437,10 +453,12 @@ export class AppController extends Reactive {
     if (!authClient || this.authBusy) return;
     this.authBusy = true; this.authError = '';
     try {
-      const { error } = await authClient.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: new URL('./', location.href).href } });
+      const { error } = await authClient.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: cleanReturnUrl() } });
       if (error) throw error;
-    } catch {
-      this.authError = '로그인을 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.';
+    } catch (error) {
+      // 영어 오류나 제공자 코드는 보이지 않는다. 연결 문제인지만 나눠 알린다.
+      const offline = !navigator.onLine || error instanceof TypeError || (error as { name?: string } | null)?.name === 'AuthRetryableFetchError';
+      this.authError = offline ? '인터넷 연결을 확인하고 다시 눌러 주세요' : '로그인하지 못했어요. 다시 눌러 주세요';
       this.authBusy = false;
     }
   }

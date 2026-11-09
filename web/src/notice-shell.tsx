@@ -10,6 +10,7 @@ import { type AppController, STALE_MS, TABS, remember, settingsSubtitle, setting
 import type { UserProfile } from './profile';
 import { Avatar } from './ui';
 import { Onboarding } from './onboarding';
+import { LoginScreen, LoginStatus } from './login-screen';
 import type { CanvasMode } from './devices';
 import { bodyInterests, withMyDeadline } from './notice-view';
 import './platform-settings';
@@ -48,10 +49,11 @@ export function NoticeShell({ app }: { app: AppController }) {
   // 화면이 반영된 뒤에 포커스 이동 같은 후속 작업이 풀리게 알린다.
   useEffect(() => { app.commit(); });
   useEffect(() => {
-    document.title = app.authReady && app.view === 'settings' ? `${settingsTitle()} - ${APP_NAME}` : APP_NAME;
+    document.title = app.gated ? `로그인 - ${APP_NAME}` : app.authReady && app.view === 'settings' ? `${settingsTitle()} - ${APP_NAME}` : APP_NAME;
   });
 
-  if (!app.authReady) return <p role="status" className="platform-preview">로그인 상태를 확인하고 있어요.</p>;
+  if (!app.authReady) return <LoginStatus text="로그인 상태를 확인하고 있어요." />;
+  if (app.gated) return <LoginScreen app={app} />;
   const filtered = app.filtered();
   const counts = Object.fromEntries(TABS.map((t) => [t.id, t.id === 'saved'
     ? app.filtered(app.savedNotices()).length : app.byTab(filtered, t.id).length]));

@@ -30,6 +30,9 @@ test('notice HTML is sanitized in React detail', async ({ page }) => {
 });
 
 test('detail shows my Gemini summary first in the plain original style and describes pictures by their text', async ({ page }) => {
+  // 깨진 그림은 안내 글로 바뀐다(rich.ts). 이 테스트는 그림의 대체 글자를 보므로 그림 요청에 작은 PNG를 돌려준다.
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+  await page.route('https://www.skku.edu/a.png', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: png }));
   await page.goto('/?api=sample/api/v1');
   await page.waitForFunction(() => !!customElements.get('notice-detail-screen'));
   await page.evaluate(() => {
