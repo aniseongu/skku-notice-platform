@@ -2,7 +2,7 @@
 // 스위치는 바로 반영되는 설정에만 쓰고(role="switch"), 켜짐·꺼짐을 글자로도 알린다(색에만 의존하지 않는다).
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
-import type { ByokStatus, CanvasStatus } from './byok';
+import { backfillNote, type ByokStatus, type CanvasStatus } from './byok';
 import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, validDeviceName, type CanvasMode, type Device } from './devices';
 import { ENROLLMENT, MILITARY, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
 import { programLabel } from './skku-programs';
@@ -91,6 +91,7 @@ export interface SettingsModel {
     busy: boolean;
     error: string;
     status: ByokStatus | null;
+    backfill: number;
     register: (apiKey: string) => void;
     remove: () => void;
     canvas: CanvasStatus | null;
@@ -234,6 +235,8 @@ function BoardGroups({ model }: { model: SettingsModel }) {
     const group = otherGroup.get(source.id) ?? collegeOf.get(source.id) ?? (known.has(source.id) ? '기타' : '학교 공통');
     groups.set(group, [...(groups.get(group) ?? []), source]);
   }
+  // 부트캠프처럼 전공과 상관없는 게시판은 단과대·학과 묶음 뒤에 둔다.
+  const ordered = [...groups].sort(([a], [b]) => Number([...otherGroup.values()].includes(a)) - Number([...otherGroup.values()].includes(b)));
   const busy = model.loading;
   return <>
     {mine.length ? mine.map((source) => <SwitchRow key={source.id} label={source.label} checked disabled={busy} onChange={() => model.toggle(source.id, false)} />)
@@ -242,7 +245,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
       <summary>게시판 더 보기 ({others.length}개)</summary>
       <input className="input" type="search" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off" value={query}
         onChange={(event) => setQuery(event.currentTarget.value)} />
-      {[...groups].map(([group, items]) => <div className="board-group" key={group} role="group" aria-label={group}>
+      {ordered.map(([group, items]) => <div className="board-group" key={group} role="group" aria-label={group}>
         <p className="board-group-title">{group}</p>
         {items.map((source) => <SwitchRow key={source.id} label={source.label} checked={false} disabled={busy} onChange={() => model.toggle(source.id, true)} />)}
       </div>)}
@@ -631,7 +634,8 @@ function KeyRow({ name, help, state, children, guide }: { name: string; help: st
 }
 
 /** 비밀 한 줄: 저장 상태, 입력하기·수정하기·지우기, 눌러서 펼치는 입력칸과 받는 방법(Gemini 키와 아이캠퍼스 토큰이 같이 쓴다). */
-function SecretRow({ name, help, placeholder, status, loading, busy, error, onRegister, onRemove, guide, valid }: {
+function SecretRow({ name, help, placeholder, status, loading, busy, error, onRegister, onRemove, guide, valid, note }: {
+  note?: string | null;
   name: string; help: string; placeholder: string;
   status: { keyHint: string; disabled: boolean; lastError: string | null } | null;
   loading: boolean; busy: boolean; error: string;
@@ -662,6 +666,7 @@ function SecretRow({ name, help, placeholder, status, loading, busy, error, onRe
         {status ? <button type="button" className="text-button key-action" aria-label={`${name} 지우기`} disabled={busy} onClick={onRemove}>지우기</button> : null}
       </div>
       {status?.lastError ? <p className="field-note error" role="alert">{status.lastError}</p> : null}
+      {note ? <p className="field-note" role="status">{note}</p> : null}
       {error ? <p className="field-note error" role="alert">{error}</p> : null}
     </>}
   </Setting>;
@@ -682,7 +687,8 @@ function GeminiRow({ model }: { model: SettingsModel }) {
     </KeyRow>;
   }
   return <SecretRow name="Gemini 키" help={help} placeholder="AIza 또는 AQ.로 시작하는 키" status={byok.status} loading={byok.loading} busy={byok.busy}
-    error={byok.error} onRegister={byok.register} onRemove={byok.remove} guide={guide} />;
+    error={byok.error} onRegister={byok.register} onRemove={byok.remove} guide={guide}
+    note={backfillNote(byok.backfill, !!byok.status?.disabled)} />;
 }
 
 function CanvasRow({ model }: { model: SettingsModel }) {

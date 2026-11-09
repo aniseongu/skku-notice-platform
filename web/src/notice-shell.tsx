@@ -197,7 +197,7 @@ function settingsModel(app: AppController) {
     profile: app.profile, profileStatus: app.profileStatus, profileMessage: app.profileMessage, profileError: app.profileError,
     saveProfile: (profile: UserProfile) => { void app.saveProfile(profile); },
     openOnboarding: () => app.openOnboarding(),
-    byok: { available: app.byokOn, loading: app.byokLoading, busy: app.byokBusy, error: app.byokError, status: app.byokStatus,
+    byok: { available: app.byokOn, loading: app.byokLoading, busy: app.byokBusy, error: app.byokError, status: app.byokStatus, backfill: app.byokBackfill,
       register: (apiKey: string) => { void app.registerKey(apiKey); }, remove: () => { void app.removeKey(); },
       canvas: app.canvasStatus, canvasBusy: app.canvasBusy, canvasError: app.canvasError,
       registerCanvas: (token: string) => { void app.registerCanvas(token); }, removeCanvas: () => { void app.removeCanvas(); } },

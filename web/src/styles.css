@@ -657,7 +657,7 @@
   .seg button { flex: 1 1 4.5rem; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); color: var(--text); font-weight: 500; }
   .seg button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in oklch, var(--accent) 12%, var(--surface)); font-weight: 700; }
   .choice-list { display: grid; gap: 8px; }
-  .choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 8px 16px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); color: var(--text); text-align: left; font-size: 16px; }
+  .choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 8px 16px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); color: var(--text); text-align: left; font-size: 15px; }
   .choice[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in oklch, var(--accent) 10%, var(--surface)); font-weight: 600; }
   .choice-note { display: block; font-size: 13px; font-weight: 400; color: var(--text-3); }
   .choice-check { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line); }
@@ -693,7 +693,7 @@
   .onb-x .i { width: 20px; height: 20px; }
   .onb-body { flex: 1 0 auto; width: min(100%, 36rem); margin-inline: auto; padding: 8px 16px 24px; display: grid; grid-auto-rows: max-content; align-content: start; gap: 16px; }
   /* 전역 h1은 한 줄 제목 막대용(overflow hidden, nowrap)이라 여기서는 줄바꿈을 허용하고 행이 눌려 사라지지 않게 한다. */
-  .onb-body h1 { margin: 8px 0 0; font-size: 24px; line-height: 1.35; font-weight: 700; overflow: visible; white-space: normal; text-overflow: clip; }
+  .onb-body h1 { margin: 8px 0 0; font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: -0.02em; overflow: visible; white-space: normal; text-overflow: clip; }
   .onb-body > p, .onb-lead { margin: 0; color: var(--text-2); }
   .onb-group { display: grid; gap: 8px; }
   .onb-group h2 { margin: 8px 0 0; font-size: 15px; font-weight: 700; }
@@ -702,11 +702,11 @@
   .onb-foot .solid-button, .onb-foot .ghost-button { width: 100%; }
   .onb-search { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); }
   /* 왼쪽 브랜드 칸(넓은 화면에서만). 앱 아이콘과 이름, 한 줄 설명, 지금 몇 번째 질문인지 보여 주는 단계 목록. */
-  .onb-brand-lockup { display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+  .onb-brand-lockup { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
   .onb-brand-lockup .brand-mark { width: 32px; height: 32px; color: var(--accent); }
   .onb-brand-copy { display: grid; gap: 10px; }
-  .onb-brand-copy h2 { margin: 0; font-size: 30px; line-height: 1.3; font-weight: 800; letter-spacing: -0.02em; }
-  .onb-brand-copy p { margin: 0; color: var(--text-2); font-size: 16px; }
+  .onb-brand-copy h2 { margin: 0; font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .onb-brand-copy p { margin: 0; color: var(--text-2); font-size: 15px; }
   .onb-steplist { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
   .onb-steplist li { display: flex; align-items: center; gap: 12px; color: var(--text-3); font-size: 15px; }
   .onb-steplist .num { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; border: 1.5px solid var(--line); border-radius: 50%; font-size: 13px; font-weight: 700; background: var(--surface); }
@@ -718,8 +718,19 @@
     .onb { grid-template-columns: minmax(320px, 5fr) minmax(0, 7fr); }
     .onb-brand { display: flex; flex-direction: column; justify-content: space-between; gap: 32px; padding: 40px 44px 48px; background: color-mix(in oklch, var(--accent) 8%, var(--bg)); border-right: 1px solid var(--line); }
     .onb-top-inner { padding-top: 16px; }
-    .onb-body h1 { font-size: 26px; }
+    .onb-body h1 { font-size: 21px; line-height: 28px; }
   }
+  /* 마우스를 올리면 눌러지는 칸임이 보이게 한다. 목록 행과 같은 연한 면 색을 쓰고, 터치 기기에는 적용하지 않는다. */
+  @media (hover: hover) {
+    .onb .choice:hover:not([aria-pressed="true"]), .onb .chip:hover:not([aria-pressed="true"]), .onb .seg button:hover:not([aria-pressed="true"]),
+    .onb .switch-row:hover:not(:disabled), .onb .ghost-button:hover:not(:disabled), .onb .icon-button:hover:not(:disabled) {
+      background: color-mix(in oklch, var(--sunken) 70%, var(--surface));
+    }
+    .onb .choice:hover:not([aria-pressed="true"]), .onb .chip:hover:not([aria-pressed="true"]) { border-color: var(--text-3); }
+    .onb .solid-button:hover:not(:disabled) { background: color-mix(in oklch, var(--accent) 88%, var(--text)); }
+    .onb .text-button:hover { color: var(--text); }
+  }
+  .onb .choice:focus-visible, .onb .chip:focus-visible, .onb .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   @media (prefers-reduced-motion: reduce) { .switch, .switch::after, .onb-bar > span { transition: none; } }
 }
 

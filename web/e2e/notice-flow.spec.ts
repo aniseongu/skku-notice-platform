@@ -348,16 +348,16 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('button', { name: '3학년' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
-  // 기타 게시판: 전공과 상관없는 부트캠프 게시판을 고를 수 있고, 건너뛰어도 된다.
-  await expect(dialog.getByRole('heading', { name: '전공과 상관없는 게시판도 받을까요?' })).toBeVisible();
-  await expect(dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ })).toHaveAttribute('aria-checked', 'false');
-  await dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ }).click();
-  await dialog.getByRole('button', { name: '다음' }).click();
   // 게시판·키워드: 내 전공에 맞춰 추천이 켜져 있다.
   await expect(dialog.getByRole('heading', { name: '받을 공지를 골라 주세요' })).toBeFocused();
   await expect(dialog.getByRole('switch', { name: /^성균관대 공지 추천/ })).toHaveAttribute('aria-checked', 'true');
   await expect(dialog.getByRole('switch', { name: /^소프트웨어학과 공지 추천/ })).toHaveAttribute('aria-checked', 'true');
   await dialog.getByRole('button', { name: '장학' }).click();
+  await dialog.getByRole('button', { name: '다음' }).click();
+  // 기타 게시판은 전공 게시판 다음에 나온다. 부트캠프 게시판을 고를 수 있고, 건너뛰어도 된다.
+  await expect(dialog.getByRole('heading', { name: '전공과 상관없는 게시판도 받을까요?' })).toBeVisible();
+  await expect(dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ })).toHaveAttribute('aria-checked', 'false');
+  await dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ }).click();
   await dialog.getByRole('button', { name: '저장하고 다음' }).click();
   const saved = (await calls(page)).find((call) => call[0] === 'finish')![1] as Record<string, unknown>;
   expect(saved).toMatchObject({

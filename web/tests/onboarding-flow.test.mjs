@@ -70,7 +70,8 @@ test('changing majors updates recommendations unless the boards were chosen by h
 test('steps move forward and back in order and required answers gate the next button', () => {
   assert.equal(previousStep('primary'), null);
   assert.equal(nextStep('primary'), 'double');
-  assert.equal(nextStep('boards'), 'notify');
+  assert.equal(nextStep('boards'), 'etc');
+  assert.equal(nextStep('etc'), 'notify');
   assert.equal(nextStep('notify'), null);
   const draft = initialDraft(EMPTY_PROFILE, [], []);
   assert.equal(canContinue('primary', draft), false);

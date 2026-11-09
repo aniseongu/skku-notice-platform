@@ -3,8 +3,8 @@ import { boardsForPrograms } from './skku-boards.ts';
 import { MAX_PROGRAMS, programKey, type Program } from './skku-programs.ts';
 import type { UserProfile } from './profile.ts';
 
-export type Step = 'primary' | 'double' | 'status' | 'etc' | 'boards' | 'notify';
-export const STEPS: readonly Step[] = ['primary', 'double', 'status', 'etc', 'boards', 'notify'];
+export type Step = 'primary' | 'double' | 'status' | 'boards' | 'etc' | 'notify';
+export const STEPS: readonly Step[] = ['primary', 'double', 'status', 'boards', 'etc', 'notify'];
 
 // 골라서 쓰는 키워드. 직접 쓰는 입력은 설정에서 한다(처음에는 고르기만 해도 되게).
 export const KEYWORD_SUGGESTIONS = ['장학', '인턴', '채용', '공모전', '대외활동', '교환학생', '수강신청', '졸업', '특강', '등록금'] as const;

@@ -1,5 +1,5 @@
 // 첫 로그인 설정. 한 화면에 한 질문, 모두 골라서 답하고, 이전·건너뛰기가 항상 있다.
-// 순서: 주전공 → 복수전공(선택) → 학년·재학 상태 → 받을 게시판·키워드 → 알림.
+// 순서: 주전공 → 복수전공(선택) → 학년·재학 상태 → 받을 게시판·키워드 → 기타 게시판(부트캠프 등) → 알림.
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { AppController } from './app-controller';
 import { ENROLLMENT } from './profile';
@@ -12,7 +12,7 @@ import {
 import { APP_NAME } from './brand';
 import { Card, ChipGroup, ChoiceList, Segmented, SwitchRow } from './ui';
 
-const STEP_LABELS = ['주전공', '복수전공', '학년·재학 상태', '기타 게시판', '받을 공지', '알림'] as const;
+const STEP_LABELS = ['주전공', '복수전공', '학년·재학 상태', '받을 공지', '기타 게시판', '알림'] as const;
 
 const YEARS = [1, 2, 3, 4, 5].map((year) => ({ value: year, label: year === 5 ? '5학년 이상' : `${year}학년` }));
 const STATUS = ENROLLMENT.map((value) => ({ value, label: value }));
@@ -138,20 +138,7 @@ export function Onboarding({ app }: { app: AppController }) {
       <h2>재학 상태</h2>
       <Segmented label="재학 상태" options={STATUS} value={draft.enrollmentStatus} onChange={(enrollmentStatus) => setDraft({ ...draft, enrollmentStatus })} />
     </div>;
-    foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('etc')}>다음</button>;
-  } else if (step === 'etc') {
-    title = '전공과 상관없는 게시판도 받을까요?';
-    lead = '부트캠프처럼 누구나 들을 수 있는 공지예요. 건너뛰어도 돼요.';
-    const nameOf = (id: string) => sources.find((source) => source.id === id)?.name ?? BOARD_CATALOG.find((board) => board.id === id)?.name ?? id;
-    const groups = [...new Set(OTHER_BOARDS.map((board) => board.group))];
-    body = <div className="onb-group">
-      {groups.map((group) => <Card key={group} id={`etc-${group}`} title={group}>
-        {OTHER_BOARDS.filter((board) => board.group === group).map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
-          checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
-      </Card>)}
-      <p className="card-note">부트캠프 교육생 모집 안내는 성균관대 공지에도 올라와요.</p>
-    </div>;
-    foot = <button type="button" className="solid-button" onClick={() => go('boards')}>다음</button>;
+    foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('boards')}>다음</button>;
   } else if (step === 'boards') {
     title = '받을 공지를 골라 주세요';
     lead = '내 전공에 맞춰 추천했어요. 언제든 바꿀 수 있어요.';
@@ -164,6 +151,19 @@ export function Onboarding({ app }: { app: AppController }) {
       <h2>관심 키워드 (선택)</h2>
       <p className="card-note">키워드와 맞는 공지는 소리로 알려드려요.</p>
       <ChipGroup label="관심 키워드" options={keywordOptions} selected={draft.keywords} onToggle={(word) => setDraft({ ...draft, keywords: toggleValue(draft.keywords, word) })} />
+    </div>;
+    foot = <button type="button" className="solid-button" onClick={() => go('etc')}>다음</button>;
+  } else if (step === 'etc') {
+    title = '전공과 상관없는 게시판도 받을까요?';
+    lead = '부트캠프처럼 누구나 들을 수 있는 공지예요. 건너뛰어도 돼요.';
+    const nameOf = (id: string) => sources.find((source) => source.id === id)?.name ?? BOARD_CATALOG.find((board) => board.id === id)?.name ?? id;
+    const groups = [...new Set(OTHER_BOARDS.map((board) => board.group))];
+    body = <div className="onb-group">
+      {groups.map((group) => <Card key={group} id={`etc-${group}`} title={group}>
+        {OTHER_BOARDS.filter((board) => board.group === group).map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
+          checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
+      </Card>)}
+      <p className="card-note">부트캠프 교육생 모집 안내는 성균관대 공지에도 올라와요.</p>
       {app.onboardingError ? <p className="error-text" role="alert">{app.onboardingError}</p> : null}
     </div>;
     foot = <button type="button" className="solid-button" disabled={app.onboardingBusy} onClick={() => { void save(); }}>
