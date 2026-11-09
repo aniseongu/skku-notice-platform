@@ -22,8 +22,8 @@ export function LoginScreen({ app }: { app: AppController }) {
       <div className="login-main">
       <div className="login-top">
         <svg className="login-mark" aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg>
-        <h1>내게 맞는 성균관대 공지만<br />골라서 알려 줘요</h1>
-        <p className="login-sub">학과와 관심 키워드를 정하면 마감 전에 알려 줘요</p>
+        <h1>필요한 성균관대 공지만<br />알려 줘요</h1>
+        <p className="login-sub">학과와 관심 키워드를 정하면 마감 전에 챙겨 줘요</p>
       </div>
       <div className="login-preview">
         <p className="login-preview-label" id="login-preview-label">알림 예시</p>
@@ -46,7 +46,7 @@ export function LoginScreen({ app }: { app: AppController }) {
         <div aria-live="polite" className="login-live">
           {app.authError ? <p className="login-error" role="alert">{app.authError}</p> : null}
         </div>
-        <p className="login-legal">계속하면 <a href="./privacy.html">개인정보처리방침</a>에 동의하게 돼요</p>
+        <p className="login-legal">계속하면 <a href="./privacy.html">개인정보처리방침</a>에 동의한 것으로 봐요</p>
       </div>
     </div>
   </div>;
