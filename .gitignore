@@ -60,3 +60,8 @@ web/playwright-report/
 
 # Deno 검사가 만드는 잠금 파일
 deno.lock
+
+# Cloudflare CLI 캐시
+.wrangler/
+# Supabase CLI 연결 정보(로컬)
+supabase/.temp/
