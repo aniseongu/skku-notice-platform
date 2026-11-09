@@ -500,16 +500,21 @@
 @layer settings {
   .settings { padding: 0 var(--gutter) calc(var(--tabbar-h) + 32px); max-width: 760px; }
   .settings-head { margin: 28px 0 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
-  .settings-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 28px 0 8px; }
+  /* 묶음 제목과 같은 줄의 글자 단추. 오른쪽 끝은 상자 안쪽 선에 맞춘다. */
+  .settings-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 28px 0 8px; padding-right: var(--gutter); }
   .settings-head-row .settings-head { margin: 0; }
-  .text-button { min-height: 44px; margin: -13px 0; padding: 0 4px; border: 0; background: none; color: var(--text-2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .head-action { min-height: 44px; margin: -13px -8px; padding: 0 8px; border: 0; background: none; color: var(--accent); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .box.is-editing { box-shadow: inset 0 0 0 1px var(--accent); }
   .order-box { padding: 4px 0; }
-  .order-help { margin: 0; padding: 10px 0; border-top: 1px solid var(--line); }
+  .order-help { margin: 0; padding: 10px 0; border-top: 1px solid var(--line); color: var(--text-2); }
   .order-list { list-style: none; margin: 0; padding: 0; }
-  .order-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; border-top: 1px solid var(--line); }
+  .order-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; border-top: 1px solid var(--line); }
   .order-list li:first-child { border-top: 0; }
   .order-name { min-width: 0; overflow-wrap: anywhere; }
-  .order-handle { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--text-3); cursor: grab; touch-action: none; }
+  .order-controls { display: flex; flex: none; align-items: center; margin-right: -10px; }
+  .order-move, .order-handle { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--text-2); }
+  .order-move:disabled { color: var(--text-3); opacity: 0.4; }
+  .order-handle { cursor: grab; touch-action: none; }
   .settings-lead { margin: -2px 0 8px; font-size: 13px; line-height: 19px; color: var(--text-2); }
   .box { border-radius: var(--r-lg); background: var(--surface); padding: 0 var(--gutter); }
   .setting { display: flex; flex-direction: column; gap: 10px; padding: 16px 0; }
@@ -572,6 +577,8 @@
   @media (min-width: 720px) {
     .settings { padding: 0 24px 48px; }
     .box { padding: 0; background: none; border-top: 1px solid var(--line); border-radius: 0; }
+    .settings-head-row { padding-right: 0; }
+    .box.is-editing { padding: 0 12px; border-top: 0; border-radius: var(--r-md); }
     .setting { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 24px; align-items: start; }
     .setting:has(> .setting-control > .connection-summary) > .setting-text { padding-top: 11px; }
   }

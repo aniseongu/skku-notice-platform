@@ -106,10 +106,10 @@ const THEMES: [Theme, string][] = [['auto', '자동'], ['light', '밝게'], ['da
 const YEARS = [1, 2, 3, 4, 5];
 const SEMESTERS = [1, 2];
 
-function Section({ id, title, action, children }: { id: string; title: string; action?: ReactNode; children: ReactNode }) {
+function Section({ id, title, action, boxClass = '', children }: { id: string; title: string; action?: ReactNode; boxClass?: string; children: ReactNode }) {
   return <section aria-labelledby={id}>
     {action ? <div className="settings-head-row"><h2 id={id} className="settings-head">{title}</h2>{action}</div> : <h2 id={id} className="settings-head">{title}</h2>}
-    <div className="box">{children}</div></section>;
+    <div className={`box ${boxClass}`.trim()}>{children}</div></section>;
 }
 
 function Setting({ name, help, children, className = '' }: { name: string; help?: ReactNode; children?: ReactNode; className?: string }) {
@@ -382,8 +382,8 @@ function BoardsSection({ model }: { model: SettingsModel }) {
   const [editing, setEditing] = useState(false);
   const order = model.boardOrder;
   const canOrder = order.boards.length > 1;
-  return <Section id="s-boards" title="받을 게시판" action={canOrder
-    ? <button type="button" className="text-button" onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : null}>
+  return <Section id="s-boards" title="받을 게시판" boxClass={editing && canOrder ? 'is-editing' : ''} action={canOrder
+    ? <button type="button" className="head-action" onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : null}>
     {editing && canOrder ? <BoardOrderList order={order} editing /> : !model.userId ? <>
       <LoginNote model={model} what="게시판 구독" />
       {canOrder ? <BoardOrderList order={order} editing={false} /> : null}
@@ -395,16 +395,16 @@ function BoardsSection({ model }: { model: SettingsModel }) {
   </Section>;
 }
 
-// 휴대폰에는 방향키가 없어서 끌기만 알려 준다.
-function orderHelp(): string {
-  return matchMedia('(pointer: coarse)').matches ? '손잡이를 끌어서 옮겨요' : '손잡이를 끌거나 방향키로 옮겨요';
+function chevron(d: string) {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20"><path d={d} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
 function BoardOrderList({ order, editing }: { order: SettingsModel['boardOrder']; editing: boolean }) {
   const listRef = useRef<HTMLUListElement>(null);
   const latest = useRef(order);
   latest.current = order;
-  const focusId = useRef<string | null>(null);
+  // 옮긴 줄에서 다시 포커스할 단추. 끝에 닿아 꺼진 단추면 반대쪽 단추로 간다.
+  const focusId = useRef<{ id: string; kind: 'handle' | 'up' | 'down' } | null>(null);
   const [message, setMessage] = useState('');
   const ids = order.boards.map((board) => board.id);
   const move = (from: number, to: number) => {
@@ -430,26 +430,34 @@ function BoardOrderList({ order, editing }: { order: SettingsModel['boardOrder']
     return () => sortable.destroy();
   }, [editing]);
   useEffect(() => {
-    if (!focusId.current) return;
-    listRef.current?.querySelector<HTMLButtonElement>(`[data-board-id="${CSS.escape(focusId.current)}"] .order-handle`)?.focus();
+    const want = focusId.current;
+    if (!want) return;
     focusId.current = null;
+    const row = listRef.current?.querySelector(`[data-board-id="${CSS.escape(want.id)}"]`);
+    const pick = (kind: string) => row?.querySelector<HTMLButtonElement>(kind === 'handle' ? '.order-handle' : `.order-move[data-dir="${kind}"]`);
+    const target = pick(want.kind);
+    (target && !target.disabled ? target : pick(want.kind === 'up' ? 'down' : want.kind === 'down' ? 'up' : 'handle'))?.focus();
   });
   return <div className="order-box">
     <ul className="order-list" ref={listRef}>
       {order.boards.map((board, index) => <li key={board.id} data-board-id={board.id}>
         <span className="order-name">{board.label}</span>
-        {editing ? <button type="button" className="order-handle" aria-label={`${board.label} 순서 옮기기`}
-          onKeyDown={(event) => {
-            if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-            event.preventDefault();
-            focusId.current = board.id;
-            move(ids.indexOf(board.id), index + (event.key === 'ArrowUp' ? -1 : 1));
-          }}>
-          <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20"><path d="M5 8h14M5 12h14M5 16h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-        </button> : null}
+        {editing ? <span className="order-controls">
+          <button type="button" className="order-move" data-dir="up" aria-label={`${board.label} 위로 옮기기`} disabled={index === 0}
+            onClick={() => { focusId.current = { id: board.id, kind: 'up' }; move(index, index - 1); }}>{chevron('M6 15l6-6 6 6')}</button>
+          <button type="button" className="order-move" data-dir="down" aria-label={`${board.label} 아래로 옮기기`} disabled={index === order.boards.length - 1}
+            onClick={() => { focusId.current = { id: board.id, kind: 'down' }; move(index, index + 1); }}>{chevron('M6 9l6 6 6-6')}</button>
+          <button type="button" className="order-handle" aria-label={`${board.label} 순서 옮기기`}
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+              event.preventDefault();
+              focusId.current = { id: board.id, kind: 'handle' };
+              move(ids.indexOf(board.id), index + (event.key === 'ArrowUp' ? -1 : 1));
+            }}>{chevron('M5 8h14M5 12h14M5 16h14')}</button>
+        </span> : null}
       </li>)}
     </ul>
-    {editing ? <p className="field-note order-help">{orderHelp()}</p> : null}
+    {editing ? <p className="field-note order-help">끌거나 위아래 단추로 옮겨요. 왼쪽 목록에 바로 반영돼요</p> : null}
     {editing && order.status ? <p className="field-note" role="status">{order.status === 'saved' ? '저장했어요' : '저장하지 못했어요. 다시 옮기면 또 저장해요'}</p> : null}
     <p className="visually-hidden" role="status" aria-live="polite">{message}</p>
   </div>;
