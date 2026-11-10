@@ -98,9 +98,7 @@
   .row.read .dday { font-weight: 600; }
   /* 마감이 3일 안으로 임박했으면 읽은 글이어도 어두운 모드에서 빨간색을 지킨다(원본은 읽으면 회색으로 흐려졌다). */
   .row.read .dday.urgent { color: var(--danger); }
-  /* 읽은 글도 판정 라벨의 색 계열은 지킨다(정보라서). 어두운 모드에서는 본문 글자색과 섞어 연하게 하되 대비는 4.5:1 이상으로 둔다. */
-  .row.read .reason.relevant b, .row.read .interest { color: light-dark(var(--accent), color-mix(in oklch, var(--accent) 62%, var(--text-2))); }
-  .row.read .reason.maybe b { color: light-dark(var(--soon), color-mix(in oklch, var(--soon) 62%, var(--text-2))); }
+  /* 읽은 글의 관심 키워드·판정 라벨(관심 인턴, 확인 필요 등)은 색을 빼고 회색으로 연하게 한다. 안 읽은 글만 색을 지킨다(위 .row.read .reason b 규칙). */
   .row:active, .row[aria-current="true"] { background: var(--sunken); }
   .row:focus-visible { outline-offset: -2px; }
 
