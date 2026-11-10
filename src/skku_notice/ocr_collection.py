@@ -17,8 +17,8 @@ _LETTERS = re.compile(r"[0-9A-Za-z가-힣]")
 
 
 def has_readable_text(body: object) -> bool:
-    """본문에 읽을 만한 글자가 있는지. 자소설닷컴처럼 줄표(—)만 있는 본문은 글자가 없는 것으로 보고 그림을 읽는다."""
-    return isinstance(body, str) and len(_LETTERS.findall(body)) >= 5
+    """본문에 읽을 글자가 있는지. 줄표(—)만 있는 자소설닷컴 본문은 글자가 없는 것으로 보고 그림을 읽는다."""
+    return isinstance(body, str) and len(_LETTERS.findall(body)) >= 3
 
 
 ENGINE_VERSION = "rapidocr-3.10.0-ppocrv5-korean-tiled-v1"
