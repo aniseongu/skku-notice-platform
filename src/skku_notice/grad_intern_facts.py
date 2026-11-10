@@ -135,9 +135,9 @@ CLOCK = re.compile(r"(\d{1,2})\s*:\s*(\d{2})\s*[~\-–∼]\s*(\d{1,2})\s*:\s*(\d
 TASK_SECTION = re.compile(r"(?:\[?\s*담당\s*업무\s*\]?|모집\s*직무|주요\s*업무|하는\s*일)\s*[:：]?\s*(.{20,900}?)(?=\n\s*\n\s*\n|\[\s*(?:접수|자격|우대|근무|복리|채용|지원)|자격\s*요건|우대\s*(?:사항|조건)|$)", re.S)
 SW_WORDS: dict[str, re.Pattern[str]] = {
     "application_embedded": re.compile(r"소프트웨어\s*개발|SW\s*개발|프로그래밍|프론트\s*엔드|백\s*엔드|웹\s*개발|앱\s*개발|모바일\s*앱|임베디드|펌웨어|게임\s*개발|클라이언트\s*개발|서버\s*개발|Android|iOS|React|Spring|\bJava\b|Python|C\+\+|JavaScript|TypeScript|Kotlin|Swift|\bSQL\b|코딩|알고리즘|프로그램\s*(?:개발|제작)|(?:앱|웹|서비스|플랫폼|시스템|서버|API|SW|S/W|소프트웨어|게임|AI|데이터)\s*개발|개발자|프로그래머|\bdeveloper\b|software engineer", re.I),
-    "data_ai": re.compile(r"데이터\s*분석|데이터\s*엔지니어|머신\s*러닝|딥\s*러닝|AI\s*모델|인공지능\s*(?:모델|개발)|LLM|MLOps|data\s*(?:scientist|engineer|analyst)", re.I),
+    "data_ai": re.compile(r"데이터\s*분석|데이터\s*엔지니어|데이터\s*사이언|통계\s*분석|데이터\s*베이스|\bDBA\b|머신\s*러닝|딥\s*러닝|AI\s*모델|인공지능\s*(?:모델|개발)|LLM|MLOps|data\s*(?:scientist|engineer|analyst)", re.I),
     "cloud_platform": re.compile(r"클라우드|인프라|DevOps|Kubernetes|\bAWS\b|\bGCP\b|Azure", re.I),
-    "system_network": re.compile(r"시스템\s*(?:운영|엔지니어|관리)|네트워크\s*(?:운영|엔지니어|구축)|서버\s*(?:운영|관리)"),
+    "system_network": re.compile(r"시스템\s*(?:운영|엔지니어|관리)|IT\s*(?:인프라|운영)|네트워크\s*(?:운영|엔지니어|구축)|서버\s*(?:운영|관리)"),
     "security": re.compile(r"정보\s*보호|보안\s*(?:관제|운영|엔지니어|점검)|침투\s*테스트|사이버\s*보안", re.I),
     "software_qa": re.compile(r"소프트웨어\s*테스트|테스트\s*자동화|QA\s*엔지니어|SW\s*품질", re.I),
 }
