@@ -344,7 +344,8 @@ def run_external_collection(settings: dict, store: NoticeStore, now: datetime, p
                         "title": notice.title,
                         "category": notice.category,
                         "url": notice.url,
-                        "posted_on": notice.posted_on.isoformat(),
+                        # 학교 글처럼 처음 본 날짜를 지킨다(원본은 목록이 바뀌어도 날짜를 다시 쓰지 않는다).
+                        "posted_on": _first_posted_on(old, notice.posted_on).isoformat(),
                         "pinned": False,
                         "deadline": deadline,
                         "first_seen": old.get("first_seen", stamp),

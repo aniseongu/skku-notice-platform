@@ -427,3 +427,18 @@ def test_a_new_notice_uses_the_listed_date_and_a_broken_saved_date_is_replaced()
     assert job._first_posted_on({"posted_on": None}, listed) == listed
     assert job._first_posted_on({"posted_on": "not-a-date"}, listed) == listed
     assert job._first_posted_on({"posted_on": "2026-11-06"}, listed) == date(2026, 11, 6)
+
+
+def test_external_postings_also_keep_their_first_seen_date(monkeypatch):
+    store = MemoryStore()
+    store.rows["intern/9"] = {
+        "id": "intern/9", "source_id": "intern", "article_no": "9", "title": "인턴",
+        "posted_on": "2026-11-05",
+        "first_seen": "2026-11-05T00:00:00+09:00", "fetched_at": "2026-11-05T01:00:00+09:00",
+    }
+    relisted = Notice("intern", "9", "인턴", "인턴", "https://x.test/9", date(2026, 11, 20), False)
+    settings = {"sources": [SOURCES[1]], "user_agent": "test", "timeout_seconds": 2}
+    monkeypatch.setitem(job.COLLECTORS, "linkareer", lambda post, now, source_id: [(relisted, None)])
+    monkeypatch.setattr(job.time, "sleep", lambda _: None)
+    job.run_external_collection(settings, store, NOW, post=lambda *a: None)
+    assert store.rows["intern/9"]["posted_on"] == "2026-11-05"
