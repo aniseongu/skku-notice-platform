@@ -2,6 +2,8 @@
 Description=Judge external internship postings with each user's own Gemini key (BYOK)
 Wants=network-online.target
 After=network-online.target
+# 판정이 끝나면 바로 알림 후보를 확인해 보낸다(원본은 한 번의 실행 안에서 판정 뒤 바로 알린다).
+OnSuccess=skku-notice-push.service
 
 [Service]
 Type=oneshot

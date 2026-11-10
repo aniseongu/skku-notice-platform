@@ -2,6 +2,8 @@
 Description=Process a bounded batch of shared notice images with RapidOCR
 Wants=network-online.target
 After=network-online.target
+# 이미지 글자를 읽고 나면 그 글을 바로 판정한다.
+OnSuccess=skku-notice-judge.service
 
 [Service]
 Type=oneshot

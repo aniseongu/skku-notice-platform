@@ -2,7 +2,8 @@
 Description=Collect shared SKKU notices
 Wants=network-online.target
 After=network-online.target
-OnSuccess=skku-notice-ocr.service
+# 수집이 끝나면 바로 글자 읽기와 AI 판정을 돌려 새 글에 설명·요약이 곧바로 붙게 한다(판정은 글자 읽기를 기다리지 않는다).
+OnSuccess=skku-notice-ocr.service skku-notice-judge.service
 
 [Service]
 Type=oneshot
