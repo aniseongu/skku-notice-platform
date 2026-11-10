@@ -11,7 +11,7 @@ import hashlib
 import time
 from datetime import UTC, datetime
 
-from skku_notice.byok_crypto import ByokCryptoError, decrypt_api_key
+from skku_notice.ai_users import build_user_ai, gather_rows, used_today
 from skku_notice.grad_intern_facts import build_facts, call_gemini
 from skku_notice.grad_intern_rules import GradProfile, assess_department, assess_university_3p
 from skku_notice.grad_intern_sources import DEPT_RULESET, EXTRACTOR_VERSION, P3_RULESET
@@ -19,7 +19,6 @@ from skku_notice.grad_intern_sources import DEPT_RULESET, EXTRACTOR_VERSION, P3_
 MAX_PER_RUN = 8
 ENQUEUE_PER_RUN = 10
 SW_COLLEGE, SW_DEPARTMENT = "소프트웨어융합대학", "소프트웨어학과"
-REJECTED = {400, 401, 403}
 
 
 def profile_from_row(row: dict) -> GradProfile:
@@ -44,9 +43,17 @@ def assess(profile: GradProfile, title: str, body: str, ai: dict | None) -> dict
     }
 
 
-def run_graduation(store, master_key: str, now: datetime, client_factory=None, sleep=time.sleep) -> dict[str, int]:
+def rows_for(store, user_id: str, gemini_row: dict | None) -> dict[str, dict]:
+    return gather_rows(store, user_id, gemini_row)
+
+
+def run_graduation(store, master_key: str, now: datetime, client_factory=None, sleep=time.sleep,
+                   provider_factory=None) -> dict[str, int]:
+    from skku_notice.ai_providers import make_client
     from skku_notice.byok_judge import DAILY_CALLS, PACE_SECONDS, _RecordingClient
     from skku_notice.gemini_client import gemini_client
+
+    provider_factory = provider_factory or make_client
 
     client_factory = client_factory or gemini_client
     counts = {"grad_queued": 0, "grad_assessed": 0, "grad_cached": 0, "grad_ai": 0, "grad_ai_unavailable": 0}
@@ -74,38 +81,29 @@ def run_graduation(store, master_key: str, now: datetime, client_factory=None, s
         if shared is not None:
             ai, ai_status = shared, "used"
             counts["grad_shared"] = counts.get("grad_shared", 0) + 1
-        elif key and not key.get("disabled_at"):
-            used = key["used_today"] if key.get("used_on") == today else 0
-            # 하루 한도의 절반까지만 졸업요건에 쓰고, 나머지는 인턴 공고 판정에 남겨 둔다.
-            if used >= DAILY_CALLS // 2:
-                ai_status = "limit"
+        elif rows_for(store, user_id, key):
+            rows = rows_for(store, user_id, key)
+            half = DAILY_CALLS // 2  # 하루 한도의 절반까지만 졸업요건에 쓰고, 나머지는 인턴 공고 판정에 남겨 둔다.
+            user_ai = build_user_ai(store, master_key, user_id, rows, today, now, half,
+                                    gemini_client_for=lambda k: _RecordingClient(client_factory(k)),
+                                    provider_client_for=provider_factory)
+            if not user_ai.candidates:
+                at_limit = any(used_today(r, today) >= half for r in rows.values())
+                ai_status = "limit" if at_limit else "unavailable"
             else:
-                try:
-                    api_key = decrypt_api_key(master_key, user_id, key["ciphertext"])
-                except ByokCryptoError:
-                    api_key = ""
+                if used_calls:
+                    sleep(PACE_SECONDS)
+                used_calls += 1
+                ai = call_gemini(req["title"], req.get("body") or "", user_ai.primary_model, "routed", client=user_ai.client)
+                user_ai.settle(store, now)
+                if ai is None:
                     ai_status = "unavailable"
-                if api_key:
-                    if used_calls:
-                        sleep(PACE_SECONDS)
-                    used_calls += 1
-                    client = _RecordingClient(client_factory(api_key))
-                    ai = call_gemini(req["title"], req.get("body") or "", key["model"], api_key, client=client)
-                    usage = {"used_on": today, "used_today": used + 1}
-                    if client.failed and client.error_code in REJECTED:
-                        stamp = now.isoformat()
-                        store.update_key(user_id, {**usage, "disabled_at": stamp, "error_at": stamp,
-                                                   "last_error": "Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요."})
-                    else:
-                        store.update_key(user_id, {**usage, "last_error": None, "error_at": None})
-                    if ai is None:
-                        ai_status = "unavailable"
-                        counts["grad_ai_unavailable"] += 1
-                    else:
-                        ai_status, model = "used", key["model"]
-                        counts["grad_ai"] += 1
-                        if hasattr(store, "save_ai_facts"):
-                            store.save_ai_facts(notice_id, text_hash, EXTRACTOR_VERSION, ai, key["model"])
+                    counts["grad_ai_unavailable"] += 1
+                else:
+                    ai_status, model = "used", user_ai.client.model
+                    counts["grad_ai"] += 1
+                    if hasattr(store, "save_ai_facts"):
+                        store.save_ai_facts(notice_id, text_hash, EXTRACTOR_VERSION, ai, model)
 
         result = assess(profile_from_row(req), req["title"], req.get("body") or "", ai)
         store.save_assessment({

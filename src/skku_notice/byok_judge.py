@@ -10,7 +10,8 @@ import re
 import time
 from datetime import UTC, datetime
 
-from skku_notice.byok_crypto import ByokCryptoError, decrypt_api_key
+from skku_notice.ai_providers import make_client
+from skku_notice.ai_users import build_user_ai, gather_rows, used_today
 from skku_notice.gemini_client import gemini_client
 from skku_notice.intern_ai import BATCH, judge_internships
 from skku_notice.scheduled_collection import NoticeStore, StoreError
@@ -75,6 +76,37 @@ class JudgeStore(NoticeStore):
                 "limit": str(MAX_USERS_PER_RUN),
             },
         ).json()
+
+    # Groq·OpenRouter 키와 AI 설정. 표가 없는 환경이면 비어 있는 것으로 읽어 Gemini 동작을 그대로 둔다.
+    def ai_key_users(self) -> list[str]:
+        try:
+            rows = self._request("GET", "user_ai_keys", params={
+                "select": "user_id", "disabled_at": "is.null", "order": "user_id",
+                "limit": str(MAX_USERS_PER_RUN)}).json()
+        except StoreError:
+            return []
+        return list(dict.fromkeys(r["user_id"] for r in rows))
+
+    def ai_keys_for(self, user_id: str) -> list[dict]:
+        try:
+            return self._request("GET", "user_ai_keys", params={
+                "user_id": f"eq.{user_id}",
+                "select": "provider,ciphertext,model,disabled_at,used_on,used_today"}).json()
+        except StoreError:
+            return []
+
+    def preferences(self, user_id: str) -> dict | None:
+        try:
+            rows = self._request("GET", "user_ai_preferences", params={
+                "user_id": f"eq.{user_id}", "select": "ai_enabled,routing_mode,auto_routing_consent_at,"
+                "manual_provider,free_only,paid_calls_opt_in_at,daily_request_cap"}).json()
+        except StoreError:
+            return None
+        return rows[0] if rows else None
+
+    def update_ai_key(self, user_id: str, provider: str, fields: dict) -> None:
+        params = {"user_id": f"eq.{user_id}", "provider": f"eq.{provider}"}
+        self._request("PATCH", "user_ai_keys", params=params, json=fields)
 
     def profile(self, user_id: str) -> dict:
         params = {"user_id": f"eq.{user_id}", "select": ",".join(PROFILE_COLUMNS)}
@@ -196,19 +228,20 @@ class _RecordingClient:
 
 def run_judging(
     store: JudgeStore, master_key: str, now: datetime, client_factory=gemini_client,
-    sleep=time.sleep, clock=time.monotonic,
+    sleep=time.sleep, clock=time.monotonic, provider_factory=make_client,
 ) -> dict[str, int]:
     counts = {"users": 0, "judged": 0, "translated": 0, "translation_failed": 0,
               "rejected": 0, "limited": 0, "errors": 0}
     today = now.astimezone(UTC).date().isoformat()
     started = clock()
-    for row in store.keys():
+    for user_id, gemini_row in _users(store):
         if clock() - started > RUN_BUDGET_SECONDS:
             break
-        user_id = row["user_id"]
-        used = row["used_today"] if row.get("used_on") == today else 0
-        if used >= DAILY_CALLS:
+        rows = gather_rows(store, user_id, gemini_row)
+        if rows and all(used_today(r, today) >= DAILY_CALLS for r in rows.values()):
             counts["limited"] += 1
+            continue
+        if not rows:
             continue
         pending = store.pending(user_id)
         school = store.pending_school(user_id)
@@ -216,15 +249,12 @@ def run_judging(
         if not pending and not school and not translations:
             continue
         counts["users"] += 1
-        try:
-            api_key = decrypt_api_key(master_key, user_id, row["ciphertext"])
-        except ByokCryptoError:
-            stamp = now.isoformat()
-            unreadable = "저장된 키를 읽지 못했어요. 다시 등록해 주세요."
-            store.update_key(user_id, {"disabled_at": stamp, "error_at": stamp, "last_error": unreadable})
-            counts["errors"] += 1
-            continue
-        client = _RecordingClient(client_factory(api_key))
+        ai = build_user_ai(store, master_key, user_id, rows, today, now, DAILY_CALLS,
+                           gemini_client_for=lambda key: _RecordingClient(client_factory(key)),
+                           provider_client_for=provider_factory, counts=counts)
+        if not ai.candidates:
+            continue  # 키를 못 읽었다(오류로 셈). 판정은 다음 실행으로 미룬다(코드 기반 경로는 그대로)
+        client = ai.client
         profile = store.profile(user_id)
         phases = (
             (pending, judge_internships, store.pending),
@@ -238,32 +268,15 @@ def run_judging(
                     if clock() - started > RUN_BUDGET_SECONDS:
                         break
                     batch = refill(user_id)
-                if not batch or used >= DAILY_CALLS:
+                if not batch or ai.capped():
                     break
                 if calls:
                     sleep(PACE_SECONDS)
                 calls += 1
                 items = [{"id": p["notice_id"], "title": p["title"], "body": p["body"]} for p in batch]
-                found = judge(items, row["model"], api_key, profile=profile, client=client)
-                used += 1
-                usage = {"used_on": today, "used_today": used}
-                if client.failed and client.error_code in REJECTED_CODES:
-                    stamp = now.isoformat()
-                    store.update_key(
-                        user_id,
-                        {**usage, "disabled_at": stamp, "error_at": stamp,
-                         "last_error": "Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요."},
-                    )
-                    counts["rejected"] += 1
-                    break
+                found = judge(items, ai.primary_model, "routed", profile=profile, client=client)
+                ai.settle(store, now, counts)
                 if client.failed:
-                    message = (
-                        "Gemini 사용 한도를 넘었어요. 잠시 뒤 다시 시도해요."
-                        if client.error_code == 429
-                        else "Gemini 판정을 잠시 못 했어요. 다시 시도해요."
-                    )
-                    store.update_key(user_id, {**usage, "last_error": message, "error_at": now.isoformat()})
-                    counts["errors"] += 1
                     break
                 store.save_judgments(
                     [
@@ -272,7 +285,7 @@ def run_judging(
                             "notice_id": key,
                             "verdict": j.verdict,
                             "reason": j.reason[:300],
-                            "model": j.model,
+                            "model": client.model or j.model,
                             "summary": j.summary,
                             "deadline": j.deadline,
                             "deadline_kind": j.deadline_kind,
@@ -281,7 +294,6 @@ def run_judging(
                         for key, j in found.items()
                     ]
                 )
-                store.update_key(user_id, {**usage, "last_error": None, "error_at": None})
                 counts["judged"] += len(found)
                 # 가득 차지 않았거나 하나도 못 받았으면 더 이을 것이 없다.
                 if len(batch) < BATCH or not found:
@@ -291,29 +303,30 @@ def run_judging(
         if client.failed:
             continue
         for item in translations:
-            if used >= DAILY_CALLS:
+            if ai.capped():
                 break
             translated = translate_notice(
-                item["title"], item.get("body"), row["model"], api_key, client=client
+                item["title"], item.get("body"), ai.primary_model, "routed", client=client
             )
-            used += 1
-            usage = {"used_on": today, "used_today": used}
+            ai.settle(store, now, counts)
             if client.failed:
-                fields = {**usage, "last_error": "Gemini 번역을 잠시 못 했어요. 다시 시도해요.",
-                          "error_at": now.isoformat()}
-                if client.error_code in REJECTED_CODES:
-                    fields["disabled_at"] = now.isoformat()
-                    fields["last_error"] = "Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요."
-                store.update_key(user_id, fields)
-                counts["errors"] += 1
                 break
             store.save_translation({"user_id": user_id, "notice_id": item["notice_id"],
                                     "title": translated[0] if translated else None,
-                                    "body": translated[1] if translated else None, "model": row["model"],
+                                    "body": translated[1] if translated else None,
+                                    "model": client.model or ai.primary_model,
                                     "attempts": item["attempts"] + 1, "updated_at": now.isoformat()})
             counts["translated" if translated else "translation_failed"] += 1
-            store.update_key(user_id, {**usage, "last_error": None, "error_at": None})
     return counts
+
+
+def _users(store) -> list[tuple[str, dict | None]]:
+    """AI 키가 있는 사용자: Gemini 키 행과 Groq·OpenRouter만 가진 사용자. Gemini 행이 없으면 None."""
+    users: dict[str, dict | None] = {row["user_id"]: row for row in store.keys()}
+    extra = getattr(store, "ai_key_users", None)
+    for user_id in (extra() if extra else []):
+        users.setdefault(user_id, None)
+    return list(users.items())[:MAX_USERS_PER_RUN]
 
 
 def main() -> int:
