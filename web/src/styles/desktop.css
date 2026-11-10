@@ -11,17 +11,13 @@
     .list-pane, .detail-pane { min-height: 0; overflow-y: auto; }
     .list-pane { padding-bottom: 32px; background: var(--surface); }
 
+    /* 상단 바(.topbar)는 Tailwind 클래스로 옮겼다(notice-shell.tsx의 TOPBAR). 사이드바 브랜드 줄과 상세 머리가 .pane-head를 쓴다. */
     .pane-head {
       display: flex; align-items: center; gap: 8px; height: var(--head-h); flex: none;
       border-bottom: 1px solid var(--line);
     }
     .brand { margin: 0 -12px 12px; padding: 0 24px; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
     .brand .brand-mark { width: 32px; height: 32px; color: var(--accent); }
-    .topbar { position: sticky; top: 0; z-index: 2; padding: 0 24px; }
-    .topbar-text { min-width: 88px; }
-    .topbar h1 { font-size: 21px; line-height: 28px; font-weight: 700; }
-    .topbar .updated { font-size: 12px; line-height: 16px; }
-    .topbar .search { flex: 0 1 260px; width: 260px; min-width: 120px; height: 36px; padding: 0 12px; }
     .icon-button { width: 36px; height: 36px; border-radius: var(--r-sm); }
 
     /* 사이드바 항목은 Tailwind 클래스로 옮겼다(notice-shell.tsx의 SideItem, SideGroup). */
@@ -47,8 +43,6 @@
     .app { grid-template-columns: 248px minmax(0, 680px) minmax(400px, 1fr); }
     .app.is-settings { grid-template-columns: 248px minmax(0, 1fr); }
     .app.is-settings .detail-pane { display: none; }
-    /* 설정 머리 줄을 내용 폭(.settings 760px)에 맞춰 닫기 단추가 내용 오른쪽 끝선에 오게 한다. 아래 선은 칸 끝까지 둔다. */
-    .app.is-settings .list-pane .topbar { padding-right: max(24px, calc(100% - 760px + 24px)); }
     .app.no-detail { grid-template-columns: 248px minmax(0, 1fr); }
     .app.no-detail .detail-pane { display: none; }
     .app.no-detail .list-pane { border-right: 0; }

@@ -2,32 +2,8 @@
 @layer mobile {
   .detail-pane, .wide-only { display: none; }
   .list-pane { padding-bottom: calc(var(--tabbar-h) + 24px + env(safe-area-inset-bottom)); }
-  .navigation-head { display: contents; }
-
-  .topbar {
-    position: sticky; top: var(--wco-h); z-index: 2;
-    display: flex; align-items: center; gap: 4px;
-    padding: calc(10px + env(safe-area-inset-top)) 4px 10px var(--gutter);
-    border-bottom: 1px solid var(--line);
-    user-select: none; -webkit-user-select: none;
-  }
-  .topbar > .brand-mark { width: 30px; height: 30px; flex: none; margin-right: 6px; color: var(--accent); }
-  .topbar-text { flex: 1; min-width: 0; }
-  .topbar .back { margin-left: -12px; }
+  /* 상단 바와 갱신 줄은 Tailwind 클래스로 옮겼다(notice-shell.tsx). h1 기본 모양만 남긴다. */
   h1 { font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .updated { font-size: 13px; line-height: 18px; color: var(--text-3); font-variant-numeric: tabular-nums; }
-  .updated.stale { color: var(--text-2); }
-
-  @media (max-width: 719px) {
-    .feed-topbar {
-      position: relative; top: auto; gap: 0;
-      padding: calc(8px + env(safe-area-inset-top)) 4px 8px var(--gutter);
-      border-bottom: 0; background: var(--bg);
-      -webkit-backdrop-filter: none; backdrop-filter: none;
-    }
-    .feed-topbar > .brand-mark { width: 36px; height: 36px; margin-right: 8px; }
-    .feed-topbar h1 { font-size: 21px; line-height: 28px; font-weight: 800; }
-  }
 
   .tools { padding: 4px var(--gutter) 0; }
   .chips {

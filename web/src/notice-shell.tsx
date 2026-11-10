@@ -100,16 +100,16 @@ export function NoticeShell({ app }: { app: AppController }) {
 
       <main className="list-pane">
         {reading ? <ReadingView app={app} notice={reading} /> : <>
-          <div className="navigation-head">
-            <header className={`pane-head topbar glass ${settings ? '' : 'feed-topbar'}`}>
-              {settings ? <button type="button" className="icon-button narrow-only back" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} onClick={app.backSettings}><Icon name="back" /></button> : null}
-              {settings ? null : <Brand className="brand-mark narrow-only" />}
-              <div className="topbar-text">
-                <h1>{title}</h1>
-                {settings ? <p className="updated">{settingsSubtitle()}</p> : <UpdatedLine app={app} count={list.length} />}
+          <div className="navigation-head contents">
+            <header className={`${TOPBAR} ${settings ? TOPBAR_SETTINGS : TOPBAR_FEED}`}>
+              {settings ? <button type="button" className="icon-button narrow-only back -ml-[12px]" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} onClick={app.backSettings}><Icon name="back" /></button> : null}
+              {settings ? null : <Brand className="brand-mark narrow-only mr-[8px] h-[36px] w-[36px] flex-none text-accent" />}
+              <div className={TOPBAR_TEXT}>
+                <h1 className={`${TOPBAR_H1} ${settings ? '' : 'max-[719px]:text-[21px] max-[719px]:leading-[28px] max-[719px]:font-extrabold'}`}>{title}</h1>
+                {settings ? <p className={`${UPDATED} text-ink-3`}>{settingsSubtitle()}</p> : <UpdatedLine app={app} count={list.length} />}
               </div>
               {settings ? null : <>
-                <label className="search wide-only"><Icon name="search" />
+                <label className="search wide-only min-[720px]:h-[36px] min-[720px]:min-w-[120px] min-[720px]:w-[260px] min-[720px]:flex-[0_1_260px] min-[720px]:px-[12px] min-[720px]:py-0"><Icon name="search" />
                   <input type="search" placeholder="공지 찾기" autoComplete="off" aria-label="공지 검색" aria-keyshortcuts="/" value={app.query}
                     onChange={(event) => { app.query = event.currentTarget.value; app.selectedId = null; app.selectedReads = []; }} />
                   {app.query ? null : <Kbd keys={['/']} />}</label>
@@ -210,6 +210,15 @@ function settingsModel(app: AppController) {
   };
 }
 
+// 상단 바. 휴대폰은 위에 붙는 한 줄(홈 목록은 바탕과 같은 면에 선 없음), 720px부터는 64px 머리 줄이다.
+const TOPBAR = 'pane-head topbar glass sticky top-[var(--wco-h)] z-[2] flex items-center gap-[4px] border-b border-line pt-[calc(10px_+_env(safe-area-inset-top))] pr-[4px] pb-[10px] pl-[var(--gutter)] select-none [-webkit-user-select:none] min-[720px]:top-0 min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:gap-[8px] min-[720px]:px-[24px] min-[720px]:py-0';
+const TOPBAR_FEED = 'feed-topbar max-[719px]:relative max-[719px]:top-auto max-[719px]:gap-0 max-[719px]:border-b-0 max-[719px]:bg-bg max-[719px]:pt-[calc(8px_+_env(safe-area-inset-top))] max-[719px]:pr-[4px] max-[719px]:pb-[8px] max-[719px]:pl-[var(--gutter)] max-[719px]:[-webkit-backdrop-filter:none] max-[719px]:[backdrop-filter:none]';
+// 설정 머리 줄은 내용 폭(760px)에 맞춰 닫기 단추가 내용 오른쪽 끝선에 오게 한다.
+const TOPBAR_SETTINGS = 'min-[720px]:pr-[max(24px,calc(100%_-_760px_+_24px))]';
+const TOPBAR_TEXT = 'topbar-text min-w-0 flex-1 min-[720px]:min-w-[88px]';
+const TOPBAR_H1 = 'min-[720px]:text-[21px] min-[720px]:leading-[28px]';
+const UPDATED = 'updated text-[13px] leading-[18px] tabular-nums min-[720px]:text-[12px] min-[720px]:leading-[16px]';
+
 // 사이드바(PC 전용) 항목. 현재 항목은 aria-current=page로 표시한다.
 const SIDE_ITEM = 'flex items-center justify-between gap-[8px] min-h-[40px] px-[12px] py-0 border-0 rounded-sm text-[15px] font-medium text-left select-none [-webkit-user-select:none] [@media(pointer:coarse)]:min-h-[44px]';
 const SIDE_ITEM_IDLE = 'bg-transparent hover:bg-hover-soft';
@@ -236,15 +245,15 @@ function SideGroup({ app, id, title, count, children }: { app: AppController; id
 }
 
 function UpdatedLine({ app, count }: { app: AppController; count?: number }) {
-  if (app.loading && !app.generatedAt) return <p className="updated">공지를 불러오고 있어요</p>;
-  if (!app.generatedAt) return <p className="updated">받은 시각을 알 수 없어요</p>;
+  if (app.loading && !app.generatedAt) return <p className={`${UPDATED} text-ink-3`}>공지를 불러오고 있어요</p>;
+  if (!app.generatedAt) return <p className={`${UPDATED} text-ink-3`}>받은 시각을 알 수 없어요</p>;
   const stale = Date.now() - Date.parse(app.generatedAt) > STALE_MS;
   const time = new Intl.DateTimeFormat('ko-KR', {
     timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date(app.generatedAt));
   const total = count === undefined ? '' : `${count}건, `;
   // "확인 필요"(판정)와 겹치지 않게 수집 지연은 다른 말로 쓴다.
-  return <p className={`updated ${stale ? 'stale' : ''}`}>{stale ? `${time} 수집 지연` : `${total}${time} 기준`}</p>;
+  return <p className={`${UPDATED} ${stale ? 'stale text-ink-2' : 'text-ink-3'}`}>{stale ? `${time} 수집 지연` : `${total}${time} 기준`}</p>;
 }
 
 const Empty = ({ title, body, action, onAction }: { title: string; body: string; action?: string; onAction?: () => void }) =>
@@ -429,16 +438,16 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
     today: todayKst(), body: shownBody, mySummary: mine?.summary ?? null, summarizing: app.summarizing === notice.id, summaryError: app.summaryErrorId === notice.id && !app.summarizing ? app.summaryError : '', makeSummary: () => { void app.makeSummary(notice); }, interests,
     ai: judgement?.ai ?? mine?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
     retry: () => { app.bodies.delete(notice.id); app.requestUpdate(); },
-    graduation: app.showsGraduation(notice) ? { assessment: app.graduationFor(notice), busy: app.graduationBusy === notice.id, error: app.graduationError, request: () => { void app.requestGraduation(notice); }, hasKey: !!app.byokStatus && !app.byokStatus.disabled } : undefined,
+    graduation: app.showsGraduation(notice) ? { tracks: visibleTracks(app.profile), assessment: app.graduationFor(notice), busy: app.graduationBusy === notice.id, error: app.graduationError, request: () => { void app.requestGraduation(notice); }, hasKey: !!app.byokStatus && !app.byokStatus.disabled } : undefined,
   }} />;
 }
 
 /** 휴대폰 앱 안 상세 화면: 뒤로 가기, 상세, 바닥의 원문 열기 */
 function ReadingView({ app, notice }: { app: AppController; notice: Notice }) {
   return <Fragment>
-    <header className="pane-head topbar glass">
-      <button type="button" className="icon-button back" aria-label="목록으로" onClick={() => history.back()}><Icon name="back" /></button>
-      <div className="topbar-text"><h1>공지</h1></div>
+    <header className={TOPBAR}>
+      <button type="button" className="icon-button back -ml-[12px]" aria-label="목록으로" onClick={() => history.back()}><Icon name="back" /></button>
+      <div className={TOPBAR_TEXT}><h1 className={TOPBAR_H1}>공지</h1></div>
     </header>
     <div className="reading"><Detail app={app} notice={notice} /></div>
     <div className="read-actions glass">
