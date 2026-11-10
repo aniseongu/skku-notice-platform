@@ -79,7 +79,7 @@ export function settingsSubtitle(): string {
     case 'keywords': return '관심 있는 공지를 골라 봐요';
     case 'calendar': return '저장한 공지의 마감을 구글 캘린더에 넣어요';
     case 'profile': return '내 정보와 Gemini에 알려줄 내용을 적어요';
-    case 'keys': return '키와 지원 자격 정보를 관리해요';
+    case 'keys': return 'Gemini 키와 아이캠퍼스 토큰을 관리해요';
     default: return '알림과 연결을 정해요';
   }
 }

@@ -82,7 +82,10 @@
   .keyword-list li { display: flex; align-items: center; justify-content: space-between; min-height: 44px; border-bottom: 1px solid var(--line); font-size: 15px; }
   .segmented { display: inline-flex; padding: 3px; border-radius: var(--r-md); background: var(--sunken); align-self: flex-start; }
   .segmented button { min-height: 38px; padding: 0 14px; border: 0; border-radius: 8px; background: none; color: var(--text-2); font-size: 14px; font-weight: 500; }
-  .segmented button[aria-checked="true"], .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px oklch(0.2 0.02 var(--h) / 0.12); }
+  .segmented button[aria-checked="true"], .segmented button[aria-pressed="true"] { background: var(--text); color: var(--bg); font-weight: 700; box-shadow: 0 1px 2px oklch(0.2 0.02 var(--h) / 0.12); }
+  /* 선택지 묶음은 열 폭을 채워 시작점과 끝점을 맞춘다(시간 입력 안의 오전·오후는 제외). */
+  .setting-control > .segmented, .setting-control > div:not(.time-control):not(.inline-row) > .segmented { width: 100%; }
+  .setting-control > .segmented button, .setting-control > div:not(.time-control):not(.inline-row) > .segmented button { flex: 1; white-space: nowrap; padding: 0 8px; }
 
   @media (min-width: 720px) {
     .settings { padding: 0 24px 48px; }

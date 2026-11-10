@@ -131,7 +131,7 @@ export function NoticeShell({ app }: { app: AppController }) {
           {settings ? <platform-settings-screen model={settingsModel(app)} /> : <>
             <div className={`tools narrow-only ${app.selecting ? 'max-[719px]:hidden' : ''}`}>
               <label className="search"><Icon name="search" />
-                <input type="search" placeholder="제목, 분류, 판정 이유로 찾기" autoComplete="off" aria-label="공지 검색" value={app.query}
+                <input type="search" placeholder="공지 찾기" autoComplete="off" aria-label="공지 검색" value={app.query}
                   onChange={(event) => { app.query = event.currentTarget.value; app.selectedId = null; app.selectedReads = []; }} /></label>
               <div className="chips" role="group" aria-label="관심 키워드">
                 {app.keywords.length ? <button type="button" className="chip" aria-pressed={!app.keyword} onClick={() => app.setKeyword(null)}>모두</button> : null}
@@ -257,7 +257,7 @@ function UpdatedLine({ app, count }: { app: AppController; count?: number }) {
   }).format(new Date(app.generatedAt));
   const total = count === undefined ? '' : `${count}건, `;
   // "확인 필요"(판정)와 겹치지 않게 수집 지연은 다른 말로 쓴다.
-  return <p className={`${UPDATED} ${stale ? 'stale text-ink-2' : 'text-ink-3'}`}>{stale ? `${time} 수집 지연` : `${total}${time} 기준`}</p>;
+  return <p className={`${UPDATED} ${stale ? 'stale text-ink-2' : 'text-ink-3'}`}>{stale ? `${time} 이후 새 공지를 못 가져왔어요` : `${total}${time} 기준`}</p>;
 }
 
 const Empty = ({ title, body, action, onAction }: { title: string; body: string; action?: string; onAction?: () => void }) =>

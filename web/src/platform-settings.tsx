@@ -691,8 +691,8 @@ function SecretRow({ name, help, placeholder, status, loading, busy, error, onRe
       {guide}
     </> : <>
       <div className="connection-summary"><span className="setting-state">{state}</span>
-        <button type="button" className="text-button key-action" aria-label={`${name} ${status ? '수정하기' : '입력하기'}`} disabled={loading} onClick={() => setEditing(true)}>{status ? '수정하기' : '입력하기'}</button>
-        {status ? <button type="button" className="text-button key-action" aria-label={`${name} 지우기`} disabled={busy} onClick={onRemove}>지우기</button> : null}
+        <button type="button" className="ghost-button key-action min-h-[40px] px-[14px] py-0" aria-label={`${name} ${status ? '수정하기' : '입력하기'}`} disabled={loading} onClick={() => setEditing(true)}>{status ? '수정하기' : '입력하기'}</button>
+        {status ? <button type="button" className="ghost-button key-action min-h-[40px] px-[14px] py-0 text-danger" aria-label={`${name} 지우기`} disabled={busy} onClick={onRemove}>지우기</button> : null}
       </div>
       {status?.lastError ? <p className="field-note error" role="alert">{status.lastError}</p> : null}
       {note ? <p className="field-note" role="status">{note}</p> : null}
@@ -709,7 +709,7 @@ function GeminiRow({ model }: { model: SettingsModel }) {
     '만들어진 키를 붙여 넣고 "저장하기"를 눌러요. 저장하면 Gemini에 확인한 뒤 암호화해 서버에만 보관해요',
     '무료 등급은 보낸 내용이 Google 제품 개선에 쓰일 수 있어요. 키는 나에게 맞는 공지와 인턴 공고를 고르는 데만 써요',
   ]} />;
-  const help = '나에게 맞는 공지를 소리로 알리고, 공지 요약과 영어 공지 번역을 만드는 데 써요';
+  const help = '나에게 맞는 공지를 알림으로 보내고, 공지 요약과 영어 공지 번역을 만드는 데 써요';
   if (!byok?.available) {
     return <KeyRow name="Gemini 키" help={help} state="준비 중" guide={null}>
       <span className="field-note">지금은 키를 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
