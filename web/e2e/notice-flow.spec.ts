@@ -1115,9 +1115,8 @@ test('software original major is asked for the admission year and the internship
   await expect(section.getByText('최대 240시간이라 280시간에 못 미쳐요')).toBeVisible();
   // 안 되는 쪽은 빨강 계열 글자다(배지나 카드가 아니다).
   expect(await p3.evaluate((el) => getComputedStyle(el).color)).toBe(await page.evaluate(() => { const probe = document.createElement('span'); probe.style.color = 'var(--danger)'; document.body.append(probe); const c = getComputedStyle(probe).color; probe.remove(); return c; }));
-  // 인정 기준은 버튼 없이 글로 바로 보인다. 복사·접힘 버튼은 없다.
-  await expect(section.getByText('인정 기준: 법인 기업·연구소·공공기관에서 전일제 4주 이상 또는 파트타임 160시간 이상')).toBeVisible();
-  await expect(section.getByText('비교과 현장실습 280시간 이상', { exact: false })).toBeVisible();
+  // 인정 기준은 적지 않는다. 판정 한 줄과 이유 한 줄만 보인다.
+  await expect(section).not.toContainText('인정 기준');
   await expect(section.getByRole('button')).toHaveCount(1);  // 키가 없을 때 나오는 "다시 확인하기"뿐이다
   await expect(section).not.toContainText(/인정 완료|합격|승인됨/);
 });

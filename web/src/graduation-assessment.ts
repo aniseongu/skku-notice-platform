@@ -34,10 +34,6 @@ export const AFTER_COMPLETION: Record<string, string> = {
   '3P-APPLICATION': '챌린지스퀘어에서 교외이수비교과 승인 신청 뒤 3품 인턴십 인증 신청',
 };
 
-/** 인정받으려면 어떻게 해야 하는지 한 줄(공고나 AI와 무관한 고정 안내). 출처: 학과 졸업평가 지침 제28조, 학교 공지 141724. */
-export const CRITERIA_DEPT = '법인 기업·연구소·공공기관에서 전일제 4주 이상 또는 파트타임 160시간 이상';
-export const CRITERIA_3P = '교과 현장실습 1학점 이상 또는 비교과 현장실습 280시간 이상(1일 8시간·주 5일, 공휴일 제외)';
-
 /** 한 줄 이유: 안 맞는 항목이 있으면 그것, 확인 못 한 항목이 있으면 그것, 아니면 판정 문장. */
 export function reasonOf(track: Track): string {
   const fail = track.checks.find((c) => c.result === 'fail');
