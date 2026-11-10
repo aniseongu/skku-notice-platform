@@ -77,13 +77,14 @@ class NoticeStore:
         return {row["id"]: row for row in rows}
 
     def recheck_pool(self, source_ids: list[str], recent_since: str) -> tuple[list[dict], set[str]]:
-        """다시 읽을 후보 글과 "중요한 글" 번호(누군가 저장했거나 누군가의 AI 판정이 관련 있음·확인 필요인 글)."""
+        """다시 읽을 후보 글과 "중요한 글" 번호(누군가 저장했거나 AI 판정이 관련 있음·확인 필요인 글)."""
         cols = ("id,source_id,article_no,title,category,url,posted_on,pinned,deadline,first_seen,fetched_at,"
                 "body,body_html,attachments,images,changed_at,change_kind,previous_title")
         important = set()
         for table, params in (
             ("user_notice_states", {"is_saved": "eq.true", "select": "notice_id", "limit": "5000"}),
-            ("user_notice_judgments", {"verdict": "in.(relevant,maybe)", "select": "notice_id", "limit": "5000"}),
+            ("user_notice_judgments",
+             {"verdict": "in.(relevant,maybe)", "select": "notice_id", "limit": "5000"}),
         ):
             important |= {row["notice_id"] for row in self._request("GET", table, params=params).json()}
         sources = ",".join(source_ids)
