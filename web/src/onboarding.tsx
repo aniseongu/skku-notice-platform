@@ -19,8 +19,8 @@ const STEP_LABELS = ['주전공', '복수전공', '학년·재학 상태', '인�
 const YEARS = [1, 2, 3, 4, 5].map((year) => ({ value: year, label: year === 5 ? '5학년 이상' : `${year}학년` }));
 const STATUS = ENROLLMENT.map((value) => ({ value, label: value }));
 const ADMISSION = [...ADMISSION_YEARS, OLD_ADMISSION_YEAR].map((value) => ({ value, label: value === OLD_ADMISSION_YEAR ? '2016 이전' : `${value}` }));
-const THREE_P = [{ value: 'done', label: '채웠어요' }, { value: 'todo', label: '아직이에요' }, { value: 'no', label: '이 영역은 안 해요' }];
-const DEPT_DONE = [{ value: 'yes', label: '채웠어요' }, { value: 'no', label: '아직이에요' }];
+const THREE_P = [{ value: 'done', label: '채웠어요' }, { value: 'todo', label: '아직이에요' }, { value: 'no', label: '안 해요' }];
+const DEPT_DONE = [{ value: 'yes', label: '마쳤어요' }, { value: 'no', label: '아직이에요' }];
 const SERVICE = MILITARY.map((value) => ({ value, label: value }));
 
 /** 대학을 고른 뒤 그 대학의 학과만 보여 준다. 대학 줄은 학과 목록으로 들어가는 이동 줄이고, 학과는 고르기만 한다(확정은 아래 "다음"). */

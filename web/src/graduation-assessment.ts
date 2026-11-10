@@ -116,7 +116,7 @@ export function visibleTracks(profile: Pick<UserProfile, 'programs' | 'deptInter
   };
 }
 
-/** 신3품 인턴십 질문의 답: 채웠어요 / 아직 안 채웠어요 / 이 영역은 안 해요. 아직 답하지 않았으면 null. */
+/** 신3품 인턴십 질문의 답: 채웠어요 / 아직이에요 / 안 해요. 아직 답하지 않았으면 null. */
 export type ThreePAnswer = 'done' | 'todo' | 'no';
 export function threePAnswer(value: { university3pInternshipDone: boolean | null; university3pInternshipSelected: boolean | null }): ThreePAnswer | null {
   if (value.university3pInternshipDone === true) return 'done';

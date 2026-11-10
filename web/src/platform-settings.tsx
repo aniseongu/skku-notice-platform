@@ -635,19 +635,19 @@ function Profile({ model }: { model: SettingsModel }) {
     </Section>
     <Section id="s-internship" title="인턴십 졸업요건">
       {isSoftwareOriginal(profile) ? <>
-        <Setting name="입학 연도" help="학번에 따라 졸업요건이 달라서 써요. 학번 전체는 받지 않아요">
+        <Setting name="입학 연도" help="입학 연도마다 졸업요건이 달라요. 학번 전체는 받지 않아요">
           <Choice label="입학 연도" grid value={profile.admissionYear} disabled={!ready}
             options={[...ADMISSION_YEARS, OLD_ADMISSION_YEAR].map((value) => [value, value === OLD_ADMISSION_YEAR ? '2016 이전' : `${value}`] as const)}
             onPick={(admissionYear) => save({ admissionYear })} /></Setting>
       </> : null}
-      <Setting name="3품 인턴십" help="채웠다면 인턴 공고에서 안 보여 드려요. 고르지 않으면 아직으로 봐요">
+      <Setting name="3품 인턴십" help="인턴십 영역을 채웠다면 인턴 공고에서 이 요건을 빼 드려요">
         <Choice label="3품 인턴십" value={threePAnswer(profile)} disabled={!ready}
-          options={[['done', '채웠어요'], ['todo', '아직이에요'], ['no', '이 영역은 안 해요']] as const}
+          options={[['done', '채웠어요'], ['todo', '아직이에요'], ['no', '안 해요']] as const}
           onPick={(value) => save(threePFields(value as ThreePAnswer))} /></Setting>
       {isSoftwareOriginal(profile) ? <>
-        <Setting name="솦 인턴십" help="채웠다면 인턴 공고에서 안 보여 드려요">
+        <Setting name="솦 인턴십" help="마쳤다면 인턴 공고에서 이 요건을 빼 드려요">
           <Choice label="솦 인턴십" value={profile.deptInternshipDone === null ? null : profile.deptInternshipDone ? 'yes' : 'no'} disabled={!ready}
-            options={[['yes', '채웠어요'], ['no', '아직이에요']] as const}
+            options={[['yes', '마쳤어요'], ['no', '아직이에요']] as const}
             onPick={(value) => save({ deptInternshipDone: value === 'yes' })} /></Setting>
       </> : null}
     </Section>

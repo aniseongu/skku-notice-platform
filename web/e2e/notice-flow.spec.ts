@@ -1096,7 +1096,7 @@ test('software original major is asked for the admission year and the internship
   await dialog.getByRole('button', { name: '2022', exact: true }).click();
   await expect(dialog.getByRole('button', { name: '다음' })).toBeEnabled();
   await dialog.getByRole('group', { name: '솦 인턴십' }).getByRole('button', { name: '아직이에요' }).click();
-  await dialog.getByRole('group', { name: '3품 인턴십' }).getByRole('button', { name: '이 영역은 안 해요' }).click();
+  await dialog.getByRole('group', { name: '3품 인턴십' }).getByRole('button', { name: '안 해요' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
