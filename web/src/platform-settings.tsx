@@ -452,27 +452,27 @@ function BoardOrderList({ order, editing, onToggle, busy = false }: { order: Set
     (target && !target.disabled ? target : pick(want.kind === 'up' ? 'down' : want.kind === 'down' ? 'up' : 'handle'))?.focus();
   });
   return <div className="order-box">
-    <ul className="order-list" ref={listRef}>
+    <ul className={`order-list ${editing ? 'editing' : ''}`} ref={listRef}>
       {order.boards.map((board, index) => <li key={board.id} data-board-id={board.id}>
+        {editing ? <button type="button" className="order-handle" aria-label={`${board.label} 순서 옮기기`}
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+              event.preventDefault();
+              focusId.current = { id: board.id, kind: 'handle' };
+              move(ids.indexOf(board.id), index + (event.key === 'ArrowUp' ? -1 : 1));
+            }}>{chevron('M5 8h14M5 12h14M5 16h14')}</button> : null}
         <span className="order-name">{board.label}</span>
         {editing ? <span className="order-controls">
           <button type="button" className="order-move" data-dir="up" aria-label={`${board.label} 위로 옮기기`} disabled={index === 0}
             onClick={() => { focusId.current = { id: board.id, kind: 'up' }; move(index, index - 1); }}>{chevron('M6 15l6-6 6 6')}</button>
           <button type="button" className="order-move" data-dir="down" aria-label={`${board.label} 아래로 옮기기`} disabled={index === order.boards.length - 1}
             onClick={() => { focusId.current = { id: board.id, kind: 'down' }; move(index, index + 1); }}>{chevron('M6 9l6 6 6-6')}</button>
-          <button type="button" className="order-handle" aria-label={`${board.label} 순서 옮기기`}
-            onKeyDown={(event) => {
-              if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-              event.preventDefault();
-              focusId.current = { id: board.id, kind: 'handle' };
-              move(ids.indexOf(board.id), index + (event.key === 'ArrowUp' ? -1 : 1));
-            }}>{chevron('M5 8h14M5 12h14M5 16h14')}</button>
         </span> : null}
-        {onToggle ? <button type="button" role="switch" className="switch-row switch-only" aria-checked="true" aria-label={`${board.label} 받기`} disabled={busy}
+        {onToggle && !editing ? <button type="button" role="switch" className="switch-row switch-only" aria-checked="true" aria-label={`${board.label} 받기`} disabled={busy}
           onClick={() => onToggle(board.id)}><span className="switch-state" aria-hidden="true">켜짐</span><span className="switch" aria-hidden="true" /></button> : null}
       </li>)}
     </ul>
-    {editing ? <p className="field-note order-help">손잡이를 끌거나 위아래 단추로 옮기면 목록 순서만 바뀌어요</p> : null}
+    {editing ? <p className="field-note order-help">손잡이를 끌거나 화살표를 눌러 순서를 바꿔요. 바꾸면 바로 저장돼요</p> : null}
     {editing && order.status ? <p className="field-note" role="status">{order.status === 'saved' ? '저장했어요' : '저장하지 못했어요. 다시 옮기면 또 저장해요'}</p> : null}
     <p className="visually-hidden" role="status" aria-live="polite">{message}</p>
   </div>;
@@ -480,26 +480,29 @@ function BoardOrderList({ order, editing, onToggle, busy = false }: { order: Set
 
 function Keywords({ model }: { model: SettingsModel }) {
   const [draft, setDraft] = useState('');
-  const add = () => { model.addKeyword(draft); setDraft(''); };
+  const add = () => { if (!draft.trim()) return; model.addKeyword(draft); setDraft(''); };
   return <div className="settings">
     <Back model={model} />
-    <section aria-labelledby="s-keywords">
-      <h2 id="s-keywords" className="settings-head">관심 키워드</h2>
-      <div className="box">
-        <Setting name="키워드" help={'제목이나 본문에 이 글자가 그대로 들어간 공지를 "관심"으로 표시해요'}>
-          <div className="inline-row">
-            <input className="input" type="text" autoComplete="off" aria-label="새 키워드" placeholder="예: 겨울방학 인턴" value={draft}
-              onChange={(event) => setDraft(event.currentTarget.value)}
-              onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); add(); } }} />
-            <button type="button" className="ghost-button" onClick={add}>추가하기</button>
-          </div>
-          {model.keywords.length ? <ul className="keyword-list">{model.keywords.map((word) => <li key={word}><span>{word}</span>
-            <button type="button" className="text-button" aria-label={`${word} 삭제`} onClick={() => model.removeKeyword(word)}>삭제</button></li>)}</ul> : null}
-          {model.keywordNote ? <p className="field-note" role="status">{model.keywordNote}</p>
-            : model.userId ? null : <p className="field-note">로그인하면 다른 기기와 같은 키워드를 써요</p>}
-        </Setting>
+    <Section id="s-keywords" title="관심 키워드">
+      <div className="setting stacked">
+        <p className="setting-help m-0">제목이나 본문에 이 글자가 그대로 들어간 공지를 "관심"으로 표시해요</p>
+        <div className="inline-row">
+          <input className="input" type="text" autoComplete="off" aria-label="새 키워드" placeholder="예: 겨울방학 인턴" value={draft}
+            onChange={(event) => setDraft(event.currentTarget.value)}
+            onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); add(); } }} />
+          <button type="button" className="solid-button" disabled={!draft.trim()} onClick={add}>추가하기</button>
+        </div>
+        {model.keywordNote ? <p className="field-note m-0" role="status">{model.keywordNote}</p>
+          : model.userId ? null : <p className="field-note m-0">로그인하면 다른 기기와 같은 키워드를 써요</p>}
       </div>
-    </section>
+      <div className="setting stacked">
+        <p className="setting-name m-0">내 키워드 {model.keywords.length}개</p>
+        {model.keywords.length
+          ? <ul className="keyword-list">{model.keywords.map((word) => <li key={word}><span>{word}</span>
+            <button type="button" className="text-button" aria-label={`${word} 삭제`} onClick={() => model.removeKeyword(word)}>삭제</button></li>)}</ul>
+          : <p className="field-note m-0">아직 키워드가 없어요. 위에 입력해서 추가해 보세요</p>}
+      </div>
+    </Section>
   </div>;
 }
 
@@ -554,20 +557,21 @@ function CalendarPage({ model }: { model: SettingsModel }) {
   return <div className="settings">
     <Back model={model} />
     <Section id="s-calendar" title="저장한 공지의 마감">
-      <div className="setting">
-        <p className="setting-help">마감이 남은 저장 공지를 "성대 공지" 캘린더에 넣어요</p>
+      <Setting name="구글 캘린더" help={'마감이 남은 저장 공지를 "성대 공지" 캘린더에 넣어요'}>
         <span className="setting-state">{connected ? (auto.active ? '연결됨 · 30분마다 자동으로 맞춰요' : '연결됨') : '연결 안 됨'}</span>
-        {connected && !auto.active ? <p className={`field-note ${auto.error ? 'error' : ''}`} role={auto.error ? 'alert' : 'status'}>{auto.error ?? '자동으로 맞추려면 다시 연결해 주세요'}</p> : null}
+        {connected && !auto.active ? <p className={`field-note m-0 ${auto.error ? 'error' : ''}`} role={auto.error ? 'alert' : 'status'}>{auto.error ?? '자동으로 맞추려면 다시 연결해 주세요'}</p> : null}
+        {connected ? <p className="field-note m-0">저장한 공지 {calendar.savedCount}개{syncedAt ? ` · 마지막 맞춤 ${syncedAt}` : ''}</p> : null}
         <div className="inline-row">
-          {connected
-            ? <button type="button" className="ghost-button" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '맞추고 있어요' : '지금 맞추기'}</button>
-            : <button type="button" className="solid-button" disabled={calendar.busy} onClick={calendar.connect}>구글 캘린더에 연결하기</button>}
-          {connected && !auto.active ? <button type="button" className="ghost-button" disabled={calendar.busy} onClick={calendar.connect}>다시 연결하기</button> : null}
           {connected ? <button type="button" className="text-button" disabled={calendar.busy} onClick={calendar.disconnect}>연결 끊기</button> : null}
+          {connected && !auto.active ? <button type="button" className="ghost-button" disabled={calendar.busy} onClick={calendar.connect}>다시 연결하기</button> : null}
+          {connected
+            ? <button type="button" className="solid-button" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '맞추고 있어요' : '지금 맞추기'}</button>
+            : <button type="button" className="solid-button" disabled={calendar.busy} onClick={calendar.connect}>구글 캘린더에 연결하기</button>}
         </div>
-        {calendar.message ? <p className="field-note ok" role="status">{calendar.message}</p> : null}
-        {calendar.error ? <p className="field-note error" role="alert">{calendar.error}</p> : null}
-        {connected ? <p className="field-note">저장한 공지 {calendar.savedCount}개{syncedAt ? ` · 마지막 맞춤 ${syncedAt}` : ''}</p> : null}
+        {calendar.message ? <p className="field-note ok m-0" role="status">{calendar.message}</p> : null}
+        {calendar.error ? <p className="field-note error m-0" role="alert">{calendar.error}</p> : null}
+      </Setting>
+      <div className="setting stacked">
         <Guide label="연결하는 방법" steps={[
           '"구글 캘린더에 연결하기"를 눌러 구글 허용 화면으로 가요',
           '"확인되지 않은 앱"이라고 나오면 "고급"을 누른 뒤 "계속"을 눌러요',
@@ -576,7 +580,7 @@ function CalendarPage({ model }: { model: SettingsModel }) {
       </div>
     </Section>
     <Section id="s-calendar-help" title="알아 두세요">
-      <div className="setting"><ul className="rule-list">
+      <div className="setting stacked"><ul className="rule-list">
         <li>이 앱이 만든 "성대 공지" 캘린더만 다뤄요. 내 다른 캘린더는 읽지 못해요</li>
         <li>구글이 주는 열쇠는 암호화해 보관하고, 연결을 끊거나 계정을 지우면 지워요</li>
         <li>연결을 끊어도 "성대 공지" 캘린더는 남아요. 필요 없으면 구글 캘린더에서 지워 주세요</li>

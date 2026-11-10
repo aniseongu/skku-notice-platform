@@ -11,16 +11,24 @@
   .order-list { list-style: none; margin: 0; padding: 0; }
   .order-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; border-top: 1px solid var(--line); }
   .order-list li:first-child { border-top: 0; }
-  .order-name { min-width: 0; overflow-wrap: anywhere; }
+  .order-name { min-width: 0; flex: 1; overflow-wrap: anywhere; }
   .order-controls { display: flex; flex: none; align-items: center; margin-right: -10px; }
   .order-move, .order-handle { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--text); }
   .order-move:disabled { color: var(--text-3); opacity: 0.6; cursor: default; }
   /* 손잡이는 끌기 전용이라 위아래 단추보다 한 단계 연하게, 앞에 간격을 둔다. */
-  .order-handle { margin-left: 4px; color: var(--text-2); cursor: grab; touch-action: none; }
+  .order-handle { margin: 0 -4px 0 -12px; color: var(--text-2); cursor: grab; touch-action: none; border-radius: var(--r-md); }
+  .order-handle:hover, .order-move:hover:not(:disabled) { background: var(--sunken); }
+  /* 순서를 바꾸는 중에는 줄이 끌 수 있는 면으로 보이게 한다. */
+  .order-list.editing li { background: color-mix(in oklch, var(--sunken) 55%, transparent); }
+  .head-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
   .settings-lead { margin: -2px 0 8px; font-size: 13px; line-height: 19px; color: var(--text-2); }
   .box { border-radius: var(--r-lg); background: var(--surface); padding: 0 var(--gutter); }
   .setting { display: flex; flex-direction: column; gap: 10px; padding: 16px 0; }
   .setting + .setting { border-top: 1px solid var(--line); }
+  /* 이름 칸과 조작 칸으로 나누지 않고 전체 폭에 위에서 아래로 쌓는 묶음(키워드, 안내 목록 등) */
+  .setting.stacked { display: flex; flex-direction: column; gap: 10px; }
+  .stacked .keyword-list { border-top: 0; }
+  .stacked .keyword-list li:last-child { border-bottom: 0; }
   .setting-name { font-size: 15px; line-height: 22px; font-weight: 600; }
   .setting-help { margin-top: 2px; font-size: 13px; line-height: 19px; color: var(--text-2); word-break: keep-all; text-wrap: pretty; }
   .setting-saved { margin-top: 4px; font-size: 13px; color: var(--accent); font-weight: 600; }
@@ -82,6 +90,7 @@
     .settings-head-row { padding-right: 0; }
     /* 이름과 설명은 왼쪽, 조작은 오른쪽 끝에 맞춘다. 단추가 칸 가운데에 어정쩡하게 뜨지 않게 오른쪽 열은 내용 폭(최대 520px)이다. */
     .setting { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px); gap: 24px; align-items: start; }
+    .setting.stacked { display: flex; align-items: stretch; }
     .setting-control > .ghost-button, .setting-control > .solid-button, .setting-control .segmented, .setting-control > .time-control { align-self: flex-end; }
     .setting-control > .inline-row { justify-content: flex-end; }
     .setting-control > .field-note, .setting-control > .setting-state { text-align: right; }

@@ -61,8 +61,9 @@ function Body({ body: rawBody, heading = '본문' }: { body: NoticeBody; heading
   const paragraphs = (body.body ?? '').split(/\n+/).filter(Boolean);
   const images = (body.images ?? []).map(safeUrl).filter((url) => url !== '#');
   if (!paragraphs.length && !images.length) return <p className="detail-note">본문에 글자가 없어요. '원문 열기'에서 확인해 주세요</p>;
-  return <section className="detail-section body-text" aria-label="본문">
-    <h3>{body.body_from_image ? `${heading} (그림에서 읽은 글)` : heading}</h3>
+  // 글자가 없고 그림만 있으면 빈 "본문" 제목을 달지 않고 그림만 보여 준다.
+  return <section className="detail-section body-text" aria-label={paragraphs.length ? '본문' : '본문 그림'}>
+    {paragraphs.length ? <h3>{body.body_from_image ? `${heading} (그림에서 읽은 글)` : heading}</h3> : null}
     {body.body_from_image && paragraphs.length > 0 ? <p className="detail-note first">그림 속 글자를 자동으로 읽어서 틀릴 수 있어요. 아래 그림과 원문이 정확해요</p> : null}
     {paragraphs.map((para, index) => <p key={index}>{para}</p>)}
     {images.map((src, index) => <BodyImage key={`${src}-${index}`} src={src} alt={imageAlt(index, body)} />)}
