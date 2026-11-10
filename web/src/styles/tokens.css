@@ -1,0 +1,36 @@
+@layer tokens {
+  :root {
+    color-scheme: light dark;
+    --h: 163; /* 성균관대 진녹색 #124532 */
+    --bg: light-dark(oklch(0.972 0.004 var(--h)), oklch(0.17 0.006 var(--h)));
+    --surface: light-dark(oklch(0.996 0.002 var(--h)), oklch(0.215 0.008 var(--h)));
+    --sunken: light-dark(oklch(0.948 0.006 var(--h)), oklch(0.265 0.008 var(--h)));
+    --line: light-dark(oklch(0.912 0.006 var(--h)), oklch(0.3 0.008 var(--h)));
+    --text: light-dark(oklch(0.24 0.012 var(--h)), oklch(0.94 0.005 var(--h)));
+    --text-2: light-dark(oklch(0.45 0.014 var(--h)), oklch(0.78 0.01 var(--h)));
+    --text-3: light-dark(oklch(0.54 0.012 var(--h)), oklch(0.66 0.01 var(--h)));
+    --accent: light-dark(oklch(0.4 0.075 var(--h)), oklch(0.8 0.1 var(--h)));
+    --on-accent: light-dark(oklch(0.99 0.005 var(--h)), oklch(0.2 0.03 var(--h)));
+    --danger: light-dark(oklch(0.55 0.19 25), oklch(0.74 0.15 25));
+    /* 위험 단추 면: 어두운 화면에서 글자색 --danger(밝은 살구)를 면으로 쓰면 가장 튀어서, 면은 두 모드 모두 흰 글자가 읽히는 진한 빨강으로 둔다. */
+    --danger-fill: light-dark(oklch(0.55 0.19 25), oklch(0.5 0.16 25));
+    --soon: light-dark(oklch(0.54 0.12 65), oklch(0.8 0.12 75));
+    /* 유리는 불투명 94%(DESIGN 6절 92% 이상). 아래 글이 비쳐 읽기 어렵지 않게. */
+    --glass: light-dark(oklch(0.996 0.002 var(--h) / 0.94), oklch(0.215 0.008 var(--h) / 0.94));
+    --shadow-pop: 0 1px 2px oklch(0.2 0.02 var(--h) / 0.08), 0 8px 24px oklch(0.2 0.02 var(--h) / 0.12);
+    --r-sm: 6px;
+    --r-md: 10px;
+    --r-lg: 14px;
+    --r-pill: 999px;
+    --font: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --gutter: 16px;
+    --head-h: 64px;
+    --tabbar-h: 64px;
+    --wco-h: 0px;
+    /* Windows 탐색 칸 면(Mica처럼 바탕에 강조색을 아주 약하게 섞는다). 내용 칸은 --surface. */
+    --mica: color-mix(in oklch, var(--bg) 94%, var(--accent));
+  }
+  /* 설정 화면의 테마 선택(기기 설정, 밝게, 어둡게). light-dark()가 이 값을 따른다. */
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
+}

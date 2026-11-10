@@ -1,7 +1,7 @@
 # ruff: noqa: E501  (사용법 설명과 CSS 템플릿은 한 줄에 한 항목이라 줄이 길다)
 """시스템 아키텍처 그림(assets/readme/system-architecture-dark.svg)의 색을 웹 다크 모드 토큰에서 다시 만든다.
 
-사용: python3 scripts/architecture_colors.py          # web/src/styles.css의 다크 토큰으로 SVG의 <style>과 화살표 색을 갱신
+사용: python3 scripts/architecture_colors.py          # web/src/styles/tokens.css의 다크 토큰으로 SVG의 <style>과 화살표 색을 갱신
       python3 scripts/architecture_colors.py --check  # 갱신할 내용이 있으면 1로 끝난다(웹 색이 바뀌었는데 그림이 그대로인지 확인)
 
 기술 로고(Python, React, Supabase 등)는 브랜드 색이라 건드리지 않는다. 그림의 도형 색은 모두 SVG 안의 클래스가 정한다.
@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CSS = ROOT / "web/src/styles.css"
+CSS = ROOT / "web/src/styles/tokens.css"
 SVG = ROOT / "assets/readme/system-architecture-dark.svg"
 
 
@@ -51,7 +51,7 @@ def dark_tokens() -> dict[str, str]:
         line = re.search(rf"--{re.escape(name)}:\s*light-dark\(.*", css)
         values = re.findall(r"oklch\(([\d.]+)\s+([\d.]+)\s+var\(--h\)\)", line.group(0)) if line else []
         if len(values) < 2:
-            raise SystemExit(f"web/src/styles.css에서 --{name}의 다크 값을 찾지 못했다")
+            raise SystemExit(f"web/src/styles/tokens.css에서 --{name}의 다크 값을 찾지 못했다")
         lightness, chroma = values[1]  # light-dark(라이트, 다크)의 두 번째가 다크
         tokens[name] = oklch_hex(float(lightness), float(chroma), hue)
     return tokens

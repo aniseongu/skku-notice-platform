@@ -1,0 +1,241 @@
+@layer platform {
+  /* 설치 앱: 당겨서 새로고침이 화면 전체를 다시 불러오지 않게(docs/design/platforms.md) */
+  @media (display-mode: standalone), (display-mode: window-controls-overlay) {
+    body { overscroll-behavior-y: contain; }
+  }
+
+  /* Windows 설치 앱에서 제목 표시줄을 접으면 그 자리에 앱 이름 막대를 그린다 */
+  @media (display-mode: window-controls-overlay) {
+    :root { --wco-h: env(titlebar-area-height, 0px); }
+    .wco-bar {
+      position: fixed; top: 0; left: env(titlebar-area-x, 0); z-index: 5;
+      display: flex; align-items: center; gap: 8px;
+      width: env(titlebar-area-width, 100%); height: env(titlebar-area-height, 33px); padding: 0 12px;
+      background: var(--bg); font-size: 13px; font-weight: 600; color: var(--text-2);
+      app-region: drag; -webkit-app-region: drag;
+    }
+    .wco-bar .brand-mark { width: 18px; height: 18px; color: var(--accent); }
+    body { padding-top: env(titlebar-area-height, 0px); }
+  }
+}
+
+@layer platform {
+  .platform-preview { padding: 10px 16px; background: var(--sunken); color: var(--text-2); font-size: 13px; }
+  /* 설정 화면은 원본의 구역(.settings-head + .box)과 줄(.setting)을 그대로 쓴다. 아래는 그 안에 들어가는 새 구성요소다. */
+  .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 52px; padding: 6px 0; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; color: var(--text); }
+  .setting-control > .switch-row:first-child, .box > .switch-row:first-child { border-top: 0; }
+  .switch-text { display: grid; gap: 2px; }
+  .switch-label { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
+  .switch-note { font-size: 13px; color: var(--text-3); }
+  .switch-state { margin-left: auto; padding-right: 10px; font-size: 13px; font-weight: 500; color: var(--text-2); }
+  .switch-row:focus-visible, .onb button:focus-visible, .settings-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* 프로필 아이콘: 사진이 없으면 인스타그램처럼 옅은 원 안의 기본 사람 모양이다. */
+  .avatar { display: inline-grid; place-items: center; flex: none; overflow: hidden; border-radius: 50%; background: var(--sunken); color: var(--text-3); box-shadow: inset 0 0 0 1px var(--line); }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .avatar svg { width: 72%; height: 72%; fill: currentColor; align-self: end; }
+  .account-row { display: flex; align-items: center; gap: 14px; padding: 16px 0; }
+  .account-row .setting-name, .account-row .setting-help { display: block; overflow-wrap: anywhere; }
+  .profile-hero { display: flex; align-items: center; gap: 16px; padding: 20px 0 4px; }
+  .profile-hero p { margin: 0; }
+  .counter { align-self: flex-end; font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .counter.over { color: var(--danger); }
+  .rule-list { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; line-height: 19px; color: var(--text-2); }
+  .key-action { padding: 10px 8px; }
+  .board-group { display: grid; margin-top: 12px; }
+  .board-group-title { margin: 0; padding: 8px 0 4px; font-size: 13px; font-weight: 600; color: var(--text-3); }
+  .info-list { display: grid; gap: 2px; margin: 0; }
+  .info-list > div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 14px; }
+  .info-list dt { flex: none; color: var(--text-3); }
+  .info-list dd { margin: 0; text-align: right; font-weight: 600; color: var(--text); }
+  .switch { position: relative; flex: none; width: 46px; height: 28px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--sunken); transition: background 0.15s, border-color 0.15s; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px oklch(0.2 0.02 var(--h) / 0.25); transition: transform 0.15s; }
+  .switch-row[aria-checked="true"] .switch { border-color: var(--accent); background: var(--accent); }
+  .switch-row[aria-checked="true"] .switch::after { transform: translateX(18px); }
+  .switch-row:disabled { opacity: 0.55; }
+  .badge { padding: 1px 8px; border-radius: var(--r-pill); background: var(--sunken); color: var(--text-2); font-size: 12px; font-weight: 600; }
+  .seg { display: flex; flex-wrap: wrap; gap: 8px; }
+  .seg button { flex: 1 1 4.5rem; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); color: var(--text); font-weight: 500; }
+  /* 고른 칸은 DESIGN 2절대로 --text로 채운다(초록 없음). */
+  .seg button[aria-pressed="true"] { border-color: var(--text); background: var(--text); color: var(--bg); font-weight: 700; }
+  .seg[data-columns="3"] { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .choice-list { display: grid; overflow: hidden; border-radius: var(--r-lg); background: var(--surface); }
+  /* 칸 사이 구분선은 스위치 줄처럼 왼쪽 16px 안쪽에서 시작한다(칸 끝까지 닿지 않는다). */
+  .choice { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 8px 16px; border: 0; border-radius: 0; background: var(--surface); color: var(--text); text-align: left; font-size: 15px; font-weight: 400; }
+  .choice + .choice::before { content: ""; position: absolute; top: 0; left: 16px; right: 16px; height: 1px; background: var(--line); }
+  .choice[aria-checked="true"] { font-weight: 700; }
+  .choice-note { display: block; font-size: 13px; font-weight: 400; color: var(--text-3); }
+  .choice-desc { display: block; font-size: 13px; font-weight: 400; color: var(--text-2); }
+  .choice-check { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--text-3); display: grid; place-items: center; }
+  .choice[aria-checked="true"] .choice-check { border-color: var(--text); }
+  .choice[aria-checked="true"] .choice-check::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--text); }
+  .choice-chevron { flex: none; width: 8px; height: 8px; margin-right: 4px; border-top: 1.5px solid var(--text-3); border-right: 1.5px solid var(--text-3); transform: rotate(45deg); }
+  .chip-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+  .hint { padding: 10px 12px; border-radius: var(--r-md); background: var(--sunken); color: var(--text-2); font-size: 14px; }
+  .error-text { color: var(--danger); font-size: 14px; }
+
+  /* 첫 로그인 설정(온보딩). 좁은 화면은 한 칸(질문만), 넓은 화면은 왼쪽 브랜드·단계, 오른쪽 선택 영역의 분할 화면이다.
+     스크롤은 오른쪽 칸(.onb-main) 하나가 맡고 위(뒤로·진행·건너뛰기)와 아래(주 행동)는 그 안에서 붙여 둔다.
+     목록만 따로 스크롤하면 스크롤바 폭만큼 본문이 좁아져 위 줄과 좌우 끝이 어긋나기 때문이다. */
+  .onb { position: fixed; inset: 0; z-index: 60; display: grid; grid-template-columns: minmax(0, 1fr); background: var(--bg); color: var(--text); }
+  .onb-brand { display: none; }
+  .onb-main { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
+  .onb-top { position: sticky; top: 0; z-index: 2; background: var(--bg); padding-top: env(safe-area-inset-top); }
+  .onb-top-inner { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; column-gap: 12px; width: min(100%, 36rem); margin-inline: auto; padding: 8px 12px 4px 4px; }
+  .onb-top .icon-button { width: 44px; height: 44px; margin: 0; }
+  /* 첫 단계에도 뒤로 가기 칸(44px)을 비워 두어 단계가 바뀌어도 진행 막대의 폭과 위치가 같다. */
+  .onb-top-slot { display: block; width: 44px; height: 44px; }
+  /* 제목으로 옮기는 포커스는 읽어 주기 위한 것이라 눈에 보이는 링을 그리지 않는다(눌러지는 요소가 아니다). */
+  .onb-body h1:focus { outline: none; }
+  /* 진행: 5개로 끊긴 막대(끝낸 구간과 지금 구간이 채워진다). 숫자는 화면 낭독기용 속성으로만 둔다. */
+  .onb-progress { display: flex; gap: 6px; align-items: center; }
+  .onb-progress > span { flex: 1; height: 4px; border-radius: var(--r-pill); background: var(--line); transition: background 0.2s; }
+  .onb-progress > span[data-done="true"] { background: var(--text); }
+  /* 건너뛰기·닫기: 얇은 테두리의 알약 버튼. 글자만 덩그러니 있으면 눌러지는 것으로 보이지 않는다. */
+  .onb-skip, .onb-x { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 44px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); color: var(--text); font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .onb-skip { padding: 0 16px; border-radius: var(--r-md); }
+  .onb-x { width: 44px; padding: 0; }
+  .onb-skip:hover, .onb-x:hover { background: var(--sunken); }
+  .onb-skip:active, .onb-x:active { background: var(--sunken); }
+  .onb-x .i { width: 20px; height: 20px; }
+  .onb-body { flex: 1 0 auto; width: min(100%, 36rem); margin-inline: auto; padding: 8px 16px 24px; display: grid; grid-auto-rows: max-content; align-content: start; gap: 16px; }
+  /* 전역 h1은 한 줄 제목 막대용(overflow hidden, nowrap)이라 여기서는 줄바꿈을 허용하고 행이 눌려 사라지지 않게 한다. */
+  .onb-body h1 { margin: 8px 0 0; font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: -0.02em; overflow: visible; white-space: normal; text-overflow: clip; }
+  .onb-body > p, .onb-lead { margin: 0; color: var(--text-2); }
+  .onb-group { display: grid; gap: 8px; }
+  .onb .settings-head { margin: 0 0 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
+  /* 라벨은 자기 칩·목록과 한 덩어리다. 위 24px(앞에 다른 묶음이 있으면 32px), 아래 8px. 묶음의 gap이 8px이라 위 여백은 그만큼 뺀다. */
+  .onb-group > h2 { margin: 16px 0 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
+  .onb-group > h2:first-child { margin-top: 0; }
+  .onb-group > * + h2 { margin-top: 24px; }
+  .onb-foot { position: sticky; bottom: 0; z-index: 2; background: linear-gradient(to bottom, transparent, var(--bg) 14px); padding: 18px 0 0; }
+  .onb-foot-inner { width: min(100%, 36rem); margin-inline: auto; padding: 0 16px calc(12px + env(safe-area-inset-bottom)); display: grid; gap: 8px; }
+  .onb-foot .solid-button, .onb-foot .ghost-button { width: 100%; }
+  .onb .text-button { min-height: 44px; }
+  /* 4차 평가: 고르는 부품의 모양을 키워드 칩과 같은 알약으로 맞추고, 꺼진 다음 단추도 글자가 읽히게(3:1 이상) 한다. 건너뛰기는 한 단계 가볍게. */
+  .onb .seg button { border-radius: var(--r-pill); }
+  .onb-foot .solid-button:disabled { opacity: 1; border-color: var(--line); background: var(--sunken); color: var(--text-2); }
+  .onb-skip { font-weight: 500; }
+  .onb .card-note { margin: 0; color: var(--text-2); font-size: 14px; }
+  .onb .chip { min-height: 44px; }
+  .onb .chip::before { inset: 0; }
+  .onb-search { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); }
+  /* 왼쪽 브랜드 칸(넓은 화면에서만). 앱 아이콘과 이름, 한 줄 설명, 지금 몇 번째 질문인지 보여 주는 단계 목록. */
+  .onb-brand-lockup { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+  .onb-brand-lockup .brand-mark { width: 32px; height: 32px; color: var(--accent); }
+  .onb-brand-copy { display: grid; gap: 10px; }
+  .onb-brand-copy h2 { margin: 0; font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .onb-brand-copy p { margin: 0; color: var(--text-2); font-size: 15px; }
+  .onb-steplist { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+  .onb-steplist li { display: flex; align-items: center; gap: 12px; color: var(--text-3); font-size: 15px; }
+  .onb-steplist .num { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; border: 1.5px solid var(--line); border-radius: 50%; font-size: 13px; font-weight: 700; background: var(--surface); }
+  .onb-steplist li[data-state="current"] { color: var(--text); font-weight: 700; }
+  .onb-steplist li[data-state="current"] .num { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+  .onb-steplist li[data-state="done"] { color: var(--text-2); }
+  .onb-steplist li[data-state="done"] .num { border-color: var(--accent); color: var(--accent); }
+  @media (min-width: 900px) {
+    .onb { grid-template-columns: minmax(320px, 5fr) minmax(0, 7fr); }
+    .onb-brand { display: flex; flex-direction: column; justify-content: space-between; gap: 32px; padding: 40px 44px 48px; background: color-mix(in oklch, var(--accent) 8%, var(--bg)); border-right: 1px solid var(--line); }
+    .onb-top-inner { padding-top: 16px; }
+    .onb-body h1 { font-size: 21px; line-height: 28px; }
+  }
+  /* 마우스를 올리면 눌러지는 칸임이 보이게 한다. 목록 행과 같은 연한 면 색을 쓰고, 터치 기기에는 적용하지 않는다. */
+  @media (hover: hover) {
+    .onb .choice:hover:not([aria-checked="true"]), .onb .chip:hover:not([aria-pressed="true"]), .onb .seg button:hover:not([aria-pressed="true"]),
+    .onb .switch-row:hover:not(:disabled), .onb .ghost-button:hover:not(:disabled), .onb .icon-button:hover:not(:disabled) {
+      background: color-mix(in oklch, var(--sunken) 70%, var(--surface));
+    }
+    .onb .chip:hover:not([aria-pressed="true"]) { border-color: var(--text-3); }
+    .onb .solid-button:hover:not(:disabled) { background: color-mix(in oklch, var(--accent) 88%, var(--text)); }
+    .onb .text-button:hover { color: var(--text); }
+  }
+  .onb .choice:focus-visible, .onb .chip:focus-visible, .onb .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .onb .choice:focus-visible { outline-offset: -2px; }
+  @media (prefers-reduced-motion: reduce) { .switch, .switch::after, .onb-bar > span { transition: none; } }
+}
+
+/* 스크롤바: 내용이 넘칠 때만 생기고(overflow-y: auto), 얇게 그린다. 평소에는 보이지 않고 마우스를 올린 칸에서만 나타난다.
+   키보드·클릭으로 생기는 포커스(:focus-within, :focus-visible)로는 나타나지 않는다. 포커스가 있는 칸과 마우스가 있는 칸이 달라도
+   마우스가 없는 칸에 막대가 남지 않게 하려는 규칙이다. 모든 브라우저에서 표준 속성(scrollbar-width·scrollbar-color)만 쓴다.
+   크롬은 ::-webkit-scrollbar-thumb에 건 :hover 스타일을 마우스가 떠난 뒤에도 다시 그리지 않아 막대가 남았다. */
+@layer platform {
+  /* 마우스를 올릴 수 없는 터치 기기는 막대를 숨기면 스크롤되는 칸인지 알 수 없어 기본 모양을 둔다. */
+  @media (hover: hover) {
+    .sidebar, .list-pane, .detail-pane, .onb-main { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+    .sidebar:hover, .list-pane:hover, .detail-pane:hover, .onb-main:hover {
+      scrollbar-color: color-mix(in srgb, var(--text-3) 55%, transparent) transparent;
+    }
+  }
+}
+
+@layer platform {
+  /* 되돌릴 수 없는 일(계정 삭제)의 확인 버튼은 위험 색으로 구분한다. */
+  .solid-button.danger { background: var(--danger-fill); color: oklch(0.99 0.005 25); }
+}
+
+@layer platform {
+  /* 계정 삭제는 설정 맨 아래에 작은 글자로 따로 둔다. 눈에 띄지 않되 찾을 수는 있다. */
+  .delete-account { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; margin-top: 8px; padding: 8px 0 24px; }
+  .delete-account .text-button { color: var(--text-3); font-size: 13px; font-weight: 500; }
+  /* 확인은 다른 설정 묶음과 같은 면으로 감싸 한 층에 둔다. 휴대폰은 두 단추를 같은 폭으로 나누고 실행을 오른쪽(엄지 쪽)에 둔다. */
+  .delete-confirm { display: flex; flex-direction: column; gap: 8px; align-items: stretch; width: 100%; margin-top: 16px; padding: 16px var(--gutter); border-radius: var(--r-lg); background: var(--surface); }
+  .delete-confirm .inline { display: grid; grid-template-columns: 1fr 1fr; }
+  @media (min-width: 720px) {
+    .delete-confirm { margin-top: 8px; padding: 16px 0 0; border-top: 1px solid var(--line); border-radius: 0; background: none; align-items: flex-start; }
+    .delete-confirm .setting-help { max-width: 34rem; }
+    .delete-confirm .inline { display: flex; }
+    .delete-confirm .inline button { min-width: 120px; }
+  }
+  .delete-title { margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; color: var(--text); }
+  .delete-confirm .inline { margin-top: 4px; }
+}
+
+@layer platform {
+  /* 로그인 전에는 이 화면만 보인다. 토스 첫 화면처럼 위에 그림과 큰 제목, 가운데 제품 예시 하나, 엄지가 닿는 아래에 단추 하나. 움직임과 장식은 없다. */
+  .login-screen { display: flex; flex-direction: column; min-height: 100dvh; background: var(--bg); }
+  .login-screen.is-status { align-items: center; justify-content: center; }
+  .login-status { margin: 0; font-size: 14px; line-height: 20px; color: var(--text-2); }
+  .login-column { display: flex; flex: 1; flex-direction: column; width: 100%; padding: 0 20px; }
+  /* TDS Top처럼 위 그림(알림 예시), 제목, 설명을 한 묶음으로 위에 두고 단추만 아래에 둔다. */
+  .login-main { display: flex; flex: 1; flex-direction: column; padding-top: calc(48px + env(safe-area-inset-top)); }
+  .login-top { padding-top: 32px; }
+  .login-top h1 { margin: 0; font-size: 28px; line-height: 38px; font-weight: 700; letter-spacing: -0.02em; overflow: visible; text-overflow: clip; white-space: normal; word-break: keep-all; }
+  .login-sub { margin: 8px 0 0; font-size: 17px; line-height: 26px; font-weight: 500; color: var(--text-2); word-break: keep-all; text-wrap: balance; }
+  /* 알림 예시: 실제 휴대폰 알림처럼 한 장만. 목록 묶음과 같은 반경, 그림자 없이 테두리로 구분한다. */
+  /* 예시는 제목 묶음 바로 아래에 붙이고 남는 공간은 단추 위로 보낸다(위 묶음과 아래 단추 두 덩어리). */
+  .login-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; font-size: 22px; line-height: 30px; font-weight: 700; color: var(--text); }
+  .login-mark { width: 48px; height: 48px; flex: none; }
+  .login-preview { pointer-events: none; }
+  .login-preview-label { margin: 0 0 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-2); }
+  .login-note { width: 100%; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+  .login-note-head { display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 18px; color: var(--text-2); }
+  .login-note-mark { width: 18px; height: 18px; flex: none; }
+  .login-note-app { font-weight: 600; color: var(--text); }
+  .login-note-time { margin-left: auto; color: var(--text-2); }
+  .login-note-title { margin: 8px 0 0; font-size: 15px; line-height: 22px; font-weight: 600; color: var(--text); }
+  .login-note-body { margin: 2px 0 0; font-size: 14px; line-height: 20px; color: var(--text-2); }
+  .login-note-body .nowrap { white-space: nowrap; }
+  .login-bottom { padding-top: 24px; padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+  /* 구글 로그인 단추: Google 브랜드 지침의 색을 그대로 쓴다(G 로고는 원색 유지). 크기는 토스의 가장 큰 단추에 맞춘다. */
+  .google-button {
+    display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 56px;
+    border: 1px solid light-dark(#747775, #8E918F); border-radius: var(--r-md);
+    background: light-dark(#FFFFFF, #131314); color: light-dark(#1F1F1F, #E3E3E3); font-size: 17px; font-weight: 600;
+  }
+  .google-button:active:not(:disabled) { background: light-dark(#F2F2F2, #1E1F20); }
+  .google-button:disabled { opacity: 0.7; }
+  .google-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .google-button .login-g { flex: none; width: 20px; height: 20px; }
+  .login-live:empty { display: none; }
+  .login-live { margin-top: 12px; }
+  .login-error { margin: 0; font-size: 14px; line-height: 20px; text-align: center; color: var(--danger); }
+  .login-legal { margin: 14px 0 0; font-size: 13px; line-height: 20px; text-align: center; color: var(--text-2); }
+  .login-legal a { display: inline-block; padding: 12px 4px; margin: -12px -4px; color: var(--text); }
+  @media (min-width: 720px) {
+    .login-screen { align-items: center; justify-content: center; }
+    .login-column { flex: none; max-width: 420px; padding: 48px 0; }
+    .login-main { flex: none; padding-top: 0; }
+    .login-top h1 { font-size: 30px; line-height: 40px; }
+    .login-bottom { margin-top: 0; padding-bottom: 0; }
+    .login-legal { font-size: 14px; }
+  }
+}

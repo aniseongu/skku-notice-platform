@@ -1,0 +1,116 @@
+/* PC (브라우저 창, 설치 앱): 바닥까지 닿는 평평한 칸, 칸마다 따로 스크롤, 64px 머리 줄이 한 줄로 이어진다 */
+@layer desktop {
+  @media (min-width: 720px) {
+    body { overflow: hidden; }
+    .narrow-only, .tabbar { display: none !important; }
+    .wide-only { display: flex; }
+    .app {
+      display: grid; grid-template-columns: 248px minmax(0, 1fr);
+      height: calc(100dvh - var(--wco-h));
+    }
+    .sidebar, .list-pane, .detail-pane { min-height: 0; overflow-y: auto; }
+    .sidebar {
+      display: flex; flex-direction: column; padding: 0 12px 12px;
+      border-right: 1px solid var(--line); background: var(--mica);
+    }
+    .list-pane { padding-bottom: 32px; background: var(--surface); }
+
+    .pane-head {
+      display: flex; align-items: center; gap: 8px; height: var(--head-h); flex: none;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { margin: 0 -12px 12px; padding: 0 24px; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+    .brand .brand-mark { width: 32px; height: 32px; color: var(--accent); }
+    .topbar { position: sticky; top: 0; z-index: 2; padding: 0 24px; }
+    .topbar-text { min-width: 88px; }
+    .topbar h1 { font-size: 21px; line-height: 28px; font-weight: 700; }
+    .topbar .updated { font-size: 12px; line-height: 16px; }
+    .topbar .search { flex: 0 1 260px; width: 260px; min-width: 120px; height: 36px; padding: 0 12px; }
+    .icon-button { width: 36px; height: 36px; border-radius: var(--r-sm); }
+
+    /* 묶음 머리는 누르면 접고 편다. 모양은 예전 머리 글자 그대로, 오른쪽 끝에 작은 꺾쇠만 둔다. */
+    .side-head {
+      display: flex; align-items: center; justify-content: space-between; width: calc(100% - 24px);
+      margin: 20px 12px 4px; padding: 4px 0; border: 0; background: none; cursor: pointer;
+      font: inherit; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-2); text-align: left;
+    }
+    .side-head:hover { color: var(--text); }
+    .side-count { margin-left: 6px; font-weight: 500; color: var(--text-3); }
+    .side-chevron { width: 8px; height: 8px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); }
+    .side-head[aria-expanded="false"] .side-chevron { transform: rotate(-45deg); }
+    .side-group[hidden] { display: none; }
+    .side-group { display: flex; flex-direction: column; gap: 1px; }
+    .side-item {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      min-height: 40px; padding: 0 12px; border: 0; border-radius: var(--r-sm);
+      background: none; color: var(--text-2); font-size: 15px; font-weight: 500; text-align: left;
+      user-select: none; -webkit-user-select: none;
+    }
+    .side-label { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .side-label > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .side-label .i { width: 20px; height: 20px; }
+    .side-item .count { font-size: 14px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+    .side-item[aria-current="page"] { background: var(--sunken); color: var(--text); font-weight: 600; }
+    .side-item[aria-current="page"] .i { color: var(--accent); }
+    .side-item.add { color: var(--text-3); }
+    .side-foot { display: flex; flex-direction: column; gap: 1px; margin-top: auto; padding-top: 12px; }
+
+    @media (pointer: coarse) { .side-item { min-height: 44px; } }
+
+    .view-options { padding: 4px 24px 0; }
+    .list { padding: 0; }
+    .group + .group { margin-top: 8px; }
+    .group-head { min-height: 0; margin: 0; padding: 6px 24px; }
+    .group-head h2 { font-size: 12px; line-height: 16px; }
+    .rows { border-radius: 0; background: none; }
+    .row { padding: 12px 24px; }
+    .rows li .row { border-top: 1px solid var(--line); }
+
+    @media (hover: hover) {
+      .row:hover:not([aria-current="true"]) {
+        background: color-mix(in oklch, var(--sunken) 70%, var(--surface));
+      }
+      .batch-row:has(.row:hover:not([aria-current="true"])) .selection-check {
+        background: color-mix(in oklch, var(--sunken) 70%, var(--surface));
+      }
+      .side-item:hover:not([aria-current="page"]), .icon-button:hover:not(:disabled) {
+        background: color-mix(in oklch, var(--sunken) 70%, transparent);
+      }
+    }
+  }
+
+  @media (min-width: 1080px) {
+    .app { grid-template-columns: 248px minmax(0, 680px) minmax(400px, 1fr); }
+    .app.is-settings { grid-template-columns: 248px minmax(0, 1fr); }
+    .app.is-settings .detail-pane { display: none; }
+    /* 설정 머리 줄을 내용 폭(.settings 760px)에 맞춰 닫기 단추가 내용 오른쪽 끝선에 오게 한다. 아래 선은 칸 끝까지 둔다. */
+    .app.is-settings .list-pane .topbar { padding-right: max(24px, calc(100% - 760px + 24px)); }
+    .app.no-detail { grid-template-columns: 248px minmax(0, 1fr); }
+    .app.no-detail .detail-pane { display: none; }
+    .app.no-detail .list-pane { border-right: 0; }
+    .list-pane { border-right: 1px solid var(--line); }
+    .detail-pane { display: block; background: var(--bg); }
+    .detail-head { justify-content: space-between; padding: 0 32px 0 20px; }
+    .detail-actions { display: flex; gap: 8px; }
+    .detail { padding: 24px 32px; }
+    .detail-head .solid-button, .detail-head .ghost-button { min-height: 36px; padding: 0 14px; font-size: 14px; }
+    .detail-head .save-button { width: 36px; height: 36px; border-radius: var(--r-md); }
+    /* 넓은 목록 행: [메타 열 120px] [제목과 판정] [D-day] */
+    .row {
+      grid-template-columns: 120px minmax(0, 1fr) 48px;
+      grid-template-areas: "meta title dday" "meta reason dday";
+      gap: 2px 24px; padding: 12px 24px;
+    }
+    .row:has(> .dday) .title { margin-top: 0; }
+    /* 판정 줄이 없는 행은 그 줄 자리(18px)를 남기지 않는다. 그래서 행 높이가 제목 줄 수만 따른다. */
+    .row:has(> .sub:empty) { grid-template-areas: "meta title dday"; }
+    .row .meta { min-width: 0; flex-direction: column; flex-wrap: nowrap; gap: 0; padding-top: 2px; }
+    .row .meta span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row .meta .board { color: var(--text-2); font-weight: 600; }
+    .row.read .meta .board { color: var(--text-3); font-weight: 500; }
+    .row .title { font-size: 15px; line-height: 22px; }
+    .row .dday { align-self: start; padding-top: 2px; text-align: right; }
+    /* 판정은 한 줄(ux-rules 2절). 넘치면 줄여서 행 높이가 제목 줄 수만 따르게 한다. */
+    .row .sub { font-size: 13px; line-height: 19px; margin-top: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
+}
