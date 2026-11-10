@@ -3,7 +3,7 @@
 import os
 import re
 import time
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -75,6 +75,28 @@ class NoticeStore:
         ids = ",".join(f'"{source_id}/{n}"' for n in article_numbers)
         rows = self._request("GET", "platform_notices", params={"id": f"in.({ids})", "select": "*"}).json()
         return {row["id"]: row for row in rows}
+
+    def recheck_pool(self, source_ids: list[str], recent_since: str) -> tuple[list[dict], set[str]]:
+        """다시 읽을 후보 글과 "중요한 글" 번호(누군가 저장했거나 누군가의 AI 판정이 관련 있음인 글)."""
+        cols = ("id,source_id,article_no,title,category,url,posted_on,pinned,deadline,first_seen,fetched_at,"
+                "body,body_html,attachments,images,changed_at,change_kind,previous_title")
+        important = set()
+        for table, params in (
+            ("user_notice_states", {"is_saved": "eq.true", "select": "notice_id", "limit": "5000"}),
+            ("user_notice_judgments", {"verdict": "eq.relevant", "select": "notice_id", "limit": "5000"}),
+        ):
+            important |= {row["notice_id"] for row in self._request("GET", table, params=params).json()}
+        sources = ",".join(source_ids)
+        rows = self._request("GET", "platform_notices", params={
+            "source_id": f"in.({sources})", "fetched_at": "not.is.null", "first_seen": f"gte.{recent_since}",
+            "select": cols, "limit": "500"}).json()
+        have = {row["id"] for row in rows}
+        wanted = sorted(i for i in important if i not in have and i.split("/")[0] in source_ids)[:200]
+        if wanted:
+            ids = ",".join(f'"{i}"' for i in wanted)
+            rows += self._request("GET", "platform_notices", params={
+                "id": f"in.({ids})", "fetched_at": "not.is.null", "select": cols}).json()
+        return rows, important
 
     def subscribed_source_ids(self) -> set[str]:
         """Boards that at least one user follows. Only these on-demand boards are collected."""
@@ -165,25 +187,6 @@ def run_collection(
             }
             store.upsert("platform_sources", [source_row])
             updates = []
-            # Recheck at most one old body per board per run, including edits with unchanged titles.
-            # 새 글은 작성자가 곧바로 고치고 포스터를 바꾸므로 먼저, 더 자주 다시 읽는다.
-            due = []
-            for notice in notices:
-                old = previous.get(f"{source['id']}/{notice.article_no}", {})
-                try:
-                    checked = datetime.fromisoformat(old.get("fetched_at") or "")
-                    if not checked.tzinfo:
-                        continue
-                    age = now - checked
-                    recent = False
-                    if old.get("first_seen"):
-                        seen = datetime.fromisoformat(old["first_seen"])
-                        recent = bool(seen.tzinfo) and now - seen < RECHECK_RECENT_WINDOW
-                    if age >= RECHECK_INTERVAL or (recent and age >= RECHECK_RECENT_INTERVAL):
-                        due.append((not recent, checked, notice.article_no))
-                except (TypeError, ValueError):
-                    pass
-            recheck_number = min(due)[2] if due else None
             for notice in notices:
                 notice_id = f"{source['id']}/{notice.article_no}"
                 old = previous.get(notice_id, {})
@@ -206,9 +209,7 @@ def run_collection(
                     old.get(key) != value for key, value in metadata.items() if key != "deadline"
                 )
                 title_changed = bool(old) and old.get("title") != notice.title
-                needs_detail = (
-                    not old.get("fetched_at") or title_changed or notice.article_no == recheck_number
-                )
+                needs_detail = not old.get("fetched_at") or title_changed
                 if not changed and not needs_detail:
                     continue
                 row = {
@@ -268,16 +269,83 @@ def run_collection(
         except (FetchError, ParseError, StoreError, KeyError, TypeError, ValueError) as exc:
             failed += 1
             print(f"{source['id']}: 수집 실패 ({type(exc).__name__})", flush=True)
+    try:
+        rechecked = run_recheck(sources, store, settings, now)
+        if rechecked:
+            print(f"본문 다시 읽기 {rechecked}건", flush=True)
+    except (StoreError, KeyError, TypeError, ValueError) as exc:
+        print(f"본문 다시 읽기 실패 ({type(exc).__name__})", flush=True)
     return total, failed
 
 
-# 오래된 글은 하루에 한 번, 새 글은 3시간마다 본문을 다시 읽는다(포스터 교체 대응, 보드당 1건은 그대로).
-RECHECK_INTERVAL = timedelta(hours=24)
+# 원본(alert)과 같은 재확인: 실행당 최대 3건, 중요한 글(저장했거나 관련 있음)은 12시간마다 먼저,
+# 올라온 지 48시간 안의 새 글은 3시간마다(최신 글 먼저). 마감이 지난 글은 읽지 않는다.
+RECHECK_PER_RUN = 3
+RECHECK_IMPORTANT_INTERVAL = timedelta(hours=12)
 RECHECK_RECENT_INTERVAL = timedelta(hours=3)
 RECHECK_RECENT_WINDOW = timedelta(hours=48)
 EXTERNAL_INTERVAL = timedelta(minutes=55)
 EXTERNAL_DETAILS_PER_RUN = 5
 EXTERNAL_DETAIL_WINDOW = timedelta(days=45)
+
+
+def _when(value: object) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed.tzinfo else None
+
+
+def recheck_candidates(rows: list[dict], important: set[str], now: datetime) -> list[dict]:
+    """다시 읽을 글을 정한다(원본 _recheck_candidates와 같은 순서): 중요한 글, 그다음 갓 올라온 글(최신순)."""
+    urgent: list[tuple[datetime, str, dict]] = []
+    fresh: list[tuple[datetime, str, dict]] = []
+    for row in rows:
+        fetched, seen = _when(row.get("fetched_at")), _when(row.get("first_seen"))
+        deadline = _when(row.get("deadline"))
+        if fetched is None or ".skku.edu/" not in str(row.get("url", "")) or (deadline and deadline < now):
+            continue
+        age = now - fetched
+        is_recent = seen is not None and now - seen < RECHECK_RECENT_WINDOW
+        if row["id"] in important and age >= RECHECK_IMPORTANT_INTERVAL:
+            urgent.append((fetched, row["id"], row))
+        elif is_recent and age >= RECHECK_RECENT_INTERVAL:
+            fresh.append((seen, row["id"], row))
+    urgent.sort(key=lambda item: (item[0], item[1]))
+    fresh.sort(key=lambda item: item[1])
+    fresh.sort(key=lambda item: item[0], reverse=True)
+    return [row for _, _, row in (urgent + fresh)][:RECHECK_PER_RUN]
+
+
+def run_recheck(sources: list[dict], store: NoticeStore, settings: dict, now: datetime) -> int:
+    """고쳐졌을 수 있는 글의 본문을 다시 읽고, 바뀌었으면 "수정됨"으로 기록한다."""
+    school = [s["id"] for s in sources if not s.get("external")]
+    if not school:
+        return 0
+    stamp = now.astimezone(KST).isoformat()
+    rows, important = store.recheck_pool(school, (now - RECHECK_RECENT_WINDOW).astimezone(UTC).isoformat())
+    agent, timeout = settings["user_agent"], float(settings["timeout_seconds"])
+    gap = max(1.5, float(settings.get("request_gap_seconds", 1.5)))
+    done = 0
+    for row in recheck_candidates(rows, important, now):
+        time.sleep(gap)
+        try:
+            detail = parse_detail(fetch_detail(row["url"], agent, timeout), row["url"])
+        except (FetchError, ParseError, ValueError):
+            continue
+        attachments = [{"name": n, "url": u, "type": t, "size": s} for n, u, t, s in detail.attachments]
+        changed = (
+            row.get("body") != detail.body_text or row.get("body_html") != detail.body_html
+            or row.get("attachments", []) != attachments or row.get("images", []) != list(detail.images)
+        )
+        update = {**row, "body": detail.body_text, "body_html": detail.body_html, "attachments": attachments,
+                  "images": list(detail.images), "fetched_at": stamp}
+        if changed:
+            update.update({"changed_at": stamp, "change_kind": "본문", "previous_title": None})
+        store.upsert("platform_notices", [update])
+        done += 1
+    return done
 
 
 def run_external_collection(settings: dict, store: NoticeStore, now: datetime, post=None) -> tuple[int, int]:

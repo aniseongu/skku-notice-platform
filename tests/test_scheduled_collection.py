@@ -31,6 +31,11 @@ class MemoryStore:
         self.sources = {}
         self.rows = {}
         self.writes = []
+        self.important = set()
+
+    def recheck_pool(self, source_ids, recent_since):
+        rows = [r.copy() for r in self.rows.values() if r["source_id"] in source_ids and r.get("fetched_at")]
+        return rows, set(self.important)
 
     def source(self, source_id):
         return self.sources.get(source_id)
@@ -187,6 +192,7 @@ def test_one_failed_board_does_not_stop_other_boards(monkeypatch):
 
 def test_old_body_is_rechecked_and_changes_are_recorded(monkeypatch):
     store = MemoryStore()
+    store.important = {"school/123"}
     store.rows["school/123"] = {
         "id": "school/123",
         "source_id": "school",
@@ -222,53 +228,38 @@ def test_old_body_is_rechecked_and_changes_are_recorded(monkeypatch):
     assert store.rows["school/123"]["first_seen"] == "2026-11-01T00:00:00+09:00"
 
 
-def test_rechecks_only_oldest_body_per_board(monkeypatch):
-    from dataclasses import replace
+def test_old_notice_is_not_rechecked_unless_it_is_important_or_recent(monkeypatch):
+    # 원본(alert)처럼 중요하지도 새 글도 아닌 글은 다시 읽지 않는다.
+    assert _recheck_requests(monkeypatch, [("1", 200, 100), ("2", 300, 50)]) == []
 
-    store = MemoryStore()
-    second = replace(
-        NOTICE, article_no="124", title="다른 공지", url="https://www.skku.edu/notice?articleNo=124"
+
+def test_important_notices_are_rechecked_first_and_at_most_three_per_run(monkeypatch):
+    requested = _recheck_requests(
+        monkeypatch,
+        [("1", 10, 4), ("2", 12, 5), ("3", 9, 4), ("4", 8, 4), ("5", 300, 20), ("6", 400, 30)],
+        important={"school/5", "school/6"},
     )
-    for notice, checked in [(NOTICE, "2026-11-01T00:00:00+09:00"), (second, "2026-11-02T00:00:00+09:00")]:
-        store.rows[f"school/{notice.article_no}"] = {
-            "id": f"school/{notice.article_no}",
-            "source_id": "school",
-            "article_no": notice.article_no,
-            "title": notice.title,
-            "category": notice.category,
-            "url": notice.url,
-            "posted_on": notice.posted_on.isoformat(),
-            "pinned": False,
-            "deadline": None,
-            "first_seen": checked,
-            "fetched_at": checked,
-            "body": "본문",
-            "body_html": "<p>본문</p>",
-            "attachments": [],
-            "images": [],
-        }
-    requested = []
-    monkeypatch.setattr(job.time, "sleep", lambda _: None)
-    monkeypatch.setattr(job, "fetch_list", lambda *_: "list")
-    monkeypatch.setattr(job, "parse_list", lambda *_: [NOTICE, second])
-    monkeypatch.setattr(job, "fetch_detail", lambda url, *_: requested.append(url) or "detail")
-    monkeypatch.setattr(
-        job,
-        "parse_detail",
-        lambda *_: SimpleNamespace(body_text="본문", body_html="<p>본문</p>", attachments=(), images=()),
-    )
-    assert job.run_collection(SETTINGS, store, NOW) == (2, 0)
-    assert requested == [NOTICE.url]
-    assert store.rows["school/123"]["change_kind"] is None
-    assert store.rows["school/124"]["fetched_at"] == "2026-11-02T00:00:00+09:00"
+    # 중요한 글(오래 전에 읽은 것부터) 먼저, 남은 자리는 새 글(최신 first_seen 먼저).
+    assert requested == [
+        "https://www.skku.edu/notice?articleNo=6",
+        "https://www.skku.edu/notice?articleNo=5",
+        "https://www.skku.edu/notice?articleNo=4",
+    ]
 
 
-def _recheck_requests(monkeypatch, specs):
+def test_important_notice_waits_twelve_hours_and_passed_deadlines_are_skipped(monkeypatch):
+    assert _recheck_requests(monkeypatch, [("1", 300, 11)], important={"school/1"}) == []
+    assert len(_recheck_requests(monkeypatch, [("1", 300, 13)], important={"school/1"})) == 1
+    assert _recheck_requests(monkeypatch, [("1", 10, 4)], deadline=(NOW.replace(day=1)).isoformat()) == []
+
+
+def _recheck_requests(monkeypatch, specs, important=frozenset(), deadline=None):
     """specs: [(article_no, first_seen_hours_ago, fetched_hours_ago)] -> requested detail URLs."""
     from dataclasses import replace
     from datetime import timedelta
 
     store = MemoryStore()
+    store.important = set(important)
     notices = []
     for no, seen_h, fetched_h in specs:
         n = replace(NOTICE, article_no=no, title=f"공지{no}", url=f"https://www.skku.edu/notice?articleNo={no}")
@@ -276,7 +267,7 @@ def _recheck_requests(monkeypatch, specs):
         store.rows[f"school/{no}"] = {
             "id": f"school/{no}", "source_id": "school", "article_no": no, "title": n.title,
             "category": n.category, "url": n.url, "posted_on": n.posted_on.isoformat(),
-            "pinned": False, "deadline": None,
+            "pinned": False, "deadline": deadline,
             "first_seen": (NOW - timedelta(hours=seen_h)).isoformat(),
             "fetched_at": (NOW - timedelta(hours=fetched_h)).isoformat(),
             "body": "본문", "body_html": "<p>본문</p>", "attachments": [], "images": [],
