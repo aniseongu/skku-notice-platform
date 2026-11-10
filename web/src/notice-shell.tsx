@@ -1,6 +1,6 @@
 // 앱 화면. 상태와 동작은 AppController가 맡고, 이 파일은 구독해서 그리기만 한다.
 // 그림자 DOM을 쓰지 않아 전역 토큰과 글꼴을 그대로 받는다. 학교 글자는 React가 자동으로 이스케이프한다.
-import type { AiPreferences, AiProvider } from './ai-providers';
+import { aiConnectModel } from './ai-connect';
 import { visibleTracks } from './graduation-assessment';
 import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { applyBoardOrder } from './board-order';
@@ -202,13 +202,7 @@ function settingsModel(app: AppController) {
     profile: app.profile, profileStatus: app.profileStatus, profileMessage: app.profileMessage, profileError: app.profileError,
     saveProfile: (profile: UserProfile) => { void app.saveProfile(profile); },
     openOnboarding: () => app.openOnboarding(),
-    byok: { available: app.byokOn, loading: app.byokLoading, busy: app.byokBusy, error: app.byokError, status: app.byokStatus, backfill: app.byokBackfill,
-      register: (apiKey: string) => { void app.registerKey(apiKey); }, remove: () => { void app.removeKey(); },
-      ai: { keys: app.aiKeys, prefs: app.aiPrefs, busy: app.aiBusy, error: app.aiError, gemini: !!app.byokStatus && !app.byokStatus.disabled,
-        register: (provider: AiProvider, key: string) => { void app.registerAi(provider, key); }, remove: (provider: AiProvider) => { void app.removeAi(provider); },
-        savePrefs: (prefs: AiPreferences) => { void app.updateAiPrefs(prefs); } },
-      canvas: app.canvasStatus, canvasBusy: app.canvasBusy, canvasError: app.canvasError,
-      registerCanvas: (token: string) => { void app.registerCanvas(token); }, removeCanvas: () => { void app.removeCanvas(); } },
+    byok: aiConnectModel(app),
     account: { busy: app.accountBusy, error: app.accountError, remove: () => { void app.deleteAccount(); } },
     devicesInfo: { devices: app.devices, thisId: app.thisDeviceId, summaryTime: app.summaryTime, hasCanvasToken: !!app.canvasStatus, busy: app.devicesBusy, error: app.devicesError,
       refresh: () => { void app.refreshDevices(); }, setMode: (mode: string) => { void app.setCanvasMode(mode as CanvasMode); }, remove: (id: string) => { void app.removeDevice(id); }, rename: (id: string, name: string) => app.renameDevice(id, name),

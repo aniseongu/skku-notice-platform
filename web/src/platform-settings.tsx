@@ -3,8 +3,9 @@
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
-import { aiModeLabel, PROVIDER_GUIDE, looksLikeAiKey, type AiKeyStatus, type AiPreferences, type AiProvider } from './ai-providers';
-import { backfillNote, looksLikeGeminiKey, type ByokStatus, type CanvasStatus } from './byok';
+import { AiConnect } from './ai-connect';
+import type { AiKeyStatus, AiPreferences, AiProvider } from './ai-providers';
+import { type ByokStatus, type CanvasStatus } from './byok';
 import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, validDeviceName, type CanvasMode, type Device } from './devices';
 import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
 import { programLabel } from './skku-programs';
@@ -639,13 +640,13 @@ function Profile({ model }: { model: SettingsModel }) {
             options={[...ADMISSION_YEARS, OLD_ADMISSION_YEAR].map((value) => [value, value === OLD_ADMISSION_YEAR ? '2016 이전' : `${value}`] as const)}
             onPick={(admissionYear) => save({ admissionYear })} /></Setting>
       </> : null}
-      <Setting name="학교 신3품 인턴십" help="채웠다면 인턴 공고에서 안 보여 드려요. 고르지 않으면 아직으로 봐요">
-        <Choice label="학교 신3품 인턴십" value={threePAnswer(profile)} disabled={!ready}
+      <Setting name="3품 인턴십" help="채웠다면 인턴 공고에서 안 보여 드려요. 고르지 않으면 아직으로 봐요">
+        <Choice label="3품 인턴십" value={threePAnswer(profile)} disabled={!ready}
           options={[['done', '채웠어요'], ['todo', '아직이에요'], ['no', '이 영역은 안 해요']] as const}
           onPick={(value) => save(threePFields(value as ThreePAnswer))} /></Setting>
       {isSoftwareOriginal(profile) ? <>
-        <Setting name="학과 졸업 인턴십" help="채웠다면 인턴 공고에서 안 보여 드려요">
-          <Choice label="학과 졸업 인턴십" value={profile.deptInternshipDone === null ? null : profile.deptInternshipDone ? 'yes' : 'no'} disabled={!ready}
+        <Setting name="솦 인턴십" help="채웠다면 인턴 공고에서 안 보여 드려요">
+          <Choice label="솦 인턴십" value={profile.deptInternshipDone === null ? null : profile.deptInternshipDone ? 'yes' : 'no'} disabled={!ready}
             options={[['yes', '채웠어요'], ['no', '아직이에요']] as const}
             onPick={(value) => save({ deptInternshipDone: value === 'yes' })} /></Setting>
       </> : null}
@@ -711,57 +712,6 @@ function SecretRow({ name, help, placeholder, status, loading, busy, error, onRe
   </Setting>;
 }
 
-function GeminiRow({ model }: { model: SettingsModel }) {
-  const { byok } = model;
-  const guide = <Guide label="받는 방법" steps={[
-    <>{ext('https://aistudio.google.com/apikey', 'Google AI Studio의 API 키 화면')}을 열고 Google 계정으로 로그인해요</>,
-    '"API 키 만들기"를 누르고, 프로젝트를 고르라고 하면 새 프로젝트를 만들어요',
-    '만들어진 키를 붙여 넣고 "저장하기"를 눌러요. 저장하면 Gemini에 확인한 뒤 암호화해 서버에만 보관해요',
-    '무료 등급은 보낸 내용이 Google 제품 개선에 쓰일 수 있어요. 키는 나에게 맞는 공지와 인턴 공고를 고르는 데만 써요',
-  ]} />;
-  const help = '나에게 맞는 공지를 알림으로 보내고, 공지 요약과 영어 공지 번역을 만드는 데 써요';
-  if (!byok?.available) {
-    return <KeyRow name="Gemini 키" help={help} state="준비 중" guide={null}>
-      <span className="field-note">지금은 키를 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
-    </KeyRow>;
-  }
-  return <SecretRow name="Gemini 키" help={help} placeholder="Google AI Studio에서 만든 키" status={byok.status} loading={byok.loading} busy={byok.busy}
-    error={byok.error} onRegister={byok.register} onRemove={byok.remove} guide={guide} valid={looksLikeGeminiKey}
-    note={backfillNote(byok.backfill, !!byok.status?.disabled)} />;
-}
-
-function AiProviderRow({ model, provider }: { model: SettingsModel; provider: AiProvider }) {
-  const ai = model.byok?.ai;
-  const info = PROVIDER_GUIDE[provider];
-  if (!ai || !model.byok?.available) return null;
-  const status = ai.keys.find((key) => key.provider === provider) ?? null;
-  const guide = <Guide label="받는 방법" steps={[ext(info.url, info.steps[0]), ...info.steps.slice(1)]} />;
-  return <SecretRow name={`${info.name} 키`} help={`${info.blurb}. 연결하지 않아도 기본 분석은 쓸 수 있어요`} placeholder={info.placeholder}
-    status={status} loading={model.byok.loading} busy={ai.busy} error={ai.error} guide={guide} valid={looksLikeAiKey}
-    onRegister={(value) => ai.register(provider, value)} onRemove={() => ai.remove(provider)} />;
-}
-
-function AiModeRow({ model }: { model: SettingsModel }) {
-  const ai = model.byok?.ai;
-  if (!ai || !model.byok?.available) return null;
-  const connected = ai.keys.filter((key) => !key.disabled).length + (ai.gemini ? 1 : 0);
-  const { prefs } = ai;
-  const many = connected > 1;
-  return <Setting name="AI 분석" help={aiModeLabel(connected, prefs)}>
-    <Choice label="AI 분석" value={prefs.aiEnabled ? 'on' : 'off'} disabled={ai.busy}
-      options={[['on', '켜기'], ['off', '끄기']] as const} onPick={(value) => ai.savePrefs({ ...prefs, aiEnabled: value === 'on' })} />
-    {many ? <>
-      <Choice label="여러 키 사용 방식" value={prefs.routingMode} disabled={ai.busy || !prefs.aiEnabled}
-        options={[['manual', '직접 고르기'], ['auto', '자동 선택']] as const}
-        onPick={(value) => ai.savePrefs({ ...prefs, routingMode: value, autoRoutingConsent: value === 'auto' })} />
-      <p className="field-note">자동 선택을 켜면 내가 등록한 키 중 쓸 수 있는 곳으로 바뀔 수 있고, 분석할 공지 글이 그 업체로 보내져요</p>
-    </> : null}
-    <Choice label="요금" value={prefs.paidOptIn ? 'paid' : 'free'} disabled={ai.busy || !prefs.aiEnabled}
-      options={[['free', '무료만 쓰기'], ['paid', '유료도 허용']] as const} onPick={(value) => ai.savePrefs({ ...prefs, paidOptIn: value === 'paid' })} />
-    <p className="field-note">무료만 쓰기가 기본이에요. 키를 등록해도 유료 모델은 허용하기 전에는 쓰지 않아요</p>
-  </Setting>;
-}
-
 function CanvasRow({ model }: { model: SettingsModel }) {
   const { byok } = model;
   const help = '아이캠퍼스의 강의와 과제 마감을 알려드리는 데 써요';
@@ -787,10 +737,7 @@ function Keys({ model }: { model: SettingsModel }) {
   return <div className="settings">
     <Back model={model} />
     <Section id="s-keys" title="연결 키">
-      <AiModeRow model={model} />
-      <GeminiRow model={model} />
-      <AiProviderRow model={model} provider="groq" />
-      <AiProviderRow model={model} provider="openrouter" />
+      {model.byok ? <div className="flex flex-col gap-3 p-4"><h3 className="m-0 text-[17px] font-semibold text-ink">AI 연결</h3><AiConnect byok={model.byok} /></div> : null}
       <CanvasRow model={model} />
     </Section>
   </div>;

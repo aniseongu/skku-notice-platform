@@ -224,17 +224,18 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await withApp(page, { authUserId: 'account-a', byokOn: false, registerKey: 'fn:register', removeKey: 'fn:remove', registerCanvas: 'fn:registerCanvas', removeCanvas: 'fn:removeCanvas', profileStatus: 'ready', onboardingDismissed: true });
   // 서버 기능이 아직 없을 때도 줄은 보이고 이유를 알려 준다.
   await expect(screen.getByRole('heading', { name: '연결 키' })).toBeVisible();
-  await expect(screen.locator('.setting', { hasText: 'Gemini 키' }).getByText('준비 중')).toBeVisible();
+  await expect(screen.getByText('지금은 키를 연결할 수 없어요')).toBeVisible();
   await expect(screen.locator('.setting', { hasText: '아이캠퍼스 토큰' }).getByText('준비 중')).toBeVisible();
   await expect(screen.getByLabel('Gemini 키', { exact: true })).toHaveCount(0);
   // 학기·병역 같은 프로필은 프로필 설정에서 바꾼다. 연결 키 쪽에는 두지 않는다.
   await expect(screen.getByRole('radio', { name: '2학기' })).toHaveCount(0);
   await expect(screen.getByRole('radio', { name: '복무 전' })).toHaveCount(0);
   await withApp(page, { byokOn: true, byokLoading: false, byokStatus: null });
-  await expect(screen.locator('.setting', { hasText: 'Gemini 키' }).getByText('미설정')).toBeVisible();
+  await expect(screen.locator('[data-provider="gemini"]').getByText('연결 안 됨')).toBeVisible();
+  await expect(screen.getByText('연결하지 않아도 괜찮아요')).toBeVisible();
   await expect(screen.locator('.setting', { hasText: '아이캠퍼스 토큰' }).getByText('미설정')).toBeVisible();
-  await screen.getByRole('button', { name: 'Gemini 키 입력하기' }).click();
-  const save = screen.getByRole('button', { name: '저장하기' });
+  await screen.getByRole('button', { name: 'Gemini 키 연결하기' }).click();
+  const save = screen.getByRole('button', { name: '연결하기', exact: true });
   await expect(save).toBeDisabled();
   const key = `AIza${'D'.repeat(35)}`;
   const input = screen.getByLabel('Gemini 키', { exact: true });
@@ -243,17 +244,16 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await screen.getByRole('button', { name: '보기' }).click();
   await expect(input).toHaveAttribute('type', 'text');
   await screen.getByRole('button', { name: '숨기기' }).click();
-  await screen.getByText('받는 방법').click();
-  await expect(screen.getByRole('link', { name: /Google AI Studio/ })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
+  await expect(screen.getByRole('link', { name: 'Gemini에서 키 만들기' })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
   await save.click();
   expect(await calls(page)).toEqual([['register', key]]);
   await withApp(page, { byokStatus: { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 } });
-  await expect(screen.getByText('저장됨 ····DDDD')).toBeVisible();
+  await expect(screen.getByText('연결됨 ····DDDD')).toBeVisible();
   expect(await screen.innerText()).not.toContain(key);
   await expect(screen.getByLabel('Gemini 키', { exact: true })).toHaveCount(0);
   await withApp(page, { byokStatus: { keyHint: 'DDDD', model: 'm', disabled: true, lastError: 'Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요.', usedToday: 0 } });
   await expect(screen.getByRole('alert')).toContainText('다시 등록');
-  await screen.getByRole('button', { name: 'Gemini 키 지우기' }).click();
+  await screen.getByRole('button', { name: 'Gemini 키 연결 끊기' }).click();
   expect(await calls(page)).toEqual([['remove']]);
   // 아이캠퍼스 토큰도 같은 흐름이다. 형식이 맞지 않으면 저장할 수 없다.
   await withApp(page, {});
@@ -715,9 +715,9 @@ test('core settings tasks finish within their click budget and in the expected o
 
   // 1) Gemini 키: 연결 키 → 입력하기 → 저장하기 = 3클릭
   await click('연결 키', screen.getByRole('link', { name: /연결 키/ }));
-  await click('Gemini 입력하기', screen.getByRole('button', { name: 'Gemini 키 입력하기' }));
+  await click('Gemini 연결하기', screen.getByRole('button', { name: 'Gemini 키 연결하기' }));
   await screen.getByLabel('Gemini 키', { exact: true }).fill(`AQ.${'a'.repeat(50)}`);
-  await click('Gemini 저장하기', screen.getByRole('button', { name: '저장하기' }));
+  await click('Gemini 연결 확정', screen.getByRole('button', { name: '연결하기', exact: true }));
   expect(log.length).toBe(3);
   expect((await calls(page))[0][0]).toBe('registerKey');
   // 2) 같은 쪽에서 아이캠퍼스 토큰: 입력하기 → 저장하기 = 추가 2클릭(쪽 이동 없음)
@@ -1095,8 +1095,8 @@ test('software original major is asked for the admission year and the internship
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('button', { name: '2022', exact: true }).click();
   await expect(dialog.getByRole('button', { name: '다음' })).toBeEnabled();
-  await dialog.getByRole('group', { name: '학과 졸업 인턴십' }).getByRole('button', { name: '아직이에요' }).click();
-  await dialog.getByRole('group', { name: '학교 신3품 인턴십' }).getByRole('button', { name: '이 영역은 안 해요' }).click();
+  await dialog.getByRole('group', { name: '솦 인턴십' }).getByRole('button', { name: '아직이에요' }).click();
+  await dialog.getByRole('group', { name: '3품 인턴십' }).getByRole('button', { name: '이 영역은 안 해요' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();

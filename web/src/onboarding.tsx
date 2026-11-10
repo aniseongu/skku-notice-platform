@@ -1,5 +1,6 @@
 // 첫 로그인 설정. 한 화면에 한 질문, 모두 골라서 답하고, 이전·건너뛰기가 항상 있다.
 // 순서: 주전공 → 복수전공(선택) → 학년·재학 상태·병역 → 받을 게시판·키워드 → 기타 게시판(부트캠프 등) → 알림.
+import { AiConnect, aiConnectModel } from './ai-connect';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { AppController } from './app-controller';
 import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR } from './profile';
@@ -66,7 +67,6 @@ export function Onboarding({ app }: { app: AppController }) {
   const [doubleAnswer, setDoubleAnswer] = useState<DoubleAnswer>(() => (draft.programs.length > 1 ? 'yes' : null));
   const [changingPrimary, setChangingPrimary] = useState(() => app.profile.programs.length === 0);
   const [saved, setSaved] = useState(false);
-  const [aiKey, setAiKey] = useState('');
   const heading = useRef<HTMLHeadingElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const manual = app.onboardingManual;
@@ -109,7 +109,7 @@ export function Onboarding({ app }: { app: AppController }) {
   const pushAsk = app.pushStatus === 'off';
 
   const afterAi = () => { if (app.pushStatus === 'off') go('notify'); else app.closeOnboarding(); };
-  const save = async () => { if (await app.finishOnboarding(draft)) { setSaved(true); if (app.byokOn && !app.byokStatus) go('ai'); else afterAi(); } };
+  const save = async () => { if (await app.finishOnboarding(draft)) { setSaved(true); if (app.byokOn && !app.byokStatus && app.aiKeys.length === 0) go('ai'); else afterAi(); } };
 
   let title = '', lead = '', body: React.ReactNode = null, foot: React.ReactNode = null;
   if (step === 'primary') {
@@ -166,14 +166,14 @@ export function Onboarding({ app }: { app: AppController }) {
         <p className="card-note">입학 연도마다 졸업요건이 달라서 물어봐요. 학번 전체는 받지 않아요</p>
         <Segmented label="입학 연도" options={ADMISSION} columns={4} value={draft.admissionYear} onChange={(admissionYear) => setDraft({ ...draft, admissionYear })} />
       </> : null}
-      <h2>학교 신3품 인턴십</h2>
+      <h2>3품 인턴십</h2>
       <p className="card-note">글로벌·창의·AI·인턴십 중 인턴십 영역을 채웠나요? 채웠다면 인턴 공고에서 이 요건을 빼 드려요</p>
-      <Segmented label="학교 신3품 인턴십" options={THREE_P} columns={3} value={threePAnswer(draft)}
+      <Segmented label="3품 인턴십" options={THREE_P} columns={3} value={threePAnswer(draft)}
         onChange={(value) => setDraft({ ...draft, ...threePFields(value as ThreePAnswer) })} />
       {isSoftwareOriginal({ programs: draft.programs }) ? <>
-        <h2>학과 졸업 인턴십</h2>
-        <p className="card-note">학과 졸업 인턴십을 마쳤나요? 마쳤다면 인턴 공고에서 이 요건을 빼 드려요</p>
-        <Segmented label="학과 졸업 인턴십" options={DEPT_DONE} columns={2}
+        <h2>솦 인턴십</h2>
+        <p className="card-note">솦 인턴십을 마쳤나요? 마쳤다면 인턴 공고에서 이 요건을 빼 드려요</p>
+        <Segmented label="솦 인턴십" options={DEPT_DONE} columns={2}
           value={draft.deptInternshipDone === null ? null : draft.deptInternshipDone ? 'yes' : 'no'}
           onChange={(value) => setDraft({ ...draft, deptInternshipDone: value === 'yes' })} />
       </> : null}
@@ -208,19 +208,13 @@ export function Onboarding({ app }: { app: AppController }) {
     foot = <button type="button" className="solid-button" disabled={app.onboardingBusy} onClick={() => { void save(); }}>
       {app.onboardingBusy ? '저장하고 있어요' : app.onboardingError ? '다시 시도하기' : '다음'}</button>;
   } else if (step === 'ai') {
-    title = 'Gemini 키가 있나요?';
-    lead = '키를 넣으면 나에게 맞는 공지를 골라 알리고 요약해 드려요. 나중에 설정에서 넣어도 돼요';
-    body = <div className="onb-group">
-      <input className="input" type="password" autoComplete="off" spellCheck={false} aria-label="Gemini 키" placeholder="Google AI Studio에서 만든 키를 붙여 넣어요"
-        value={aiKey} disabled={app.byokBusy} onChange={(event) => setAiKey(event.currentTarget.value.trim())} />
-      <p className="card-note">aistudio.google.com/apikey에서 무료로 만들 수 있어요. 저장하면 Gemini에 확인한 뒤 암호화해 서버에만 보관해요</p>
-      {app.byokError ? <p className="error-text" role="alert">{app.byokError}</p> : null}
-    </div>;
-    foot = <>
-      <button type="button" className="solid-button" disabled={app.byokBusy || !aiKey} onClick={() => { void app.registerKey(aiKey).then(() => { if (app.byokStatus) afterAi(); }); }}>
-        {app.byokBusy ? '확인하고 있어요' : '저장하기'}</button>
-      <button type="button" className="ghost-button" disabled={app.byokBusy} onClick={afterAi}>나중에 할게요</button>
-    </>;
+    title = 'AI를 연결할까요?';
+    lead = '연결하지 않아도 공지와 알림은 똑같이 써요. 나중에 설정에서 연결해도 돼요';
+    const connected = !!app.byokStatus || app.aiKeys.length > 0;
+    body = <div className="onb-group"><AiConnect byok={aiConnectModel(app)} /></div>;
+    foot = connected
+      ? <button type="button" className="solid-button" onClick={afterAi}>다음</button>
+      : <button type="button" className="ghost-button" disabled={app.byokBusy || app.aiBusy} onClick={afterAi}>나중에 할게요</button>;
   } else {
     title = '알림을 켜 둘까요?';
     lead = '새 공지가 올라오면 이 기기로 알려드려요. 키워드와 맞지 않는 공지는 조용히 보여드려요.';
