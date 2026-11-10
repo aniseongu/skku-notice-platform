@@ -13,9 +13,9 @@ export interface GraduationModel {
 const MARK = { pass: '✓', fail: '✕', unknown: '?' } as const;
 const MARK_TEXT = { pass: '확인됨', fail: '기준에 안 맞음', unknown: '확인 못 함' } as const;
 const AI_NOTE = {
-  no_key: 'Gemini 키가 없어서 공고에 적힌 표기만 읽었어요. 설정에서 키를 넣으면 담당 업무까지 살펴봐요',
-  unavailable: 'Gemini가 잠시 응답하지 않아 공고에 적힌 표기만 읽었어요. 다시 확인하면 이어서 살펴봐요',
-  limit: '오늘 Gemini 사용 한도를 다 써서 공고에 적힌 표기만 읽었어요. 내일 다시 확인해 주세요',
+  no_key: '공고에 적힌 표기만 읽었어요. 설정에서 Gemini 키를 넣으면 담당 업무까지 봐요',
+  unavailable: 'Gemini가 잠시 응답하지 않아 표기만 읽었어요. 다시 확인하면 이어서 봐요',
+  limit: '오늘 Gemini 한도를 다 써서 표기만 읽었어요. 내일 다시 확인해 주세요',
 } as const;
 
 function TrackBlock({ name, track }: { name: string; track: Track }) {
@@ -26,6 +26,7 @@ function TrackBlock({ name, track }: { name: string; track: Track }) {
     {track.checks.length ? <ul className="grad-checks">{track.checks.map((check, index) => <li key={`${check.ruleId}-${index}`}>
       <span className="grad-mark" aria-hidden="true">{MARK[check.result]}</span><span className="visually-hidden">{MARK_TEXT[check.result]}: </span>{check.note}</li>)}</ul> : null}
     {track.notes.map((note, index) => <p className="detail-note" key={index}>{note}</p>)}
+    {track.status === 'NOT_ELIGIBLE' ? <p className="grad-next">기간이나 시간이 다른 공고라면 그 공고에서 다시 확인해 보세요</p> : null}
     {track.status !== 'NOT_APPLICABLE' && afterCompletion.length ? <>
       <p className="grad-sub">수행한 뒤에 확인해요</p>
       <ul className="grad-after">{afterCompletion.map((text) => <li key={text}>{text}</li>)}</ul>
@@ -55,10 +56,13 @@ export function GraduationSection({ title, model }: { title: string; model: Grad
       {ready.university3p ? <TrackBlock name="학교 신3품 인턴십" track={ready.university3p} /> : null}
       {ready.facts?.missing.length ? <p className="detail-note">공고에서 못 찾은 것: {ready.facts.missing.join(', ')}</p> : null}
       {ready.aiStatus && ready.aiStatus !== 'used' ? <p className="detail-note" role="status">{AI_NOTE[ready.aiStatus]}</p> : null}
-      <p className="detail-note">근거: 소프트웨어학과 졸업평가 지침 제28~31조(2025-06-01 시행), 학교 신3품 인턴십 안내. 공고만으로는 인정을 확정할 수 없어요</p>
-      <div className="inline">
-        <button type="button" className="ghost-button" disabled={busy} onClick={model.request}>{busy ? '요청하고 있어요' : '다시 확인하기'}</button>
-        <button type="button" className="ghost-button" onClick={() => { void copy(); }}>{copied ? '복사했어요' : '학과 문의용 질문 복사'}</button>
+      <details className="grad-basis">
+        <summary>근거 보기</summary>
+        <p>소프트웨어학과 졸업평가 지침 제28~31조(2025-06-01 시행)와 학교 3품 인턴십 안내예요. 신3품은 학교가 정한 인증 제도이고, 인턴십 영역은 비교과 현장실습 280시간 이상 또는 교과 현장실습 1학점 이상이에요. 공고만으로는 인정을 확정할 수 없어요</p>
+      </details>
+      <div className="grad-actions">
+        <button type="button" className="solid-button" onClick={() => { void copy(); }}>{copied ? '복사했어요' : '학과에 물어볼 질문 복사'}</button>
+        <button type="button" className="ghost-button" disabled={busy} onClick={model.request}>{busy ? '요청하고 있어요' : '공고로 다시 확인'}</button>
       </div>
     </> : null}
     {error ? <p className="field-note error" role="alert">{error}</p> : null}

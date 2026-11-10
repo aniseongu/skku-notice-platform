@@ -93,7 +93,16 @@
   .grad-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 4px; font-size: 15px; line-height: 22px; }
   .grad-badge { flex: none; padding: 2px 8px; border-radius: 999px; background: var(--sunken); color: var(--text-2); font-size: 13px; line-height: 18px; font-weight: 600; }
   .grad-track[data-status="LIKELY"] .grad-badge, .grad-track[data-status="CONDITIONAL"] .grad-badge { background: var(--accent); color: var(--on-accent); }
-  .grad-track[data-status="NOT_ELIGIBLE"] .grad-badge { color: var(--danger); }
+  .grad-track[data-status="NOT_ELIGIBLE"] .grad-badge { background: var(--surface); color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
+  .grad-next { margin: 4px 0 0; font-size: 14px; line-height: 21px; color: var(--text-2); }
+  .grad .detail-note { font-size: 13px; line-height: 20px; color: var(--text-2); margin-top: 12px; }
+  .grad-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+  .grad-actions button { min-height: 44px; }
+  .grad-basis { margin-top: 12px; font-size: 13px; line-height: 20px; color: var(--text-2); }
+  .grad-basis summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 600; }
+  .grad-basis p { margin: 0 0 4px; }
+  @media (max-width: 480px) { .grad-actions { flex-direction: column; } .grad-actions button { width: 100%; } }
+  .grad > h3 { color: var(--text-2); }
   .grad-label { margin: 0 0 8px; font-size: 14px; line-height: 21px; color: var(--text-2); }
   .grad-checks, .grad-after { margin: 0 0 8px; padding: 0; list-style: none; font-size: 14px; line-height: 21px; }
   .grad-checks li, .grad-after li { position: relative; padding-left: 22px; }
