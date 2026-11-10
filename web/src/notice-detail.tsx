@@ -1,6 +1,7 @@
 import { createRoot, type Root } from 'react-dom/client';
 import { cleanTitle, deadlineDetail, deadlinePassed, deadlineText, daysLeft, koreanDate, safeUrl, VERDICT_LABEL, type Notice, type NoticeBody, type Verdict } from './data';
 import { useState } from 'react';
+import { GraduationSection, type GraduationModel } from './graduation-assessment-view';
 import { cleanHtml, fileType, IMAGE_MISSING, replaceBrokenImage } from './rich';
 
 export interface NoticeDetailModel {
@@ -18,6 +19,8 @@ export interface NoticeDetailModel {
   rule: string | null;
   notified: boolean;
   retry: () => void;
+  /** 소프트웨어학과 원전공이 인턴 공고를 열었을 때만 있다. */
+  graduation?: GraduationModel;
 }
 
 /** 그림의 대체 텍스트: 자동으로 읽은 글이 있으면 앞부분을 함께 알려 준다. */
@@ -79,6 +82,7 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
       : model.summarizing ? <section className="detail-section" aria-labelledby="sec-summary"><h3 id="sec-summary">요약</h3><p className="detail-note first" role="status">요약을 만들고 있어요</p></section>
       : model.summaryError && model.makeSummary ? <section className="detail-section" aria-labelledby="sec-summary"><h3 id="sec-summary">요약</h3><p className="detail-note first" role="status">{model.summaryError}</p><button type="button" className="text-button" onClick={model.makeSummary}>다시 만들기</button></section>
       : loaded?.summary_status === 'failed' ? <section className="detail-section" aria-labelledby="sec-summary"><h3 id="sec-summary">요약</h3><p className="detail-note first" role="status">요약을 만들지 못했어요. 나중에 다시 만들어 볼게요</p></section> : null}
+    {model.graduation ? <GraduationSection title={title} model={model.graduation} /> : null}
     {body === 'loading' ? <p className="detail-note">본문을 불러오고 있어요</p> : !loaded ? <><p className="detail-note" role="status">본문을 불러오지 못했어요. 다시 불러오거나 원문을 확인해 주세요</p><button type="button" className="text-button" onClick={model.retry}>본문 다시 불러오기</button></>
       : loaded.translation?.body ? <><section className="detail-section body-text" aria-label="한국어로 옮긴 본문"><h3>본문 (한국어로 옮긴 글)</h3><p className="detail-note first">Gemini 번역이에요. 정확한 내용은 아래 영어 원문을 확인해 주세요</p>{loaded.translation.body.split(/\n+/).filter(Boolean).map((para, index) => <p key={index}>{para}</p>)}</section><div className="original-body" lang="en"><Body body={loaded} heading="영어 원문" /></div></> : <Body body={loaded} />}
     {loaded?.ocr_text?.length ? <section className="detail-section body-text" aria-labelledby="sec-ocr">

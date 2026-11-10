@@ -55,3 +55,27 @@ test('profile round trip uses the programs array and returns null when there is 
   await assert.rejects(saveProfile(client, 'u', { ...base, programs: [{ college: '경영대학', department: '물리학과' }] }), /확인/);
   assert.equal(rows.length, 1);
 });
+
+test('admission year and 3P selection round-trip and fall back to the old columns before the migration', async () => {
+  const calls = [];
+  const row = { programs: [], year: null, semester: null, enrollment_status: null, military_service: null, onboarded_at: null, interests: '', wants: '', avoids: '', admission_year: 2022, university_3p_internship_selected: false };
+  const client = { from: () => ({
+    select: (columns) => ({ eq: () => ({ maybeSingle: async () => { calls.push(columns); return columns.includes('admission_year') ? { data: row, error: null } : { data: { ...row, admission_year: undefined }, error: null }; } }) }),
+    upsert: async (value) => { calls.push(Object.keys(value)); return { error: null }; },
+  }) };
+  const loaded = await loadProfile(client, 'u');
+  assert.equal(loaded.admissionYear, 2022);
+  assert.equal(loaded.university3pInternshipSelected, false);
+  await saveProfile(client, 'u', { ...base, admissionYear: 2022, university3pInternshipSelected: true });
+  assert.ok(calls.at(-1).includes('admission_year') && calls.at(-1).includes('university_3p_internship_selected'));
+
+  const old = { from: () => ({
+    select: (columns) => ({ eq: () => ({ maybeSingle: async () => columns.includes('admission_year')
+      ? { data: null, error: { code: '42703', message: 'column user_profiles.admission_year does not exist' } }
+      : { data: { ...row, admission_year: undefined, university_3p_internship_selected: undefined }, error: null } }) }),
+    upsert: async (value) => ('admission_year' in value ? { error: { code: '42703', message: 'admission_year' } } : { error: null }),
+  }) };
+  assert.equal((await loadProfile(old, 'u')).admissionYear, null);
+  await saveProfile(old, 'u', { ...base, admissionYear: 2022 });
+  assert.throws(() => validateProfile({ ...base, admissionYear: 1999 }), /입학 연도/);
+});

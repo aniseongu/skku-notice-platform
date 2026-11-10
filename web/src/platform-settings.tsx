@@ -2,9 +2,10 @@
 // 스위치는 바로 반영되는 설정에만 쓰고(role="switch"), 켜짐·꺼짐을 글자로도 알린다(색에만 의존하지 않는다).
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { isSoftwareOriginal } from './graduation-assessment';
 import { backfillNote, looksLikeGeminiKey, type ByokStatus, type CanvasStatus } from './byok';
 import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, validDeviceName, type CanvasMode, type Device } from './devices';
-import { ENROLLMENT, MILITARY, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
+import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
 import { programLabel } from './skku-programs';
 import { BOARD_CATALOG, COLLEGE_BOARD, DEPARTMENT_BOARD, OTHER_BOARDS } from './skku-boards';
 import Sortable from 'sortablejs';
@@ -619,6 +620,16 @@ function Profile({ model }: { model: SettingsModel }) {
           options={SEMESTERS.map((value) => [value, `${value}학기`] as const)} onPick={(semester) => save({ semester })} /></Setting>
       <Setting name="병역"><Choice label="병역" value={profile.militaryService} disabled={!ready}
         options={MILITARY.map((value) => [value, value] as const)} onPick={(militaryService) => save({ militaryService })} /></Setting>
+      {isSoftwareOriginal(profile) ? <>
+        <Setting name="입학 연도" help="소프트웨어학과 인턴십 졸업요건이 학번에 따라 달라서 써요. 학번 전체는 받지 않아요">
+          <Choice label="입학 연도" value={profile.admissionYear} disabled={!ready}
+            options={[...ADMISSION_YEARS, OLD_ADMISSION_YEAR].map((value) => [value, value === OLD_ADMISSION_YEAR ? '2016 이전' : `${value}`] as const)}
+            onPick={(admissionYear) => save({ admissionYear })} /></Setting>
+        <Setting name="학교 신3품 인턴십 영역" help="인성 필수 외에 글로벌·창의·AI·인턴십 중 두 영역을 골라요. 인턴 공고에서 졸업요건을 확인할 때 써요">
+          <Choice label="학교 신3품 인턴십 영역" value={profile.university3pInternshipSelected === null ? 'unknown' : profile.university3pInternshipSelected ? 'yes' : 'no'} disabled={!ready}
+            options={[['yes', '골랐어요'], ['no', '안 골랐어요'], ['unknown', '아직 몰라요']] as const}
+            onPick={(value) => save({ university3pInternshipSelected: value === 'unknown' ? null : value === 'yes' })} /></Setting>
+      </> : null}
     </Section>
     <AboutMe model={model} />
     {model.profileMessage ? <p className="field-note ok" role="status">{model.profileMessage}</p> : null}

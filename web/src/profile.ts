@@ -8,6 +8,10 @@ export interface UserProfile {
   enrollmentStatus: string | null;
   militaryService: string | null;
   onboardedAt: string | null;
+  /** 입학 연도 네 자리(학번 전체는 받지 않는다). 소프트웨어학과 인턴십 졸업요건 판정에만 쓴다. */
+  admissionYear: number | null;
+  /** 학교 신3품에서 인턴십 영역을 골랐는지. 모르면 null. */
+  university3pInternshipSelected: boolean | null;
   /** Gemini가 인턴 공고를 고를 때 읽는 주관식 설명. 각각 300자까지. */
   interests: string;
   wants: string;
@@ -21,19 +25,31 @@ export const ENROLLMENT = ['재학', '휴학', '졸업예정', '졸업'] as cons
 export const MILITARY = ['복무 전', '복무 완료', '해당 없음'] as const;
 export const EMPTY_PROFILE: UserProfile = {
   programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null,
+  admissionYear: null, university3pInternshipSelected: null,
   interests: '', wants: '', avoids: '',
 };
 
 const COLUMNS = 'programs,year,semester,enrollment_status,military_service,onboarded_at,interests,wants,avoids';
+const EXTRA_COLUMNS = ',admission_year,university_3p_internship_selected';
+/** 새 열이 아직 없는 환경(마이그레이션 전)이면 예전 열만으로 다시 시도한다. */
+const missingColumn = (error: { code?: string; message?: string } | null) =>
+  !!error && (error.code === '42703' || error.code === 'PGRST204' || /admission_year|university_3p_internship_selected/.test(error.message ?? ''));
+
+export const ADMISSION_YEARS = Array.from({ length: 10 }, (_, i) => 2026 - i); // 2026 ~ 2017
+export const OLD_ADMISSION_YEAR = 2016;  // "2016학번 이전"을 하나로 묶는다
 
 /** 행이 없으면 null이다. 테이블이 아직 없는 환경처럼 읽을 수 없으면 던진다(호출하는 쪽이 온보딩을 숨긴다). */
 export async function loadProfile(client: SupabaseClient, userId: string): Promise<UserProfile | null> {
-  const { data, error } = await client.from('user_profiles').select(COLUMNS).eq('user_id', userId).maybeSingle();
+  let { data: raw, error } = await client.from('user_profiles').select(COLUMNS + EXTRA_COLUMNS).eq('user_id', userId).maybeSingle();
+  if (missingColumn(error)) ({ data: raw, error } = await client.from('user_profiles').select(COLUMNS).eq('user_id', userId).maybeSingle());
   if (error) throw error;
+  const data = raw as unknown as Record<string, any> | null;  // eslint-disable-line @typescript-eslint/no-explicit-any
   if (!data) return null;
   return {
     programs: parsePrograms(data.programs), year: data.year, semester: data.semester,
     enrollmentStatus: data.enrollment_status, militaryService: data.military_service, onboardedAt: data.onboarded_at,
+    admissionYear: Number.isInteger(data.admission_year) ? data.admission_year : null,
+    university3pInternshipSelected: typeof data.university_3p_internship_selected === 'boolean' ? data.university_3p_internship_selected : null,
     interests: cleanText(data.interests), wants: cleanText(data.wants), avoids: cleanText(data.avoids),
   };
 }
@@ -64,6 +80,7 @@ export function validateProfile(profile: UserProfile): void {
   if (profile.programs.length > MAX_PROGRAMS || new Set(keys).size !== keys.length || !profile.programs.every(validProgram)) {
     throw new Error('대학과 학과를 확인해 주세요.');
   }
+  if (profile.admissionYear !== null && !(Number.isInteger(profile.admissionYear) && profile.admissionYear >= 2000 && profile.admissionYear <= 2100)) throw new Error('입학 연도를 확인해 주세요.');
   if (!inRange(profile.year, 1, 6) || !inRange(profile.semester, 1, 2)) throw new Error('학년과 학기를 확인해 주세요.');
   if (profile.enrollmentStatus !== null && !(ENROLLMENT as readonly string[]).includes(profile.enrollmentStatus)) throw new Error('재학 상태를 확인해 주세요.');
   if (profile.militaryService !== null && !(MILITARY as readonly string[]).includes(profile.militaryService)) throw new Error('병역 상태를 확인해 주세요.');
@@ -74,11 +91,15 @@ export function validateProfile(profile: UserProfile): void {
 
 export async function saveProfile(client: SupabaseClient, userId: string, profile: UserProfile): Promise<void> {
   validateProfile(profile);
-  const { error } = await client.from('user_profiles').upsert({
+  const row = {
     user_id: userId, programs: profile.programs, year: profile.year, semester: profile.semester,
     enrollment_status: profile.enrollmentStatus, military_service: profile.militaryService,
     onboarded_at: profile.onboardedAt, updated_at: new Date().toISOString(),
     interests: cleanText(profile.interests), wants: cleanText(profile.wants), avoids: cleanText(profile.avoids),
+  };
+  let { error } = await client.from('user_profiles').upsert({
+    ...row, admission_year: profile.admissionYear, university_3p_internship_selected: profile.university3pInternshipSelected,
   }, { onConflict: 'user_id' });
+  if (missingColumn(error)) ({ error } = await client.from('user_profiles').upsert(row, { onConflict: 'user_id' }));
   if (error) throw error;
 }

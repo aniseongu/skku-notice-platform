@@ -20,6 +20,7 @@ import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from '
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
 import { byokAvailable, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
+import { loadGraduation, requestGraduation, isInternshipNotice, isSoftwareOriginal, type GraduationAssessment } from './graduation-assessment';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import type { Draft } from './onboarding-flow';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
@@ -169,7 +170,7 @@ export class AppController extends Reactive {
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, authName: { state: true }, authAvatar: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
     byokOn: { state: true }, byokBackfill: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true }, canvasStatus: { state: true }, canvasBusy: { state: true }, canvasError: { state: true },
     calendarId: { state: true }, calendarBusy: { state: true }, calendarMessage: { state: true }, calendarError: { state: true }, calendarSyncedAt: { state: true },
-    myJudgments: { state: true }, myInterests: { state: true },
+    myJudgments: { state: true }, myInterests: { state: true }, graduationBusy: { state: true }, graduationError: { state: true },
     devices: { state: true }, thisDeviceId: { state: true }, devicesBusy: { state: true }, devicesError: { state: true }, summaryTime: { state: true },
     calendarAuto: { state: true },
     accountBusy: { state: true }, accountError: { state: true },
@@ -343,7 +344,7 @@ export class AppController extends Reactive {
           this.authUserId = userId;
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.devices = []; this.thisDeviceId = null; this.devicesError = ''; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.devices = []; this.thisDeviceId = null; this.devicesError = ''; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -730,6 +731,8 @@ export class AppController extends Reactive {
     const key = JSON.stringify([userId, epoch, draft]);
     const nextProfile: UserProfile = {
       ...this.profile, programs: draft.programs, year: draft.year, enrollmentStatus: draft.enrollmentStatus, militaryService: draft.militaryService,
+      admissionYear: isSoftwareOriginal({ programs: draft.programs }) ? draft.admissionYear : this.profile.admissionYear,
+      university3pInternshipSelected: isSoftwareOriginal({ programs: draft.programs }) ? draft.university3pInternshipSelected : this.profile.university3pInternshipSelected,
       onboardedAt: this.profile.onboardedAt ?? new Date().toISOString(),
     };
     const boards = draft.boards.filter((id) => this.sources.some((source) => source.id === id && !source.external));
@@ -1570,6 +1573,61 @@ export class AppController extends Reactive {
       this.myTranslations = translations;
       this.requestUpdate();
     } catch { /* 번역을 읽지 못하면 원문을 그대로 표시한다. */ }
+  }
+
+  /** 소프트웨어학과 인턴십 졸업요건 확인: 공지마다 내 판정을 불러오고, 기다리는 중이면 워커가 끝낼 때까지 가끔 다시 읽는다. */
+  graduations = new Map<string, GraduationAssessment | null | 'loading'>();
+  graduationBusy: string | null = null;
+  graduationError = '';
+  private graduationPolls = new Map<string, ReturnType<typeof setTimeout>>();
+  resetGraduations(): void {
+    this.graduations = new Map(); this.graduationBusy = null; this.graduationError = '';
+    for (const timer of this.graduationPolls.values()) clearTimeout(timer);
+    this.graduationPolls = new Map();
+  }
+  /** 이 공지에 졸업요건 확인을 보여 줄지: 소프트웨어학과 원전공이고 인턴 공고일 때만. */
+  showsGraduation(notice: Notice): boolean {
+    const external = !!this.sources.find((source) => source.id === notice.source_id)?.external;
+    return !!authClient && !!this.authUserId && isSoftwareOriginal(this.profile) && isInternshipNotice(notice, external);
+  }
+  graduationFor(notice: Notice): GraduationAssessment | null {
+    const userId = this.authUserId;
+    if (!authClient || !userId || !this.showsGraduation(notice)) return null;
+    const cached = this.graduations.get(notice.id);
+    if (cached !== undefined) return cached === 'loading' ? null : cached;
+    this.graduations.set(notice.id, 'loading');
+    void this.reloadGraduation(notice.id, userId, this.subscriptionsEpoch, 0);
+    return null;
+  }
+  private async reloadGraduation(noticeId: string, userId: string, epoch: number, attempt: number): Promise<void> {
+    if (!authClient) return;
+    let row: GraduationAssessment | null = null;
+    try { row = await loadGraduation(authClient, userId, noticeId); }
+    catch { if (epoch === this.subscriptionsEpoch) this.graduationError = '졸업요건 결과를 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.'; }
+    if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
+    this.graduations.set(noticeId, row);
+    this.requestUpdate();
+    // 워커는 10분마다 돈다. 기다리는 동안 20초마다 확인하고, 약 14분이 지나면 멈춘다.
+    if (row?.state === 'pending' && attempt < 40) {
+      this.graduationPolls.set(noticeId, setTimeout(() => { void this.reloadGraduation(noticeId, userId, epoch, attempt + 1); }, 20000));
+    }
+  }
+  async requestGraduation(notice: Notice): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.graduationBusy) return;
+    this.graduationBusy = notice.id; this.graduationError = '';
+    try {
+      await requestGraduation(authClient, userId, notice.id);
+      if (epoch !== this.subscriptionsEpoch) return;
+      const before = this.graduations.get(notice.id);
+      this.graduations.set(notice.id, { ...(typeof before === 'object' && before ? before : { aiStatus: null, department: null, university3p: null, facts: null }), state: 'pending' });
+      clearTimeout(this.graduationPolls.get(notice.id));
+      this.graduationPolls.set(notice.id, setTimeout(() => { void this.reloadGraduation(notice.id, userId, epoch, 1); }, 20000));
+    } catch {
+      if (epoch === this.subscriptionsEpoch) this.graduationError = '확인을 요청하지 못했어요. 잠시 뒤 다시 눌러 주세요.';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.graduationBusy = null;
+    }
   }
 
   myInfo(notice: Notice): MyNoticeInfo | null {
