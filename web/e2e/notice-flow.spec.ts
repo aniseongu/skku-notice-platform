@@ -173,7 +173,7 @@ test('board subscriptions are switches grouped by college with search', async ({
   await withApp(page, { authUserId: 'account-a', subscriptions: ['skku-notice01'], toggleSubscription: 'fn:toggle' });
   const mine = screen.getByRole('switch', { checked: true });
   await expect(mine).toHaveCount(1);
-  await expect(mine.first()).toContainText('켜짐');
+  await expect(mine.first()).toHaveAttribute('aria-checked', 'true');
   await mine.first().click();
   await screen.locator('details.connection-manual > summary').click();
   const more = screen.getByRole('switch', { checked: false });
@@ -939,8 +939,8 @@ test('notifications page: this device iCampus mode, daily summary time and the d
   await withApp(page, { authUserId: 'account-a', pushStatus: 'on', devices, thisDeviceId: 'd1', summaryTime: '21:05',
     canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null },
     refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', removeDevice: 'fn:remove', renameDevice: 'fn:rename', setSummaryTime: 'fn:time' });
-  // 이 기기 아캠 알림: 원본과 같은 세 가지, 지금 값이 골라져 있다.
-  const mode = screen.getByRole('radiogroup', { name: '이 기기 아캠 알림' });
+  // 이 기기 아이캠퍼스 알림: 원본과 같은 세 가지, 지금 값이 골라져 있다.
+  const mode = screen.getByRole('radiogroup', { name: '이 기기 아이캠퍼스 알림' });
   await expect(mode.getByRole('radio')).toHaveText(['끄기', '하루 요약', '요약과 마감']);
   await expect(mode.getByRole('radio', { name: '요약과 마감' })).toHaveAttribute('aria-checked', 'true');
   await mode.getByRole('radio', { name: '하루 요약' }).click();

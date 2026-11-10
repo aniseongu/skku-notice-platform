@@ -8,7 +8,7 @@
     --line: light-dark(oklch(0.912 0.006 var(--h)), oklch(0.3 0.008 var(--h)));
     --text: light-dark(oklch(0.24 0.012 var(--h)), oklch(0.94 0.005 var(--h)));
     --text-2: light-dark(oklch(0.45 0.014 var(--h)), oklch(0.78 0.01 var(--h)));
-    --text-3: light-dark(oklch(0.54 0.012 var(--h)), oklch(0.66 0.01 var(--h)));
+    --text-3: light-dark(oklch(0.5 0.012 var(--h)), oklch(0.72 0.01 var(--h)));
     --accent: light-dark(oklch(0.4 0.075 var(--h)), oklch(0.8 0.1 var(--h)));
     --on-accent: light-dark(oklch(0.99 0.005 var(--h)), oklch(0.2 0.03 var(--h)));
     --danger: light-dark(oklch(0.55 0.19 25), oklch(0.74 0.15 25));

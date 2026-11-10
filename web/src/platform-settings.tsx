@@ -242,7 +242,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   const ordered = [...groups].sort(([a], [b]) => Number([...otherGroup.values()].includes(a)) - Number([...otherGroup.values()].includes(b)));
   const busy = model.loading;
   return <>
-    <details className="connection-manual board-more-list" open={mine.length === 0}>
+    {others.length === 0 && !query ? <p className="field-note">모든 게시판을 받고 있어요</p> : <details className="connection-manual board-more-list" open={mine.length === 0}>
       <summary>게시판 더 보기 ({others.length}개)</summary>
       <input className="input" type="search" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off" value={query}
         onChange={(event) => setQuery(event.currentTarget.value)} />
@@ -251,7 +251,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
         {items.map((source) => <SwitchRow key={source.id} label={source.label} checked={false} disabled={busy} onChange={() => model.toggle(source.id, true)} />)}
       </div>)}
       {others.length === 0 ? <p className="field-note" role="status">{query ? `'${query}'에 맞는 게시판이 없어요` : '모든 게시판을 받고 있어요'}</p> : null}
-    </details>
+    </details>}
   </>;
 }
 
@@ -358,8 +358,8 @@ function Notifications({ model }: { model: SettingsModel }) {
         </>}
       </Setting>
       {model.userId && info ? <>
-        <Setting name="이 기기 아캠 알림" help="아이캠퍼스의 하루 요약과 마감을 이 기기로 받을지 정해요">
-          <Choice label="이 기기 아캠 알림" value={on ? (thisDevice?.canvasMode ?? 'reminders') : null} options={CANVAS_MODES}
+        <Setting name="이 기기 아이캠퍼스 알림" help="아이캠퍼스의 하루 요약과 마감을 이 기기로 받을지 정해요">
+          <Choice label="이 기기 아이캠퍼스 알림" value={on ? (thisDevice?.canvasMode ?? 'reminders') : null} options={CANVAS_MODES}
             disabled={!on || !thisDevice || !info.hasCanvasToken || info.busy} onPick={(mode: CanvasMode) => info.setMode(mode)} />
           <p className="field-note">{!on ? '먼저 이 기기 알림을 켜 주세요' : !info.hasCanvasToken ? '연결 키에서 아이캠퍼스 토큰을 저장해 주세요' : '요약과 마감을 고르면 하루 전과 3시간 전에도 알려요'}</p>
         </Setting>
@@ -469,7 +469,7 @@ function BoardOrderList({ order, editing, onToggle, busy = false }: { order: Set
             onClick={() => { focusId.current = { id: board.id, kind: 'down' }; move(index, index + 1); }}>{chevron('M6 9l6 6 6-6')}</button>
         </span> : null}
         {onToggle && !editing ? <button type="button" role="switch" className="switch-row switch-only" aria-checked="true" aria-label={`${board.label} 받기`} disabled={busy}
-          onClick={() => onToggle(board.id)}><span className="switch-state" aria-hidden="true">켜짐</span><span className="switch" aria-hidden="true" /></button> : null}
+          onClick={() => onToggle(board.id)}><span className="switch" aria-hidden="true" /></button> : null}
       </li>)}
     </ul>
     {editing ? <p className="field-note order-help">손잡이를 끌거나 화살표를 눌러 순서를 바꿔요. 바꾸면 바로 저장돼요</p> : null}
