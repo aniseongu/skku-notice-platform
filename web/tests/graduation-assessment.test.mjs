@@ -121,3 +121,13 @@ test('표지는 보이는 영역의 판정만 합친다', () => {
   assert.equal(badgeOf2({ dept: 'NEEDS_REVIEW', p3: 'NOT_ELIGIBLE' }, all), 'review');
   assert.equal(badgeOf2(undefined, all), 'review');
 });
+
+import { shownBadge } from '../src/graduation-assessment.ts';
+test('표지는 정보가 되는 것만 적는다: 확인 필요와 해당 없음 판정 글에는 적지 않는다', () => {
+  assert.equal(shownBadge('ok', 'relevant'), 'ok');
+  assert.equal(shownBadge('no', 'maybe'), 'no');
+  assert.equal(shownBadge('ok', null), 'ok');
+  assert.equal(shownBadge('review', 'relevant'), null);
+  assert.equal(shownBadge('ok', 'not_relevant'), null);
+  assert.equal(shownBadge(null, 'relevant'), null);
+});

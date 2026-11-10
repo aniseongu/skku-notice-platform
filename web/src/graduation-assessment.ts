@@ -152,6 +152,14 @@ export function badgeOf(statuses: GraduationStatuses | undefined, tracks: Visibl
   return shown.some((v) => v === 'NEEDS_REVIEW') ? 'review' : 'no';
 }
 
+/** 목록·상세 머리에 실제로 적을 표지. 정보가 되는 것만 적는다:
+ *  - "확인 필요"는 아는 게 없다는 말이라 적지 않는다(자세한 판정은 상세의 졸업요건 칸이 보여 준다).
+ *  - 이 학생과 관련 없다고(해당 없음) 이미 판정한 글에는 적지 않는다. 한 줄에 판정이 둘이면 서로 경쟁한다. */
+export function shownBadge(badge: GraduationBadge | null, verdict: string | null | undefined): GraduationBadge | null {
+  if (badge !== 'ok' && badge !== 'no') return null;
+  return verdict === 'not_relevant' ? null : badge;
+}
+
 /** 내 판정 결과의 요약만 한 번에 읽는다(목록 표지와 "졸업요건 충족만 보기"에 쓴다). */
 export async function loadGraduationStatuses(client: SupabaseClient, userId: string): Promise<Map<string, GraduationStatuses>> {
   const { data, error } = await client.from('user_notice_graduation_assessments').select('notice_id,department,university_3p')
