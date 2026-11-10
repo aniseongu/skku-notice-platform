@@ -1,6 +1,6 @@
 /* 휴대폰 (One UI, 720px 미만). 목록과 검색은 같은 시작선에 맞춘다. */
 @layer mobile {
-  .sidebar, .detail-pane, .wide-only { display: none; }
+  .detail-pane, .wide-only { display: none; }
   .list-pane { padding-bottom: calc(var(--tabbar-h) + 24px + env(safe-area-inset-bottom)); }
   .navigation-head { display: contents; }
 

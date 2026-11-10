@@ -8,11 +8,7 @@
       display: grid; grid-template-columns: 248px minmax(0, 1fr);
       height: calc(100dvh - var(--wco-h));
     }
-    .sidebar, .list-pane, .detail-pane { min-height: 0; overflow-y: auto; }
-    .sidebar {
-      display: flex; flex-direction: column; padding: 0 12px 12px;
-      border-right: 1px solid var(--line); background: var(--mica);
-    }
+    .list-pane, .detail-pane { min-height: 0; overflow-y: auto; }
     .list-pane { padding-bottom: 32px; background: var(--surface); }
 
     .pane-head {
@@ -28,34 +24,7 @@
     .topbar .search { flex: 0 1 260px; width: 260px; min-width: 120px; height: 36px; padding: 0 12px; }
     .icon-button { width: 36px; height: 36px; border-radius: var(--r-sm); }
 
-    /* 묶음 머리는 누르면 접고 편다. 모양은 예전 머리 글자 그대로, 오른쪽 끝에 작은 꺾쇠만 둔다. */
-    .side-head {
-      display: flex; align-items: center; justify-content: space-between; width: calc(100% - 24px);
-      margin: 20px 12px 4px; padding: 4px 0; border: 0; background: none; cursor: pointer;
-      font: inherit; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-2); text-align: left;
-    }
-    .side-head:hover { color: var(--text); }
-    .side-count { margin-left: 6px; font-weight: 500; color: var(--text-3); }
-    .side-chevron { width: 8px; height: 8px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); }
-    .side-head[aria-expanded="false"] .side-chevron { transform: rotate(-45deg); }
-    .side-group[hidden] { display: none; }
-    .side-group { display: flex; flex-direction: column; gap: 1px; }
-    .side-item {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      min-height: 40px; padding: 0 12px; border: 0; border-radius: var(--r-sm);
-      background: none; color: var(--text-2); font-size: 15px; font-weight: 500; text-align: left;
-      user-select: none; -webkit-user-select: none;
-    }
-    .side-label { display: flex; align-items: center; gap: 10px; min-width: 0; }
-    .side-label > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .side-label .i { width: 20px; height: 20px; }
-    .side-item .count { font-size: 14px; color: var(--text-3); font-variant-numeric: tabular-nums; }
-    .side-item[aria-current="page"] { background: var(--sunken); color: var(--text); font-weight: 600; }
-    .side-item[aria-current="page"] .i { color: var(--accent); }
-    .side-item.add { color: var(--text-3); }
-    .side-foot { display: flex; flex-direction: column; gap: 1px; margin-top: auto; padding-top: 12px; }
-
-    @media (pointer: coarse) { .side-item { min-height: 44px; } }
+    /* 사이드바 항목은 Tailwind 클래스로 옮겼다(notice-shell.tsx의 SideItem, SideGroup). */
 
     .view-options { padding: 4px 24px 0; }
     .list { padding: 0; }
@@ -68,7 +37,7 @@
       .batch-row:has(.row:hover:not([aria-current="true"])) .selection-check {
         background: color-mix(in oklch, var(--sunken) 70%, var(--surface));
       }
-      .side-item:hover:not([aria-current="page"]), .icon-button:hover:not(:disabled) {
+      .icon-button:hover:not(:disabled) {
         background: color-mix(in oklch, var(--sunken) 70%, transparent);
       }
     }

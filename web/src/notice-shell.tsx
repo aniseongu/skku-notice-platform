@@ -76,9 +76,9 @@ export function NoticeShell({ app }: { app: AppController }) {
   return <>
     <div className="wco-bar" aria-hidden="true"><Brand />{APP_NAME}</div>
     <div className={`app ${classes}`} inert={onboarding}>
-      <aside className="sidebar" aria-label="탐색">
+      <aside className="sidebar hidden border-r border-line bg-mica px-[12px] pt-0 pb-[12px] min-[720px]:flex min-[720px]:min-h-0 min-[720px]:flex-col min-[720px]:overflow-y-auto" aria-label="탐색">
         <div className="pane-head brand"><Brand />{APP_NAME}</div>
-        <nav className="side-group" aria-label="보기">
+        <nav className="side-group flex flex-col gap-[1px]" aria-label="보기">
           {TABS.map((t, index) => <SideItem key={t.id} label={t.label} count={counts[t.id]} active={app.view === t.id}
             onClick={() => app.setView(t.id)} shortcut={String(index + 1)} icon={t.icon} />)}
         </nav>
@@ -86,14 +86,14 @@ export function NoticeShell({ app }: { app: AppController }) {
           {app.keywords.map((word) => <SideItem key={word} label={word} count={keywordTotals.counts[word]}
             active={app.keyword === word && !settings} onClick={() => app.setKeyword(app.keyword === word ? null : word)}
             ariaLabel={`${word}, 공지 ${keywordTotals.counts[word]}개`} />)}
-          <button type="button" className="side-item add" onClick={() => app.openSettings('keywords')}>{app.keywords.length ? '키워드 관리하기' : '키워드 추가하기'}</button>
+          <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('keywords')}>{app.keywords.length ? '키워드 관리하기' : '키워드 추가하기'}</button>
         </SideGroup>
         <SideGroup app={app} id="boards" title={app.tab() === 'intern' ? '인턴 공고 사이트' : '게시판'} count={app.tabSources().length}>
           {boardChoices(app).map((b) => <SideItem key={b.id} label={b.label} count={null} active={app.activeBoard() === b.id && !settings}
             onClick={() => { app.setBoard(b.id); if (settings) app.leaveSettings(); }} />)}
-          {app.tab() === 'intern' ? null : <button type="button" className="side-item add" onClick={() => app.openSettings('notifications')}>게시판 더 고르기</button>}
+          {app.tab() === 'intern' ? null : <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('notifications')}>게시판 더 고르기</button>}
         </SideGroup>
-        <div className="side-foot">
+        <div className="side-foot mt-auto flex flex-col gap-[1px] pt-[12px]">
           <SideItem label="설정" count={null} active={settings} onClick={app.openSettingsHome} />
         </div>
       </aside>
@@ -210,23 +210,28 @@ function settingsModel(app: AppController) {
   };
 }
 
+// 사이드바(PC 전용) 항목. 현재 항목은 aria-current=page로 표시한다.
+const SIDE_ITEM = 'flex items-center justify-between gap-[8px] min-h-[40px] px-[12px] py-0 border-0 rounded-sm text-[15px] font-medium text-left select-none [-webkit-user-select:none] [@media(pointer:coarse)]:min-h-[44px]';
+const SIDE_ITEM_IDLE = 'bg-transparent hover:bg-hover-soft';
+const SIDE_ITEM_CURRENT = 'bg-sunken text-ink font-semibold [&_.i]:text-accent';
+
 function SideItem({ label, count, active, onClick, shortcut, ariaLabel, icon }: {
   label: string; count: number | null; active: boolean; onClick: () => void; shortcut?: string; ariaLabel?: string; icon?: IconName;
 }) {
-  return <button type="button" className="side-item" aria-current={active ? 'page' : 'false'} onClick={onClick}
+  return <button type="button" className={`side-item ${SIDE_ITEM} ${active ? SIDE_ITEM_CURRENT : `text-ink-2 ${SIDE_ITEM_IDLE}`}`} aria-current={active ? 'page' : 'false'} onClick={onClick}
     aria-label={ariaLabel} aria-keyshortcuts={shortcut} title={shortcut ? `${label} (${shortcut})` : undefined}>
-    <span className="side-label">{icon ? <Icon name={icon} /> : null}<span>{label}</span></span>{count === null ? null : <span className="count">{count}</span>}</button>;
+    <span className="side-label flex min-w-0 items-center gap-[10px] [&_.i]:h-[20px] [&_.i]:w-[20px]">{icon ? <Icon name={icon} /> : null}<span className="overflow-hidden text-ellipsis whitespace-nowrap">{label}</span></span>{count === null ? null : <span className="count text-[14px] text-ink-3 tabular-nums">{count}</span>}</button>;
 }
 
 // 사이드바 묶음은 머리를 눌러 접고 편다. 접은 묶음은 기억한다(사용자 요청 2026-11-03).
 function SideGroup({ app, id, title, count, children }: { app: AppController; id: string; title: string; count?: number; children: ReactNode }) {
   const open = !app.collapsed.includes(id);
   return <>
-    <button type="button" className="side-head" aria-expanded={open} aria-controls={`side-${id}`} onClick={() => {
+    <button type="button" className="side-head mx-[12px] mt-[20px] mb-[4px] flex w-[calc(100%_-_24px)] cursor-pointer items-center justify-between border-0 bg-transparent px-0 py-[4px] text-left text-[13px] leading-[18px] font-semibold text-ink-2 [&:hover]:text-ink" aria-expanded={open} aria-controls={`side-${id}`} onClick={() => {
       app.collapsed = open ? [...app.collapsed, id] : app.collapsed.filter((x) => x !== id);
       remember('side-collapsed', JSON.stringify(app.collapsed));
-    }}><span>{title}{!open && count ? <span className="side-count">{count}</span> : null}</span><span className="side-chevron" aria-hidden="true" /></button>
-    <div className="side-group" id={`side-${id}`} hidden={!open}>{children}</div>
+    }}><span>{title}{!open && count ? <span className="side-count ml-[6px] font-medium text-ink-3">{count}</span> : null}</span><span className={`side-chevron h-[8px] w-[8px] border-r-[1.5px] border-b-[1.5px] border-current ${open ? '[transform:rotate(45deg)_translateY(-2px)]' : '[transform:rotate(-45deg)]'}`} aria-hidden="true" /></button>
+    <div className="side-group flex flex-col gap-[1px]" id={`side-${id}`} hidden={!open}>{children}</div>
   </>;
 }
 
