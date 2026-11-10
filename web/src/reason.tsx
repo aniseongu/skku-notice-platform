@@ -23,7 +23,7 @@ export function Reason({ interests, ai, rule, read = false, grad = null, detail 
   }
   if (ai) {
     // 해당 없음은 가장 연하게: 굵지 않고 흐린 회색. 읽었는지와 관계없이 같다.
-    if (ai.verdict === 'not_relevant') return <span className="reason not_relevant text-ink-3">{badge}<b className={`${LABEL} font-normal`}>{VERDICT_LABEL[ai.verdict]}</b>{ai.reason}</span>;
+    if (ai.verdict === 'not_relevant') return <span className="reason not_relevant text-ink-3"><b className={`${LABEL} font-normal`}>{VERDICT_LABEL[ai.verdict]}</b>{badge}{ai.reason}</span>;
     const tone = ai.verdict === 'relevant' ? 'text-accent' : 'text-soon';
     return <span className={`reason ${ai.verdict}`}><b className={strong(read, tone)}>{VERDICT_LABEL[ai.verdict]}</b>{badge}{ai.reason}</span>;
   }
