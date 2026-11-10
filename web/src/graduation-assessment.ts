@@ -140,7 +140,7 @@ export function isInternshipNotice(notice: { title: string; source_id?: string }
 
 /** 목록 표지: 내가 채워야 할 요건에 이 공고가 맞는지. */
 export type GraduationBadge = 'ok' | 'review' | 'no';
-export const BADGE_LABEL: Record<GraduationBadge, string> = { ok: '졸업요건 충족', review: '공고를 열면 졸업요건을 알 수 있어요', no: '졸업요건 미달' };
+export const BADGE_LABEL: Record<GraduationBadge, string> = { ok: '졸업 충족', review: '졸업 확인', no: '졸업 미달' };
 export interface GraduationStatuses { dept: Status | null; p3: Status | null }
 
 /** 보이는 영역의 판정을 하나로 합친다. 아직 판정이 없으면(현장실습 모집처럼 열어서 봐야 알 수 있는 공고) review. 하나라도 가능하면 ok, 아니면 확인 필요가 있으면 review, 모두 안 맞으면 no. */

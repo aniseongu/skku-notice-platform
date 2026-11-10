@@ -14,10 +14,10 @@ const FADED: Record<string, string> = {
 const strong = (read: boolean, color: string) => `${LABEL} ${read ? `font-medium ${FADED[color]}` : `font-semibold ${color}`}`;
 const BADGE_COLOR: Record<GraduationBadge, string> = { ok: 'text-accent', review: 'text-soon', no: 'text-ink-3' };
 
-export function Reason({ interests, ai, rule, read = false, grad = null, detail = false }: {
-  interests: string[]; ai: { verdict: Verdict; reason: string } | null; rule: string | null; read?: boolean; grad?: GraduationBadge | null; detail?: boolean;
+export function Reason({ interests, ai, rule, read = false, grad = null }: {
+  interests: string[]; ai: { verdict: Verdict; reason: string } | null; rule: string | null; read?: boolean; grad?: GraduationBadge | null;
 }) {
-  const badge = grad ? <b className={`grad-badge ${grad === 'no' ? `${LABEL} font-normal ${BADGE_COLOR.no}` : strong(read, BADGE_COLOR[grad])}`}>{detail && grad === 'review' ? '졸업요건 확인 필요' : BADGE_LABEL[grad]}</b> : null;
+  const badge = grad ? <b className={`grad-badge ${grad === 'no' ? `${LABEL} font-normal ${BADGE_COLOR.no}` : strong(read, BADGE_COLOR[grad])}`}>{BADGE_LABEL[grad]}</b> : null;
   if (interests.length) {
     return <span className="reason"><b className={`interest ${strong(read, 'text-accent')}`}>관심 {interests.join(', ')}</b>{badge}{ai && ai.verdict !== 'not_relevant' ? ai.reason : ''}</span>;
   }
