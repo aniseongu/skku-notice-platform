@@ -32,6 +32,11 @@ export function GraduationSection({ model }: { title: string; model: GraduationM
     {ready ? <>
       {model.tracks.p3 && ready.university3p ? <Result name="3품 인턴십" track={ready.university3p} /> : null}
       {model.tracks.dept && ready.department ? <Result name="솦 인턴십" track={ready.department} /> : null}
+      {/* 보험 약관의 유의사항처럼 작고 옅게, 영역마다 반복하지 않고 한 번만 적는다. */}
+      <ul className="m-0 mt-[12px] list-none border-t border-line p-0 pt-[10px] text-[12px] leading-[18px] text-ink-3" aria-label="유의사항">
+        <li>· 공고에 적힌 내용만 보고 대략 판단한 결과예요</li>
+        <li>· 3품 인턴십과 솦 인턴십 모두 실제 인정 여부는 학교와 학과에 확인이 필요해요</li>
+      </ul>
       {ready.aiStatus && ready.aiStatus !== 'used' ? <p className="m-0 text-[13px] leading-[20px] text-ink-3" role="status">{AI_NOTE[ready.aiStatus]}</p> : null}
     </> : null}
     {error ? <p className="field-note error" role="alert">{error}</p> : null}
