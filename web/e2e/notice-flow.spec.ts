@@ -346,7 +346,7 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('heading', { name: '복수전공이 있나요?' })).toBeFocused();
   await expect(dialog.getByRole('radiogroup', { name: '복수전공 선택' }).getByRole('radio')).toHaveCount(2);
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
-  await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '6단계 중 2단계');
+  await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '7단계 중 2단계');
   expect(Math.abs((await dialog.getByRole('progressbar').boundingBox())!.width - barWidth1)).toBeLessThanOrEqual(0.5);
   await dialog.getByRole('radio', { name: '있어요', exact: true }).click();
   await dialog.getByRole('button', { name: '경영대학', exact: true }).click();

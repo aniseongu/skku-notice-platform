@@ -9,6 +9,7 @@ import unicodedata
 
 from google.genai import types
 
+from skku_notice.eligibility import ELIGIBILITY_RULE
 from skku_notice.fetch import ImageData
 from skku_notice.gemini_client import gemini_client
 from skku_notice.judge import Judgment
@@ -26,7 +27,8 @@ SYSTEM = (
     "실제 모집 직무, 담당 업무, 지원 자격을 근거로 IT 개발, 데이터, 인공지능, 보안, QA 등 "
     "소프트웨어 관련 직무이고 학부생이 지원할 수 있으면 relevant로 판정하세요. "
     "직무가 비개발이거나 경력 필수, 대학원생만 지원하는 등 지원할 수 없으면 not_relevant입니다. "
-    "졸업예정자 또는 졸업자만 지원할 수 있고 사용자 프로필과 맞지 않으면 not_relevant입니다. "
+    + ELIGIBILITY_RULE +
+    "프로필과 자격이 맞지 않으면 not_relevant입니다. "
     "정보가 불충분하거나 자격이 확실하지 않으면 maybe입니다. 회사 업종, 로고, 광고 이미지만으로 "
     "직무나 자격을 추정하지 마세요. 회사 소개의 기술 키워드만으로 모집 직무라고 추정하지 마세요. "
     "회계, 계리, 영업 등 비개발 직무는 엑셀 VBA 같은 보조 역량을 우대한다는 이유만으로 "

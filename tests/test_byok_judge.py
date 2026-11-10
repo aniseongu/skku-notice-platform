@@ -326,3 +326,10 @@ def test_the_run_budget_stops_further_batches_and_users():
     ticks = iter([0, 0, 10_000, 10_000, 10_000, 10_000])
     counts = judge.run_judging(store, MASTER, NOW, echo_factory, sleep=lambda _s: None, clock=lambda: next(ticks))
     assert counts["judged"] == 6 and counts["users"] == 1
+
+
+def test_eligibility_rule_in_all_prompts():
+    from skku_notice import intern_ai, school_ai
+    from skku_notice.eligibility import ELIGIBILITY_RULE
+    assert "재학은 졸업예정이 아닙니다" in ELIGIBILITY_RULE
+    assert ELIGIBILITY_RULE in school_ai.SYSTEM and ELIGIBILITY_RULE in intern_ai.SYSTEM

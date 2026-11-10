@@ -729,7 +729,7 @@ export class AppController extends Reactive {
     catch (error) { this.onboardingError = error instanceof Error ? error.message : '키워드를 확인해 주세요.'; return false; }
     const key = JSON.stringify([userId, epoch, draft]);
     const nextProfile: UserProfile = {
-      ...this.profile, programs: draft.programs, year: draft.year, enrollmentStatus: draft.enrollmentStatus,
+      ...this.profile, programs: draft.programs, year: draft.year, enrollmentStatus: draft.enrollmentStatus, militaryService: draft.militaryService,
       onboardedAt: this.profile.onboardedAt ?? new Date().toISOString(),
     };
     const boards = draft.boards.filter((id) => this.sources.some((source) => source.id === id && !source.external));

@@ -10,7 +10,7 @@ export interface ByokStatus {
 
 /** 키 문자열은 이 모듈 밖으로 나가지 않고 요청 한 번에만 쓴다. 화면과 로그에는 마지막 4글자만 남는다. */
 export function looksLikeGeminiKey(value: string): boolean {
-  return /^(AIza[0-9A-Za-z_-]{35}|AQ\.[0-9A-Za-z_.-]{20,150})$/.test(value);
+  return /^[0-9A-Za-z_.~-]{20,300}$/.test(value);
 }
 
 export interface CanvasStatus { keyHint: string; disabled: boolean; lastError: string | null; lastOkAt: string | null }
@@ -168,7 +168,7 @@ async function failure(error: unknown, fallback: string): Promise<Error> {
 }
 
 export async function registerByokKey(client: SupabaseClient, apiKey: string): Promise<string> {
-  if (!looksLikeGeminiKey(apiKey)) throw new Error('Gemini API 키 형식이 맞지 않아요.');
+  if (!looksLikeGeminiKey(apiKey)) throw new Error('키를 끝까지 복사해 공백 없이 붙여 넣어 주세요.');
   const { data, error } = await client.functions.invoke('byok', { method: 'POST', body: { apiKey } });
   if (error) throw await failure(error, '키를 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
   const hint = (data as { keyHint?: unknown } | null)?.keyHint;

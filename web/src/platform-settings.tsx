@@ -2,7 +2,7 @@
 // 스위치는 바로 반영되는 설정에만 쓰고(role="switch"), 켜짐·꺼짐을 글자로도 알린다(색에만 의존하지 않는다).
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
-import { backfillNote, type ByokStatus, type CanvasStatus } from './byok';
+import { backfillNote, looksLikeGeminiKey, type ByokStatus, type CanvasStatus } from './byok';
 import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, validDeviceName, type CanvasMode, type Device } from './devices';
 import { ENROLLMENT, MILITARY, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
 import { programLabel } from './skku-programs';
@@ -694,8 +694,8 @@ function GeminiRow({ model }: { model: SettingsModel }) {
       <span className="field-note">지금은 키를 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
     </KeyRow>;
   }
-  return <SecretRow name="Gemini 키" help={help} placeholder="AIza 또는 AQ.로 시작하는 키" status={byok.status} loading={byok.loading} busy={byok.busy}
-    error={byok.error} onRegister={byok.register} onRemove={byok.remove} guide={guide}
+  return <SecretRow name="Gemini 키" help={help} placeholder="Google AI Studio에서 만든 키" status={byok.status} loading={byok.loading} busy={byok.busy}
+    error={byok.error} onRegister={byok.register} onRemove={byok.remove} guide={guide} valid={looksLikeGeminiKey}
     note={backfillNote(byok.backfill, !!byok.status?.disabled)} />;
 }
 

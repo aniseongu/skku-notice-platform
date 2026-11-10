@@ -1,8 +1,8 @@
 // 첫 로그인 설정. 한 화면에 한 질문, 모두 골라서 답하고, 이전·건너뛰기가 항상 있다.
-// 순서: 주전공 → 복수전공(선택) → 학년·재학 상태 → 받을 게시판·키워드 → 기타 게시판(부트캠프 등) → 알림.
+// 순서: 주전공 → 복수전공(선택) → 학년·재학 상태·병역 → 받을 게시판·키워드 → 기타 게시판(부트캠프 등) → 알림.
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { AppController } from './app-controller';
-import { ENROLLMENT } from './profile';
+import { ENROLLMENT, MILITARY } from './profile';
 import { COLLEGES, MAX_PROGRAMS, findCollege, programKey, programLabel, type Program } from './skku-programs';
 import { BOARD_CATALOG, boardsForPrograms, OTHER_BOARDS } from './skku-boards';
 import {
@@ -12,10 +12,11 @@ import {
 import { APP_NAME } from './brand';
 import { Card, ChipGroup, ChoiceList, Segmented, SwitchRow } from './ui';
 
-const STEP_LABELS = ['주전공', '복수전공', '학년·재학 상태', '받을 공지', '기타 게시판', '알림'] as const;
+const STEP_LABELS = ['주전공', '복수전공', '학년·재학 상태', '받을 공지', '기타 게시판', 'AI 키', '알림'] as const;
 
 const YEARS = [1, 2, 3, 4, 5].map((year) => ({ value: year, label: year === 5 ? '5학년 이상' : `${year}학년` }));
 const STATUS = ENROLLMENT.map((value) => ({ value, label: value }));
+const SERVICE = MILITARY.map((value) => ({ value, label: value }));
 
 /** 대학을 고른 뒤 그 대학의 학과만 보여 준다. 대학 줄은 학과 목록으로 들어가는 이동 줄이고, 학과는 고르기만 한다(확정은 아래 "다음"). */
 function ProgramPicker({ onPick, onCancel, current }: {
@@ -61,6 +62,7 @@ export function Onboarding({ app }: { app: AppController }) {
   const [doubleAnswer, setDoubleAnswer] = useState<DoubleAnswer>(() => (draft.programs.length > 1 ? 'yes' : null));
   const [changingPrimary, setChangingPrimary] = useState(() => app.profile.programs.length === 0);
   const [saved, setSaved] = useState(false);
+  const [aiKey, setAiKey] = useState('');
   const heading = useRef<HTMLHeadingElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const manual = app.onboardingManual;
@@ -102,7 +104,8 @@ export function Onboarding({ app }: { app: AppController }) {
   const keywordOptions = [...KEYWORD_SUGGESTIONS, ...draft.keywords.filter((word) => !(KEYWORD_SUGGESTIONS as readonly string[]).includes(word))];
   const pushAsk = app.pushStatus === 'off';
 
-  const save = async () => { if (await app.finishOnboarding(draft)) { setSaved(true); if (app.pushStatus === 'off') go('notify'); else app.closeOnboarding(); } };
+  const afterAi = () => { if (app.pushStatus === 'off') go('notify'); else app.closeOnboarding(); };
+  const save = async () => { if (await app.finishOnboarding(draft)) { setSaved(true); if (app.byokOn && !app.byokStatus) go('ai'); else afterAi(); } };
 
   let title = '', lead = '', body: React.ReactNode = null, foot: React.ReactNode = null;
   if (step === 'primary') {
@@ -138,13 +141,16 @@ export function Onboarding({ app }: { app: AppController }) {
       ? <button type="button" className="solid-button" disabled={!pendingDouble} onClick={() => { if (pendingDouble) { addDouble(pendingDouble); go('status'); } }}>다음</button>
       : <button type="button" className="solid-button" disabled={!canContinue('double', draft, doubleAnswer)} onClick={() => go('status')}>다음</button>;
   } else if (step === 'status') {
-    title = '학년과 재학 상태가 어떻게 되나요?';
-    lead = '지원 자격에 맞는 공지를 고를 때 써요';
+    title = '학교 정보를 알려 주세요';
+    lead = '지원 자격에 맞는 공지를 고를 때만 써요';
     body = <div className="onb-group">
       <h2>학년</h2>
       <Segmented label="학년" options={YEARS} columns={3} value={draft.year} onChange={(year) => setDraft({ ...draft, year })} />
       <h2>재학 상태</h2>
       <Segmented label="재학 상태" options={STATUS} value={draft.enrollmentStatus} onChange={(enrollmentStatus) => setDraft({ ...draft, enrollmentStatus })} />
+      <p className="card-note">졸업예정은 이번 학기에 졸업하는 경우, 졸업은 학위를 이미 받은 경우예요</p>
+      <h2>병역</h2>
+      <Segmented label="병역" options={SERVICE} columns={3} value={draft.militaryService} onChange={(militaryService) => setDraft({ ...draft, militaryService })} />
     </div>;
     foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('boards')}>다음</button>;
   } else if (step === 'boards') {
@@ -175,6 +181,20 @@ export function Onboarding({ app }: { app: AppController }) {
     </div>;
     foot = <button type="button" className="solid-button" disabled={app.onboardingBusy} onClick={() => { void save(); }}>
       {app.onboardingBusy ? '저장하고 있어요' : app.onboardingError ? '다시 시도하기' : '다음'}</button>;
+  } else if (step === 'ai') {
+    title = 'Gemini 키가 있나요?';
+    lead = '키를 넣으면 나에게 맞는 공지를 골라 알리고 요약해 드려요. 나중에 설정에서 넣어도 돼요';
+    body = <div className="onb-group">
+      <input className="input" type="password" autoComplete="off" spellCheck={false} aria-label="Gemini 키" placeholder="Google AI Studio에서 만든 키를 붙여 넣어요"
+        value={aiKey} disabled={app.byokBusy} onChange={(event) => setAiKey(event.currentTarget.value.trim())} />
+      <p className="card-note">aistudio.google.com/apikey에서 무료로 만들 수 있어요. 저장하면 Gemini에 확인한 뒤 암호화해 서버에만 보관해요</p>
+      {app.byokError ? <p className="error-text" role="alert">{app.byokError}</p> : null}
+    </div>;
+    foot = <>
+      <button type="button" className="solid-button" disabled={app.byokBusy || !aiKey} onClick={() => { void app.registerKey(aiKey).then(() => { if (app.byokStatus) afterAi(); }); }}>
+        {app.byokBusy ? '확인하고 있어요' : '저장하기'}</button>
+      <button type="button" className="ghost-button" disabled={app.byokBusy} onClick={afterAi}>나중에 할게요</button>
+    </>;
   } else {
     title = '알림을 켜 둘까요?';
     lead = '새 공지가 올라오면 이 기기로 알려드려요. 키워드와 맞지 않는 공지는 조용히 보여드려요.';

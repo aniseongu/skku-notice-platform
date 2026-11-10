@@ -71,7 +71,8 @@ test('steps move forward and back in order and required answers gate the next bu
   assert.equal(previousStep('primary'), null);
   assert.equal(nextStep('primary'), 'double');
   assert.equal(nextStep('boards'), 'etc');
-  assert.equal(nextStep('etc'), 'notify');
+  assert.equal(nextStep('etc'), 'ai');
+  assert.equal(nextStep('ai'), 'notify');
   assert.equal(nextStep('notify'), null);
   const draft = initialDraft(EMPTY_PROFILE, [], []);
   assert.equal(canContinue('primary', draft), false);

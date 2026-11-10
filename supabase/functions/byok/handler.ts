@@ -109,7 +109,7 @@ export async function handle(req: Request, deps: ByokDeps): Promise<Response> {
       await deps.saveCanvasToken({ user_id: userId, ciphertext, token_hint: tokenHint });
       return reply(200, origin, { ok: true, keyHint: tokenHint });
     }
-    if (!looksLikeGeminiKey(body.apiKey)) return reply(400, origin, { error: 'Gemini API 키 형식이 맞지 않아요.' });
+    if (!looksLikeGeminiKey(body.apiKey)) return reply(400, origin, { error: '키를 끝까지 복사해 공백 없이 붙여 넣어 주세요.' });
     const model = body.model === undefined ? DEFAULT_MODEL : body.model;
     if (typeof model !== 'string' || !MODEL_PATTERN.test(model)) return reply(400, origin, { error: '모델 이름을 확인해 주세요.' });
     const verdict = await deps.verifyGeminiKey(body.apiKey);

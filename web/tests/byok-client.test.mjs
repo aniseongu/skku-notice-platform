@@ -9,7 +9,7 @@ test('key format check and request never send a malformed key', async () => {
   assert.equal(looksLikeGeminiKey('AIza123'), false);
   let calls = 0;
   const client = { functions: { invoke: async () => { calls++; return { data: { keyHint: 'CCCC' }, error: null }; } } };
-  await assert.rejects(registerByokKey(client, 'nope'), /형식/);
+  await assert.rejects(registerByokKey(client, 'nope'), /붙여 넣어/);
   assert.equal(calls, 0);
   assert.equal(await registerByokKey(client, KEY), 'CCCC');
 });

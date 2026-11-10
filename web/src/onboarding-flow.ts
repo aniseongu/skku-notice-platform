@@ -3,8 +3,8 @@ import { boardsForPrograms } from './skku-boards.ts';
 import { MAX_PROGRAMS, programKey, type Program } from './skku-programs.ts';
 import type { UserProfile } from './profile.ts';
 
-export type Step = 'primary' | 'double' | 'status' | 'boards' | 'etc' | 'notify';
-export const STEPS: readonly Step[] = ['primary', 'double', 'status', 'boards', 'etc', 'notify'];
+export type Step = 'primary' | 'double' | 'status' | 'boards' | 'etc' | 'ai' | 'notify';
+export const STEPS: readonly Step[] = ['primary', 'double', 'status', 'boards', 'etc', 'ai', 'notify'];
 
 // 골라서 쓰는 키워드. 직접 쓰는 입력은 설정에서 한다(처음에는 고르기만 해도 되게).
 export const KEYWORD_SUGGESTIONS = ['장학', '인턴', '채용', '공모전', '대외활동', '교환학생', '수강신청', '졸업', '특강', '등록금'] as const;
@@ -14,6 +14,7 @@ export interface Draft {
   programs: Program[];
   year: number | null;
   enrollmentStatus: string | null;
+  militaryService: string | null;
   boards: string[];
   keywords: string[];
   /** 사용자가 게시판을 직접 바꿨으면 전공을 고쳐도 추천으로 덮어쓰지 않는다. */
@@ -27,6 +28,7 @@ export function initialDraft(profile: UserProfile, subscriptions: string[], keyw
     year: profile.year,
     // 가장 흔한 값을 미리 골라 두어 클릭을 줄인다. 이미 정한 사람의 값은 그대로 둔다.
     enrollmentStatus: profile.enrollmentStatus ?? '재학',
+    militaryService: profile.militaryService,
     boards: subscribed ? [...subscriptions] : boardsForPrograms(profile.programs),
     keywords: [...keywords],
     boardsTouched: subscribed,
@@ -50,7 +52,9 @@ export function canContinue(step: Step, draft: Draft, doubleAnswer: DoubleAnswer
   switch (step) {
     case 'primary': return draft.programs.length >= 1;
     case 'double': return doubleAnswer === 'no' || draft.programs.length >= 2;
-    case 'status': return draft.year !== null && draft.enrollmentStatus !== null;
+    // 졸업한 사람은 학년이 없어도 된다.
+    case 'status': return draft.enrollmentStatus !== null && (draft.year !== null || draft.enrollmentStatus === '졸업');
+    case 'ai': return true;
     case 'etc': return true;
     case 'boards': return true;
     case 'notify': return true;
