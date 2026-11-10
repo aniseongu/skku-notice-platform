@@ -26,9 +26,9 @@
   .setting-saved { margin-top: 4px; font-size: 13px; color: var(--accent); font-weight: 600; }
   .setting-control { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-width: 0; }
   .device-name-action { min-height: 44px; }
-  .inline { display: flex; flex-wrap: wrap; gap: 8px; }
+  .inline-row { display: flex; flex-wrap: wrap; gap: 8px; }
   /* 입력칸의 기본 최소 폭(약 300px) 때문에 옆 단추가 아래 줄로 떨어지지 않게 한다. */
-  .inline .input { flex: 1 1 200px; min-width: 0; }
+  .inline-row .input { flex: 1 1 200px; min-width: 0; }
   /* 단추는 혼자 있어도 글자 폭만큼. 한 줄에 둔 단추들과 폭 규칙을 같게 한다. */
   .setting-control > .ghost-button, .setting-control > .solid-button { align-self: flex-start; }
   .setting-control > :first-child { margin-top: 0; }
@@ -56,7 +56,7 @@
   .device-name { display: flex; align-items: center; gap: 8px; font-weight: 600; }
   .device-list .field-note { grid-column: 1; margin: 0; }
   .device-actions { grid-row: 1 / span 2; grid-column: 2; display: flex; gap: 4px; }
-  .device-list li > .inline { grid-column: 1 / -1; }
+  .device-list li > .inline-row { grid-column: 1 / -1; }
   .time-control { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
   .time-numbers { display: flex; align-items: center; gap: 6px; }
   .time-number { width: 56px; min-width: 0; padding: 10px 6px; text-align: center; font-variant-numeric: tabular-nums; appearance: textfield; }
@@ -83,8 +83,10 @@
     /* 이름과 설명은 왼쪽, 조작은 오른쪽 끝에 맞춘다. 단추가 칸 가운데에 어정쩡하게 뜨지 않게 오른쪽 열은 내용 폭(최대 520px)이다. */
     .setting { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px); gap: 24px; align-items: start; }
     .setting-control > .ghost-button, .setting-control > .solid-button, .setting-control > .segmented, .setting-control > .time-control { align-self: flex-end; }
-    .setting-control > .inline { justify-content: flex-end; }
+    .setting-control > .inline-row { justify-content: flex-end; }
     .setting-control > .field-note, .setting-control > .setting-state { text-align: right; }
+    /* 안내 목록은 오른쪽 열에 왼쪽 정렬로 두면 오른쪽 끝에 맞춘 조작과 어긋나므로 전체 폭 아래에 둔다. */
+    .setting:has(> .setting-control > .rule-list) { grid-template-columns: minmax(0, 1fr); gap: 8px; }
     .box > .settings-lead { padding-top: 12px; margin: 0 0 4px; }
     .setting:has(> .setting-control > .connection-summary) > .setting-text { padding-top: 11px; }
   }

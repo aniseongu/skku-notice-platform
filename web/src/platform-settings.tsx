@@ -297,7 +297,7 @@ function DeleteAccount({ model }: { model: SettingsModel }) {
     {confirming ? <div className="delete-confirm" role="group" aria-labelledby="delete-account-title" aria-describedby="delete-account-help" aria-busy={account.busy}>
       <p id="delete-account-title" className="delete-title">계정을 삭제할까요?</p>
       <p id="delete-account-help" className="setting-help">구독, 키워드, 저장한 공지까지 계정 정보가 모두 삭제돼요. 삭제한 뒤에는 되돌릴 수 없어요</p>
-      <div className="inline">
+      <div className="inline-row">
         <button type="button" className="ghost-button" ref={closeRef} disabled={account.busy} onClick={() => setConfirming(false)}>닫기</button>
         <button type="button" className="solid-button danger" disabled={account.busy} onClick={account.remove}>{account.busy ? '삭제하고 있어요' : '삭제하기'}</button>
       </div>
@@ -314,7 +314,7 @@ function DeviceRow({ device, info }: { device: Device; info: NonNullable<Setting
   const save = async () => { if (validDeviceName(draft) && await info.rename(device.id, draft)) setEditing(false); };
   return <li>
     {editing
-      ? <div className="inline">
+      ? <div className="inline-row">
         <input className="input" aria-label={`${name} 이름`} value={draft} maxLength={40} autoFocus onChange={(event) => setDraft(event.currentTarget.value)}
           onKeyDown={(event) => { if (event.key === 'Enter') void save(); if (event.key === 'Escape') setEditing(false); }} />
         <button type="button" className="solid-button" disabled={info.busy || !validDeviceName(draft)} onClick={() => void save()}>저장하기</button>
@@ -343,7 +343,7 @@ function Notifications({ model }: { model: SettingsModel }) {
       <Setting name="이 기기 알림" help="앱을 닫아도 브라우저가 켜져 있으면 알림으로 받아요">
         {!model.userId ? <p className="field-note">로그인하면 이 기기로 알림을 받을 수 있어요</p> : <>
           <span className="setting-state">{on ? '켜져 있어요' : '꺼져 있어요'} · 브라우저 권한 {permissionText(model.pushStatus)}</span>
-          <div className="inline">
+          <div className="inline-row">
             {on
               ? <><button type="button" className="ghost-button" onClick={model.disablePush}>알림 끄기</button>
                 <button type="button" className="ghost-button" onClick={model.testNotification}>테스트 알림 띄우기</button></>
@@ -487,7 +487,7 @@ function Keywords({ model }: { model: SettingsModel }) {
       <h2 id="s-keywords" className="settings-head">관심 키워드</h2>
       <div className="box">
         <Setting name="키워드" help={'제목이나 본문에 이 글자가 그대로 들어간 공지를 "관심"으로 표시해요'}>
-          <div className="inline">
+          <div className="inline-row">
             <input className="input" type="text" autoComplete="off" aria-label="새 키워드" placeholder="예: 겨울방학 인턴" value={draft}
               onChange={(event) => setDraft(event.currentTarget.value)}
               onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); add(); } }} />
@@ -558,7 +558,7 @@ function CalendarPage({ model }: { model: SettingsModel }) {
         <p className="setting-help">마감이 남은 저장 공지를 "성대 공지" 캘린더에 넣어요</p>
         <span className="setting-state">{connected ? (auto.active ? '연결됨 · 30분마다 자동으로 맞춰요' : '연결됨') : '연결 안 됨'}</span>
         {connected && !auto.active ? <p className={`field-note ${auto.error ? 'error' : ''}`} role={auto.error ? 'alert' : 'status'}>{auto.error ?? '자동으로 맞추려면 다시 연결해 주세요'}</p> : null}
-        <div className="inline">
+        <div className="inline-row">
           {connected
             ? <button type="button" className="ghost-button" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '맞추고 있어요' : '지금 맞추기'}</button>
             : <button type="button" className="solid-button" disabled={calendar.busy} onClick={calendar.connect}>구글 캘린더에 연결하기</button>}
@@ -608,7 +608,7 @@ function Profile({ model }: { model: SettingsModel }) {
     </Section>
     <Section id="s-school" title="학교 정보">
       <Setting name="학년 및 학기" help="인턴 공고의 지원 자격을 가릴 때만 써요">
-        <div className="flex flex-col gap-[8px]">
+        <div className="flex flex-col gap-[8px] min-[720px]:items-end">
           <Choice label="학년" value={profile.year} disabled={!ready}
             options={YEARS.map((year) => [year, year === 5 ? '5학년 이상' : `${year}학년`] as const)} onPick={(year) => save({ year })} />
           <Choice label="학기" value={profile.semester} disabled={!ready}
@@ -674,12 +674,12 @@ function SecretRow({ name, help, placeholder, status, loading, busy, error, onRe
   const state = loading ? '확인 중' : status ? `저장됨 ····${status.keyHint}${status.disabled ? ' (사용 중지됨)' : ''}` : '미설정';
   return <Setting name={name} help={help}>
     {editing ? <>
-      <div className="inline">
+      <div className="inline-row">
         <input className="input" type={shown ? 'text' : 'password'} autoComplete="off" spellCheck={false} aria-label={name}
           placeholder={placeholder} value={value} disabled={busy} onChange={(event) => setValue(event.currentTarget.value.trim())} />
         <button type="button" className="ghost-button" aria-pressed={shown} disabled={busy} onClick={() => setShown(!shown)}>{shown ? '숨기기' : '보기'}</button>
       </div>
-      <div className="inline">
+      <div className="inline-row">
         <button type="button" className="solid-button" disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인하고 있어요' : '저장하기'}</button>
         <button type="button" className="ghost-button" disabled={busy} onClick={() => { setEditing(false); setValue(''); setShown(false); }}>닫기</button>
       </div>
