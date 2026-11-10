@@ -2,6 +2,7 @@
 // 스타터는 public/sw.js에 Workbox CDN을 불러오지만, 여기서는 generateSW로 서비스 워커를 빌드 때 만든다.
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import tailwindcss from '@tailwindcss/vite';
 import { APP_NAME } from './src/brand';
 
 export default defineConfig({
@@ -9,6 +10,7 @@ export default defineConfig({
   base: './',
   build: { target: 'es2022', assetsDir: 'code' },
   plugins: [
+    tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: null,
