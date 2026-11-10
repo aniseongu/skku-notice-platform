@@ -334,16 +334,16 @@ function ViewFilters({ app }: { app: AppController }) {
     const selectedUnread = selectedVisible.filter((notice) => !app.isRead(notice)).length;
     const selectedRead = selectedVisible.length - selectedUnread;
     const count = selectedVisible.length;
-    return <div className="view-options select-options flex-wrap gap-y-[8px] bg-[color-mix(in_oklch,var(--accent)_8%,var(--surface))] py-[8px]" role="group" aria-label="공지 선택">
+    return <div className="view-options select-options flex-wrap gap-y-[8px] bg-[color-mix(in_oklch,var(--accent)_8%,var(--surface))] py-[4px] min-[720px]:py-[8px]" role="group" aria-label="공지 선택">
       <label className={`select-all order-1 ${count ? 'font-semibold text-ink' : ''}`}><input type="checkbox" ref={allBox} checked={everyone} disabled={!list.length}
         onChange={(event) => { app.selectedReads = event.currentTarget.checked ? list.map((notice) => notice.id) : []; }} />
         <span aria-live="polite">{count ? <><b className="font-semibold text-accent">{count}개</b> 선택됨</> : '전체 선택'}</span></label>
       <button type="button" className={`${SELECT_BTN} order-2 ml-auto bg-transparent font-medium text-ink-2 hover:bg-hover min-[720px]:order-3 min-[720px]:ml-0`} onClick={() => app.closeSelection()}>완료</button>
       <div className="order-3 flex w-full gap-[8px] min-[720px]:order-2 min-[720px]:ml-auto min-[720px]:w-auto">
-        <button type="button" className={`${SELECT_BTN} bg-accent font-semibold text-on-accent disabled:opacity-40`} disabled={!selectedUnread}
+        <button type="button" className={`${SELECT_BTN} bg-accent font-semibold text-on-accent disabled:bg-sunken disabled:text-ink-3`} disabled={!selectedUnread}
           aria-label={`선택한 읽지 않은 공지 ${selectedUnread}개 읽음으로 표시`}
           onClick={() => app.markSelectedRead(true)}>읽음으로 표시</button>
-        <button type="button" className={`${SELECT_BTN} bg-sunken font-semibold text-ink disabled:opacity-40`} disabled={!selectedRead}
+        <button type="button" className={`${SELECT_BTN} border border-line bg-transparent font-semibold text-ink disabled:text-ink-3`} disabled={!selectedRead}
           aria-label={`선택한 읽은 공지 ${selectedRead}개 읽지 않음으로 표시`}
           onClick={() => app.markSelectedRead(false)}>안 읽음으로 표시</button>
       </div>

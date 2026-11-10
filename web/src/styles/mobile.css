@@ -78,7 +78,7 @@
                                                                     color-mix(in oklch, var(--surface) 40%, var(--bg))); }
   .batch-row:has(.row[aria-current="true"]) .selection-check, .batch-row:has(.row:active) .selection-check { background: var(--sunken); }
   .selection-check { display: grid; place-items: center; flex: none; width: 44px; min-height: 44px; cursor: pointer; }
-  .selection-check input, .select-all input { appearance: none; position: relative; width: 20px; height: 20px; margin: 0; flex: none; border: 2px solid var(--text-3); border-radius: 6px; background: transparent; cursor: pointer; }
+  .selection-check input, .select-all input { appearance: none; position: relative; width: 20px; height: 20px; margin: 0; flex: none; border: 2px solid var(--text-2); border-radius: 6px; background: transparent; cursor: pointer; }
   .selection-check input:checked, .select-all input:checked, .select-all input:indeterminate { background: var(--accent); border-color: var(--accent); }
   .batch-row:has(.selection-check input:checked) .selection-check { background: color-mix(in oklch, var(--accent) 8%, var(--surface)); }
   .selection-check input:checked::after, .select-all input:checked::after { content: ""; position: absolute; left: 4px; top: 1px; width: 5px; height: 9px; border: solid var(--surface); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
