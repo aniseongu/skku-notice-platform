@@ -103,7 +103,8 @@ def test_without_a_key_no_gemini_call_and_static_rules_only():
     counts = run(store, models)
     assert models.calls == 0 and counts["grad_assessed"] == 1
     row = store.saved[0]
-    assert row["ai_status"] == "no_key" and row["department"]["status"] == "NEEDS_REVIEW"
+    # 키가 없어도 공고 글에서 코드로 읽을 수 있는 것은 읽는다(회사 이름·기간·전일제·업무 분야).
+    assert row["ai_status"] == "no_key" and row["department"]["status"] in ("LIKELY", "CONDITIONAL", "NEEDS_REVIEW")
 
 
 def test_disabled_key_or_daily_limit_never_calls_gemini():

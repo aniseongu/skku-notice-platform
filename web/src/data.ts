@@ -119,11 +119,10 @@ export const cleanTitle = (title: string) =>
 // 띄어쓰기 무시, 비슷한 말 포함(docs/design/ux-rules.md 2-1절).
 const squash = (text: string) => text.replace(/\s+/g, '').toLowerCase();
 
+import { keywordMatchesNotice } from './keyword-match';
 export function keywordMatches(keyword: string, text: string): boolean {
-  const haystack = squash(text);
-  const words = keyword.split(/\s+/).filter(Boolean);
-  // 그 글자가 그대로 있을 때만 맞는다. 비슷한 말이나 뜻으로는 맞추지 않는다(D-024).
-  return words.length > 0 && words.every((word) => haystack.includes(squash(word)));
+  // 낱말마다 따로 찾고(띄어쓰기 무시), 방학 낱말은 같은 뜻의 말로도 찾는다. 규칙은 keyword-match.ts와 DB의 keyword_in_text가 같다.
+  return keywordMatchesNotice(keyword, text);
 }
 
 // 날짜 계산은 모두 한국 시간 기준 날짜(YYYY-MM-DD)로 한다.

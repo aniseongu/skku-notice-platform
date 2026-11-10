@@ -3,7 +3,7 @@ import json
 from datetime import date
 
 from skku_notice import grad_intern_facts as gf
-from skku_notice.grad_intern_rules import LIKELY, NEEDS_REVIEW, GradProfile, assess_department
+from skku_notice.grad_intern_rules import CONDITIONAL, LIKELY, GradProfile, assess_department
 
 PROFILE = GradProfile(2022, "original_major", True, True)
 TITLE = "[(주)예시모빌리티] 차량 진단 및 OTA 소프트웨어 검증 인턴 모집"
@@ -54,16 +54,17 @@ def test_full_extraction_drives_the_department_rules_end_to_end():
 def test_without_ai_only_static_facts_remain_and_the_result_needs_review():
     extracted = gf.build_facts(TITLE, BODY, None)
     assert extracted.ai_used is False
-    # 제목에 회사 이름이 있으면 키 없이도 회사로 본다(소유자 지시). 담당 업무는 Gemini 없이는 모른다.
-    assert extracted.facts.task_category == "unknown" and extracted.facts.organization_type == "incorporated_company"
-    assert assess_department(PROFILE, extracted.facts).status == NEEDS_REVIEW
-    assert "담당 업무" in set(extracted.missing) and "기관 종류" not in set(extracted.missing)
+    # 키가 없어도 공고 글에서 코드로 읽는다: 제목의 회사 이름, 모집 직무("테스트 자동화")의 업무 분야, 전일제와 근무 기간.
+    assert extracted.facts.task_category == "software_qa" and extracted.facts.organization_type == "incorporated_company"
+    assert assess_department(PROFILE, extracted.facts).status in (LIKELY, CONDITIONAL)
+    assert "담당 업무" not in set(extracted.missing) and "기관 종류" not in set(extracted.missing)
 
 
 def test_t30_model_claim_without_a_quote_in_the_posting_is_dropped():
     reply = ai_reply(evidence=[{"field": "tasks", "quote": "공고에 없는 문장입니다 정말로"}])
     extracted = gf.build_facts(TITLE, BODY, reply)
-    assert extracted.facts.task_category == "unknown"  # 근거 없는 모델 주장은 버린다(회사 이름은 제목에서 읽는다)
+    # 근거 없는 모델 주장은 버린다. 업무 분야는 공고의 모집 직무 글에서 코드로 읽은 값이다.
+    assert extracted.facts.task_category == "software_qa"
     assert extracted.tasks == [t for t in extracted.tasks if gf.quote_in_text(t, TITLE + BODY)]
 
 
@@ -91,7 +92,7 @@ def test_invalid_enum_dates_and_numbers_never_become_facts():
     bad = ai_reply(work_mode="sometimes", start_date="2027-02-30", end_date="x", explicitly_stated_hours=-5,
                    task_category="magic", academic_credit="many")
     extracted = gf.build_facts(TITLE, BODY, bad)
-    assert extracted.facts.task_category == "unknown"
+    assert extracted.facts.task_category == "software_qa"  # 모델의 magic은 버리고 공고 글에서 읽은 값만 남는다
     assert extracted.facts.explicitly_stated_hours is None and extracted.facts.academic_credit is None
 
 
@@ -212,3 +213,32 @@ def test_요약_한_문장만으로도_회사_이름과_개월_수를_읽고_프
     assert extracted.organization_name == "넷마블네오" and extracted.facts.organization_type == "incorporated_company"
     assert extracted.facts.duration_months == 5
     assert "넷마블네오" in SYSTEM and "요약:" in SYSTEM
+
+
+def test_공사·공단_이름은_공공기관으로_본다():
+    from skku_notice.grad_intern_facts import build_facts
+
+    agency = build_facts("[한국관광공사] 2027년 체험형 청년인턴", "한국관광공사에서 인턴을 모집합니다.", None)
+    assert agency.facts.organization_type == "public_agency"
+    assert agency.facts.corporate_status_verified is False
+
+
+def test_LLM_없이_실제_공고_모양에서_기간과_근무_형태와_업무_분야를_읽는다():
+    from skku_notice.grad_intern_facts import build_facts
+
+    ui = build_facts("[지엘엔인터내셔널] [하나금융그룹] UI체험형인턴 모집", (
+        "접수 기간 2026-11-10 ~ 2026-11-22\n\n모집부문 및 상세내용\nUI 디자인\n(0명)담당업무\nGUI 및 콘텐츠 디자인 업무 지원\n"
+        "서비스 품질 향상을 위한 QA 업무 지원\n\n\n채용형태\n- 인턴 6개월\n\n자격요건\n피그마 능력\n\n근무조건\n근무시간\n주 5일(월~금) 09:00 ~ 18:00\n"), None)
+    assert ui.facts.duration_months == 6 and ui.facts.duration_days == 180
+    assert ui.facts.work_mode == "full_time"          # 주 5일 + 하루 9시간
+    assert ui.facts.start_date is None                 # 접수 기간은 근무 기간이 아니다
+
+    store = build_facts("[이마트24] 2027년 신입인턴 채용", (
+        "[담당업무]\n신규 오픈점 개점 준비 및 운영 업무 실습\n직영점 상품, 매출, 재고 등 점포 운영 관리\n점포 매출 활성화 및 운영 효율 개선 활동\n\n\n[접수기간]\n11월 09일 ~ 11월 18일\n"), None)
+    assert store.facts.task_category == "non_software"
+
+    dev = build_facts("[게임사] 서버 개발 인턴", "[담당업무]\n- 게임 서버 개발 및 Python 도구 제작\n- 백엔드 API 구현\n\n\n[접수기간]\n11월 1일 ~ 11월 20일\n", None)
+    assert dev.facts.task_category == "application_embedded"
+
+    mixed = build_facts("[회사] 인턴", "[담당업무]\n- 서비스 기획 및 마케팅\n- 백엔드 개발 지원\n\n\n[접수기간]\n11월\n", None)
+    assert mixed.facts.task_category == "unknown"      # 섞인 직무는 코드로 단정하지 않는다

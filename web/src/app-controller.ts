@@ -20,6 +20,7 @@ import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from '
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
 import { byokAvailable, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
+import { keywordMatchesNotice } from './keyword-match';
 import { loadGraduation, loadGraduationStatuses, badgeOf, gradParts, requestGraduation, isInternshipNotice, type GradPart, type GraduationBadge, type GraduationStatuses, isSoftwareOriginal, visibleTracks, type GraduationAssessment } from './graduation-assessment';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import type { Draft } from './onboarding-flow';
@@ -580,7 +581,9 @@ export class AppController extends Reactive {
     // 제목과 분류(이 기기에서) + 서버가 본문과 그림 글자에서 찾은 것. 판정 이유 문장은 보지 않는다(D-024).
     const judgement = this.judgement(notice);
     const text = `${notice.title} ${notice.title_ko ?? ''} ${notice.category ?? ''}`;
-    const found = new Set(this.keywords.filter((word) => keywordMatches(word, text)));
+    // 방학 키워드는 공고에서 뽑은 근무 기간(약 2개월, 그 방학 기간)이어도 맞는다. 판정이 아직 없으면 글자와 같은 뜻의 말로만 본다.
+    const period = this.graduationStatuses.get(notice.id)?.period;
+    const found = new Set(this.keywords.filter((word) => keywordMatchesNotice(word, text, period)));
     for (const word of judgement?.interests ?? []) {
       if (this.keywords.includes(word)) found.add(word);
     }

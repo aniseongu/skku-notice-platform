@@ -2,6 +2,7 @@
 // 이 모듈은 본인 행만 읽고 "확인 요청"만 쓴다. 결과를 "인정"이라고 말하지 않는다(최종 인증은 학과와 학교가 한다).
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { UserProfile } from './profile.ts';
+import type { WorkPeriod } from './keyword-match.ts';
 
 export type Status = 'LIKELY' | 'CONDITIONAL' | 'NEEDS_REVIEW' | 'NOT_ELIGIBLE' | 'NOT_APPLICABLE';
 const STATUSES: readonly Status[] = ['LIKELY', 'CONDITIONAL', 'NEEDS_REVIEW', 'NOT_ELIGIBLE', 'NOT_APPLICABLE'];
@@ -140,7 +141,7 @@ export function isInternshipNotice(notice: { title: string; source_id?: string }
 
 /** 목록 표지: 내가 채워야 할 요건에 이 공고가 맞는지. */
 export type GraduationBadge = 'ok' | 'review' | 'no';
-export interface GraduationStatuses { dept: Status | null; p3: Status | null }
+export interface GraduationStatuses { dept: Status | null; p3: Status | null; period?: WorkPeriod }
 
 /** 보이는 영역의 판정을 하나로 합친다. 아직 판정이 없으면(현장실습 모집처럼 열어서 봐야 알 수 있는 공고) review. 하나라도 가능하면 ok, 아니면 확인 필요가 있으면 review, 모두 안 맞으면 no. */
 export function badgeOf(statuses: GraduationStatuses | undefined, tracks: VisibleTracks): GraduationBadge | null {
@@ -170,14 +171,20 @@ export function gradParts(statuses: GraduationStatuses | undefined, tracks: Visi
 
 /** 내 판정 결과의 요약만 한 번에 읽는다(목록 표지와 "졸업요건 충족만 보기"에 쓴다). */
 export async function loadGraduationStatuses(client: SupabaseClient, userId: string): Promise<Map<string, GraduationStatuses>> {
-  const { data, error } = await client.from('user_notice_graduation_assessments').select('notice_id,department,university_3p')
+  const { data, error } = await client.from('user_notice_graduation_assessments').select('notice_id,department,university_3p,facts')
     .eq('user_id', userId).eq('status', 'READY').limit(1000);
   if (error) throw error;
   const read = (value: unknown): Status | null => {
     const status = (value as { status?: unknown } | null)?.status;
     return STATUSES.includes(status as Status) ? status as Status : null;
   };
-  return new Map((data ?? []).map((row) => [String(row.notice_id), { dept: read(row.department), p3: read(row.university_3p) }]));
+  const period = (value: unknown): WorkPeriod | undefined => {
+    const facts = value as { start_date?: unknown; end_date?: unknown; duration_days?: unknown } | null;
+    if (!facts) return undefined;
+    const text = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+    return { start: text(facts.start_date), end: text(facts.end_date), days: typeof facts.duration_days === 'number' ? facts.duration_days : null };
+  };
+  return new Map((data ?? []).map((row) => [String(row.notice_id), { dept: read(row.department), p3: read(row.university_3p), period: period(row.facts) }]));
 }
 
 /** 학과에 문의할 때 붙여 넣을 질문. 개인 정보는 넣지 않는다. */

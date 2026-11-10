@@ -39,6 +39,7 @@ ORG_SENTENCE = re.compile(r"(?:^|[\n.:：]\s*)([가-힣A-Za-z][가-힣A-Za-z0-9&
 # 포스터 글: "넷마블네오에서 첫 플레이를 시작하세요", 연도와 함께 단독 줄로 나온 이름("2026넷마블네오")
 ORG_POSTER = re.compile(r"(?:^|[\n.:：])\s*([가-힣A-Za-z][가-힣A-Za-z0-9&·]{1,11})\s*에서\s[^\n]{0,24}?(?:시작|지원|도전|만나|함께)")
 ORG_YEAR_LINE = re.compile(r"^\s*20\d\d\s*([가-힣][가-힣A-Za-z0-9]{1,11})\s*$", re.M)
+PUBLIC_NAME = re.compile(r"공사$|공단$|진흥원|공공기관|시청|도청|구청|교육청|위원회")
 NON_COMPANY_NAME = re.compile(r"대학교|대학원|대학|연구실|학과|센터|학생|인턴십|채용|모집")
 CREDIT = re.compile(r"(\d(?:\.\d)?)\s*학점")
 
@@ -119,6 +120,42 @@ def lacks_key_facts(title: str, body: str) -> bool:
     return not (has_org and has_period and TASK_WORDS.search(text))
 
 
+
+# --- LLM 없이 코드로만 읽는 규칙(Gemini 키가 없어도 동작한다) ---
+# 근무 형태: "주 5일"과 하루 7시간 이상(예: 09:00 ~ 18:00, 하루 7H)이면 전일제로 본다. 파트타임·시간제 말이 있으면 정하지 않는다.
+WEEK5 = re.compile(r"주\s*5\s*일")
+DAY_HOURS = re.compile(r"하루\s*(\d{1,2})\s*(?:[Hh]|시간)")
+CLOCK = re.compile(r"(\d{1,2})\s*:\s*(\d{2})\s*[~\-–∼]\s*(\d{1,2})\s*:\s*(\d{2})")
+
+# 담당 업무 분야: 공고의 "담당업무"(없으면 제목과 앞부분) 칸에서 말을 찾는다. 소프트웨어 말만 있으면 그 분야, 소프트웨어가 아닌 말만 있으면
+# non_software, 섞여 있으면 정하지 않고 Gemini에 맡긴다(섞인 직무를 코드로 단정하지 않는다).
+TASK_SECTION = re.compile(r"(?:\[?\s*담당\s*업무\s*\]?|모집\s*직무|주요\s*업무|하는\s*일)\s*[:：]?\s*(.{20,900}?)(?=\n\s*\n\s*\n|\[\s*(?:접수|자격|우대|근무|복리|채용|지원)|자격\s*요건|우대\s*(?:사항|조건)|$)", re.S)
+SW_WORDS: dict[str, re.Pattern[str]] = {
+    "application_embedded": re.compile(r"소프트웨어\s*개발|SW\s*개발|프로그래밍|프론트\s*엔드|백\s*엔드|웹\s*개발|앱\s*개발|모바일\s*앱|임베디드|펌웨어|게임\s*개발|클라이언트\s*개발|서버\s*개발|Android|iOS|React|Spring|\bJava\b|Python|코딩|개발자|\bdeveloper\b|software engineer", re.I),
+    "data_ai": re.compile(r"데이터\s*분석|데이터\s*엔지니어|머신\s*러닝|딥\s*러닝|AI\s*모델|인공지능\s*(?:모델|개발)|LLM|MLOps|data\s*(?:scientist|engineer|analyst)", re.I),
+    "cloud_platform": re.compile(r"클라우드|인프라|DevOps|Kubernetes|\bAWS\b|\bGCP\b|Azure", re.I),
+    "system_network": re.compile(r"시스템\s*(?:운영|엔지니어|관리)|네트워크\s*(?:운영|엔지니어|구축)|서버\s*(?:운영|관리)"),
+    "security": re.compile(r"정보\s*보호|보안\s*(?:관제|운영|엔지니어|점검)|침투\s*테스트|사이버\s*보안", re.I),
+    "software_qa": re.compile(r"소프트웨어\s*테스트|테스트\s*자동화|QA\s*엔지니어|SW\s*품질", re.I),
+}
+NON_SW_WORDS = re.compile(r"영업|마케팅|회계|재무|인사|총무|상품\s*기획|MD\b|매장|점포|고객\s*(?:응대|관리)|\bCS\b|물류|생산\s*관리|설비|전기\s*(?:공사|설비)|디자인|콘텐츠\s*제작|경영\s*지원|행정|사무\s*보조|운영\s*지원|가맹점|브랜드|PR\b|홍보|번역|통역|연구\s*보조")
+
+
+def static_task_category(title: str, body: str) -> tuple[str, str] | None:
+    """(분야, 근거 문장) 또는 None. 코드만으로 뚜렷하게 정할 수 있을 때만 답한다."""
+    match = TASK_SECTION.search(body or "")
+    scope = match.group(1) if match else f"{title}\n{(body or '')[:500]}"
+    sw = {name: len(pattern.findall(scope)) for name, pattern in SW_WORDS.items() if pattern.search(scope)}
+    non = NON_SW_WORDS.search(scope)
+    if sw and not non:
+        name = max(sw, key=lambda k: sw[k])
+        hit = SW_WORDS[name].search(scope)
+        return name, hit.group(0) if hit else name
+    if non and not sw and match:  # 담당 업무 칸이 있고 소프트웨어 말이 하나도 없을 때만 소프트웨어가 아니라고 본다
+        return "non_software", non.group(0)
+    return None
+
+
 def static_facts(title: str, body: str) -> dict:
     """정규식으로 읽을 수 있는 사실. 모호하면 비워 둔다(예: 전일제와 파트타임이 함께 적힌 공고)."""
     text = f"{title}\n{body}"[:MAX_TEXT]
@@ -156,6 +193,18 @@ def static_facts(title: str, body: str) -> dict:
         found["explicitly_stated_hours"] = hours.pop()
         match = TOTAL_HOURS.search(text)
         found["evidence"].append({"field": "hours", "quote": match.group(0)})
+    if "work_mode" not in found and not PART_TIME.search(text):
+        clock = CLOCK.search(text)
+        day_hours = DAY_HOURS.search(text)
+        span = ((int(clock.group(3)) * 60 + int(clock.group(4))) - (int(clock.group(1)) * 60 + int(clock.group(2)))) / 60 if clock else 0
+        long_day = span >= 7 or (day_hours is not None and int(day_hours.group(1)) >= 7)
+        if WEEK5.search(text) and (long_day or not clock):
+            found["work_mode"] = "full_time"
+            found["evidence"].append({"field": "work_mode", "quote": (WEEK5.search(text) or clock).group(0)})
+    category = static_task_category(title, body)
+    if category:
+        found["task_category"], quote = category
+        found["evidence"].append({"field": "tasks", "quote": quote})
     for pattern in (ORG_LABEL, ORG_LEGAL, ORG_SENTENCE, ORG_POSTER, ORG_YEAR_LINE):
         match = pattern.search(text)
         name = next((g for g in (match.groups() if match else ()) if g), "").strip(" .-:：")
@@ -313,7 +362,8 @@ def build_facts(title: str, body: str, ai: dict | None) -> Extracted:
     # 회사 이름이 적혀 있으면 회사로 본다(소유자 지시 2026-11-11: (주)·주식회사 표기는 없어도 된다). 키가 없어 Gemini가 기관 종류를
     # 못 채운 경우에도 같다. 대학교·연구실·센터처럼 회사가 아닌 이름은 제외한다.
     if org_name and "organization_type" not in values and not NON_COMPANY_NAME.search(org_name):
-        values["organization_type"] = "incorporated_company"
+        # 공사·공단·진흥원 같은 이름은 공공기관이다(규정에서 회사와 따로 본다).
+        values["organization_type"] = "public_agency" if PUBLIC_NAME.search(org_name) else "incorporated_company"
         evidence.append({"field": "organization", "quote": org_name})
 
     # 법인 여부: 이 서비스에 올라오는 기업·연구소 공고는 모두 법인으로 본다(소유자 지시). 모델의 단언은 쓰지 않고
