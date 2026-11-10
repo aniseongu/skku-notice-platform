@@ -50,7 +50,7 @@ class MemoryStore:
 
 def test_shared_ocr_is_cached_by_image_hash(monkeypatch):
     store = MemoryStore()
-    monkeypatch.setattr(job, "fetch_image", lambda *_: SimpleNamespace(data=b"image"))
+    monkeypatch.setattr(job, "fetch_image", lambda *_, **__: SimpleNamespace(data=b"image"))
     calls = []
     monkeypatch.setattr(job, "read_images", lambda images: calls.append(images) or "한국어 공지")
     assert job.run_one(store, "test", NOW) == "processed"
@@ -64,7 +64,7 @@ def test_stale_images_are_removed_without_fetching(monkeypatch):
     store = MemoryStore()
     store.present = False
     monkeypatch.setattr(
-        job, "fetch_image", lambda *_: (_ for _ in ()).throw(AssertionError("unexpected fetch"))
+        job, "fetch_image", lambda *_, **__: (_ for _ in ()).throw(AssertionError("unexpected fetch"))
     )
     assert job.run_one(store, "test", NOW) == "stale"
     assert store.removed
@@ -72,7 +72,7 @@ def test_stale_images_are_removed_without_fetching(monkeypatch):
 
 def test_attempt_is_recorded_before_a_worker_crash(monkeypatch):
     store = MemoryStore()
-    monkeypatch.setattr(job, "fetch_image", lambda *_: SimpleNamespace(data=b"image"))
+    monkeypatch.setattr(job, "fetch_image", lambda *_, **__: SimpleNamespace(data=b"image"))
 
     def crash(_images):
         raise RuntimeError("interrupted")
@@ -88,7 +88,7 @@ def test_attempt_is_recorded_before_a_worker_crash(monkeypatch):
 def test_failed_refresh_preserves_last_good_result(monkeypatch):
     store = MemoryStore()
     store.image["status"] = "ready"
-    monkeypatch.setattr(job, "fetch_image", lambda *_: None)
+    monkeypatch.setattr(job, "fetch_image", lambda *_, **__: None)
     assert job.run_one(store, "test", NOW) == "failed"
     assert store.marked[0][-2:] == (None, True)
 

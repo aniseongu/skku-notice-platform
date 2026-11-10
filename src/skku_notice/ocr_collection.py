@@ -157,7 +157,8 @@ def run_one(store: OCRStore, user_agent: str, now: datetime, *, discover: bool =
         return "stale"
     # Record the attempt first so an OOM or timeout cannot block the queue forever.
     store.start_attempt(notice_id, image_url, now)
-    image = fetch_image(image_url, user_agent)
+    # 외부 인턴 공고의 그림도 읽는다. 허용 목록의 공개 이미지 호스트만 열린다(fetch.EXTERNAL_IMAGE_HOSTS).
+    image = fetch_image(image_url, user_agent, allow_external=True)
     if image is None:
         store.mark(notice_id, image_url, now, None, was_ready=was_ready)
         return "failed"
