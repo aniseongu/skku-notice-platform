@@ -3,6 +3,7 @@
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
+import { aiModeLabel, PROVIDER_GUIDE, looksLikeAiKey, type AiKeyStatus, type AiPreferences, type AiProvider } from './ai-providers';
 import { backfillNote, looksLikeGeminiKey, type ByokStatus, type CanvasStatus } from './byok';
 import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, validDeviceName, type CanvasMode, type Device } from './devices';
 import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
@@ -95,6 +96,10 @@ export interface SettingsModel {
     backfill: number;
     register: (apiKey: string) => void;
     remove: () => void;
+    ai?: {
+      keys: AiKeyStatus[]; prefs: AiPreferences; busy: boolean; error: string; gemini: boolean;
+      register: (provider: AiProvider, key: string) => void; remove: (provider: AiProvider) => void; savePrefs: (prefs: AiPreferences) => void;
+    };
     canvas: CanvasStatus | null;
     canvasBusy: boolean;
     canvasError: string;
@@ -179,7 +184,7 @@ function Overview({ model }: { model: SettingsModel }) {
             {model.name && model.email ? <span className="setting-help">{model.email}</span> : null}</div>
         </div>
         <SettingsLink model={model} label="프로필 설정" help={profileSummary(model.profile)} section="profile" />
-        <SettingsLink model={model} label="연결 키" help="Gemini 키와 아이캠퍼스 토큰" section="keys" />
+        <SettingsLink model={model} label="연결 키" help="Gemini·Groq·OpenRouter 키와 아이캠퍼스 토큰" section="keys" />
         <Setting name="로그아웃" help="이 기기에서만 나가요. 구독과 저장은 계정에 남아요">
           <button type="button" className="ghost-button" disabled={model.authBusy} onClick={model.signOut}>이 기기에서 로그아웃</button>
           {model.authError ? <p className="field-note error" role="alert">{model.authError}</p> : null}
@@ -573,7 +578,7 @@ function CalendarPage({ model }: { model: SettingsModel }) {
         {calendar.error ? <p className="field-note error m-0" role="alert">{calendar.error}</p> : null}
       </Setting>
       <div className="setting stacked">
-        <Guide label="연결하는 방법" steps={[
+        <Guide bare label="연결하는 방법" steps={[
           '"구글 캘린더에 연결하기"를 눌러 구글 허용 화면으로 가요',
           '"확인되지 않은 앱"이라고 나오면 "고급"을 누른 뒤 "계속"을 눌러요',
           '허용하고 돌아오면 "성대 공지" 캘린더가 생기고 마감이 바로 들어가요',
@@ -649,8 +654,9 @@ function Profile({ model }: { model: SettingsModel }) {
   </div>;
 }
 
-function Guide({ label, steps }: { label: string; steps: ReactNode[] }) {
-  return <details className="connection-manual"><summary>{label}</summary><ol className="steps">{steps.map((step, index) => <li key={index}>{step}</li>)}</ol></details>;
+// bare: 이미 위에 구분선이 있는 묶음 안에서는 자기 윗선과 여백을 없애 선이 두 줄로 겹치지 않게 한다.
+function Guide({ label, steps, bare = false }: { label: string; steps: ReactNode[]; bare?: boolean }) {
+  return <details className={`connection-manual ${bare ? 'mt-0 border-t-0' : ''}`}><summary>{label}</summary><ol className="steps">{steps.map((step, index) => <li key={index}>{step}</li>)}</ol></details>;
 }
 
 const ext = (href: string, text: string) => <a href={href} target="_blank" rel="noopener noreferrer">{text}</a>;
@@ -721,6 +727,38 @@ function GeminiRow({ model }: { model: SettingsModel }) {
     note={backfillNote(byok.backfill, !!byok.status?.disabled)} />;
 }
 
+function AiProviderRow({ model, provider }: { model: SettingsModel; provider: AiProvider }) {
+  const ai = model.byok?.ai;
+  const info = PROVIDER_GUIDE[provider];
+  if (!ai || !model.byok?.available) return null;
+  const status = ai.keys.find((key) => key.provider === provider) ?? null;
+  const guide = <Guide label="받는 방법" steps={[ext(info.url, info.steps[0]), ...info.steps.slice(1)]} />;
+  return <SecretRow name={`${info.name} 키`} help={`${info.blurb}. 연결하지 않아도 기본 분석은 쓸 수 있어요`} placeholder={info.placeholder}
+    status={status} loading={model.byok.loading} busy={ai.busy} error={ai.error} guide={guide} valid={looksLikeAiKey}
+    onRegister={(value) => ai.register(provider, value)} onRemove={() => ai.remove(provider)} />;
+}
+
+function AiModeRow({ model }: { model: SettingsModel }) {
+  const ai = model.byok?.ai;
+  if (!ai || !model.byok?.available) return null;
+  const connected = ai.keys.filter((key) => !key.disabled).length + (ai.gemini ? 1 : 0);
+  const { prefs } = ai;
+  const many = connected > 1;
+  return <Setting name="AI 분석" help={aiModeLabel(connected, prefs)}>
+    <Choice label="AI 분석" value={prefs.aiEnabled ? 'on' : 'off'} disabled={ai.busy}
+      options={[['on', '켜기'], ['off', '끄기']] as const} onPick={(value) => ai.savePrefs({ ...prefs, aiEnabled: value === 'on' })} />
+    {many ? <>
+      <Choice label="여러 키 사용 방식" value={prefs.routingMode} disabled={ai.busy || !prefs.aiEnabled}
+        options={[['manual', '직접 고르기'], ['auto', '자동 선택']] as const}
+        onPick={(value) => ai.savePrefs({ ...prefs, routingMode: value, autoRoutingConsent: value === 'auto' })} />
+      <p className="field-note">자동 선택을 켜면 내가 등록한 키 중 쓸 수 있는 곳으로 바뀔 수 있고, 분석할 공지 글이 그 업체로 보내져요</p>
+    </> : null}
+    <Choice label="요금" value={prefs.paidOptIn ? 'paid' : 'free'} disabled={ai.busy || !prefs.aiEnabled}
+      options={[['free', '무료만 쓰기'], ['paid', '유료도 허용']] as const} onPick={(value) => ai.savePrefs({ ...prefs, paidOptIn: value === 'paid' })} />
+    <p className="field-note">무료만 쓰기가 기본이에요. 키를 등록해도 유료 모델은 허용하기 전에는 쓰지 않아요</p>
+  </Setting>;
+}
+
 function CanvasRow({ model }: { model: SettingsModel }) {
   const { byok } = model;
   const help = '아이캠퍼스의 강의와 과제 마감을 알려드리는 데 써요';
@@ -746,7 +784,10 @@ function Keys({ model }: { model: SettingsModel }) {
   return <div className="settings">
     <Back model={model} />
     <Section id="s-keys" title="연결 키">
+      <AiModeRow model={model} />
       <GeminiRow model={model} />
+      <AiProviderRow model={model} provider="groq" />
+      <AiProviderRow model={model} provider="openrouter" />
       <CanvasRow model={model} />
     </Section>
   </div>;
