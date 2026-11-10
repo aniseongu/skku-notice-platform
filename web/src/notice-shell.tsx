@@ -334,7 +334,7 @@ function ViewFilters({ app }: { app: AppController }) {
     const selectedUnread = selectedVisible.filter((notice) => !app.isRead(notice)).length;
     const selectedRead = selectedVisible.length - selectedUnread;
     const count = selectedVisible.length;
-    return <div className="view-options select-options flex-wrap gap-y-[8px] bg-[color-mix(in_oklch,var(--accent)_8%,var(--surface))] min-h-[48px] py-[4px] min-[720px]:pt-[4px] min-[720px]:pb-0" role="group" aria-label="공지 선택">
+    return <div className="view-options select-options flex-wrap gap-y-[8px] bg-[color-mix(in_oklch,var(--accent)_8%,var(--surface))] border-b border-line min-h-[48px] py-[4px] min-[720px]:pt-[4px] min-[720px]:pb-0" role="group" aria-label="공지 선택">
       <label className={`select-all order-1 ${count ? 'font-semibold text-ink' : ''}`}><input type="checkbox" ref={allBox} checked={everyone} disabled={!list.length}
         onChange={(event) => { app.selectedReads = event.currentTarget.checked ? list.map((notice) => notice.id) : []; }} />
         <span aria-live="polite">{count ? <><b className="font-semibold text-accent">{count}개</b> 선택됨</> : '전체 선택'}</span>
