@@ -89,9 +89,14 @@ export async function loadGraduation(client: SupabaseClient, userId: string, not
 }
 
 /** 확인을 요청한다(다시 확인도 같다). 결과는 워커가 채우고, 같은 입력이면 저장된 결과를 다시 쓴다. */
+/** 새 요청은 insert, 이미 있으면 update로 다시 요청한다. 사용자는 요청 열만 쓸 수 있어서 upsert는 권한 오류(403)가 난다. */
 export async function requestGraduation(client: SupabaseClient, userId: string, noticeId: string): Promise<void> {
-  const { error } = await client.from('user_notice_graduation_assessments')
-    .upsert({ user_id: userId, notice_id: noticeId, status: 'PENDING', requested_at: new Date().toISOString() }, { onConflict: 'user_id,notice_id' });
+  const table = 'user_notice_graduation_assessments';
+  const requestedAt = new Date().toISOString();
+  let { error } = await client.from(table).insert({ user_id: userId, notice_id: noticeId, status: 'PENDING', requested_at: requestedAt });
+  if (error?.code === '23505') {
+    ({ error } = await client.from(table).update({ status: 'PENDING', requested_at: requestedAt }).eq('user_id', userId).eq('notice_id', noticeId));
+  }
   if (error) throw error;
 }
 

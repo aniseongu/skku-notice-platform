@@ -34,7 +34,8 @@ export const EMPTY_PROFILE: UserProfile = {
 };
 
 const COLUMNS = 'programs,year,semester,enrollment_status,military_service,onboarded_at,interests,wants,avoids';
-const EXTRA_COLUMNS = ',admission_year,university_3p_internship_selected,dept_internship_done,university_3p_internship_done';
+const EXTRA_COLUMNS = ',admission_year,university_3p_internship_selected';
+const DONE_COLUMNS = ',dept_internship_done,university_3p_internship_done';
 /** 새 열이 아직 없는 환경(마이그레이션 전)이면 예전 열만으로 다시 시도한다. */
 const missingColumn = (error: { code?: string; message?: string } | null) =>
   !!error && (error.code === '42703' || error.code === 'PGRST204' || /admission_year|university_3p_internship_selected|dept_internship_done|university_3p_internship_done/.test(error.message ?? ''));
@@ -44,8 +45,13 @@ export const OLD_ADMISSION_YEAR = 2016;  // "2016학번 이전"을 하나로 묶
 
 /** 행이 없으면 null이다. 테이블이 아직 없는 환경처럼 읽을 수 없으면 던진다(호출하는 쪽이 온보딩을 숨긴다). */
 export async function loadProfile(client: SupabaseClient, userId: string): Promise<UserProfile | null> {
-  let { data: raw, error } = await client.from('user_profiles').select(COLUMNS + EXTRA_COLUMNS).eq('user_id', userId).maybeSingle();
-  if (missingColumn(error)) ({ data: raw, error } = await client.from('user_profiles').select(COLUMNS).eq('user_id', userId).maybeSingle());
+  // 새 열이 없는 환경이면 가장 새로운 열부터 하나씩 빼며 다시 읽는다(있는 열은 그대로 읽는다).
+  let data_: unknown = null, error: { code?: string; message?: string } | null = null;
+  for (const columns of [COLUMNS + EXTRA_COLUMNS + DONE_COLUMNS, COLUMNS + EXTRA_COLUMNS, COLUMNS]) {
+    ({ data: data_, error } = await client.from('user_profiles').select(columns).eq('user_id', userId).maybeSingle());
+    if (!missingColumn(error)) break;
+  }
+  const raw = data_;
   if (error) throw error;
   const data = raw as unknown as Record<string, any> | null;  // eslint-disable-line @typescript-eslint/no-explicit-any
   if (!data) return null;
@@ -103,10 +109,12 @@ export async function saveProfile(client: SupabaseClient, userId: string, profil
     onboarded_at: profile.onboardedAt, updated_at: new Date().toISOString(),
     interests: cleanText(profile.interests), wants: cleanText(profile.wants), avoids: cleanText(profile.avoids),
   };
-  let { error } = await client.from('user_profiles').upsert({
-    ...row, admission_year: profile.admissionYear, university_3p_internship_selected: profile.university3pInternshipSelected,
-    dept_internship_done: profile.deptInternshipDone, university_3p_internship_done: profile.university3pInternshipDone,
-  }, { onConflict: 'user_id' });
-  if (missingColumn(error)) ({ error } = await client.from('user_profiles').upsert(row, { onConflict: 'user_id' }));
+  const extra = { admission_year: profile.admissionYear, university_3p_internship_selected: profile.university3pInternshipSelected };
+  const done = { dept_internship_done: profile.deptInternshipDone, university_3p_internship_done: profile.university3pInternshipDone };
+  let error: { code?: string; message?: string } | null = null;
+  for (const values of [{ ...row, ...extra, ...done }, { ...row, ...extra }, row]) {
+    ({ error } = await client.from('user_profiles').upsert(values, { onConflict: 'user_id' }));
+    if (!missingColumn(error)) break;
+  }
   if (error) throw error;
 }

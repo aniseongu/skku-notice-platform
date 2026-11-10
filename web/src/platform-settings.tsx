@@ -121,10 +121,11 @@ function Setting({ name, help, children, className = '' }: { name: string; help?
   </div>;
 }
 
-function Choice<T extends string | number>({ label, options, value, onPick, disabled }: {
-  label: string; options: readonly (readonly [T, string])[]; value: T | null; onPick: (value: T) => void; disabled?: boolean;
+function Choice<T extends string | number>({ label, options, value, onPick, disabled, grid }: {
+  label: string; options: readonly (readonly [T, string])[]; value: T | null; onPick: (value: T) => void; disabled?: boolean; grid?: boolean;
 }) {
-  return <div className="segmented" role="radiogroup" aria-label={label}>
+  // 선택지가 많으면(입학 연도) 한 줄로 늘어놓지 않고 4열 격자로 칸 안에 담는다.
+  return <div className={grid ? 'segmented grid grid-cols-4 w-full gap-[2px] [&_button]:px-0' : 'segmented'} role="radiogroup" aria-label={label}>
     {options.map(([option, text]) => <button type="button" role="radio" key={String(option)} aria-checked={value === option}
       disabled={disabled} onClick={() => onPick(option)}>{text}</button>)}
   </div>;
@@ -611,26 +612,30 @@ function Profile({ model }: { model: SettingsModel }) {
       </Setting>
     </Section>
     <Section id="s-school" title="학교 정보">
-      <Setting name="학년"><Choice label="학년" value={profile.year} disabled={!ready}
-        options={YEARS.map((year) => [year, year === 5 ? '5학년 이상' : `${year}학년`] as const)} onPick={(year) => save({ year })} /></Setting>
+      <Setting name="학년 및 학기" help="인턴 공고의 지원 자격을 가릴 때만 써요. 이름이나 학번은 받지 않아요">
+        <div className="flex flex-col gap-[8px]">
+          <Choice label="학년" value={profile.year} disabled={!ready}
+            options={YEARS.map((year) => [year, year === 5 ? '5학년 이상' : `${year}학년`] as const)} onPick={(year) => save({ year })} />
+          <Choice label="학기" value={profile.semester} disabled={!ready}
+            options={SEMESTERS.map((value) => [value, `${value}학기`] as const)} onPick={(semester) => save({ semester })} />
+        </div></Setting>
       <Setting name="재학 상태"><Choice label="재학 상태" value={profile.enrollmentStatus} disabled={!ready}
         options={ENROLLMENT.map((value) => [value, value] as const)} onPick={(enrollmentStatus) => save({ enrollmentStatus })} /></Setting>
-      <Setting name="학기" help="인턴 공고의 지원 자격을 가릴 때만 써요. 이름이나 학번은 받지 않아요">
-        <Choice label="학기" value={profile.semester} disabled={!ready}
-          options={SEMESTERS.map((value) => [value, `${value}학기`] as const)} onPick={(semester) => save({ semester })} /></Setting>
       <Setting name="병역"><Choice label="병역" value={profile.militaryService} disabled={!ready}
         options={MILITARY.map((value) => [value, value] as const)} onPick={(militaryService) => save({ militaryService })} /></Setting>
+    </Section>
+    <Section id="s-internship" title="인턴십 졸업요건">
       {isSoftwareOriginal(profile) ? <>
-        <Setting name="입학 연도" help="소프트웨어학과 인턴십 졸업요건이 학번에 따라 달라서 써요. 학번 전체는 받지 않아요">
-          <Choice label="입학 연도" value={profile.admissionYear} disabled={!ready}
+        <Setting name="입학 연도" help="학번에 따라 졸업요건이 달라서 써요. 학번 전체는 받지 않아요">
+          <Choice label="입학 연도" grid value={profile.admissionYear} disabled={!ready}
             options={[...ADMISSION_YEARS, OLD_ADMISSION_YEAR].map((value) => [value, value === OLD_ADMISSION_YEAR ? '2016 이전' : `${value}`] as const)}
             onPick={(admissionYear) => save({ admissionYear })} /></Setting>
-        <Setting name="학과 졸업 인턴십" help="소프트웨어학과 졸업평가의 인턴십 요건이에요. 채웠다면 인턴 공고에서 안 보여 드려요">
+        <Setting name="학과 졸업 인턴십" help="채웠다면 인턴 공고에서 안 보여 드려요">
           <Choice label="학과 졸업 인턴십" value={profile.deptInternshipDone === null ? null : profile.deptInternshipDone ? 'yes' : 'no'} disabled={!ready}
             options={[['yes', '채웠어요'], ['no', '아직이에요']] as const}
             onPick={(value) => save({ deptInternshipDone: value === 'yes' })} /></Setting>
       </> : null}
-      <Setting name="학교 신3품 인턴십" help="인성 필수 외에 글로벌·창의·AI·인턴십 중 두 영역을 골라요. 채웠다면 인턴 공고에서 이 요건은 안 보여 드려요">
+      <Setting name="학교 신3품 인턴십" help="채웠다면 인턴 공고에서 안 보여 드려요. 고르지 않으면 아직으로 봐요">
         <Choice label="학교 신3품 인턴십" value={threePAnswer(profile)} disabled={!ready}
           options={[['done', '채웠어요'], ['todo', '아직이에요'], ['no', '이 영역은 안 해요']] as const}
           onPick={(value) => save(threePFields(value as ThreePAnswer))} /></Setting>

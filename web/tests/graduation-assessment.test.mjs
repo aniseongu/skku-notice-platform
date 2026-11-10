@@ -47,17 +47,30 @@ test('the inquiry text carries posting facts but no personal data', () => {
   assert.ok(!/학번|이메일|입학/.test(text));
 });
 
-test('requesting writes only the request columns and loading reads only the own row', async () => {
+test('requesting inserts only the request columns and loading reads only the own row', async () => {
   let written; const filters = [];
   const client = { from: () => ({
-    upsert: async (value, options) => { written = { value, options }; return { error: null }; },
+    insert: async (value) => { written = value; return { error: null }; },
     select: () => ({ eq(key, val) { filters.push([key, val]); return this; }, maybeSingle: async () => ({ data: null, error: null }) }),
   }) };
   await requestGraduation(client, 'u1', 'n1');
-  assert.deepEqual(Object.keys(written.value).sort(), ['notice_id', 'requested_at', 'status', 'user_id']);
-  assert.equal(written.value.status, 'PENDING');
+  assert.deepEqual(Object.keys(written).sort(), ['notice_id', 'requested_at', 'status', 'user_id']);
+  assert.equal(written.status, 'PENDING');
   assert.equal(await loadGraduation(client, 'u1', 'n1'), null);
   assert.deepEqual(filters, [['user_id', 'u1'], ['notice_id', 'n1']]);
+});
+
+test('requesting again updates only status and requested_at (never upsert, which the column grants reject)', async () => {
+  let updated; const eqs = [];
+  const client = { from: () => ({
+    insert: async () => ({ error: { code: '23505' } }),
+    update: (value) => { updated = value; return { eq(key, val) { eqs.push([key, val]); return eqs.length === 2 ? Promise.resolve({ error: null }) : this; } }; },
+  }) };
+  await requestGraduation(client, 'u1', 'n1');
+  assert.deepEqual(Object.keys(updated).sort(), ['requested_at', 'status']);
+  assert.deepEqual(eqs, [['user_id', 'u1'], ['notice_id', 'n1']]);
+  const failing = { from: () => ({ insert: async () => ({ error: { code: '42501' } }) }) };
+  await assert.rejects(() => requestGraduation(failing, 'u1', 'n1'));
 });
 
 import { visibleTracks, threePAnswer, threePFields } from '../src/graduation-assessment.ts';

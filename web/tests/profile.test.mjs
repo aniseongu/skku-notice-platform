@@ -79,3 +79,19 @@ test('admission year and 3P selection round-trip and fall back to the old column
   await saveProfile(old, 'u', { ...base, admissionYear: 2022 });
   assert.throws(() => validateProfile({ ...base, admissionYear: 1999 }), /입학 연도/);
 });
+
+test('without only the new done columns, admission year and 3P selection are still read and saved', async () => {
+  const attempts = [];
+  const row = { programs: [], year: null, semester: null, enrollment_status: null, military_service: null, onboarded_at: null, interests: '', wants: '', avoids: '', admission_year: 2023, university_3p_internship_selected: true };
+  const missing = { code: '42703', message: 'column user_profiles.dept_internship_done does not exist' };
+  const client = { from: () => ({
+    select: (columns) => ({ eq: () => ({ maybeSingle: async () => columns.includes('dept_internship_done') ? { data: null, error: missing } : { data: row, error: null } }) }),
+    upsert: async (value) => { attempts.push(Object.keys(value)); return { error: 'dept_internship_done' in value ? missing : null }; },
+  }) };
+  const loaded = await loadProfile(client, 'u');
+  assert.equal(loaded.admissionYear, 2023);
+  assert.equal(loaded.deptInternshipDone, null);
+  await saveProfile(client, 'u', { ...base, admissionYear: 2023, university3pInternshipSelected: true, deptInternshipDone: false, university3pInternshipDone: false });
+  assert.equal(attempts.length, 2);
+  assert.ok(attempts[1].includes('admission_year') && !attempts[1].includes('dept_internship_done'));
+});
