@@ -43,7 +43,7 @@ test('rejects anonymous callers, bad origins, bad keys and models before touchin
   assert.equal((await t.call('POST', { apiKey: KEY }, null)).status, 401);
   assert.equal((await t.call('POST', { apiKey: KEY }, 'Bearer other')).status, 401);
   assert.equal((await t.call('POST', { apiKey: KEY }, 'Bearer good', 'https://evil.example')).status, 403);
-  assert.equal((await t.call('POST', { apiKey: 'not-a-key' })).status, 400);
+  assert.equal((await t.call('POST', { apiKey: 'bad key' })).status, 400);
   assert.equal((await t.call('POST', { apiKey: KEY, model: 'x; drop' })).status, 400);
   assert.equal((await t.call('POST', { apiKey: KEY, junk: 'x'.repeat(3000) })).status, 413);
   assert.equal((await t.call('GET')).status, 405);

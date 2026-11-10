@@ -34,7 +34,7 @@ export async function decryptApiKey(key: CryptoKey, userId: string, stored: stri
   return dec.decode(plain);
 }
 
-/** Gemini API 키 형식. 형식이 맞아도 실제 유효성은 별도 호출로 확인한다. */
+/** Gemini 키는 형식을 미리 정하지 않는다(AIza, AQ., gen-lang-client 등 계속 바뀐다). 복사 실수(공백·줄바꿈·너무 짧음)만 걸러 내고 유효성은 저장할 때 Gemini 호출로 확인한다. */
 export function looksLikeGeminiKey(value: unknown): value is string {
-  return typeof value === 'string' && /^[0-9A-Za-z_.~-]{20,300}$/.test(value);
+  return typeof value === 'string' && value.length >= 8 && value.length <= 512 && !/[\s\u0000-\u001f\u007f]/.test(value);
 }
