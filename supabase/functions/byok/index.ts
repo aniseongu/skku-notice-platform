@@ -49,9 +49,7 @@ Deno.serve((req) => handle(req, {
     let apiKey: string;
     try { apiKey = await decryptApiKey(masterKey, userId, key.ciphertext); } catch { throw new SummaryError('rejected'); }
     await service.from('user_byok_keys').update({ used_on: today, used_today: used + 1 }).eq('user_id', userId);
-    let response: Response;
-    try {
-      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(key.model)}:generateContent`, {
+    const callModel = (model: string) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
         method: 'POST', headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(25000), redirect: 'error',
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: SUMMARY_PROMPT }] },
@@ -59,6 +57,17 @@ Deno.serve((req) => handle(req, {
           generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: { type: 'OBJECT', properties: { summary: { type: 'STRING' }, deadline_kind: { type: 'STRING', enum: ['마감', '일정', '없음'] }, deadline_at: { type: 'STRING' } }, required: ['summary', 'deadline_kind', 'deadline_at'] } },
         }),
       });
+    let response: Response;
+    try {
+      response = await callModel(key.model);
+      // 고른 모델이 과부하(500·503·504)면 대체 모델로 한 번씩 더 시도한다. 안 되면 처음 응답을 쓴다.
+      if ([500, 503, 504].includes(response.status)) {
+        for (const model of ['gemini-3.5-flash-lite', 'gemini-2.5-flash-lite']) {
+          if (model === key.model) continue;
+          const retry = await callModel(model).catch(() => null);
+          if (retry?.ok) { response = retry; break; }
+        }
+      }
     } catch { throw new SummaryError('error'); }
     if ([400, 401, 403].includes(response.status)) throw new SummaryError('rejected');
     if (response.status === 429) throw new SummaryError('busy');

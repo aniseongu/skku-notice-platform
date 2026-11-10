@@ -333,3 +333,40 @@ def test_eligibility_rule_in_all_prompts():
     from skku_notice.eligibility import ELIGIBILITY_RULE
     assert "재학은 졸업예정이 아닙니다" in ELIGIBILITY_RULE
     assert ELIGIBILITY_RULE in school_ai.SYSTEM and ELIGIBILITY_RULE in intern_ai.SYSTEM
+
+
+class FlakyModels:
+    def __init__(self, bad_models):
+        self.bad, self.used = bad_models, []
+
+    def generate_content(self, **kwargs):
+        self.used.append(kwargs["model"])
+        if kwargs["model"] in self.bad:
+            raise ApiError(503)
+        return "ok"
+
+
+def test_overloaded_model_falls_back_to_another_model_only_for_overload():
+    inner = type("C", (), {})()
+    inner.models = FlakyModels({"gemini-3.1-flash-lite"})
+    client = judge._RecordingClient(inner)
+    assert client.generate_content(model="gemini-3.1-flash-lite") == "ok"
+    assert inner.models.used == ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]
+    assert not client.failed
+    # 모든 모델이 과부하면 오류를 그대로 낸다.
+    inner.models = FlakyModels({"gemini-3.1-flash-lite", *judge.FALLBACK_MODELS})
+    client = judge._RecordingClient(inner)
+    try:
+        client.generate_content(model="gemini-3.1-flash-lite")
+        raise AssertionError("should raise")
+    except ApiError:
+        assert client.failed and client.error_code == 503
+    # 키 거부(403)는 대체 모델을 시도하지 않는다.
+    seen = []
+    inner.models = type("M", (), {"generate_content": lambda self, **k: (seen.append(k["model"]), (_ for _ in ()).throw(ApiError(403)))})()
+    client = judge._RecordingClient(inner)
+    try:
+        client.generate_content(model="gemini-3.1-flash-lite")
+    except ApiError:
+        pass
+    assert seen == ["gemini-3.1-flash-lite"] and client.error_code == 403

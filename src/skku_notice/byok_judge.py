@@ -112,6 +112,11 @@ class JudgeStore(NoticeStore):
         self._request("PATCH", "user_byok_keys", params={"user_id": f"eq.{user_id}"}, json=fields)
 
 
+# 사용자가 고른 모델이 과부하(500·503·504)일 때만 차례로 시도하는 대체 모델. 키가 허용하지 않으면 원래 오류를 그대로 낸다.
+FALLBACK_MODELS = ("gemini-3.5-flash-lite", "gemini-2.5-flash-lite")
+OVERLOADED = {500, 503, 504}
+
+
 class _RecordingClient:
     """Wraps the Gemini client so the worker can tell a rejected key from a transient failure."""
 
@@ -125,8 +130,16 @@ class _RecordingClient:
         try:
             return self._inner.models.generate_content(**kwargs)
         except Exception as exc:
-            self.failed = True
             code = getattr(exc, "code", None)
+            if code in OVERLOADED:
+                for model in FALLBACK_MODELS:
+                    if model == kwargs.get("model"):
+                        continue
+                    try:
+                        return self._inner.models.generate_content(**{**kwargs, "model": model})
+                    except Exception:  # noqa: BLE001 - 대체 모델도 안 되면 처음 오류를 낸다
+                        continue
+            self.failed = True
             self.error_code = code if isinstance(code, int) else None
             raise
 
