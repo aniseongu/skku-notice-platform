@@ -126,9 +126,45 @@ export function threePFields(answer: ThreePAnswer): { university3pInternshipDone
   return { university3pInternshipDone: answer === 'done', university3pInternshipSelected: answer !== 'no' };
 }
 
-/** 인턴 공고만 대상이다: 외부 채용 소스, 학교 취업 인턴 게시판, 제목에 인턴·현장실습이 있는 글. */
-export const isInternshipNotice = (notice: { title: string; source_id?: string }, external: boolean): boolean =>
-  external || notice.source_id === 'skku-career-intern' || /인턴|현장\s*실습/.test(notice.title);
+/** 학교 글에서 인턴 공고가 아닌 행정 안내(서류 제출, 인증 신청 절차, 졸업 안내 등). */
+const ADMIN_TITLE = /서류|제출|절차|인증|졸업|수료|설명회|결과|발표|지침|이수|교과목|학점\s*인정/;
+/** 회사 이름이 들어 있다는 표시(법인 표기). */
+const COMPANY_MARK = /㈜|\(주\)|주식회사|유한회사|재단법인|사단법인|\(재\)|\b(?:Inc|Corp|Co\.|Ltd)/i;
+/** 졸업요건을 확인할 인턴 공고만 대상이다. 외부 채용 소스는 모두, 학교 글은 인턴 모집 공고(회사 이름이 있는 글)만이다.
+ *  서류 제출·인증 신청 절차 같은 안내는 제외한다. DB의 is_graduation_candidate_notice와 같은 규칙이다. */
+export function isInternshipNotice(notice: { title: string; source_id?: string }, external: boolean): boolean {
+  if (external) return true;
+  const careerBoard = notice.source_id === 'skku-career-intern';
+  if (!careerBoard && !/인턴|현장\s*실습/.test(notice.title)) return false;
+  if (ADMIN_TITLE.test(notice.title)) return false;
+  return careerBoard || COMPANY_MARK.test(notice.title);
+}
+
+/** 목록 표지: 내가 채워야 할 요건에 이 공고가 맞는지. */
+export type GraduationBadge = 'ok' | 'review' | 'no';
+export const BADGE_LABEL: Record<GraduationBadge, string> = { ok: '졸업요건 충족', review: '열어서 졸업요건 확인', no: '졸업요건 미달' };
+export interface GraduationStatuses { dept: Status | null; p3: Status | null }
+
+/** 보이는 영역의 판정을 하나로 합친다. 아직 판정이 없으면(현장실습 모집처럼 열어서 봐야 알 수 있는 공고) review. 하나라도 가능하면 ok, 아니면 확인 필요가 있으면 review, 모두 안 맞으면 no. */
+export function badgeOf(statuses: GraduationStatuses | undefined, tracks: VisibleTracks): GraduationBadge | null {
+  if (!statuses) return 'review';
+  const shown = [tracks.dept ? statuses.dept : null, tracks.p3 ? statuses.p3 : null].filter((v): v is Status => v !== null && v !== 'NOT_APPLICABLE');
+  if (!shown.length) return null;
+  if (shown.some((v) => v === 'LIKELY' || v === 'CONDITIONAL')) return 'ok';
+  return shown.some((v) => v === 'NEEDS_REVIEW') ? 'review' : 'no';
+}
+
+/** 내 판정 결과의 요약만 한 번에 읽는다(목록 표지와 "졸업요건 충족만 보기"에 쓴다). */
+export async function loadGraduationStatuses(client: SupabaseClient, userId: string): Promise<Map<string, GraduationStatuses>> {
+  const { data, error } = await client.from('user_notice_graduation_assessments').select('notice_id,department,university_3p')
+    .eq('user_id', userId).eq('status', 'READY').limit(1000);
+  if (error) throw error;
+  const read = (value: unknown): Status | null => {
+    const status = (value as { status?: unknown } | null)?.status;
+    return STATUSES.includes(status as Status) ? status as Status : null;
+  };
+  return new Map((data ?? []).map((row) => [String(row.notice_id), { dept: read(row.department), p3: read(row.university_3p) }]));
+}
 
 /** 학과에 문의할 때 붙여 넣을 질문. 개인 정보는 넣지 않는다. */
 export function inquiryText(title: string, facts: Facts | null): string {

@@ -279,6 +279,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
       if (app.query) return <Empty title={`'${app.query}'에 맞는 공지가 없어요`} body="다른 단어로 찾아보세요" action="검색어 지우기" onAction={() => { app.query = ''; }} />;
       if (app.keyword && app.view !== 'saved' && app.unreadOnly) return <Empty title={`'${app.keyword}'에 맞는 읽지 않은 공지가 없어요`} body="읽지 않은 공지만 보기를 끄면 모든 공지를 볼 수 있어요" />;
       if (app.keyword) return <Empty title={`'${app.keyword}'에 맞는 공지가 아직 없어요`} body="새 글이 오면 여기에 모여요" />;
+      if (app.view !== 'saved' && app.graduationOnly && app.gradEnabled()) return <Empty title="졸업요건에 맞는 공고가 아직 없어요" body="졸업요건 충족만 보기를 끄면 모든 공고를 볼 수 있어요" />;
       if (app.view !== 'saved' && app.unreadOnly) return <Empty title="읽지 않은 공지가 없어요" body="읽지 않은 공지만 보기를 끄면 모든 공지를 볼 수 있어요" />;
       const [heading, body] = {
         all: ['이 게시판에 공지가 없어요', '다른 게시판을 골라 보세요'],
@@ -302,13 +303,13 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
     <notice-rows-screen model={{
       rows: items.map((notice) => {
         const ai = app.judgement(notice)?.ai ?? null;
-        const interests = app.interests(notice);
+        const interests = app.shownInterests(notice);
         const cached = app.summaries.get(notice.id);
         const rowNotice = withMyDeadline(notice, cached && cached !== 'loading' ? cached : null);
         return { notice: rowNotice, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
           read: app.isRead(notice), saved: app.isSaved(notice), current: app.isWide && app.detailOpen && app.shownId === notice.id,
           selected: app.selectedReads.includes(notice.id), dim: ai?.verdict === 'not_relevant' && !interests.length,
-          interests, ai, rule: app.judgement(notice)?.rule_name ?? null };
+          interests, ai, rule: app.judgement(notice)?.rule_name ?? null, grad: app.gradBadge(notice) };
       }),
       today, selecting: app.selecting, savedView: app.view === 'saved',
       open: (event: MouseEvent, notice: Notice) => app.onRow(event, notice),
@@ -353,6 +354,11 @@ function ViewFilters({ app }: { app: AppController }) {
       app.selectedId = null;
       remember('view-unread', app.unreadOnly ? '1' : '0');
     }}><span className="filter-check" aria-hidden="true"></span>읽지 않은 공지만</button>
+    {app.gradEnabled() ? <button type="button" className="view-toggle" aria-pressed={app.graduationOnly} onClick={() => {
+      app.graduationOnly = !app.graduationOnly;
+      app.selectedId = null;
+      remember('view-grad', app.graduationOnly ? '1' : '0');
+    }}><span className="filter-check" aria-hidden="true"></span>졸업요건 충족만</button> : null}
     <div className="view-actions">{select}<SortSelect app={app} /></div>
   </div>;
 }
@@ -432,13 +438,14 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
   const body = app.body(notice);
   const translation = app.myTranslations.get(notice.id);
   const shownBody = body && body !== 'loading' && translation ? { ...body, translation } : body;
-  const interests = [...new Set([...app.interests(notice), ...bodyInterests(app.keywords, body, keywordMatches)])];
+  const interests = [...new Set([...app.shownInterests(notice), ...bodyInterests(app.keywords, body, keywordMatches).filter((word) => app.shownInterests(notice).includes(word) || !app.isExternal(notice) || !/^(인턴|인턴십|인턴쉽|intern|internship)$/i.test(word))])];
   const shown = withMyDeadline(notice, mine);
   return <notice-detail-screen model={{
     notice: shown, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
     today: todayKst(), body: shownBody, mySummary: mine?.summary ?? null, summarizing: app.summarizing === notice.id, summaryError: app.summaryErrorId === notice.id && !app.summarizing ? app.summaryError : '', makeSummary: () => { void app.makeSummary(notice); }, interests,
     ai: judgement?.ai ?? mine?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
     retry: () => { app.bodies.delete(notice.id); app.requestUpdate(); },
+    grad: app.gradBadge(notice),
     graduation: app.showsGraduation(notice) ? { tracks: visibleTracks(app.profile), assessment: app.graduationFor(notice), error: app.graduationError } : undefined,
   }} />;
 }

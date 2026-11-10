@@ -122,3 +122,17 @@ def test_gemini_call_returns_none_on_failure_or_bad_json_and_never_without_a_key
     models = _Models(json.dumps(ai_reply()))
     assert gf.call_gemini("t", "b", "m", "k", client=_client(models))["task_category"] == "software_qa"
     assert models.calls == 1
+
+
+def test_개월_수만_적힌_공고의_기간을_읽는다():
+    from skku_notice.grad_intern_facts import build_facts
+    from skku_notice.grad_intern_rules import GradProfile, assess_department
+
+    text = "넷마블네오 AI 인턴십\n그림에서 읽은 글: 인턴십 5개월 진행, 전일제"
+    extracted = build_facts("채용전환형 AI 인턴십", text, None)
+    assert extracted.facts.duration_months == 5
+    assert extracted.facts.work_mode == "full_time"
+    import dataclasses
+    facts = dataclasses.replace(extracted.facts, organization_type="incorporated_company", corporate_status_verified=True, task_category="data_ai")
+    result = assess_department(GradProfile(2022, "original_major", True, True), facts)
+    assert any(c.rule_id == "DEPT-COMPANY-FT" and c.result == "pass" for c in result.checks)

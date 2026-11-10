@@ -197,7 +197,7 @@ function Overview({ model }: { model: SettingsModel }) {
         <Choice label="목록 보기" value={model.subscriptionsOnly ? 'mine' : 'all'} disabled={model.loading || !!model.error}
           options={[['all', '모든 게시판'], ['mine', '받는 게시판만']]} onPick={(value) => model.setSubscriptionsOnly(value === 'mine')} />
       </Setting> : null}
-      <a className="settings-link" href="privacy.html" target="_blank" rel="noopener">
+      <a className="settings-link" href="privacy.html">
         <span><span className="setting-name">개인정보 처리방침</span>
           <span className="setting-help">어떤 정보를 어디에 쓰고 어떻게 지우는지 알려 드려요</span></span>
         <span className="settings-chevron" aria-hidden="true" />
@@ -630,15 +630,17 @@ function Profile({ model }: { model: SettingsModel }) {
           <Choice label="입학 연도" grid value={profile.admissionYear} disabled={!ready}
             options={[...ADMISSION_YEARS, OLD_ADMISSION_YEAR].map((value) => [value, value === OLD_ADMISSION_YEAR ? '2016 이전' : `${value}`] as const)}
             onPick={(admissionYear) => save({ admissionYear })} /></Setting>
-        <Setting name="학과 졸업 인턴십" help="채웠다면 인턴 공고에서 안 보여 드려요">
-          <Choice label="학과 졸업 인턴십" value={profile.deptInternshipDone === null ? null : profile.deptInternshipDone ? 'yes' : 'no'} disabled={!ready}
-            options={[['yes', '채웠어요'], ['no', '아직이에요']] as const}
-            onPick={(value) => save({ deptInternshipDone: value === 'yes' })} /></Setting>
       </> : null}
       <Setting name="학교 신3품 인턴십" help="채웠다면 인턴 공고에서 안 보여 드려요. 고르지 않으면 아직으로 봐요">
         <Choice label="학교 신3품 인턴십" value={threePAnswer(profile)} disabled={!ready}
           options={[['done', '채웠어요'], ['todo', '아직이에요'], ['no', '이 영역은 안 해요']] as const}
           onPick={(value) => save(threePFields(value as ThreePAnswer))} /></Setting>
+      {isSoftwareOriginal(profile) ? <>
+        <Setting name="학과 졸업 인턴십" help="채웠다면 인턴 공고에서 안 보여 드려요">
+          <Choice label="학과 졸업 인턴십" value={profile.deptInternshipDone === null ? null : profile.deptInternshipDone ? 'yes' : 'no'} disabled={!ready}
+            options={[['yes', '채웠어요'], ['no', '아직이에요']] as const}
+            onPick={(value) => save({ deptInternshipDone: value === 'yes' })} /></Setting>
+      </> : null}
     </Section>
     <AboutMe model={model} />
     {model.profileMessage ? <p className="field-note ok" role="status">{model.profileMessage}</p> : null}
@@ -746,11 +748,6 @@ function Keys({ model }: { model: SettingsModel }) {
     <Section id="s-keys" title="연결 키">
       <GeminiRow model={model} />
       <CanvasRow model={model} />
-    </Section>
-    <Section id="s-eligibility" title="내 프로필">
-      <Setting name="지원 자격 정보" help="학년, 학기, 재학 상태, 병역, 관심 분야는 프로필 설정에서 바꿔요">
-        <button type="button" className="ghost-button" onClick={() => model.openSection('profile')}>프로필 설정 열기</button>
-      </Setting>
     </Section>
   </div>;
 }

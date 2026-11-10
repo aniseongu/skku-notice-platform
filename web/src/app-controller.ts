@@ -20,7 +20,7 @@ import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from '
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
 import { byokAvailable, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
-import { loadGraduation, requestGraduation, isInternshipNotice, isSoftwareOriginal, visibleTracks, type GraduationAssessment } from './graduation-assessment';
+import { loadGraduation, loadGraduationStatuses, badgeOf, requestGraduation, isInternshipNotice, type GraduationBadge, type GraduationStatuses, isSoftwareOriginal, visibleTracks, type GraduationAssessment } from './graduation-assessment';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import type { Draft } from './onboarding-flow';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
@@ -37,6 +37,7 @@ export const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'intern', label: '인턴 공고', icon: 'briefcase' },
   { id: 'saved', label: '저장', icon: 'bookmark' },
 ];
+const GENERIC_INTERN = /^(인턴|인턴십|인턴쉽|intern|internship)$/i;
 export const STALE_MS = 2 * 3600_000;
 // 화면을 켜 둔 채로 있어도 1시간 주기의 새 공지와 D-day가 바뀌도록 5분마다 다시 받는다.
 /** 로그인 뒤 같은 자리로 돌아오게 현재 주소를 쓴다. 로그인 결과가 남긴 code, error, 해시만 뺀다(딥링크와 ?view=settings는 유지). */
@@ -170,7 +171,7 @@ export class AppController extends Reactive {
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, authName: { state: true }, authAvatar: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
     byokOn: { state: true }, byokBackfill: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true }, canvasStatus: { state: true }, canvasBusy: { state: true }, canvasError: { state: true },
     calendarId: { state: true }, calendarBusy: { state: true }, calendarMessage: { state: true }, calendarError: { state: true }, calendarSyncedAt: { state: true },
-    myJudgments: { state: true }, myInterests: { state: true }, graduationBusy: { state: true }, graduationError: { state: true },
+    myJudgments: { state: true }, myInterests: { state: true }, graduationStatuses: { state: true }, graduationOnly: { state: true }, graduationBusy: { state: true }, graduationError: { state: true },
     devices: { state: true }, thisDeviceId: { state: true }, devicesBusy: { state: true }, devicesError: { state: true }, summaryTime: { state: true },
     calendarAuto: { state: true },
     accountBusy: { state: true }, accountError: { state: true },
@@ -344,7 +345,7 @@ export class AppController extends Reactive {
           this.authUserId = userId;
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.devices = []; this.thisDeviceId = null; this.devicesError = ''; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.thisDeviceId = null; this.devicesError = ''; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -556,6 +557,18 @@ export class AppController extends Reactive {
     if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
     if (judgments) this.myJudgments = judgments;
     if (interests) this.myInterests = interests;
+    const statuses = await loadGraduationStatuses(authClient, userId).catch(() => null);
+    if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
+    if (statuses) this.graduationStatuses = statuses;
+  }
+
+  /** 내 졸업요건 판정 요약(공지 번호별). 목록 표지와 "졸업요건 충족만"에 쓴다. */
+  graduationStatuses = new Map<string, GraduationStatuses>();
+  graduationOnly = remember('view-grad') === '1';
+  /** 목록에 졸업요건 표지를 보여 줄 수 있는 사용자인지: 로그인했고 아직 채우지 않은 요건이 있다. */
+  gradEnabled(): boolean { const v = visibleTracks(this.profile); return !!authClient && !!this.authUserId && (v.dept || v.p3); }
+  gradBadge(notice: Notice): GraduationBadge | null {
+    return this.showsGraduation(notice) ? badgeOf(this.graduationStatuses.get(notice.id), visibleTracks(this.profile)) : null;
   }
 
   /** 이 글에 맞는 관심 키워드: 이 기기의 글자 매칭 + 서버의 글자 매칭 + Gemini가 뜻으로 맞춘 것 */
@@ -571,6 +584,12 @@ export class AppController extends Reactive {
       if (this.keywords.includes(word)) found.add(word);
     }
     return [...found];
+  }
+
+  /** 화면에 "관심 ○○"로 보여 줄 키워드. 외부 인턴 공고는 전부 인턴이라 키워드 인턴은 알려 주는 게 없어서 뺀다(키워드로 거르는 데는 그대로 쓴다). */
+  shownInterests(notice: Notice): string[] {
+    const all = this.interests(notice);
+    return this.isExternal(notice) ? all.filter((word) => !GENERIC_INTERN.test(word)) : all;
   }
 
   filtered(notices = this.notices): Notice[] {
@@ -1295,7 +1314,8 @@ export class AppController extends Reactive {
       .filter((n) => this.isExternal(n) === external)
       .filter((n) => tab !== 'all' || !this.authUserId || !this.subscriptionsOnly
         || (!this.subscriptionsLoading && !this.subscriptionsError && this.subscriptions.includes(n.source_id)))
-      .filter((n) => !this.unreadOnly || !this.isRead(n) || n.id === this.selectedId || n.id === this.openedId);
+      .filter((n) => !this.unreadOnly || !this.isRead(n) || n.id === this.selectedId || n.id === this.openedId)
+      .filter((n) => !this.graduationOnly || !this.gradEnabled() || this.gradBadge(n) === 'ok' || n.id === this.selectedId || n.id === this.openedId);
     return orderNotices(scoped, this.sortFor(tab));
   }
 

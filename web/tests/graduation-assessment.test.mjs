@@ -34,7 +34,7 @@ test('only a software-department original major sees the check, and only on inte
   assert.equal(isSoftwareOriginal({ programs: [biz, sw] }), false);
   assert.equal(isSoftwareOriginal({ programs: [] }), false);
   assert.equal(isInternshipNotice({ title: '수강 안내' }, false), false);
-  assert.equal(isInternshipNotice({ title: '2026 겨울 현장실습 모집' }, false), true);
+  assert.equal(isInternshipNotice({ title: '(주)에이비씨 2026 겨울 현장실습 모집' }, false), true);
   assert.equal(isInternshipNotice({ title: '채용' }, true), true);
   assert.equal(isInternshipNotice({ title: '공지', source_id: 'skku-career-intern' }, false), true);
 });
@@ -103,4 +103,21 @@ test('이유는 이름 표기와 규정 설명을 떼고 첫 문장만 남긴다
   assert.equal(shortReason('근무 시간을 공고에서 확인하지 못했어요'), '근무 시간을 공고에서 확인하지 못했어요');
   const track = { status: 'NEEDS_REVIEW', label: '확인 필요', checks: [{ ruleId: 'a', result: 'unknown', note: '기관 종류를 확인하지 못했어요. 기타 기관은 심의가 필요해요' }], unknowns: [], afterCompletion: [], notes: [] };
   assert.equal(reasonOf(track), '기관 종류를 확인하지 못했어요');
+});
+
+import { isInternshipNotice as isIntern2, badgeOf as badgeOf2 } from '../src/graduation-assessment.ts';
+test('행정 안내는 인턴 공고가 아니고 회사 이름이 있는 학교 글만 대상이다', () => {
+  assert.equal(isIntern2({ title: '[인턴십] 서류 제출 안내 - 2027년 2월(동계) 졸업 예정자 중 미제출자 대상' }, false), false);
+  assert.equal(isIntern2({ title: '3품 인턴십 인증 신청 절차 안내' }, false), false);
+  assert.equal(isIntern2({ title: '㈜넷마블네오 AI 인턴 모집' }, false), true);
+  assert.equal(isIntern2({ title: '인턴 모집' , source_id: 'skku-career-intern' }, false), true);
+  assert.equal(isIntern2({ title: '인턴 서류 제출 안내', source_id: 'skku-career-intern' }, false), false);
+  assert.equal(isIntern2({ title: '장학금 안내' }, true), true);
+});
+test('표지는 보이는 영역의 판정만 합친다', () => {
+  const all = { dept: true, p3: true };
+  assert.equal(badgeOf2({ dept: 'NOT_ELIGIBLE', p3: 'LIKELY' }, all), 'ok');
+  assert.equal(badgeOf2({ dept: 'NOT_ELIGIBLE', p3: 'LIKELY' }, { dept: true, p3: false }), 'no');
+  assert.equal(badgeOf2({ dept: 'NEEDS_REVIEW', p3: 'NOT_ELIGIBLE' }, all), 'review');
+  assert.equal(badgeOf2(undefined, all), 'review');
 });

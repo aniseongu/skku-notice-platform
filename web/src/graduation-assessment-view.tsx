@@ -30,8 +30,8 @@ export function GraduationSection({ model }: { title: string; model: GraduationM
     <h3 id="sec-grad">졸업요건 확인</h3>
     {!ready && !error ? <p className="m-0 text-[14px] leading-[21px] text-ink-3" role="status">내 졸업요건에 맞는지 확인하고 있어요</p> : null}
     {ready ? <>
-      {model.tracks.dept && ready.department ? <Result name="학과 졸업 인턴십" track={ready.department} /> : null}
       {model.tracks.p3 && ready.university3p ? <Result name="신3품 인턴십" track={ready.university3p} /> : null}
+      {model.tracks.dept && ready.department ? <Result name="학과 졸업 인턴십" track={ready.department} /> : null}
       {ready.aiStatus && ready.aiStatus !== 'used' ? <p className="m-0 text-[13px] leading-[20px] text-ink-3" role="status">{AI_NOTE[ready.aiStatus]}</p> : null}
     </> : null}
     {error ? <p className="field-note error" role="alert">{error}</p> : null}

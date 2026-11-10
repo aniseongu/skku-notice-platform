@@ -1,5 +1,5 @@
 @layer settings {
-  .settings { padding: 0 var(--gutter) calc(var(--tabbar-h) + 32px); max-width: 760px; }
+  .settings { padding: 0 var(--gutter) calc(var(--tabbar-h) + 32px); }
   .settings-head { margin: 28px 0 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
   /* 묶음 제목과 같은 줄의 글자 단추. 오른쪽 끝은 상자 안쪽 선에 맞춘다. */
   .settings-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 28px 0 8px; padding-right: var(--gutter); }
@@ -22,7 +22,7 @@
   .setting { display: flex; flex-direction: column; gap: 10px; padding: 16px 0; }
   .setting + .setting { border-top: 1px solid var(--line); }
   .setting-name { font-size: 15px; line-height: 22px; font-weight: 600; }
-  .setting-help { margin-top: 2px; font-size: 13px; line-height: 19px; color: var(--text-2); }
+  .setting-help { margin-top: 2px; font-size: 13px; line-height: 19px; color: var(--text-2); word-break: keep-all; text-wrap: pretty; }
   .setting-saved { margin-top: 4px; font-size: 13px; color: var(--accent); font-weight: 600; }
   .setting-control { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-width: 0; }
   .device-name-action { min-height: 44px; }
