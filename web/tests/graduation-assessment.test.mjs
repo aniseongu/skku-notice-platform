@@ -133,3 +133,16 @@ test('졸업요건 결과는 영역별로 한 묶음으로 적고, 확인 필요
   assert.deepEqual(gradParts(st('LIKELY', 'LIKELY'), all, 'not_relevant'), []);
   assert.deepEqual(gradParts(undefined, all, 'relevant'), []);
 });
+
+import { visibleTracks as vt, gradParts as gp } from '../src/graduation-assessment.ts';
+test('솦 인턴십은 소프트웨어학과 원전공이 아니면(복수전공 포함) 화면에 나오지 않는다', () => {
+  const sw = { college: '소프트웨어융합대학', department: '소프트웨어학과' };
+  const biz = { college: '경영대학', department: '경영학과' };
+  const base = { deptInternshipDone: false, university3pInternshipDone: false, university3pInternshipSelected: true };
+  assert.equal(vt({ ...base, programs: [sw] }).dept, true);
+  assert.equal(vt({ ...base, programs: [biz] }).dept, false);
+  assert.equal(vt({ ...base, programs: [biz, sw] }).dept, false);      // 복수전공은 졸업평가 항목이 아니다
+  const tracks = vt({ ...base, programs: [biz, sw] });
+  const parts = gp({ dept: 'LIKELY', p3: 'LIKELY' }, tracks, 'relevant');
+  assert.deepEqual(parts.map((p) => p.key), ['p3']);                  // 목록·상세 라벨에도 3품만 나온다
+});
