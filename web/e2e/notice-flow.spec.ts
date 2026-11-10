@@ -807,7 +807,7 @@ test('side menu scrollbar: absent when everything fits, thin when it overflows',
   expect(['thin', 'auto']).toContain(tall.thin);                // 크로미움은 ::-webkit-scrollbar, 파이어폭스는 thin
   if (tall.thin === 'auto') expect(tall.bar).toBe('8px');
   expect(tall.overflowing).toBe(false);
-  expect(tall.gutter).toBeGreaterThan(0);                       // 막대가 나타나도 내용 폭이 변하지 않게 막대 자리를 미리 비워 둔다(scrollbar-gutter)
+  expect(tall.gutter).toBeLessThanOrEqual(0.5);                 // 넘치지 않으면 막대 자리도 없다(스크롤바 자리를 미리 비우지 않고 화면을 최대한 쓴다. 헤드리스는 막대를 그리지 않아 이 값은 참고용이다)
   await page.setViewportSize({ width: 1280, height: 360 });
   const short = await measure();
   expect(short.overflowing).toBe(true);

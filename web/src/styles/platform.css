@@ -161,8 +161,7 @@
 @layer platform {
   /* 마우스를 올릴 수 없는 터치 기기는 막대를 숨기면 스크롤되는 칸인지 알 수 없어 기본 모양을 둔다. */
   @media (hover: hover) {
-    /* 막대가 나타나도 내용 폭이 변하지 않게 막대 자리를 처음부터 비워 둔다(scrollbar-gutter). */
-    .sidebar, .list-pane, .detail-pane, .onb-main { scrollbar-width: thin; scrollbar-color: transparent transparent; scrollbar-gutter: stable; }
+    .sidebar, .list-pane, .detail-pane, .onb-main { scrollbar-width: thin; scrollbar-color: transparent transparent; }
     .sidebar:hover, .list-pane:hover, .detail-pane:hover, .onb-main:hover {
       scrollbar-color: color-mix(in srgb, var(--text-3) 55%, transparent) transparent;
     }
