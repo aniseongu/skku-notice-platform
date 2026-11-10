@@ -1,0 +1,108 @@
+# ruff: noqa: E501
+"""졸업요건 확인 요청을 처리한다. 판정 워커(byok_judge)가 같은 타이머에서 부른다.
+
+요청은 사용자가 공지마다 누르는 "졸업요건 확인"이다. 키가 있고 일일 한도가 남았으면 Gemini로 사실을 뽑고, 아니면 공고의
+표기만 읽는 규칙 판정으로 끝낸다. 같은 입력(공지, 프로필, 규칙 버전)이면 이전 결과를 다시 쓰고 Gemini를 부르지 않는다.
+"""
+
+from __future__ import annotations
+
+import time
+from datetime import UTC, datetime
+
+from skku_notice.byok_crypto import ByokCryptoError, decrypt_api_key
+from skku_notice.grad_intern_facts import build_facts, call_gemini
+from skku_notice.grad_intern_rules import GradProfile, assess_department, assess_university_3p
+from skku_notice.grad_intern_sources import DEPT_RULESET, EXTRACTOR_VERSION, P3_RULESET
+
+MAX_PER_RUN = 5
+SW_COLLEGE, SW_DEPARTMENT = "소프트웨어융합대학", "소프트웨어학과"
+REJECTED = {400, 401, 403}
+
+
+def profile_from_row(row: dict) -> GradProfile:
+    """프로필 행에서 판정에 필요한 값만 꺼낸다. 첫 전공이 원전공, 나머지가 복수전공이다."""
+    programs = [p for p in (row.get("programs") or []) if isinstance(p, dict)]
+    index = next((i for i, p in enumerate(programs) if p.get("college") == SW_COLLEGE and p.get("department") == SW_DEPARTMENT), None)
+    if index is None:
+        sw_major, track = (False if programs else None), ("original_major" if programs else "unknown")
+    else:
+        sw_major, track = True, "original_major" if index == 0 else "double_major"
+    year = row.get("admission_year")
+    selected = row.get("university_3p_internship_selected")
+    return GradProfile(year if isinstance(year, int) else None, track, sw_major, selected if isinstance(selected, bool) else None)
+
+
+def assess(profile: GradProfile, title: str, body: str, ai: dict | None) -> dict:
+    extracted = build_facts(title, body, ai)
+    return {
+        "department": assess_department(profile, extracted.facts).as_dict(),
+        "university_3p": assess_university_3p(profile, extracted.facts).as_dict(),
+        "facts": extracted.as_dict(),
+    }
+
+
+def run_graduation(store, master_key: str, now: datetime, client_factory=None, sleep=time.sleep) -> dict[str, int]:
+    from skku_notice.byok_judge import DAILY_CALLS, PACE_SECONDS, _RecordingClient
+    from skku_notice.gemini_client import gemini_client
+
+    client_factory = client_factory or gemini_client
+    counts = {"grad_assessed": 0, "grad_cached": 0, "grad_ai": 0, "grad_ai_unavailable": 0}
+    today = now.astimezone(UTC).date().isoformat()
+    used_calls = 0
+    for req in store.graduation_requests(MAX_PER_RUN):
+        user_id, notice_id = req["user_id"], req["notice_id"]
+        key = store.key_for(user_id)
+        previous = store.assessment(user_id, notice_id) or {}
+        same_input = (
+            previous.get("input_hash") == req.get("input_hash") and previous.get("ruleset_version") == DEPT_RULESET
+            and previous.get("extractor_version") == EXTRACTOR_VERSION
+        )
+        if same_input and previous.get("ai_status") == "used":
+            store.save_assessment({"user_id": user_id, "notice_id": notice_id, "status": "READY"})
+            counts["grad_cached"] += 1
+            continue
+
+        ai, ai_status, model = None, "no_key", None
+        if key and not key.get("disabled_at"):
+            used = key["used_today"] if key.get("used_on") == today else 0
+            if used >= DAILY_CALLS:
+                ai_status = "limit"
+            else:
+                try:
+                    api_key = decrypt_api_key(master_key, user_id, key["ciphertext"])
+                except ByokCryptoError:
+                    api_key = ""
+                    ai_status = "unavailable"
+                if api_key:
+                    if used_calls:
+                        sleep(PACE_SECONDS)
+                    used_calls += 1
+                    client = _RecordingClient(client_factory(api_key))
+                    ai = call_gemini(req["title"], req.get("body") or "", key["model"], api_key, client=client)
+                    usage = {"used_on": today, "used_today": used + 1}
+                    if client.failed and client.error_code in REJECTED:
+                        stamp = now.isoformat()
+                        store.update_key(user_id, {**usage, "disabled_at": stamp, "error_at": stamp,
+                                                   "last_error": "Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요."})
+                    else:
+                        store.update_key(user_id, {**usage, "last_error": None, "error_at": None})
+                    if ai is None:
+                        ai_status = "unavailable"
+                        counts["grad_ai_unavailable"] += 1
+                    else:
+                        ai_status, model = "used", key["model"]
+                        counts["grad_ai"] += 1
+
+        result = assess(profile_from_row(req), req["title"], req.get("body") or "", ai)
+        store.save_assessment({
+            "user_id": user_id, "notice_id": notice_id, "status": "READY", "input_hash": req.get("input_hash"),
+            "ruleset_version": DEPT_RULESET, "extractor_version": EXTRACTOR_VERSION, "ai_status": ai_status,
+            "model": model, "department": result["department"], "university_3p": result["university_3p"],
+            "facts": result["facts"], "assessed_at": now.isoformat(),
+        })
+        counts["grad_assessed"] += 1
+    return counts
+
+
+__all__ = ["P3_RULESET", "assess", "profile_from_row", "run_graduation"]

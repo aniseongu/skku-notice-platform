@@ -81,6 +81,25 @@ class JudgeStore(NoticeStore):
         rows = self._request("GET", "user_profiles", params=params).json()
         return build_judge_profile(rows[0] if rows else {})
 
+    def graduation_requests(self, limit: int) -> list[dict]:
+        return self._request("POST", "rpc/list_graduation_requests", json={"p_limit": limit}).json()
+
+    def key_for(self, user_id: str) -> dict | None:
+        rows = self._request("GET", "user_byok_keys", params={
+            "user_id": f"eq.{user_id}", "select": "ciphertext,model,disabled_at,used_on,used_today"}).json()
+        return rows[0] if rows else None
+
+    def assessment(self, user_id: str, notice_id: str) -> dict | None:
+        rows = self._request("GET", "user_notice_graduation_assessments", params={
+            "user_id": f"eq.{user_id}", "notice_id": f"eq.{notice_id}",
+            "select": "input_hash,ruleset_version,extractor_version,ai_status"}).json()
+        return rows[0] if rows else None
+
+    def save_assessment(self, row: dict) -> None:
+        self._request(
+            "POST", "user_notice_graduation_assessments", params={"on_conflict": "user_id,notice_id"},
+            json=[row], headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
+
     def pending(self, user_id: str) -> list[dict]:
         body = {"p_user_id": user_id, "p_limit": BATCH}
         return self._request("POST", "rpc/list_byok_pending", json=body).json()
@@ -272,6 +291,13 @@ def main() -> int:
         store = JudgeStore(os.environ.get("SUPABASE_URL", ""), os.environ.get("SUPABASE_SECRET_KEY", ""))
         try:
             counts = run_judging(store, master_key, datetime.now(UTC))
+            from skku_notice.grad_intern_service import run_graduation
+
+            try:
+                counts.update(run_graduation(store, master_key, datetime.now(UTC)))
+            except StoreError:
+                # 졸업요건 표가 아직 없는 환경이어도 기존 판정 결과와 종료 코드는 그대로 둔다.
+                print("졸업요건 요청 처리를 건너뛰었어요", flush=True)
         finally:
             store.close()
     except (ValueError, StoreError):
