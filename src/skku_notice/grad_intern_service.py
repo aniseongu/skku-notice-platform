@@ -15,7 +15,8 @@ from skku_notice.grad_intern_facts import build_facts, call_gemini
 from skku_notice.grad_intern_rules import GradProfile, assess_department, assess_university_3p
 from skku_notice.grad_intern_sources import DEPT_RULESET, EXTRACTOR_VERSION, P3_RULESET
 
-MAX_PER_RUN = 5
+MAX_PER_RUN = 8
+ENQUEUE_PER_RUN = 10
 SW_COLLEGE, SW_DEPARTMENT = "소프트웨어융합대학", "소프트웨어학과"
 REJECTED = {400, 401, 403}
 
@@ -47,7 +48,9 @@ def run_graduation(store, master_key: str, now: datetime, client_factory=None, s
     from skku_notice.gemini_client import gemini_client
 
     client_factory = client_factory or gemini_client
-    counts = {"grad_assessed": 0, "grad_cached": 0, "grad_ai": 0, "grad_ai_unavailable": 0}
+    counts = {"grad_queued": 0, "grad_assessed": 0, "grad_cached": 0, "grad_ai": 0, "grad_ai_unavailable": 0}
+    # 버튼 없이 미리 판정한다: 아직 채우지 못한 요건이 있는 사용자의 최근 인턴 공고를 대기열에 넣는다.
+    counts["grad_queued"] = store.enqueue_graduation(ENQUEUE_PER_RUN)
     today = now.astimezone(UTC).date().isoformat()
     used_calls = 0
     for req in store.graduation_requests(MAX_PER_RUN):
@@ -66,7 +69,8 @@ def run_graduation(store, master_key: str, now: datetime, client_factory=None, s
         ai, ai_status, model = None, "no_key", None
         if key and not key.get("disabled_at"):
             used = key["used_today"] if key.get("used_on") == today else 0
-            if used >= DAILY_CALLS:
+            # 하루 한도의 절반까지만 졸업요건에 쓰고, 나머지는 인턴 공고 판정에 남겨 둔다.
+            if used >= DAILY_CALLS // 2:
                 ai_status = "limit"
             else:
                 try:

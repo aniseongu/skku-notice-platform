@@ -1583,7 +1583,7 @@ export class AppController extends Reactive {
   graduationError = '';
   private graduationPolls = new Map<string, ReturnType<typeof setTimeout>>();
   resetGraduations(): void {
-    this.graduations = new Map(); this.graduationBusy = null; this.graduationError = '';
+    this.graduations = new Map(); this.graduationBusy = null; this.graduationError = ''; this.autoGraduations = new Set();
     for (const timer of this.graduationPolls.values()) clearTimeout(timer);
     this.graduationPolls = new Map();
   }
@@ -1592,6 +1592,7 @@ export class AppController extends Reactive {
     const external = !!this.sources.find((source) => source.id === notice.source_id)?.external;
     return !!authClient && !!this.authUserId && isInternshipNotice(notice, external) && (() => { const v = visibleTracks(this.profile); return v.dept || v.p3; })();
   }
+  private autoGraduations = new Set<string>();
   graduationFor(notice: Notice): GraduationAssessment | null {
     const userId = this.authUserId;
     if (!authClient || !userId || !this.showsGraduation(notice)) return null;
@@ -1609,6 +1610,11 @@ export class AppController extends Reactive {
     if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
     this.graduations.set(noticeId, row);
     this.requestUpdate();
+    // 버튼 없이: 서버가 아직 판정해 두지 않은 공고(오래된 글 등)는 열어 볼 때 한 번 알아서 요청한다.
+    if (!row && !this.graduationError && !this.autoGraduations.has(noticeId)) {
+      this.autoGraduations.add(noticeId);
+      void this.requestGraduation({ id: noticeId } as Notice);
+    }
     // 워커는 10분마다 돈다. 기다리는 동안 20초마다 확인하고, 약 14분이 지나면 멈춘다.
     if (row?.state === 'pending' && attempt < 40) {
       this.graduationPolls.set(noticeId, setTimeout(() => { void this.reloadGraduation(noticeId, userId, epoch, attempt + 1); }, 20000));
@@ -1626,7 +1632,7 @@ export class AppController extends Reactive {
       clearTimeout(this.graduationPolls.get(notice.id));
       this.graduationPolls.set(notice.id, setTimeout(() => { void this.reloadGraduation(notice.id, userId, epoch, 1); }, 20000));
     } catch {
-      if (epoch === this.subscriptionsEpoch) this.graduationError = '확인을 요청하지 못했어요. 잠시 뒤 다시 눌러 주세요.';
+      if (epoch === this.subscriptionsEpoch) this.graduationError = '확인을 요청하지 못했어요. 잠시 뒤 다시 열어 주세요.';
     } finally {
       if (epoch === this.subscriptionsEpoch) this.graduationBusy = null;
     }

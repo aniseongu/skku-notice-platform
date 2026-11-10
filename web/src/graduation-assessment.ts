@@ -34,13 +34,18 @@ export const AFTER_COMPLETION: Record<string, string> = {
   '3P-APPLICATION': '챌린지스퀘어에서 교외이수비교과 승인 신청 뒤 3품 인턴십 인증 신청',
 };
 
-/** 한 줄 이유: 안 맞는 항목이 있으면 그것, 확인 못 한 항목이 있으면 그것, 아니면 판정 문장. */
+/** 짧은 이유 한 문장: 앞의 이름 표기와 뒤따르는 규정 설명은 떼고 첫 문장만 남긴다. */
+export function shortReason(text: string): string {
+  return text.replace(/^[^:：]{1,20}[:：]\s*/, '').split(/(?<=[요다])\.\s+/)[0].replace(/\.$/, '').trim();
+}
+
+/** 이유: 안 맞는 항목이 있으면 그것, 확인 못 한 항목이 있으면 그것, 아니면 판정 문장. */
 export function reasonOf(track: Track): string {
   const fail = track.checks.find((c) => c.result === 'fail');
-  if (track.status === 'NOT_ELIGIBLE' && fail) return fail.note;
+  if (track.status === 'NOT_ELIGIBLE' && fail) return shortReason(fail.note);
   const unknown = track.checks.find((c) => c.result === 'unknown');
-  if ((track.status === 'NEEDS_REVIEW' || track.status === 'CONDITIONAL') && unknown) return unknown.note;
-  return track.label;
+  if ((track.status === 'NEEDS_REVIEW' || track.status === 'CONDITIONAL') && unknown) return shortReason(unknown.note);
+  return shortReason(track.label);
 }
 
 const text = (value: unknown, max = 200): string => (typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '');

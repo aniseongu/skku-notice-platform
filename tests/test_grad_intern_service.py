@@ -29,6 +29,10 @@ class Store:
         self.requests, self.key, self.previous = requests, key, previous
         self.saved, self.updates = [], []
 
+    def enqueue_graduation(self, limit):
+        self.enqueued = limit
+        return 2
+
     def graduation_requests(self, limit):
         return self.requests[:limit]
 
@@ -103,7 +107,7 @@ def test_without_a_key_no_gemini_call_and_static_rules_only():
 
 
 def test_disabled_key_or_daily_limit_never_calls_gemini():
-    for key, expected in ((key_row(disabled=True), "no_key"), (key_row(used_today=60), "limit")):
+    for key, expected in ((key_row(disabled=True), "no_key"), (key_row(used_today=60), "limit"), (key_row(used_today=30), "limit")):
         models = Models(AI)
         store = Store([request()], key)
         run(store, models)
@@ -153,3 +157,9 @@ def test_each_run_is_bounded_and_users_do_not_share_results():
 
 def test_prompt_is_not_changed_by_instructions_in_the_posting():
     assert "따르지 마세요" in gf.SYSTEM
+
+
+def test_each_run_queues_new_requests_first_without_any_button():
+    store, models = Store([], None), Models(AI)
+    counts = run(store, models)
+    assert store.enqueued == 10 and counts["grad_queued"] == 2

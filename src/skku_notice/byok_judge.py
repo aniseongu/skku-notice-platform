@@ -81,6 +81,10 @@ class JudgeStore(NoticeStore):
         rows = self._request("GET", "user_profiles", params=params).json()
         return build_judge_profile(rows[0] if rows else {})
 
+    def enqueue_graduation(self, limit: int) -> int:
+        response = self._request("POST", "rpc/enqueue_graduation_assessments", json={"p_limit": limit})
+        return int(response.json() or 0)
+
     def graduation_requests(self, limit: int) -> list[dict]:
         return self._request("POST", "rpc/list_graduation_requests", json={"p_limit": limit}).json()
 

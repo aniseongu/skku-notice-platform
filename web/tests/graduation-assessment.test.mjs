@@ -73,7 +73,7 @@ test('requesting again updates only status and requested_at (never upsert, which
   await assert.rejects(() => requestGraduation(failing, 'u1', 'n1'));
 });
 
-import { visibleTracks, threePAnswer, threePFields } from '../src/graduation-assessment.ts';
+import { visibleTracks, threePAnswer, threePFields, shortReason, reasonOf } from '../src/graduation-assessment.ts';
 const SW_PROGRAMS = [{ college: '소프트웨어융합대학', department: '소프트웨어학과' }];
 const flags = (over = {}) => ({ programs: SW_PROGRAMS, deptInternshipDone: null, university3pInternshipDone: null, university3pInternshipSelected: null, ...over });
 
@@ -95,4 +95,12 @@ test('신3품 인턴십 답은 채움·선택 여부로 오간다', () => {
   assert.equal(threePAnswer({ university3pInternshipDone: null, university3pInternshipSelected: null }), null);
   assert.equal(threePFields('done').university3pInternshipSelected, true);
   assert.equal(threePFields('no').university3pInternshipDone, false);
+});
+
+test('이유는 이름 표기와 규정 설명을 떼고 첫 문장만 남긴다', () => {
+  assert.equal(shortReason('학과 졸업 인턴십: 공고에서 확인되지 않은 조건이 있어요'), '공고에서 확인되지 않은 조건이 있어요');
+  assert.equal(shortReason('기관 종류를 확인하지 못했어요. 기타 기관은 수행 전에 졸업평가위원회 심의가 필요해요'), '기관 종류를 확인하지 못했어요');
+  assert.equal(shortReason('근무 시간을 공고에서 확인하지 못했어요'), '근무 시간을 공고에서 확인하지 못했어요');
+  const track = { status: 'NEEDS_REVIEW', label: '확인 필요', checks: [{ ruleId: 'a', result: 'unknown', note: '기관 종류를 확인하지 못했어요. 기타 기관은 심의가 필요해요' }], unknowns: [], afterCompletion: [], notes: [] };
+  assert.equal(reasonOf(track), '기관 종류를 확인하지 못했어요');
 });

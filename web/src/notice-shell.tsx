@@ -439,7 +439,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
     today: todayKst(), body: shownBody, mySummary: mine?.summary ?? null, summarizing: app.summarizing === notice.id, summaryError: app.summaryErrorId === notice.id && !app.summarizing ? app.summaryError : '', makeSummary: () => { void app.makeSummary(notice); }, interests,
     ai: judgement?.ai ?? mine?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
     retry: () => { app.bodies.delete(notice.id); app.requestUpdate(); },
-    graduation: app.showsGraduation(notice) ? { tracks: visibleTracks(app.profile), assessment: app.graduationFor(notice), busy: app.graduationBusy === notice.id, error: app.graduationError, request: () => { void app.requestGraduation(notice); }, hasKey: !!app.byokStatus && !app.byokStatus.disabled } : undefined,
+    graduation: app.showsGraduation(notice) ? { tracks: visibleTracks(app.profile), assessment: app.graduationFor(notice), error: app.graduationError } : undefined,
   }} />;
 }
 

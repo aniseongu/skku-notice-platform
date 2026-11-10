@@ -1115,8 +1115,8 @@ test('software original major is asked for the admission year and the internship
   await expect(section.getByText('최대 240시간이라 280시간에 못 미쳐요')).toBeVisible();
   // 안 되는 쪽은 빨강 계열 글자다(배지나 카드가 아니다).
   expect(await p3.evaluate((el) => getComputedStyle(el).color)).toBe(await page.evaluate(() => { const probe = document.createElement('span'); probe.style.color = 'var(--danger)'; document.body.append(probe); const c = getComputedStyle(probe).color; probe.remove(); return c; }));
-  // 인정 기준은 적지 않는다. 판정 한 줄과 이유 한 줄만 보인다.
+  // 인정 기준은 적지 않는다. 판정 한 줄과 이유 한 문장만 보인다.
   await expect(section).not.toContainText('인정 기준');
-  await expect(section.getByRole('button')).toHaveCount(1);  // 키가 없을 때 나오는 "다시 확인하기"뿐이다
+  await expect(section.getByRole('button')).toHaveCount(0);  // 판정은 서버가 미리 해 두므로 누를 것이 없다
   await expect(section).not.toContainText(/인정 완료|합격|승인됨/);
 });
