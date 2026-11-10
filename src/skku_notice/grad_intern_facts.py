@@ -124,6 +124,9 @@ def lacks_key_facts(title: str, body: str) -> bool:
 # --- LLM 없이 코드로만 읽는 규칙(Gemini 키가 없어도 동작한다) ---
 # 근무 형태: "주 5일"과 하루 7시간 이상(예: 09:00 ~ 18:00, 하루 7H)이면 전일제로 본다. 파트타임·시간제 말이 있으면 정하지 않는다.
 WEEK5 = re.compile(r"주\s*5\s*일")
+WEEK_HOURS = re.compile(r"주\s*(\d{1,2})\s*시간")
+WEEK_DAYS_LOW = re.compile(r"주\s*([1-4])\s*일")
+FULL_DAY = re.compile(r"(?:1일|일|하루)\s*8\s*시간|풀\s*타임|종일\s*근무")
 DAY_HOURS = re.compile(r"하루\s*(\d{1,2})\s*(?:[Hh]|시간)")
 CLOCK = re.compile(r"(\d{1,2})\s*:\s*(\d{2})\s*[~\-–∼]\s*(\d{1,2})\s*:\s*(\d{2})")
 
@@ -131,7 +134,7 @@ CLOCK = re.compile(r"(\d{1,2})\s*:\s*(\d{2})\s*[~\-–∼]\s*(\d{1,2})\s*:\s*(\d
 # non_software, 섞여 있으면 정하지 않고 Gemini에 맡긴다(섞인 직무를 코드로 단정하지 않는다).
 TASK_SECTION = re.compile(r"(?:\[?\s*담당\s*업무\s*\]?|모집\s*직무|주요\s*업무|하는\s*일)\s*[:：]?\s*(.{20,900}?)(?=\n\s*\n\s*\n|\[\s*(?:접수|자격|우대|근무|복리|채용|지원)|자격\s*요건|우대\s*(?:사항|조건)|$)", re.S)
 SW_WORDS: dict[str, re.Pattern[str]] = {
-    "application_embedded": re.compile(r"소프트웨어\s*개발|SW\s*개발|프로그래밍|프론트\s*엔드|백\s*엔드|웹\s*개발|앱\s*개발|모바일\s*앱|임베디드|펌웨어|게임\s*개발|클라이언트\s*개발|서버\s*개발|Android|iOS|React|Spring|\bJava\b|Python|코딩|개발자|\bdeveloper\b|software engineer", re.I),
+    "application_embedded": re.compile(r"소프트웨어\s*개발|SW\s*개발|프로그래밍|프론트\s*엔드|백\s*엔드|웹\s*개발|앱\s*개발|모바일\s*앱|임베디드|펌웨어|게임\s*개발|클라이언트\s*개발|서버\s*개발|Android|iOS|React|Spring|\bJava\b|Python|C\+\+|JavaScript|TypeScript|Kotlin|Swift|\bSQL\b|코딩|알고리즘|프로그램\s*(?:개발|제작)|(?:앱|웹|서비스|플랫폼|시스템|서버|API|SW|S/W|소프트웨어|게임|AI|데이터)\s*개발|개발자|프로그래머|\bdeveloper\b|software engineer", re.I),
     "data_ai": re.compile(r"데이터\s*분석|데이터\s*엔지니어|머신\s*러닝|딥\s*러닝|AI\s*모델|인공지능\s*(?:모델|개발)|LLM|MLOps|data\s*(?:scientist|engineer|analyst)", re.I),
     "cloud_platform": re.compile(r"클라우드|인프라|DevOps|Kubernetes|\bAWS\b|\bGCP\b|Azure", re.I),
     "system_network": re.compile(r"시스템\s*(?:운영|엔지니어|관리)|네트워크\s*(?:운영|엔지니어|구축)|서버\s*(?:운영|관리)"),
@@ -201,6 +204,28 @@ def static_facts(title: str, body: str) -> dict:
         if WEEK5.search(text) and (long_day or not clock):
             found["work_mode"] = "full_time"
             found["evidence"].append({"field": "work_mode", "quote": (WEEK5.search(text) or clock).group(0)})
+    if "work_mode" not in found:
+        week_hours = WEEK_HOURS.search(text)
+        low_days = WEEK_DAYS_LOW.search(text)
+        if PART_TIME.search(text):
+            pass  # 이미 위에서 시간제 말이 있으면 정하지 않았다
+        elif week_hours and int(week_hours.group(1)) >= 35:
+            found["work_mode"] = "full_time"
+            found["evidence"].append({"field": "work_mode", "quote": week_hours.group(0)})
+        elif week_hours and int(week_hours.group(1)) <= 30:
+            found["work_mode"] = "part_time"
+            found["evidence"].append({"field": "work_mode", "quote": week_hours.group(0)})
+        elif low_days:
+            found["work_mode"] = "part_time"
+            found["evidence"].append({"field": "work_mode", "quote": low_days.group(0)})
+        elif FULL_DAY.search(text):
+            found["work_mode"] = "full_time"
+            found["evidence"].append({"field": "work_mode", "quote": FULL_DAY.search(text).group(0)})
+        else:
+            clock = CLOCK.search(text)
+            if clock and ((int(clock.group(3)) * 60 + int(clock.group(4))) - (int(clock.group(1)) * 60 + int(clock.group(2)))) >= 7 * 60:
+                found["work_mode"] = "full_time"  # 09:00~18:00처럼 하루 7시간 이상 적힌 근무시간
+                found["evidence"].append({"field": "work_mode", "quote": clock.group(0)})
     category = static_task_category(title, body)
     if category:
         found["task_category"], quote = category

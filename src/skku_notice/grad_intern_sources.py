@@ -3,7 +3,7 @@
 
 DEPT_RULESET = "cse-2025-06-01"
 P3_RULESET = "skku-3p-2026-11-10"
-EXTRACTOR_VERSION = "facts-7"
+EXTRACTOR_VERSION = "facts-8"
 
 # 사용자에게 보이는 근거. 조항과 쪽수는 docs/sources의 PDF 원문과 대조했다(2026-11-10).
 DEPT_TERMS_PDF = "cse_com_grad_evaluation_terms_250601.pdf"

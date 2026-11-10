@@ -13,10 +13,11 @@ const FADED: Record<string, string> = {
 };
 const strong = (read: boolean, color: string) => `${LABEL} ${read ? `font-medium ${FADED[color]}` : `font-semibold ${color}`}`;
 
-/** "3품 인턴십 충족, 솦 인턴십 미달" 한 묶음. 충족은 강조색, 미달은 연한 회색(글자로도 구분된다). */
+/** "3품 인턴십 충족, 솦 인턴십 미달 · 확인 필요" 한 묶음. 충족은 강조색, 미달은 연한 회색(글자로도 구분된다). 공고만 보고 러프하게 본 결과라 끝에 확인 필요를 붙인다. */
 function GradParts({ parts, read }: { parts: GradPart[]; read: boolean }) {
   return <>{parts.map((part, index) => <b key={part.key} className={`grad-badge ${part.met ? strong(read, 'text-accent') : `${LABEL} font-normal text-ink-3`}`}>
-    {part.name} {part.met ? '충족' : '미달'}{index < parts.length - 1 ? ',' : ''}</b>)}</>;
+    {part.name} {part.met ? '충족' : '미달'}{index < parts.length - 1 ? ',' : ''}</b>)}
+    <span className={`${LABEL} font-normal text-ink-3`}>· 확인 필요</span></>;
 }
 
 export function Reason({ interests, ai, rule, read = false, grad = [] }: {

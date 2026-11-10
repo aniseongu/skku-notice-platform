@@ -75,7 +75,7 @@ def test_t03_three_week_full_time_fails_both():
 
 def test_long_full_time_without_hours_is_not_confirmed_for_3p():
     f = facts(end_date=D0 + timedelta(days=7 * 10 - 1))  # 10주, 평일 상한 400시간
-    assert dept(f) == LIKELY and p3(f) == NEEDS_REVIEW
+    assert dept(f) == LIKELY and p3(f) == CONDITIONAL  # 러프하게: 회사 인턴이면 공고에서 시간을 못 봐도 조건부 가능(확인 필요)
 
 
 def test_t07_public_agency_security_five_weeks():
@@ -86,16 +86,16 @@ def test_t07_public_agency_security_five_weeks():
 
 def test_t08_work_mode_unknown_needs_review_even_if_long():
     f = facts(work_mode="unknown", end_date=D0 + timedelta(days=55))
-    assert dept(f) == NEEDS_REVIEW and p3(f) == NEEDS_REVIEW
+    assert dept(f) == CONDITIONAL and p3(f) == CONDITIONAL  # 근무 형태를 몰라도 회사 인턴이면 조건부 가능
 
 
 def test_t09_and_t16_missing_or_title_only_task_needs_review():
-    assert dept(facts(task_category="unknown")) == NEEDS_REVIEW
-    assert dept(facts(task_category="other")) == NEEDS_REVIEW
+    assert dept(facts(task_category="unknown")) == CONDITIONAL
+    assert dept(facts(task_category="other")) == CONDITIONAL
 
 
 def test_t10_unverified_corporation_needs_review():
-    assert dept(facts(corporate_status_verified=False)) == NEEDS_REVIEW
+    assert dept(facts(corporate_status_verified=False)) == CONDITIONAL  # 회사로 읽혔지만 법인 근거가 약하면 조건부
     assert dept(facts(organization_type="other", corporate_status_verified=False)) == NEEDS_REVIEW
     assert dept(facts(organization_type="unknown", corporate_status_verified=False)) == NEEDS_REVIEW
 
@@ -125,7 +125,7 @@ def test_t13_lab_monthly_hour_boundaries(semester, vacation, expected):
 
 
 def test_lab_without_monthly_hours_or_short_period():
-    assert dept(lab(monthly_hours=())) == NEEDS_REVIEW
+    assert dept(lab(monthly_hours=())) == CONDITIONAL
     assert dept(lab(end_date=date(2026, 8, 31))) == NOT_ELIGIBLE  # 6개월에 하루 모자람
     assert spans_months(date(2026, 3, 2), date(2026, 9, 1), 6) is True
     assert spans_months(date(2026, 3, 2), date(2026, 8, 31), 6) is False

@@ -207,16 +207,19 @@ def _lab_checks(facts: InternFacts) -> list[Check]:
     return checks
 
 
-def _combine(checks: list[Check]) -> str:
+def _combine(checks: list[Check], rough: bool = False) -> str:
+    """하나라도 안 맞으면 미달. 모르는 조건이 남아도 러프하게 보는 경우(기관이 회사·공공기관·교내 연구실로 읽힌 때)는
+    "조건부 가능"으로 알려 준다(확인 필요 문구와 함께 보인다). 기관도 모르면 확인 필요로 남긴다."""
     if any(c.result == FAIL for c in checks):
         return NOT_ELIGIBLE
     if any(c.result == UNKNOWN for c in checks):
-        return NEEDS_REVIEW
+        return CONDITIONAL if rough else NEEDS_REVIEW
     return LIKELY
 
 
 DEPT_LABELS = {
     LIKELY: "학과 졸업 인턴십 인정 가능성 높음 — 수행 후 평가·증빙 필요",
+    CONDITIONAL: "학과 졸업 인턴십: 되는 쪽으로 보이지만 공고에서 확인되지 않은 조건이 있어요",
     NEEDS_REVIEW: "학과 졸업 인턴십: 공고에서 확인되지 않은 조건이 있어요",
     NOT_ELIGIBLE: "학과 졸업 인턴십 기준에 맞지 않아 보여요",
     NOT_APPLICABLE: "학과 졸업 인턴십 해당 없음",
@@ -255,8 +258,8 @@ def assess_department(profile: GradProfile, facts: InternFacts) -> Assessment:
         if org == "other":
             notes.append("법인 기업·공공기관이 아니면 시작 전에 신청서를 내고 졸업평가위원회 심의를 받아야 해요")
 
-    status = _combine(checks)
-    if status == LIKELY and _crosses_year(facts.start_date, facts.end_date):
+    status = _combine(checks, rough=org in COMPANY_TYPES or org == "skku_sw_lab")
+    if status in (LIKELY, CONDITIONAL) and _crosses_year(facts.start_date, facts.end_date):
         notes.append("연도가 바뀌어요. 인증은 당해 신청이 원칙이라 신청 시기를 학과에 확인하세요")
     unknowns = tuple(c.note for c in checks if c.result == UNKNOWN)
     return Assessment(status, DEPT_RULESET, DEPT_LABELS[status], tuple(checks), unknowns, tuple(after), tuple(notes),
@@ -323,7 +326,8 @@ def assess_university_3p(profile: GradProfile, facts: InternFacts) -> Assessment
         status = NOT_ELIGIBLE
         notes.append("교과 현장실습(1학점)으로 인정받는 길은 학교 산학사업팀 인정 과목일 때만 가능해요")
     else:
-        status = NEEDS_REVIEW
+        # 시간을 공고에서 확인하지 못해도 회사·공공기관 인턴이면 러프하게 "조건부 가능"으로 본다(실제 인정은 출근 기록과 증빙으로 정해진다).
+        status = CONDITIONAL if facts.organization_type in COMPANY_TYPES else NEEDS_REVIEW
     unknowns = tuple(c.note for c in checks if c.result == UNKNOWN)
     notes.append("학교 3품만으로 학과 인턴십이 인정되지는 않아요. 업무 분야와 기관 조건을 학과도 충족해야 중복 인정돼요")
     return Assessment(status, P3_RULESET, P3_LABELS[status], tuple(checks), unknowns, tuple(after), tuple(notes), refs)

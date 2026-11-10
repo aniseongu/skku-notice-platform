@@ -242,3 +242,14 @@ def test_LLM_없이_실제_공고_모양에서_기간과_근무_형태와_업무
 
     mixed = build_facts("[회사] 인턴", "[담당업무]\n- 서비스 기획 및 마케팅\n- 백엔드 개발 지원\n\n\n[접수기간]\n11월\n", None)
     assert mixed.facts.task_category == "unknown"      # 섞인 직무는 코드로 단정하지 않는다
+
+
+def test_코드만으로_근무시간과_개발_말에서_근무_형태와_업무_분야를_더_읽는다():
+    from skku_notice.grad_intern_facts import build_facts
+
+    ft = build_facts("[회사] 인턴", "근무시간: 주 40시간\n담당업무: AI 서비스 개발 및 TypeScript 프론트엔드 구현\n", None)
+    assert ft.facts.work_mode == "full_time" and ft.facts.task_category == "application_embedded"
+    pt = build_facts("[회사] 인턴", "근무: 주 3일\n담당업무: 데이터 입력 보조 행정\n", None)
+    assert pt.facts.work_mode == "part_time"
+    nine = build_facts("[회사] 인턴", "근무시간 09:00 ~ 18:00\n", None)
+    assert nine.facts.work_mode == "full_time"
