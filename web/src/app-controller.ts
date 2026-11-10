@@ -18,6 +18,7 @@ import { connectionChain } from './connection-chain';
 import { composeSummaryTime, deleteDevice, loadDevices, loadSummaryTime, saveCanvasMode, saveDeviceName, saveSummaryTime, suggestDeviceName, type CanvasMode, type Device } from './devices';
 import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from './my-notices';
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
+import { AI_PROVIDERS, DEFAULT_AI_PREFERENCES, loadAiKeyStatuses, loadAiPreferences, registerAiKey, removeAiKey, saveAiPreferences, type AiKeyStatus, type AiPreferences, type AiProvider } from './ai-providers';
 import { byokAvailable, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
 import { keywordMatchesNotice } from './keyword-match';
@@ -170,6 +171,7 @@ export class AppController extends Reactive {
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, authName: { state: true }, authAvatar: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
+    aiKeys: { state: true }, aiPrefs: { state: true }, aiBusy: { state: true }, aiError: { state: true },
     byokOn: { state: true }, byokBackfill: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true }, canvasStatus: { state: true }, canvasBusy: { state: true }, canvasError: { state: true },
     calendarId: { state: true }, calendarBusy: { state: true }, calendarMessage: { state: true }, calendarError: { state: true }, calendarSyncedAt: { state: true },
     myJudgments: { state: true }, myInterests: { state: true }, graduationStatuses: { state: true }, graduationOnly: { state: true }, graduationBusy: { state: true }, graduationError: { state: true },
@@ -210,6 +212,10 @@ export class AppController extends Reactive {
   pushChain: { chain: ReturnType<typeof createEnableChain>; userId: string; epoch: number } | null = null;
   pushRetry = false;
   byokOn = false;
+  aiKeys: AiKeyStatus[] = [];
+  aiPrefs: AiPreferences = DEFAULT_AI_PREFERENCES;
+  aiBusy = false;
+  aiError = '';
   byokStatus: ByokStatus | null = null;
   byokBackfill = 0;
   private byokPoll: ReturnType<typeof setTimeout> | null = null;
@@ -346,7 +352,7 @@ export class AppController extends Reactive {
           this.authUserId = userId;
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.thisDeviceId = null; this.devicesError = ''; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.thisDeviceId = null; this.devicesError = ''; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -814,6 +820,9 @@ export class AppController extends Reactive {
       const [status, canvas] = await Promise.all([loadByokStatus(authClient, userId), loadCanvasStatus(authClient, userId).catch(() => null)]);
       if (epoch !== this.subscriptionsEpoch) return;
       this.byokStatus = status; this.canvasStatus = canvas; this.byokError = '';
+      const [aiKeys, aiPrefs] = await Promise.all([loadAiKeyStatuses(authClient, userId), loadAiPreferences(authClient, userId)]);
+      if (epoch !== this.subscriptionsEpoch) return;
+      this.aiKeys = aiKeys; this.aiPrefs = aiPrefs;
       await this.refreshByokBackfill(userId, epoch);
     } catch {
       if (epoch === this.subscriptionsEpoch) this.byokError = '키 정보를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.';
@@ -1094,6 +1103,49 @@ export class AppController extends Reactive {
       this.accountError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '계정을 지우지 못했어요. 잠시 뒤 다시 눌러 주세요.';
     } finally {
       this.accountBusy = false;
+    }
+  }
+
+  async registerAi(provider: AiProvider, apiKey: string): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.aiBusy || !AI_PROVIDERS.includes(provider)) return;
+    this.aiBusy = true; this.aiError = '';
+    try {
+      await registerAiKey(authClient, provider, apiKey);
+      const keys = await loadAiKeyStatuses(authClient, userId);
+      if (epoch === this.subscriptionsEpoch) this.aiKeys = keys;
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) this.aiError = error instanceof Error ? error.message : '키를 저장하지 못했어요.';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.aiBusy = false;
+    }
+  }
+
+  async removeAi(provider: AiProvider): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.aiBusy) return;
+    this.aiBusy = true; this.aiError = '';
+    try {
+      await removeAiKey(authClient, provider);
+      if (epoch === this.subscriptionsEpoch) this.aiKeys = this.aiKeys.filter((key) => key.provider !== provider);
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) this.aiError = error instanceof Error ? error.message : '키를 지우지 못했어요.';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.aiBusy = false;
+    }
+  }
+
+  async updateAiPrefs(next: AiPreferences): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.aiBusy) return;
+    this.aiBusy = true; this.aiError = '';
+    try {
+      await saveAiPreferences(authClient, userId, next);
+      if (epoch === this.subscriptionsEpoch) this.aiPrefs = next;
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) this.aiError = error instanceof Error ? error.message : 'AI 설정을 저장하지 못했어요.';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.aiBusy = false;
     }
   }
 

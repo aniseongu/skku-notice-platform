@@ -186,3 +186,65 @@ test('google calendar link stores the refresh token encrypted for "<user>:gcal",
   await assert.rejects(decryptApiKey(masterKey, 'user-a', saved[0].ciphertext));          // 사용자 번호만으로는 열리지 않는다
   await assert.rejects(decryptApiKey(masterKey, 'user-b:gcal', saved[0].ciphertext));     // 다른 사용자 이름으로도 열리지 않는다
 });
+
+async function setupProviders({ verdict = 'valid' } = {}) {
+  const t = await setup();
+  const aiSaved = [], aiDeleted = [], aiVerified = [];
+  const deps = { masterKey: t.masterKey,
+    userFromAuthorization: async (auth) => (auth === 'Bearer good' ? 'user-a' : null),
+    verifyGeminiKey: async () => 'valid', saveKey: async () => {}, deleteKey: async (id) => { aiDeleted.push(`gemini:${id}`); },
+    verifyCanvasToken: async () => 'valid', saveCanvasToken: async () => {}, deleteCanvasToken: async () => {},
+    verifyProviderKey: async (provider, key) => { aiVerified.push([provider, key]); return verdict; },
+    saveAiKey: async (row) => { aiSaved.push(row); },
+    deleteAiKey: async (id, provider) => { aiDeleted.push(`${provider}:${id}`); } };
+  const call = (method, body, url = 'https://x/byok') => handle(new Request(url, {
+    method, headers: { Origin: ORIGIN, Authorization: 'Bearer good' }, body: body === undefined ? undefined : JSON.stringify(body) }), deps);
+  return { call, aiSaved, aiDeleted, aiVerified, masterKey: t.masterKey };
+}
+
+for (const [provider, model, secret] of [['groq', 'openai/gpt-oss-20b', `gsk_${'Q'.repeat(30)}`], ['openrouter', 'openrouter/free', `sk-or-v1-${'R'.repeat(30)}`]]) {
+  test(`${provider} key is verified, encrypted for "<user>:${provider}" and only the last four characters come back`, async () => {
+    const t = await setupProviders();
+    const response = await t.call('POST', { provider, apiKey: secret });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.deepEqual(body, { ok: true, keyHint: secret.slice(-4), model });
+    assert.equal(JSON.stringify(body).includes(secret), false);
+    assert.deepEqual(t.aiVerified, [[provider, secret]]);
+    const row = t.aiSaved[0];
+    assert.equal(row.user_id, 'user-a'); assert.equal(row.provider, provider);
+    assert.equal(row.ciphertext.includes(secret), false);
+    assert.equal(await decryptApiKey(t.masterKey, `user-a:${provider}`, row.ciphertext), secret);
+    // 사용자 ID만으로나 다른 업체 이름으로는 열리지 않는다.
+    await assert.rejects(decryptApiKey(t.masterKey, 'user-a', row.ciphertext));
+    await assert.rejects(decryptApiKey(t.masterKey, `user-a:${provider === 'groq' ? 'openrouter' : 'groq'}`, row.ciphertext));
+  });
+}
+
+test('provider keys: refused or unreachable keys, bad format and bad models never reach storage', async () => {
+  const refused = await setupProviders({ verdict: 'invalid' });
+  assert.equal((await refused.call('POST', { provider: 'groq', apiKey: `gsk_${'Q'.repeat(30)}` })).status, 400);
+  assert.equal(refused.aiSaved.length, 0);
+  const outage = await setupProviders({ verdict: 'unavailable' });
+  assert.equal((await outage.call('POST', { provider: 'openrouter', apiKey: `sk-or-${'R'.repeat(30)}` })).status, 502);
+  const t = await setupProviders();
+  assert.equal((await t.call('POST', { provider: 'groq', apiKey: 'bad key' })).status, 400);
+  assert.equal((await t.call('POST', { provider: 'groq', apiKey: `gsk_${'Q'.repeat(30)}`, model: 'x; drop' })).status, 400);
+  assert.equal((await t.call('POST', { provider: 'bing', apiKey: `gsk_${'Q'.repeat(30)}` })).status, 400);
+  assert.equal(t.aiSaved.length, 0);
+  assert.equal(t.aiVerified.length, 0);
+});
+
+test('deleting one provider key leaves the others and the response never contains secrets', async () => {
+  const t = await setupProviders();
+  assert.equal((await t.call('DELETE', undefined, 'https://x/byok?provider=groq')).status, 200);
+  assert.equal((await t.call('DELETE', undefined, 'https://x/byok?provider=openrouter')).status, 200);
+  assert.equal((await t.call('DELETE')).status, 200); // provider 없음 = 기존 Gemini 삭제
+  assert.deepEqual(t.aiDeleted, ['groq:user-a', 'openrouter:user-a', 'gemini:user-a']);
+});
+
+test('without provider support in deps the old function still answers Gemini and refuses providers', async () => {
+  const t = await setup();
+  assert.equal((await t.call('POST', { provider: 'groq', apiKey: `gsk_${'Q'.repeat(30)}` })).status, 400);
+  assert.equal((await t.call('POST', { apiKey: KEY })).status, 200);
+});

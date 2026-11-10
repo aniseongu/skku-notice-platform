@@ -121,7 +121,9 @@ def build_user_ai(
     for provider, row in rows.items():
         used[provider] = used_today(row, today)
         try:
-            api_key = decrypt_api_key(master_key, user_id, row["ciphertext"])
+            # Gemini 키는 사용자 ID에, 다른 업체 키는 "<사용자 ID>:<업체>"에 묶인 암호문이다.
+            aad = user_id if provider == "gemini" else f"{user_id}:{provider}"
+            api_key = decrypt_api_key(master_key, aad, row["ciphertext"])
         except ByokCryptoError:
             stamp = now.isoformat()
             _update(store, user_id, provider, {"disabled_at": stamp, "error_at": stamp,

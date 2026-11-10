@@ -31,7 +31,7 @@ def gem_row(user, used=0):
 
 
 def ai_row(user, provider, secret, model, used=0):
-    return {"provider": provider, "ciphertext": enc(user, secret), "model": model, "disabled_at": None, "used_on": "2026-11-07", "used_today": used}
+    return {"provider": provider, "ciphertext": enc(f"{user}:{provider}", secret), "model": model, "disabled_at": None, "used_on": "2026-11-07", "used_today": used}
 
 
 class AiStore(FakeStore):
@@ -225,3 +225,12 @@ def test_graduation_with_failing_groq_key_still_returns_a_rule_result():
     saved = store.saved[0]
     assert counts["grad_ai_unavailable"] == 1 and saved["status"] == "READY" and saved["ai_status"] == "unavailable"
     assert saved["department"]["status"] in ("LIKELY", "CONDITIONAL", "NEEDS_REVIEW")  # 불합격으로 바꾸지 않는다
+
+
+def test_a_groq_ciphertext_moved_into_the_openrouter_row_does_not_open():
+    moved = ai_row("u1", "groq", GROQ_KEY, "openai/gpt-oss-20b")
+    moved["provider"] = "openrouter"  # 같은 사용자라도 업체가 다르면 AAD가 달라 열리지 않는다
+    store = AiStore(extra={"u1": [moved]})
+    net = Net({})
+    counts, _ = run(store, net)
+    assert net.requests == [] and counts["errors"] == 1

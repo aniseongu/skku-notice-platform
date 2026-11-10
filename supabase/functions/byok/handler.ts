@@ -2,6 +2,12 @@ import { encryptApiKey, looksLikeGeminiKey } from './crypto.ts';
 
 export const ALLOWED_ORIGINS = ['https://skku-notice-platform.pages.dev', 'http://localhost:5173', 'http://127.0.0.1:5173'];
 const MODEL_PATTERN = /^[a-z0-9.-]{3,60}$/;
+// Groq·OpenRouter 모델 ID는 슬래시와 콜론을 쓴다(예: openai/gpt-oss-20b, vendor/model:free).
+const AI_MODEL_PATTERN = /^[A-Za-z0-9._:/-]{3,100}$/;
+export type AiProvider = 'groq' | 'openrouter';
+const AI_PROVIDERS: AiProvider[] = ['groq', 'openrouter'];
+export const AI_DEFAULT_MODEL: Record<AiProvider, string> = { groq: 'openai/gpt-oss-20b', openrouter: 'openrouter/free' };
+const AI_LABEL: Record<AiProvider, string> = { groq: 'Groq', openrouter: 'OpenRouter' };
 export const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
 const MAX_BODY_BYTES = 2048;
 
@@ -35,6 +41,10 @@ export interface ByokDeps {
   verifyGeminiKey: (apiKey: string) => Promise<'valid' | 'invalid' | 'unavailable'>;
   saveKey: (row: { user_id: string; ciphertext: string; key_hint: string; model: string }) => Promise<void>;
   deleteKey: (userId: string) => Promise<void>;
+  /** Groq·OpenRouter 키 확인: 저장 없이 업체에 가벼운 요청만 보낸다. 키는 로그에 남기지 않는다. */
+  verifyProviderKey?: (provider: AiProvider, apiKey: string) => Promise<'valid' | 'invalid' | 'unavailable'>;
+  saveAiKey?: (row: { user_id: string; provider: AiProvider; ciphertext: string; key_hint: string; model: string }) => Promise<void>;
+  deleteAiKey?: (userId: string, provider: AiProvider) => Promise<void>;
   /** 아이캠퍼스(Canvas) 토큰: 저장 없이 canvas.skku.edu에 확인만 한다. */
   verifyCanvasToken: (token: string) => Promise<'valid' | 'invalid' | 'unavailable'>;
   saveCanvasToken: (row: { user_id: string; ciphertext: string; token_hint: string }) => Promise<void>;
@@ -69,8 +79,12 @@ export async function handle(req: Request, deps: ByokDeps): Promise<Response> {
   if (!userId) return reply(401, origin, { error: '로그인이 필요해요.' });
   try {
     if (req.method === 'DELETE') {
-      if (new URL(req.url).searchParams.get('provider') === 'canvas') await deps.deleteCanvasToken(userId);
-      else await deps.deleteKey(userId);
+      const target = new URL(req.url).searchParams.get('provider');
+      if (target === 'canvas') await deps.deleteCanvasToken(userId);
+      else if (target === 'groq' || target === 'openrouter') {
+        if (!deps.deleteAiKey) return reply(400, origin, { error: '요청 형식을 확인해 주세요.' });
+        await deps.deleteAiKey(userId, target);
+      } else await deps.deleteKey(userId);
       return reply(200, origin, { ok: true });
     }
     const text = await req.text();
@@ -109,6 +123,23 @@ export async function handle(req: Request, deps: ByokDeps): Promise<Response> {
       await deps.saveCanvasToken({ user_id: userId, ciphertext, token_hint: tokenHint });
       return reply(200, origin, { ok: true, keyHint: tokenHint });
     }
+    if (typeof body.provider === 'string' && (AI_PROVIDERS as string[]).includes(body.provider)) {
+      const provider = body.provider as AiProvider;
+      const label = AI_LABEL[provider];
+      if (!deps.verifyProviderKey || !deps.saveAiKey) return reply(400, origin, { error: '요청 형식을 확인해 주세요.' });
+      if (!looksLikeGeminiKey(body.apiKey)) return reply(400, origin, { error: '키를 끝까지 복사해 공백 없이 붙여 넣어 주세요.' });
+      const aiModel = body.model === undefined ? AI_DEFAULT_MODEL[provider] : body.model;
+      if (typeof aiModel !== 'string' || !AI_MODEL_PATTERN.test(aiModel)) return reply(400, origin, { error: '모델 이름을 확인해 주세요.' });
+      const result = await deps.verifyProviderKey(provider, body.apiKey);
+      if (result === 'invalid') return reply(400, origin, { error: `${label}에서 이 키를 받아 주지 않아요. 키를 확인해 주세요.` });
+      if (result === 'unavailable') return reply(502, origin, { error: '지금은 키를 확인할 수 없어요. 잠시 뒤 다시 시도해 주세요.' });
+      // 암호문은 "<사용자 ID>:<업체>"에 묶어 다른 업체 행이나 다른 사용자 행으로 옮겨도 열리지 않게 한다.
+      const aiCipher = await encryptApiKey(deps.masterKey, `${userId}:${provider}`, body.apiKey);
+      const aiHint = body.apiKey.slice(-4).replace(/[^A-Za-z0-9_-]/g, '_');
+      await deps.saveAiKey({ user_id: userId, provider, ciphertext: aiCipher, key_hint: aiHint, model: aiModel });
+      return reply(200, origin, { ok: true, keyHint: aiHint, model: aiModel });
+    }
+    if (body.provider !== undefined && body.provider !== 'gemini') return reply(400, origin, { error: '요청 형식을 확인해 주세요.' });
     if (!looksLikeGeminiKey(body.apiKey)) return reply(400, origin, { error: '키를 끝까지 복사해 공백 없이 붙여 넣어 주세요.' });
     const model = body.model === undefined ? DEFAULT_MODEL : body.model;
     if (typeof model !== 'string' || !MODEL_PATTERN.test(model)) return reply(400, origin, { error: '모델 이름을 확인해 주세요.' });

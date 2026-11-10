@@ -130,6 +130,26 @@ Deno.serve((req) => handle(req, {
     const { error } = await service.from('user_canvas_tokens').delete().eq('user_id', userId);
     if (error) throw error;
   },
+  async verifyProviderKey(provider, apiKey) {
+    // 모델 목록 조회는 토큰을 쓰지 않는다. 키 형식 오류와 권한 오류는 401·403, 한도는 429로 온다.
+    const endpoint = provider === 'groq' ? 'https://api.groq.com/openai/v1/models' : 'https://openrouter.ai/api/v1/auth/key';
+    try {
+      const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(8000), redirect: 'error' });
+      if (response.ok) return 'valid';
+      return [400, 401, 403].includes(response.status) ? 'invalid' : 'unavailable';
+    } catch { return 'unavailable'; }
+  },
+  async saveAiKey(row) {
+    const { error } = await service.from('user_ai_keys').upsert({
+      ...row, validation_state: 'valid', validated_at: new Date().toISOString(), disabled_at: null, last_error: null,
+      error_at: null, updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,provider' });
+    if (error) throw error;
+  },
+  async deleteAiKey(userId, provider) {
+    const { error } = await service.from('user_ai_keys').delete().eq('user_id', userId).eq('provider', provider);
+    if (error) throw error;
+  },
   async deleteKey(userId) {
     const { error } = await service.from('user_byok_keys').delete().eq('user_id', userId);
     if (error) throw error;
