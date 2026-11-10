@@ -991,7 +991,7 @@ test('a deadline that is close stays red even when the notice is already read, i
   }
 });
 
-test('on read rows the judgment labels keep their hue, softer in dark mode, with readable contrast', async ({ page }) => {
+test('on read rows the judgment labels are plain muted gray (no hue), with readable contrast', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   const rows = page.locator('notice-rows-screen a.row');
   await rows.first().waitFor();
@@ -1030,7 +1030,7 @@ test('on read rows the judgment labels keep their hue, softer in dark mode, with
         }
         return getComputedStyle(document.documentElement).backgroundColor;
       });
-      expect(label, `${scheme} ${tone}: 라벨은 이유 문장과 다른 색(색 계열 유지)`).not.toBe(plain);
+      expect(label, `${scheme} ${tone}: 읽은 글의 라벨은 이유 문장과 같은 회색(색 없음)`).toBe(plain);
       expect(contrast(await rgb(page, label), await rgb(page, surface)), `${scheme} ${tone} 대비`).toBeGreaterThanOrEqual(4.5);
     }
   }
