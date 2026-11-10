@@ -170,3 +170,11 @@ def test_batch_reuses_worker_and_stops_when_queue_is_empty(monkeypatch):
     monkeypatch.setattr(job, "run_one", run_one)
     assert job.run_batch(store, "test", NOW) == {"processed": 1, "cached": 1, "failed": 1, "stale": 0}
     assert calls == [False, False, False, False]
+
+
+def test_줄표만_있는_본문은_글자가_없는_것으로_본다():
+    from skku_notice.ocr_collection import has_readable_text
+
+    assert not has_readable_text("—\n—\n—\n—\n—")
+    assert not has_readable_text(None)
+    assert has_readable_text("넷마블네오 AI 인턴십 모집")

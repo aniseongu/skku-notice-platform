@@ -44,7 +44,12 @@ function BodyImage({ src, alt }: { src: string; alt: string }) {
   return <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} />;
 }
 
-function Body({ body, heading = '본문' }: { body: NoticeBody; heading?: string }) {
+/** 글자가 거의 없는(줄표뿐인) 본문은 본문이 없는 것으로 본다. 그림과 그림에서 읽은 글을 보여 준다. */
+const readable = (text: string | null | undefined): boolean => (text ?? '').replace(/<[^>]*>/g, '').match(/[0-9A-Za-z가-힣]/g)?.length! >= 5;
+
+function Body({ body: rawBody, heading = '본문' }: { body: NoticeBody; heading?: string }) {
+  const empty = !readable(rawBody.body) && !readable(rawBody.body_html);
+  const body: NoticeBody = empty ? { ...rawBody, body: '', body_html: null } : rawBody;
   if (!body.body && !body.body_html && !body.images?.length && body.body_status !== 'ready') {
     const status = body.body_status ?? (body.fetched_at ? 'ready' : 'pending');
     const messages = { pending: '본문을 준비하고 있어요. 원문은 바로 열 수 있어요', retrying: '본문을 다시 가져올게요. 원문은 바로 열 수 있어요', unavailable: '본문을 가져오지 못했어요. 나중에 다시 확인할게요. 원문은 바로 열 수 있어요', ready: '본문에 내용이 없어요. 원문에서 확인해 주세요' };

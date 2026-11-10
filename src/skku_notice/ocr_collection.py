@@ -2,6 +2,7 @@
 
 import hashlib
 import os
+import re
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -11,6 +12,14 @@ import yaml
 from skku_notice.fetch import fetch_image
 from skku_notice.ocr import read_images
 from skku_notice.scheduled_collection import NoticeStore, StoreError
+
+_LETTERS = re.compile(r"[0-9A-Za-z가-힣]")
+
+
+def has_readable_text(body: object) -> bool:
+    """본문에 읽을 만한 글자가 있는지. 자소설닷컴처럼 줄표(—)만 있는 본문은 글자가 없는 것으로 보고 그림을 읽는다."""
+    return isinstance(body, str) and len(_LETTERS.findall(body)) >= 5
+
 
 ENGINE_VERSION = "rapidocr-3.10.0-ppocrv5-korean-tiled-v1"
 
@@ -28,7 +37,7 @@ class OCRStore(NoticeStore):
         ).json()
         rows = []
         for notice in notices:
-            if (notice.get("body") or "").strip():
+            if has_readable_text(notice.get("body")):
                 continue
             images = notice.get("images")
             if not isinstance(images, list):
@@ -76,7 +85,7 @@ class OCRStore(NoticeStore):
                 "limit": "1",
             },
         ).json()
-        return bool(rows and not (rows[0].get("body") or "").strip()
+        return bool(rows and not has_readable_text(rows[0].get("body"))
                     and isinstance(rows[0].get("images"), list) and image_url in rows[0]["images"])
 
     def remove_image(self, notice_id: str, image_url: str) -> None:
