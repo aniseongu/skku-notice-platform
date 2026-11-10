@@ -2,7 +2,7 @@
 // 스위치는 바로 반영되는 설정에만 쓰고(role="switch"), 켜짐·꺼짐을 글자로도 알린다(색에만 의존하지 않는다).
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
-import { isSoftwareOriginal } from './graduation-assessment';
+import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
 import { backfillNote, looksLikeGeminiKey, type ByokStatus, type CanvasStatus } from './byok';
 import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, validDeviceName, type CanvasMode, type Device } from './devices';
 import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
@@ -625,11 +625,15 @@ function Profile({ model }: { model: SettingsModel }) {
           <Choice label="입학 연도" value={profile.admissionYear} disabled={!ready}
             options={[...ADMISSION_YEARS, OLD_ADMISSION_YEAR].map((value) => [value, value === OLD_ADMISSION_YEAR ? '2016 이전' : `${value}`] as const)}
             onPick={(admissionYear) => save({ admissionYear })} /></Setting>
-        <Setting name="학교 신3품 인턴십 영역" help="인성 필수 외에 글로벌·창의·AI·인턴십 중 두 영역을 골라요. 인턴 공고에서 졸업요건을 확인할 때 써요">
-          <Choice label="학교 신3품 인턴십 영역" value={profile.university3pInternshipSelected === null ? 'unknown' : profile.university3pInternshipSelected ? 'yes' : 'no'} disabled={!ready}
-            options={[['yes', '골랐어요'], ['no', '안 골랐어요'], ['unknown', '아직 몰라요']] as const}
-            onPick={(value) => save({ university3pInternshipSelected: value === 'unknown' ? null : value === 'yes' })} /></Setting>
+        <Setting name="학과 졸업 인턴십" help="소프트웨어학과 졸업평가의 인턴십 요건이에요. 채웠다면 인턴 공고에서 안 보여 드려요">
+          <Choice label="학과 졸업 인턴십" value={profile.deptInternshipDone === null ? null : profile.deptInternshipDone ? 'yes' : 'no'} disabled={!ready}
+            options={[['yes', '채웠어요'], ['no', '아직이에요']] as const}
+            onPick={(value) => save({ deptInternshipDone: value === 'yes' })} /></Setting>
       </> : null}
+      <Setting name="학교 신3품 인턴십" help="인성 필수 외에 글로벌·창의·AI·인턴십 중 두 영역을 골라요. 채웠다면 인턴 공고에서 이 요건은 안 보여 드려요">
+        <Choice label="학교 신3품 인턴십" value={threePAnswer(profile)} disabled={!ready}
+          options={[['done', '채웠어요'], ['todo', '아직이에요'], ['no', '이 영역은 안 해요']] as const}
+          onPick={(value) => save(threePFields(value as ThreePAnswer))} /></Setting>
     </Section>
     <AboutMe model={model} />
     {model.profileMessage ? <p className="field-note ok" role="status">{model.profileMessage}</p> : null}

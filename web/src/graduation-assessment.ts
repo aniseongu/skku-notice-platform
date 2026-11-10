@@ -34,6 +34,19 @@ export const AFTER_COMPLETION: Record<string, string> = {
   '3P-APPLICATION': '챌린지스퀘어에서 교외이수비교과 승인 신청 뒤 3품 인턴십 인증 신청',
 };
 
+/** 인정받으려면 어떻게 해야 하는지 한 줄(공고나 AI와 무관한 고정 안내). 출처: 학과 졸업평가 지침 제28조, 학교 공지 141724. */
+export const CRITERIA_DEPT = '법인 기업·연구소·공공기관에서 전일제 4주 이상 또는 파트타임 160시간 이상';
+export const CRITERIA_3P = '교과 현장실습 1학점 이상 또는 비교과 현장실습 280시간 이상(1일 8시간·주 5일, 공휴일 제외)';
+
+/** 한 줄 이유: 안 맞는 항목이 있으면 그것, 확인 못 한 항목이 있으면 그것, 아니면 판정 문장. */
+export function reasonOf(track: Track): string {
+  const fail = track.checks.find((c) => c.result === 'fail');
+  if (track.status === 'NOT_ELIGIBLE' && fail) return fail.note;
+  const unknown = track.checks.find((c) => c.result === 'unknown');
+  if ((track.status === 'NEEDS_REVIEW' || track.status === 'CONDITIONAL') && unknown) return unknown.note;
+  return track.label;
+}
+
 const text = (value: unknown, max = 200): string => (typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '');
 const list = (value: unknown, max = 12): string[] => (Array.isArray(value) ? value.map((v) => text(v)).filter(Boolean).slice(0, max) : []);
 
@@ -86,6 +99,26 @@ const SW = { college: '소프트웨어융합대학', department: '소프트웨�
 /** 소프트웨어학과가 원전공이면 졸업요건 확인을 보여 준다. 복수전공은 인턴십이 졸업평가 항목이 아니다. */
 export const isSoftwareOriginal = (profile: Pick<UserProfile, 'programs'>): boolean =>
   profile.programs[0]?.college === SW.college && profile.programs[0]?.department === SW.department;
+
+/** 공지에서 보여 줄 판정. 이미 채운 요건과 고르지 않은 3품 영역은 숨긴다. */
+export interface VisibleTracks { dept: boolean; p3: boolean }
+export function visibleTracks(profile: Pick<UserProfile, 'programs' | 'deptInternshipDone' | 'university3pInternshipDone' | 'university3pInternshipSelected'>): VisibleTracks {
+  return {
+    dept: isSoftwareOriginal(profile) && profile.deptInternshipDone !== true,
+    p3: profile.university3pInternshipDone !== true && profile.university3pInternshipSelected !== false,
+  };
+}
+
+/** 신3품 인턴십 질문의 답: 채웠어요 / 아직 안 채웠어요 / 이 영역은 안 해요. 아직 답하지 않았으면 null. */
+export type ThreePAnswer = 'done' | 'todo' | 'no';
+export function threePAnswer(value: { university3pInternshipDone: boolean | null; university3pInternshipSelected: boolean | null }): ThreePAnswer | null {
+  if (value.university3pInternshipDone === true) return 'done';
+  if (value.university3pInternshipSelected === false) return 'no';
+  return value.university3pInternshipSelected === true ? 'todo' : null;
+}
+export function threePFields(answer: ThreePAnswer): { university3pInternshipDone: boolean; university3pInternshipSelected: boolean } {
+  return { university3pInternshipDone: answer === 'done', university3pInternshipSelected: answer !== 'no' };
+}
 
 /** 인턴 공고만 대상이다: 외부 채용 소스, 학교 취업 인턴 게시판, 제목에 인턴·현장실습이 있는 글. */
 export const isInternshipNotice = (notice: { title: string; source_id?: string }, external: boolean): boolean =>

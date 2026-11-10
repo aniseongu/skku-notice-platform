@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { AppController } from './app-controller';
 import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR } from './profile';
-import { isSoftwareOriginal } from './graduation-assessment';
+import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
 import { COLLEGES, MAX_PROGRAMS, findCollege, programKey, programLabel, type Program } from './skku-programs';
 import { BOARD_CATALOG, boardsForPrograms, OTHER_BOARDS } from './skku-boards';
 import {
@@ -18,7 +18,8 @@ const STEP_LABELS = ['주전공', '복수전공', '학년·재학 상태', '받�
 const YEARS = [1, 2, 3, 4, 5].map((year) => ({ value: year, label: year === 5 ? '5학년 이상' : `${year}학년` }));
 const STATUS = ENROLLMENT.map((value) => ({ value, label: value }));
 const ADMISSION = [...ADMISSION_YEARS, OLD_ADMISSION_YEAR].map((value) => ({ value, label: value === OLD_ADMISSION_YEAR ? '2016 이전' : `${value}` }));
-const THREE_P = [{ value: 'yes', label: '골랐어요' }, { value: 'no', label: '안 골랐어요' }, { value: 'unknown', label: '아직 몰라요' }];
+const THREE_P = [{ value: 'done', label: '채웠어요' }, { value: 'todo', label: '아직이에요' }, { value: 'no', label: '이 영역은 안 해요' }];
+const DEPT_DONE = [{ value: 'yes', label: '채웠어요' }, { value: 'no', label: '아직이에요' }];
 const SERVICE = MILITARY.map((value) => ({ value, label: value }));
 
 /** 대학을 고른 뒤 그 대학의 학과만 보여 준다. 대학 줄은 학과 목록으로 들어가는 이동 줄이고, 학과는 고르기만 한다(확정은 아래 "다음"). */
@@ -158,12 +159,16 @@ export function Onboarding({ app }: { app: AppController }) {
         <h2>입학 연도</h2>
         <p className="card-note">소프트웨어학과 인턴십 졸업요건이 학번에 따라 달라서 물어봐요. 학번 전체는 받지 않아요</p>
         <Segmented label="입학 연도" options={ADMISSION} columns={4} value={draft.admissionYear} onChange={(admissionYear) => setDraft({ ...draft, admissionYear })} />
-        <h2>학교 신3품 인턴십 영역</h2>
-        <p className="card-note">인성 필수 외에 글로벌·창의·AI·인턴십 중 두 영역을 골라요</p>
-        <Segmented label="학교 신3품 인턴십 영역" options={THREE_P} columns={3}
-          value={draft.university3pInternshipSelected === null ? 'unknown' : draft.university3pInternshipSelected ? 'yes' : 'no'}
-          onChange={(value) => setDraft({ ...draft, university3pInternshipSelected: value === 'unknown' ? null : value === 'yes' })} />
+        <h2>학과 졸업 인턴십</h2>
+        <p className="card-note">소프트웨어학과 졸업평가의 인턴십 요건이에요. 이미 채웠다면 인턴 공고에서 안 보여 드려요</p>
+        <Segmented label="학과 졸업 인턴십" options={DEPT_DONE} columns={2}
+          value={draft.deptInternshipDone === null ? null : draft.deptInternshipDone ? 'yes' : 'no'}
+          onChange={(value) => setDraft({ ...draft, deptInternshipDone: value === 'yes' })} />
       </> : null}
+      <h2>학교 신3품 인턴십</h2>
+      <p className="card-note">인성 필수 외에 글로벌·창의·AI·인턴십 중 두 영역을 골라요. 인턴십 영역을 채웠다면 이 요건은 안 보여 드려요</p>
+      <Segmented label="학교 신3품 인턴십" options={THREE_P} columns={3} value={threePAnswer(draft)}
+        onChange={(value) => setDraft({ ...draft, ...threePFields(value as ThreePAnswer) })} />
     </div>;
     foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('boards')}>다음</button>;
   } else if (step === 'boards') {

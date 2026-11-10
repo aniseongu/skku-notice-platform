@@ -20,7 +20,7 @@ import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from '
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
 import { byokAvailable, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
-import { loadGraduation, requestGraduation, isInternshipNotice, isSoftwareOriginal, type GraduationAssessment } from './graduation-assessment';
+import { loadGraduation, requestGraduation, isInternshipNotice, isSoftwareOriginal, visibleTracks, type GraduationAssessment } from './graduation-assessment';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import type { Draft } from './onboarding-flow';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
@@ -732,7 +732,9 @@ export class AppController extends Reactive {
     const nextProfile: UserProfile = {
       ...this.profile, programs: draft.programs, year: draft.year, enrollmentStatus: draft.enrollmentStatus, militaryService: draft.militaryService,
       admissionYear: isSoftwareOriginal({ programs: draft.programs }) ? draft.admissionYear : this.profile.admissionYear,
-      university3pInternshipSelected: isSoftwareOriginal({ programs: draft.programs }) ? draft.university3pInternshipSelected : this.profile.university3pInternshipSelected,
+      university3pInternshipSelected: draft.university3pInternshipSelected,
+      university3pInternshipDone: draft.university3pInternshipDone,
+      deptInternshipDone: isSoftwareOriginal({ programs: draft.programs }) ? draft.deptInternshipDone : this.profile.deptInternshipDone,
       onboardedAt: this.profile.onboardedAt ?? new Date().toISOString(),
     };
     const boards = draft.boards.filter((id) => this.sources.some((source) => source.id === id && !source.external));
@@ -1585,10 +1587,10 @@ export class AppController extends Reactive {
     for (const timer of this.graduationPolls.values()) clearTimeout(timer);
     this.graduationPolls = new Map();
   }
-  /** 이 공지에 졸업요건 확인을 보여 줄지: 소프트웨어학과 원전공이고 인턴 공고일 때만. */
+  /** 이 공지에 졸업요건 확인을 보여 줄지: 인턴 공고이고 아직 채우지 않은 요건이 있을 때만. */
   showsGraduation(notice: Notice): boolean {
     const external = !!this.sources.find((source) => source.id === notice.source_id)?.external;
-    return !!authClient && !!this.authUserId && isSoftwareOriginal(this.profile) && isInternshipNotice(notice, external);
+    return !!authClient && !!this.authUserId && isInternshipNotice(notice, external) && (() => { const v = visibleTracks(this.profile); return v.dept || v.p3; })();
   }
   graduationFor(notice: Notice): GraduationAssessment | null {
     const userId = this.authUserId;

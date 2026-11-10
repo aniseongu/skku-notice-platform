@@ -12,6 +12,10 @@ export interface UserProfile {
   admissionYear: number | null;
   /** 학교 신3품에서 인턴십 영역을 골랐는지. 모르면 null. */
   university3pInternshipSelected: boolean | null;
+  /** 소프트웨어학과 인턴십 졸업요건을 이미 채웠는지. 채웠으면 공지에서 이 판정을 숨긴다. */
+  deptInternshipDone: boolean | null;
+  /** 학교 신3품 인턴십 영역을 이미 채웠는지. */
+  university3pInternshipDone: boolean | null;
   /** Gemini가 인턴 공고를 고를 때 읽는 주관식 설명. 각각 300자까지. */
   interests: string;
   wants: string;
@@ -25,15 +29,15 @@ export const ENROLLMENT = ['재학', '휴학', '졸업예정', '졸업'] as cons
 export const MILITARY = ['복무 전', '복무 완료', '해당 없음'] as const;
 export const EMPTY_PROFILE: UserProfile = {
   programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null,
-  admissionYear: null, university3pInternshipSelected: null,
+  admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null,
   interests: '', wants: '', avoids: '',
 };
 
 const COLUMNS = 'programs,year,semester,enrollment_status,military_service,onboarded_at,interests,wants,avoids';
-const EXTRA_COLUMNS = ',admission_year,university_3p_internship_selected';
+const EXTRA_COLUMNS = ',admission_year,university_3p_internship_selected,dept_internship_done,university_3p_internship_done';
 /** 새 열이 아직 없는 환경(마이그레이션 전)이면 예전 열만으로 다시 시도한다. */
 const missingColumn = (error: { code?: string; message?: string } | null) =>
-  !!error && (error.code === '42703' || error.code === 'PGRST204' || /admission_year|university_3p_internship_selected/.test(error.message ?? ''));
+  !!error && (error.code === '42703' || error.code === 'PGRST204' || /admission_year|university_3p_internship_selected|dept_internship_done|university_3p_internship_done/.test(error.message ?? ''));
 
 export const ADMISSION_YEARS = Array.from({ length: 10 }, (_, i) => 2026 - i); // 2026 ~ 2017
 export const OLD_ADMISSION_YEAR = 2016;  // "2016학번 이전"을 하나로 묶는다
@@ -50,6 +54,8 @@ export async function loadProfile(client: SupabaseClient, userId: string): Promi
     enrollmentStatus: data.enrollment_status, militaryService: data.military_service, onboardedAt: data.onboarded_at,
     admissionYear: Number.isInteger(data.admission_year) ? data.admission_year : null,
     university3pInternshipSelected: typeof data.university_3p_internship_selected === 'boolean' ? data.university_3p_internship_selected : null,
+    deptInternshipDone: typeof data.dept_internship_done === 'boolean' ? data.dept_internship_done : null,
+    university3pInternshipDone: typeof data.university_3p_internship_done === 'boolean' ? data.university_3p_internship_done : null,
     interests: cleanText(data.interests), wants: cleanText(data.wants), avoids: cleanText(data.avoids),
   };
 }
@@ -99,6 +105,7 @@ export async function saveProfile(client: SupabaseClient, userId: string, profil
   };
   let { error } = await client.from('user_profiles').upsert({
     ...row, admission_year: profile.admissionYear, university_3p_internship_selected: profile.university3pInternshipSelected,
+    dept_internship_done: profile.deptInternshipDone, university_3p_internship_done: profile.university3pInternshipDone,
   }, { onConflict: 'user_id' });
   if (missingColumn(error)) ({ error } = await client.from('user_profiles').upsert(row, { onConflict: 'user_id' }));
   if (error) throw error;

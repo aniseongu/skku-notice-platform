@@ -21,6 +21,8 @@ export interface Draft {
   /** 소프트웨어학과 원전공만 묻는다. */
   admissionYear: number | null;
   university3pInternshipSelected: boolean | null;
+  deptInternshipDone: boolean | null;
+  university3pInternshipDone: boolean | null;
   boards: string[];
   keywords: string[];
   /** 사용자가 게시판을 직접 바꿨으면 전공을 고쳐도 추천으로 덮어쓰지 않는다. */
@@ -37,6 +39,8 @@ export function initialDraft(profile: UserProfile, subscriptions: string[], keyw
     militaryService: profile.militaryService,
     admissionYear: profile.admissionYear,
     university3pInternshipSelected: profile.university3pInternshipSelected,
+    deptInternshipDone: profile.deptInternshipDone,
+    university3pInternshipDone: profile.university3pInternshipDone,
     boards: subscribed ? [...subscriptions] : boardsForPrograms(profile.programs),
     keywords: [...keywords],
     boardsTouched: subscribed,

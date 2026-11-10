@@ -1061,7 +1061,7 @@ test('delete account needs two steps, says what goes away, and shows a failure w
   await expect(row.getByRole('alert').last()).toContainText('다시 눌러 주세요');
 });
 
-test('software original major is asked for the admission year, and the detail shows the two graduation tracks separately', async ({ page }) => {
+test('software original major is asked for the admission year and the internship status, and the detail shows the two tracks as one colored line each', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
   await page.evaluate(() => {
@@ -1070,7 +1070,7 @@ test('software original major is asked for the admission year, and the detail sh
     w.calls = [];
     app.finishOnboarding = (draft: unknown) => { w.calls.push(['finish', draft]); return Promise.resolve(true); };
     app.closeOnboarding = () => { app.onboardingOpen = false; app.profile = { ...(app.profile as object), onboardedAt: 'x' }; };
-    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null };
+    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
     app.profileStatus = 'ready';
     app.pushStatus = 'on';
     app.authUserId = 'account-a';
@@ -1086,30 +1086,38 @@ test('software original major is asked for the admission year, and the detail sh
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('button', { name: '2022', exact: true }).click();
   await expect(dialog.getByRole('button', { name: '다음' })).toBeEnabled();
-  await dialog.getByRole('button', { name: '안 골랐어요' }).click();
+  await dialog.getByRole('group', { name: '학과 졸업 인턴십' }).getByRole('button', { name: '아직이에요' }).click();
+  await dialog.getByRole('group', { name: '학교 신3품 인턴십' }).getByRole('button', { name: '이 영역은 안 해요' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   const saved = await page.evaluate(() => (window as unknown as { calls: unknown[][] }).calls.find((call) => call[0] === 'finish')![1] as Record<string, unknown>);
   expect(saved.admissionYear).toBe(2022);
   expect(saved.university3pInternshipSelected).toBe(false);
+  expect(saved.deptInternshipDone).toBe(false);
+  expect(saved.university3pInternshipDone).toBe(false);
 
-  // 상세: 학과와 학교 3품이 따로, 수행 뒤 확인할 것은 통과로 표시하지 않는다.
+  // 상세: 학과와 학교 3품이 따로, 되면 초록·안 되면 빨강 글자로 한 줄, 기준은 눌러서 본다.
   await page.evaluate(() => {
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
-    const track = (status: string, label: string) => ({ status, label, checks: [{ ruleId: 'X', result: 'unknown', note: '법인 여부를 확인하지 못했어요' }], unknowns: [], afterCompletion: ['DEPT-EVALUATION'], notes: [] });
+    const track = (status: string, label: string, note: string, result: string) => ({ status, label, checks: [{ ruleId: 'X', result, note }], unknowns: [], afterCompletion: [], notes: [] });
+    app.profile = { ...(app.profile as object), programs: [{ college: '소프트웨어융합대학', department: '소프트웨어학과' }], deptInternshipDone: false, university3pInternshipDone: false, university3pInternshipSelected: true };
     app.showsGraduation = () => true;
-    app.graduationFor = () => ({ state: 'ready', aiStatus: 'no_key', department: track('NEEDS_REVIEW', '학과 확인 필요'), university3p: track('NOT_ELIGIBLE', '3품 기준에 못 미쳐요'), facts: { organizationName: null, workMode: 'unknown', startDate: null, endDate: null, hours: null, taskCategory: 'unknown', missing: ['담당 업무'] } });
+    app.graduationFor = () => ({ state: 'ready', aiStatus: 'no_key', department: track('NEEDS_REVIEW', '학과 확인 필요', '담당 업무가 SW와 맞는지 확인하지 못했어요', 'unknown'), university3p: track('NOT_ELIGIBLE', '3품 기준에 못 미쳐요', '최대 240시간이라 280시간에 못 미쳐요', 'fail'), facts: { organizationName: null, workMode: 'unknown', startDate: null, endDate: null, hours: null, taskCategory: 'unknown', missing: ['담당 업무'] } });
     app.requestUpdate();
   });
   await page.locator('notice-rows-screen a.row').nth(1).click();
   const section = page.getByRole('region', { name: '졸업요건 확인' });
   await expect(section).toBeVisible();
-  await expect(section.getByText('학과 졸업 인턴십')).toBeVisible();
-  await expect(section.getByText('학교 신3품 인턴십', { exact: true })).toBeVisible();
-  await expect(section.getByText('확인 필요', { exact: true })).toBeVisible();
-  await expect(section.getByText('어려움', { exact: true })).toBeVisible();
-  await expect(section.getByText('수행 기관 평가 60점 이상').first()).toBeVisible();
+  await expect(section.getByText('학과 졸업 인턴십 · 확인 필요', { exact: true })).toBeVisible();
+  const p3 = section.getByText('신3품 인턴십 · 어려울 수 있음', { exact: true });
+  await expect(p3).toBeVisible();
+  await expect(section.getByText('최대 240시간이라 280시간에 못 미쳐요')).toBeVisible();
+  // 안 되는 쪽은 빨강 계열 글자다(배지나 카드가 아니다).
+  expect(await p3.evaluate((el) => getComputedStyle(el).color)).toBe(await page.evaluate(() => { const probe = document.createElement('span'); probe.style.color = 'var(--danger)'; document.body.append(probe); const c = getComputedStyle(probe).color; probe.remove(); return c; }));
+  // 인정 기준은 버튼 없이 글로 바로 보인다. 복사·접힘 버튼은 없다.
+  await expect(section.getByText('인정 기준: 법인 기업·연구소·공공기관에서 전일제 4주 이상 또는 파트타임 160시간 이상')).toBeVisible();
+  await expect(section.getByText('비교과 현장실습 280시간 이상', { exact: false })).toBeVisible();
+  await expect(section.getByRole('button')).toHaveCount(1);  // 키가 없을 때 나오는 "다시 확인하기"뿐이다
   await expect(section).not.toContainText(/인정 완료|합격|승인됨/);
-  await expect(section.getByRole('button', { name: '학과 문의용 질문 복사' })).toBeVisible();
 });

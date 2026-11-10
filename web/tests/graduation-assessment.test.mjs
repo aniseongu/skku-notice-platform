@@ -59,3 +59,27 @@ test('requesting writes only the request columns and loading reads only the own 
   assert.equal(await loadGraduation(client, 'u1', 'n1'), null);
   assert.deepEqual(filters, [['user_id', 'u1'], ['notice_id', 'n1']]);
 });
+
+import { visibleTracks, threePAnswer, threePFields } from '../src/graduation-assessment.ts';
+const SW_PROGRAMS = [{ college: '소프트웨어융합대학', department: '소프트웨어학과' }];
+const flags = (over = {}) => ({ programs: SW_PROGRAMS, deptInternshipDone: null, university3pInternshipDone: null, university3pInternshipSelected: null, ...over });
+
+test('채우지 않은 요건만 공지에 보여 준다', () => {
+  assert.deepEqual(visibleTracks(flags()), { dept: true, p3: true });
+  assert.deepEqual(visibleTracks(flags({ university3pInternshipDone: true })), { dept: true, p3: false });
+  assert.deepEqual(visibleTracks(flags({ deptInternshipDone: true })), { dept: false, p3: true });
+  assert.deepEqual(visibleTracks(flags({ deptInternshipDone: true, university3pInternshipDone: true })), { dept: false, p3: false });
+  assert.deepEqual(visibleTracks(flags({ university3pInternshipSelected: false })), { dept: true, p3: false });
+});
+
+test('소프트웨어학과 원전공이 아니면 학과 판정은 보이지 않는다', () => {
+  assert.deepEqual(visibleTracks(flags({ programs: [{ college: '경영대학', department: '경영학과' }] })), { dept: false, p3: true });
+  assert.deepEqual(visibleTracks(flags({ programs: [{ college: '경영대학', department: '경영학과' }, ...SW_PROGRAMS] })), { dept: false, p3: true });
+});
+
+test('신3품 인턴십 답은 채움·선택 여부로 오간다', () => {
+  for (const answer of ['done', 'todo', 'no']) assert.equal(threePAnswer(threePFields(answer)), answer);
+  assert.equal(threePAnswer({ university3pInternshipDone: null, university3pInternshipSelected: null }), null);
+  assert.equal(threePFields('done').university3pInternshipSelected, true);
+  assert.equal(threePFields('no').university3pInternshipDone, false);
+});
