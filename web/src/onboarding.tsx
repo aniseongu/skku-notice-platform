@@ -261,7 +261,7 @@ export function Onboarding({ app }: { app: AppController }) {
           </div>
           {manual
             ? <button type="button" className="onb-x" aria-label="닫기" onClick={() => app.dismissOnboarding()}><svg className="i" aria-hidden="true"><use href="icons/sprite.svg#close" /></svg></button>
-            : <button type="button" className="onb-skip border-0 bg-transparent text-ink-2" onClick={() => app.dismissOnboarding()}>나중에 하기</button>}
+            : <button type="button" className="onb-skip" onClick={() => app.dismissOnboarding()}>나중에 하기</button>}
         </div>
       </div>
       <div className="onb-body">
