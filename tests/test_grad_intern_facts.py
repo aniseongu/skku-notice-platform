@@ -148,3 +148,12 @@ def test_그림_글자에서_회사_이름과_근무_일수를_읽는다():
     days = build_facts("인턴", "㈜카카오 근무일수 30일", None)
     assert days.organization_name == "카카오"
     assert days.facts.duration_days == 42
+
+
+def test_주_표기_없는_회사_이름도_문장에서_읽는다():
+    from skku_notice.grad_intern_facts import build_facts
+
+    text = "넷마블네오에서 게임개발 및 기획 직무의 채용전환형 AI 인턴십을 모집합니다. 5개월간 진행됩니다."
+    extracted = build_facts("AI 인턴십", text, None)
+    assert extracted.organization_name == "넷마블네오"
+    assert extracted.facts.duration_days == 150

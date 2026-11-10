@@ -128,16 +128,14 @@ export function threePFields(answer: ThreePAnswer): { university3pInternshipDone
 
 /** 학교 글에서 인턴 공고가 아닌 행정 안내(서류 제출, 인증 신청 절차, 졸업 안내 등). */
 const ADMIN_TITLE = /서류|제출|절차|인증|졸업|수료|설명회|결과|발표|지침|이수|교과목|학점\s*인정/;
-/** 회사 이름이 들어 있다는 표시(법인 표기). */
-const COMPANY_MARK = /㈜|\(주\)|주식회사|유한회사|재단법인|사단법인|\(재\)|\b(?:Inc|Corp|Co\.|Ltd)/i;
-/** 졸업요건을 확인할 인턴 공고만 대상이다. 외부 채용 소스는 모두, 학교 글은 인턴 모집 공고(회사 이름이 있는 글)만이다.
- *  서류 제출·인증 신청 절차 같은 안내는 제외한다. DB의 is_graduation_candidate_notice와 같은 규칙이다. */
+/** 졸업요건을 확인할 인턴 공고만 대상이다. 외부 채용 소스는 모두, 학교 글은 제목에 인턴·현장실습이 있는 모집 공고다.
+ *  회사 이름에 (주)가 붙는 일은 드물어서 법인 표기는 요구하지 않고, 서류 제출·인증 신청 절차 같은 안내만 제외한다. DB의 is_graduation_candidate_notice와 같은 규칙이다. */
 export function isInternshipNotice(notice: { title: string; source_id?: string }, external: boolean): boolean {
   if (external) return true;
   const careerBoard = notice.source_id === 'skku-career-intern';
   if (!careerBoard && !/인턴|현장\s*실습/.test(notice.title)) return false;
   if (ADMIN_TITLE.test(notice.title)) return false;
-  return careerBoard || COMPANY_MARK.test(notice.title);
+  return true;
 }
 
 /** 목록 표지: 내가 채워야 할 요건에 이 공고가 맞는지. */

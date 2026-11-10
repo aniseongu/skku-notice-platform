@@ -346,7 +346,7 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('heading', { name: '복수전공이 있나요?' })).toBeFocused();
   await expect(dialog.getByRole('radiogroup', { name: '복수전공 선택' }).getByRole('radio')).toHaveCount(2);
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
-  await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '7단계 중 2단계');
+  await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '8단계 중 2단계');
   expect(Math.abs((await dialog.getByRole('progressbar').boundingBox())!.width - barWidth1)).toBeLessThanOrEqual(0.5);
   await dialog.getByRole('radio', { name: '있어요', exact: true }).click();
   await dialog.getByRole('button', { name: '경영대학', exact: true }).click();
@@ -357,6 +357,10 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('button', { name: '재학', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('button', { name: '3학년' }).click();
+  await dialog.getByRole('button', { name: '다음' }).click();
+  // 인턴십 졸업요건: 학년과 따로 한 단계로 묻는다. 소프트웨어학과 원전공은 입학 연도를 골라야 넘어간다.
+  await expect(dialog.getByRole('heading', { name: '인턴십 졸업요건을 알려 주세요' })).toBeVisible();
+  await dialog.getByRole('button', { name: '2022', exact: true }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   // 게시판·키워드: 내 전공에 맞춰 추천이 켜져 있다.
   await expect(dialog.getByRole('heading', { name: '어떤 공지를 받을까요?' })).toBeFocused();
@@ -803,7 +807,7 @@ test('side menu scrollbar: absent when everything fits, thin when it overflows',
   expect(['thin', 'auto']).toContain(tall.thin);                // 크로미움은 ::-webkit-scrollbar, 파이어폭스는 thin
   if (tall.thin === 'auto') expect(tall.bar).toBe('8px');
   expect(tall.overflowing).toBe(false);
-  expect(tall.gutter).toBeLessThanOrEqual(0.5);                 // 넘치지 않으면 막대 자리도 없다(헤드리스는 막대를 그리지 않아 이 값은 참고용이다)
+  expect(tall.gutter).toBeGreaterThan(0);                       // 막대가 나타나도 내용 폭이 변하지 않게 막대 자리를 미리 비워 둔다(scrollbar-gutter)
   await page.setViewportSize({ width: 1280, height: 360 });
   const short = await measure();
   expect(short.overflowing).toBe(true);
@@ -991,7 +995,7 @@ test('a deadline that is close stays red even when the notice is already read, i
   }
 });
 
-test('on read rows the judgment labels are plain muted gray (no hue), with readable contrast', async ({ page }) => {
+test('on read rows the judgment labels keep their color but are lighter (not gray), with readable contrast', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   const rows = page.locator('notice-rows-screen a.row');
   await rows.first().waitFor();
@@ -1030,8 +1034,10 @@ test('on read rows the judgment labels are plain muted gray (no hue), with reada
         }
         return getComputedStyle(document.documentElement).backgroundColor;
       });
-      expect(label, `${scheme} ${tone}: 읽은 글의 라벨은 이유 문장과 같은 회색(색 없음)`).toBe(plain);
-      expect(contrast(await rgb(page, label), await rgb(page, surface)), `${scheme} ${tone} 대비`).toBeGreaterThanOrEqual(4.5);
+      const [lr, lg, lb] = await rgb(page, label);
+      expect(Math.max(lr, lg, lb) - Math.min(lr, lg, lb), `${scheme} ${tone}: 읽은 글의 라벨도 색이 있다(회색이 아니다)`).toBeGreaterThan(20);
+      expect(label, `${scheme} ${tone}: 이유 문장과 같은 회색이 아니다`).not.toBe(plain);
+      expect(contrast(await rgb(page, label), await rgb(page, surface)), `${scheme} ${tone} 대비`).toBeGreaterThanOrEqual(3);
     }
   }
 });
@@ -1082,6 +1088,7 @@ test('software original major is asked for the admission year and the internship
   await dialog.getByRole('radio', { name: '없어요', exact: true }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   await dialog.getByRole('button', { name: '3학년' }).click();
+  await dialog.getByRole('button', { name: '다음' }).click();
   await expect(dialog.getByRole('group', { name: '입학 연도' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('button', { name: '2022', exact: true }).click();

@@ -1,7 +1,7 @@
 -- 졸업요건 판정을 버튼 없이 미리 해 둔다. 판정 워커가 10분마다 부른다(서비스 역할만).
 -- 1) 아직 채우지 못한 요건이 있는 사용자에게 최근 30일 안의 인턴 공고마다 판정 대기 행을 만든다(실행당 p_limit개, 새 글 먼저).
 -- 2) 프로필이 바뀌었거나, 키를 넣은 뒤 규칙으로만 판정했던 결과를 다시 대기로 돌린다(실행당 3개).
--- 졸업요건 판정 대상 공고: 외부 채용 소스는 모두. 학교 글은 인턴·현장실습 모집 공고만(회사 이름이 있는 글).
+-- 졸업요건 판정 대상 공고: 외부 채용 소스는 모두. 학교 글은 제목에 인턴·현장실습이 있는 모집 공고(회사 이름에 (주)가 붙는 일은 드물어 법인 표기는 요구하지 않는다).
 -- 서류 제출·인증 신청 절차·졸업 안내처럼 행정 안내는 인턴 공고가 아니라 제외한다. 웹의 isInternshipNotice와 같은 규칙이다.
 create or replace function public.is_graduation_candidate_notice(p_title text, p_source_id text, p_external boolean)
 returns boolean language sql immutable parallel safe set search_path = '' as $$
@@ -9,7 +9,6 @@ returns boolean language sql immutable parallel safe set search_path = '' as $$
     or (
       (p_source_id = 'skku-career-intern' or p_title ~ '인턴|현장\s*실습')
       and p_title !~ '서류|제출|절차|인증|졸업|수료|설명회|결과|발표|지침|이수|교과목|학점\s*인정'
-      and (p_source_id = 'skku-career-intern' or p_title ~ '㈜|\(주\)|주식회사|유한회사|재단법인|사단법인|\(재\)|\m(Inc|Corp|Co\.|Ltd)')
     );
 $$;
 revoke all on function public.is_graduation_candidate_notice(text, text, boolean) from public, anon, authenticated;
@@ -55,6 +54,10 @@ begin
     where a.status = 'READY'
       and (
         a.assessed_at < p.updated_at
+        -- 판정한 뒤에 그림 글자(OCR)가 새로 나왔으면 그 글자까지 보고 다시 판정한다
+        or exists (select 1 from public.platform_notice_images i
+                   join public.platform_ocr_cache c on c.content_sha256 = i.content_sha256 and c.engine_version = i.engine_version
+                   where i.notice_id = a.notice_id and i.status = 'ready' and c.processed_at > a.assessed_at)
         or (a.ai_status in ('no_key', 'unavailable', 'limit') and k.user_id is not null
             and a.assessed_at < now() - interval '1 hour'
             and (k.used_on is distinct from current_date or k.used_today < 30))

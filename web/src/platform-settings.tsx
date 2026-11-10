@@ -218,6 +218,7 @@ const permissionText = (status: SettingsModel['pushStatus']) =>
     : typeof Notification === 'undefined' ? '확인할 수 없음'
       : Notification.permission === 'granted' ? '허용' : Notification.permission === 'denied' ? '차단' : '아직 선택하지 않음';
 
+/** 받지 않는 게시판 고르기. 받는 게시판은 위의 순서 목록에서 끄고 옮긴다. */
 function BoardGroups({ model }: { model: SettingsModel }) {
   const [query, setQuery] = useState('');
   const collegeOf = useMemo(() => {
@@ -241,8 +242,6 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   const ordered = [...groups].sort(([a], [b]) => Number([...otherGroup.values()].includes(a)) - Number([...otherGroup.values()].includes(b)));
   const busy = model.loading;
   return <>
-    {mine.length ? mine.map((source) => <SwitchRow key={source.id} label={source.label} checked disabled={busy} onChange={() => model.toggle(source.id, false)} />)
-      : <p className="field-note">아직 받는 게시판이 없어요. 아래에서 골라 주세요</p>}
     <details className="connection-manual board-more-list" open={mine.length === 0}>
       <summary>게시판 더 보기 ({others.length}개)</summary>
       <input className="input" type="search" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off" value={query}
@@ -392,26 +391,20 @@ function Notifications({ model }: { model: SettingsModel }) {
 }
 
 function BoardsSection({ model }: { model: SettingsModel }) {
-  // 고르기(받을 게시판)가 먼저, 순서는 그다음 보조 기능이다.
-  return <>
-    <Section id="s-boards" title="받을 게시판">
-      {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <Setting name="게시판" help="알림을 받고 목록에 모아 볼 게시판이에요">
-        {model.error ? <><p className="field-note error" role="alert">{model.error}</p>
-          <button type="button" className="ghost-button" onClick={model.retry}>다시 불러오기</button></> : null}
-        <BoardGroups model={model} />
-      </Setting>}
-    </Section>
-    <BoardOrderSection order={model.boardOrder} />
-  </>;
-}
-
-// 받을 게시판 고르기와 섞이지 않게 순서는 따로 묶는다. 로그인하지 않아도 이 기기에서 바꿀 수 있다.
-function BoardOrderSection({ order }: { order: SettingsModel['boardOrder'] }) {
+  // 받는 게시판 고르기와 순서 바꾸기를 한 목록에서 한다: 줄마다 켜고 끄는 스위치가 있고, 순서 바꾸기를 누르면 옮기는 손잡이가 나온다.
   const [editing, setEditing] = useState(false);
-  if (order.boards.length < 2) return null;
-  return <Section id="s-board-order" title="게시판 순서"
-    action={<button type="button" className="head-action" onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button>}>
-    <BoardOrderList order={order} editing={editing} />
+  const order = model.boardOrder;
+  const canMove = order.boards.length >= 2;
+  return <Section id="s-boards" title="받을 게시판"
+    action={canMove ? <button type="button" className="head-action" onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : undefined}>
+    <p className="settings-lead">알림을 받고 목록에 모아 볼 게시판이에요. 목록과 왼쪽 메뉴에 이 순서로 보여요</p>
+    {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <>
+      {model.error ? <><p className="field-note error" role="alert">{model.error}</p>
+        <button type="button" className="ghost-button" onClick={model.retry}>다시 불러오기</button></> : null}
+      {order.boards.length ? <BoardOrderList order={order} editing={editing} onToggle={(id) => model.toggle(id, false)} busy={model.loading} />
+        : <p className="field-note">아직 받는 게시판이 없어요. 아래에서 골라 주세요</p>}
+      <BoardGroups model={model} />
+    </>}
   </Section>;
 }
 
@@ -419,7 +412,7 @@ function chevron(d: string) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20"><path d={d} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
-function BoardOrderList({ order, editing }: { order: SettingsModel['boardOrder']; editing: boolean }) {
+function BoardOrderList({ order, editing, onToggle, busy = false }: { order: SettingsModel['boardOrder']; editing: boolean; onToggle?: (id: string) => void; busy?: boolean }) {
   const listRef = useRef<HTMLUListElement>(null);
   const latest = useRef(order);
   latest.current = order;
@@ -475,6 +468,8 @@ function BoardOrderList({ order, editing }: { order: SettingsModel['boardOrder']
               move(ids.indexOf(board.id), index + (event.key === 'ArrowUp' ? -1 : 1));
             }}>{chevron('M5 8h14M5 12h14M5 16h14')}</button>
         </span> : null}
+        {onToggle ? <button type="button" role="switch" className="switch-row switch-only" aria-checked="true" aria-label={`${board.label} 받기`} disabled={busy}
+          onClick={() => onToggle(board.id)}><span className="switch-state" aria-hidden="true">켜짐</span><span className="switch" aria-hidden="true" /></button> : null}
       </li>)}
     </ul>
     {editing ? <p className="field-note order-help">손잡이를 끌거나 위아래 단추로 옮기면 목록 순서만 바뀌어요</p> : null}

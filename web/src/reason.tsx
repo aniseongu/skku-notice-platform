@@ -4,7 +4,14 @@ import { VERDICT_LABEL, type Verdict } from './data';
 import { BADGE_LABEL, type GraduationBadge } from './graduation-assessment';
 
 const LABEL = 'mr-[6px]';
-const strong = (read: boolean, color: string) => `${LABEL} ${read ? `font-medium ${color}/60` : `font-semibold ${color}`}`;
+// 읽은 글: 색은 그대로 두고 바탕 쪽으로 18%만 옅게 섞는다. Tailwind는 완성된 클래스 이름만 찾으므로 문자열을 이어 붙이지 않는다.
+const FADED: Record<string, string> = {
+  'text-accent': 'text-[color-mix(in_oklch,var(--accent)_82%,var(--surface))]',
+  'text-soon': 'text-[color-mix(in_oklch,var(--soon)_82%,var(--surface))]',
+  'text-ink-2': 'text-ink-2',
+  'text-ink-3': 'text-ink-3',
+};
+const strong = (read: boolean, color: string) => `${LABEL} ${read ? `font-medium ${FADED[color]}` : `font-semibold ${color}`}`;
 const BADGE_COLOR: Record<GraduationBadge, string> = { ok: 'text-accent', review: 'text-soon', no: 'text-ink-3' };
 
 export function Reason({ interests, ai, rule, read = false, grad = null, detail = false }: {

@@ -15,8 +15,6 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import date
 
-from google.genai import types
-
 from skku_notice.gemini_client import gemini_client
 from skku_notice.grad_intern_rules import ORG_TYPES, TASK_CATEGORIES, WORK_MODES, InternFacts
 
@@ -36,6 +34,8 @@ WORK_DAYS = re.compile(r"(?:총\s*)?(?:근무\s*일수|근무일)\s*[:：]?\s*(?
 # 회사 이름: "회사명: ○○", "기업명 ○○", 그리고 법인 표기가 붙은 이름. 그림 글자(OCR)는 띄어쓰기가 흔들려 공백을 허용한다.
 ORG_LABEL = re.compile(r"(?:회사|기업|기관|업체|법인)\s*(?:명|이름)\s*[:：]?\s*([^\n,;/|]{2,30})")
 ORG_LEGAL = re.compile(r"(?:\(주\)|㈜|주식회사)[ \t]*([가-힣A-Za-z0-9&·.\-]{1,20})|([가-힣A-Za-z0-9&·.\-]{2,20})[ \t]*(?:\(주\)|㈜|주식회사)")
+# "넷마블네오에서 ... 인턴십을 모집합니다" 같은 문장의 주어
+ORG_SENTENCE = re.compile(r"(?:^|[\n.]\s*)([가-힣A-Za-z][가-힣A-Za-z0-9&·]{1,14})\s*(?:에서|은|는)\s[^.\n]{0,40}?(?:모집|채용)")
 CREDIT = re.compile(r"(\d(?:\.\d)?)\s*학점")
 
 
@@ -79,6 +79,21 @@ class Extracted:
         }
 
 
+TASK_WORDS = re.compile(r"직무|담당\s*업무|주요\s*업무|업무\s*내용|모집\s*(?:분야|직무|부문)|하는\s*일|수행\s*업무")
+TITLE_ORG = re.compile(r"^\s*[\[(【]([^\])】]{2,20})[\])】]")
+TITLE_GENERIC = re.compile(r"인턴|채용|모집|공고|신입|경력|수시|상시")
+
+
+def lacks_key_facts(title: str, body: str) -> bool:
+    """본문만으로 회사 이름, 근무 기간, 하는 일 중 하나라도 알 수 없으면 True. 이때는 그림 글자(OCR)를 읽어 본다."""
+    text = f"{title}\n{body}"
+    found = static_facts(title, body)
+    bracket = TITLE_ORG.match(title or "")
+    has_org = "organization_name" in found or bool(bracket and not TITLE_GENERIC.search(bracket.group(1)))
+    has_period = any(k in found for k in ("start_date", "duration_days", "duration_months"))
+    return not (has_org and has_period and TASK_WORDS.search(text))
+
+
 def static_facts(title: str, body: str) -> dict:
     """정규식으로 읽을 수 있는 사실. 모호하면 비워 둔다(예: 전일제와 파트타임이 함께 적힌 공고)."""
     text = f"{title}\n{body}"[:MAX_TEXT]
@@ -116,7 +131,7 @@ def static_facts(title: str, body: str) -> dict:
         found["explicitly_stated_hours"] = hours.pop()
         match = TOTAL_HOURS.search(text)
         found["evidence"].append({"field": "hours", "quote": match.group(0)})
-    for pattern in (ORG_LABEL, ORG_LEGAL):
+    for pattern in (ORG_LABEL, ORG_LEGAL, ORG_SENTENCE):
         match = pattern.search(text)
         name = next((g for g in (match.groups() if match else ()) if g), "").strip(" .-:：")
         if name and len(name) >= 2:
@@ -167,6 +182,10 @@ def call_gemini(title: str, body: str, model: str, api_key: str, client: object 
     """Gemini 한 번. 실패나 형식 오류는 None이고 호출한 쪽이 다시 시도한다."""
     if not api_key:
         return None
+    from google.genai import (
+        types,  # OCR 대기열 판단(ocr_collection)이 이 모듈을 가볍게 가져오도록 여기서 불러온다
+    )
+
     payload = json.dumps({"title": title, "body": body[:MAX_TEXT]}, ensure_ascii=False)
     try:
         client = client or gemini_client(api_key)

@@ -13,7 +13,7 @@ import {
 import { APP_NAME } from './brand';
 import { Card, ChipGroup, ChoiceList, Segmented, SwitchRow } from './ui';
 
-const STEP_LABELS = ['주전공', '복수전공', '학년·재학 상태', '받을 공지', '기타 게시판', 'AI 키', '알림'] as const;
+const STEP_LABELS = ['주전공', '복수전공', '학년·재학 상태', '인턴십 졸업요건', '받을 공지', '기타 게시판', 'AI 키', '알림'] as const;
 
 const YEARS = [1, 2, 3, 4, 5].map((year) => ({ value: year, label: year === 5 ? '5학년 이상' : `${year}학년` }));
 const STATUS = ENROLLMENT.map((value) => ({ value, label: value }));
@@ -155,6 +155,12 @@ export function Onboarding({ app }: { app: AppController }) {
       <p className="card-note">졸업예정은 이번 학기에 졸업하는 경우, 졸업은 학위를 이미 받은 경우예요</p>
       <h2>병역</h2>
       <Segmented label="병역" options={SERVICE} columns={3} value={draft.militaryService} onChange={(militaryService) => setDraft({ ...draft, militaryService })} />
+    </div>;
+    foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('internship')}>다음</button>;
+  } else if (step === 'internship') {
+    title = '인턴십 졸업요건을 알려 주세요';
+    lead = '이미 채운 요건은 인턴 공고에서 빼 드려요';
+    body = <div className="onb-group">
       {isSoftwareOriginal({ programs: draft.programs }) ? <>
         <h2>입학 연도</h2>
         <p className="card-note">소프트웨어학과 인턴십 졸업요건이 학번에 따라 달라서 물어봐요. 학번 전체는 받지 않아요</p>
@@ -172,7 +178,7 @@ export function Onboarding({ app }: { app: AppController }) {
           onChange={(value) => setDraft({ ...draft, deptInternshipDone: value === 'yes' })} />
       </> : null}
     </div>;
-    foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('boards')}>다음</button>;
+    foot = <button type="button" className="solid-button" disabled={!canContinue('internship', draft)} onClick={() => go('boards')}>다음</button>;
   } else if (step === 'boards') {
     title = '어떤 공지를 받을까요?';
     lead = '고른 전공을 기준으로 켜 뒀어요';

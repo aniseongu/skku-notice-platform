@@ -214,8 +214,8 @@ function settingsModel(app: AppController) {
 // 상단 바. 휴대폰은 위에 붙는 한 줄(홈 목록은 바탕과 같은 면에 선 없음), 720px부터는 64px 머리 줄이다.
 const TOPBAR = 'pane-head topbar glass sticky top-[var(--wco-h)] z-[2] flex items-center gap-[4px] border-b border-line pt-[calc(10px_+_env(safe-area-inset-top))] pr-[4px] pb-[10px] pl-[var(--gutter)] select-none [-webkit-user-select:none] min-[720px]:top-0 min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:gap-[8px] min-[720px]:px-[24px] min-[720px]:py-0';
 const TOPBAR_FEED = 'feed-topbar max-[719px]:relative max-[719px]:top-auto max-[719px]:gap-0 max-[719px]:border-b-0 max-[719px]:bg-bg max-[719px]:pt-[calc(8px_+_env(safe-area-inset-top))] max-[719px]:pr-[4px] max-[719px]:pb-[8px] max-[719px]:pl-[var(--gutter)] max-[719px]:[-webkit-backdrop-filter:none] max-[719px]:[backdrop-filter:none]';
-// 설정 머리 줄은 내용 폭(760px)에 맞춰 닫기 단추가 내용 오른쪽 끝선에 오게 한다.
-const TOPBAR_SETTINGS = 'min-[720px]:pr-[max(24px,calc(100%_-_760px_+_24px))]';
+// 설정은 전체 폭을 쓰므로 닫기 단추는 머리 줄의 오른쪽 끝(내용 오른쪽 끝선)에 둔다.
+const TOPBAR_SETTINGS = '';
 const TOPBAR_TEXT = 'topbar-text min-w-0 flex-1 min-[720px]:min-w-[88px]';
 const TOPBAR_H1 = 'min-[720px]:text-[21px] min-[720px]:leading-[28px]';
 const UPDATED = 'updated text-[13px] leading-[18px] tabular-nums min-[720px]:text-[12px] min-[720px]:leading-[16px]';

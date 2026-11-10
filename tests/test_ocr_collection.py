@@ -134,7 +134,7 @@ def test_discovery_only_enqueues_public_image_strings_without_resetting_status()
     client.client._transport = httpx.MockTransport(respond)
     try:
         client.discover()
-        assert json.loads(requests[1].content) == [
+        assert json.loads(requests[2].content) == [
             {
                 "notice_id": "school/1",
                 "image_url": "https://www.skku.edu/a.png",
@@ -142,7 +142,7 @@ def test_discovery_only_enqueues_public_image_strings_without_resetting_status()
                 "notice_seen_at": "2026-11-07T00:00:00Z",
             }
         ]
-        assert "resolution=merge-duplicates" in requests[1].headers["prefer"]
+        assert "resolution=merge-duplicates" in requests[2].headers["prefer"]
     finally:
         client.close()
 
@@ -178,3 +178,17 @@ def test_줄표만_있는_본문은_글자가_없는_것으로_본다():
     assert not has_readable_text("—\n—\n—\n—\n—")
     assert not has_readable_text(None)
     assert has_readable_text("넷마블네오 AI 인턴십 모집")
+
+
+def test_인턴_공고는_본문에_회사_이름과_기간과_업무가_모자라면_그림을_읽는다():
+    from skku_notice.ocr_collection import wants_image_text
+
+    thin = {"id": "jasoseol-intern/1", "source_id": "jasoseol-intern", "title": "AI 인턴십",
+            "body": "자세한 내용은 아래 그림을 참고하세요"}
+    full = {"id": "jasoseol-intern/2", "source_id": "jasoseol-intern", "title": "[넷마블네오] 인턴",
+            "body": "모집 직무: 게임 기획\n근무 기간: 2027.01.04 ~ 2027.03.31"}
+    school = {"id": "skku/3", "source_id": "skku-notice", "title": "장학 안내",
+              "body": "장학금 신청 방법을 알려 드립니다"}
+    assert wants_image_text(thin, {"jasoseol-intern"})
+    assert not wants_image_text(full, {"jasoseol-intern"})
+    assert not wants_image_text(school, {"jasoseol-intern"})

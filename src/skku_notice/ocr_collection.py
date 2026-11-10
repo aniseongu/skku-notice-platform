@@ -10,6 +10,7 @@ from pathlib import Path
 import yaml
 
 from skku_notice.fetch import fetch_image
+from skku_notice.grad_intern_facts import lacks_key_facts
 from skku_notice.ocr import read_images
 from skku_notice.scheduled_collection import NoticeStore, StoreError
 
@@ -21,6 +22,23 @@ def has_readable_text(body: object) -> bool:
     return isinstance(body, str) and len(_LETTERS.findall(body)) >= 3
 
 
+INTERN_TITLE = re.compile(r"인턴|현장\s*실습")
+
+
+def wants_image_text(notice: dict, external_ids: set[str]) -> bool:
+    """그림 글자를 읽을 공지인지. 본문에 글자가 없으면 읽는다.
+
+    인턴 공고는 본문에 회사 이름·근무 기간·하는 일이 모자라면 읽는다.
+    """
+    body = notice.get("body")
+    if not has_readable_text(body):
+        return True
+    title = str(notice.get("title") or "")
+    source_id = str(notice.get("source_id") or "")
+    intern = source_id in external_ids or bool(INTERN_TITLE.search(title))
+    return intern and lacks_key_facts(title, body if isinstance(body, str) else "")
+
+
 ENGINE_VERSION = "rapidocr-3.10.0-ppocrv5-korean-tiled-v1"
 
 
@@ -30,14 +48,15 @@ class OCRStore(NoticeStore):
             "GET",
             "platform_notices",
             params={
-                "select": "id,images,body,first_seen",
+                "select": "id,source_id,title,images,body,first_seen",
                 "order": "posted_on.desc,id.desc",
                 "limit": "100",
             },
         ).json()
+        external_ids = self.external_source_ids()
         rows = []
         for notice in notices:
-            if has_readable_text(notice.get("body")):
+            if not wants_image_text(notice, external_ids):
                 continue
             images = notice.get("images")
             if not isinstance(images, list):
@@ -75,17 +94,21 @@ class OCRStore(NoticeStore):
         ).json()
         return rows[0] if rows else None
 
+    def external_source_ids(self) -> set[str]:
+        rows = self._request("GET", "platform_sources", params={"select": "id", "external": "eq.true"}).json()
+        return {row["id"] for row in rows if isinstance(row, dict) and isinstance(row.get("id"), str)}
+
     def current_image(self, notice_id: str, image_url: str) -> bool:
         rows = self._request(
             "GET",
             "platform_notices",
             params={
                 "id": f"eq.{notice_id}",
-                "select": "images,body",
+                "select": "images,body,title,source_id",
                 "limit": "1",
             },
         ).json()
-        return bool(rows and not has_readable_text(rows[0].get("body"))
+        return bool(rows and wants_image_text(rows[0], self.external_source_ids())
                     and isinstance(rows[0].get("images"), list) and image_url in rows[0]["images"])
 
     def remove_image(self, notice_id: str, image_url: str) -> None:

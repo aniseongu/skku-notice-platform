@@ -34,7 +34,7 @@ test('only a software-department original major sees the check, and only on inte
   assert.equal(isSoftwareOriginal({ programs: [biz, sw] }), false);
   assert.equal(isSoftwareOriginal({ programs: [] }), false);
   assert.equal(isInternshipNotice({ title: '수강 안내' }, false), false);
-  assert.equal(isInternshipNotice({ title: '(주)에이비씨 2026 겨울 현장실습 모집' }, false), true);
+  assert.equal(isInternshipNotice({ title: '에이비씨 2026 겨울 현장실습 모집' }, false), true);
   assert.equal(isInternshipNotice({ title: '채용' }, true), true);
   assert.equal(isInternshipNotice({ title: '공지', source_id: 'skku-career-intern' }, false), true);
 });
@@ -109,7 +109,7 @@ import { isInternshipNotice as isIntern2, badgeOf as badgeOf2 } from '../src/gra
 test('행정 안내는 인턴 공고가 아니고 회사 이름이 있는 학교 글만 대상이다', () => {
   assert.equal(isIntern2({ title: '[인턴십] 서류 제출 안내 - 2027년 2월(동계) 졸업 예정자 중 미제출자 대상' }, false), false);
   assert.equal(isIntern2({ title: '3품 인턴십 인증 신청 절차 안내' }, false), false);
-  assert.equal(isIntern2({ title: '㈜넷마블네오 AI 인턴 모집' }, false), true);
+  assert.equal(isIntern2({ title: '넷마블네오 AI 인턴 모집' }, false), true);
   assert.equal(isIntern2({ title: '인턴 모집' , source_id: 'skku-career-intern' }, false), true);
   assert.equal(isIntern2({ title: '인턴 서류 제출 안내', source_id: 'skku-career-intern' }, false), false);
   assert.equal(isIntern2({ title: '장학금 안내' }, true), true);

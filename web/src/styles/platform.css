@@ -24,6 +24,7 @@
   /* 설정 화면은 원본의 구역(.settings-head + .box)과 줄(.setting)을 그대로 쓴다. 아래는 그 안에 들어가는 새 구성요소다. */
   .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 52px; padding: 6px 0; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; color: var(--text); }
   .setting-control > .switch-row:first-child, .box > .switch-row:first-child { border-top: 0; }
+  .switch-row.switch-only { width: auto; flex: none; margin-left: auto; padding: 0; border: 0; min-height: 44px; }
   .switch-text { display: grid; gap: 2px; }
   .switch-label { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
   .switch-note { font-size: 13px; color: var(--text-3); }
@@ -160,7 +161,8 @@
 @layer platform {
   /* 마우스를 올릴 수 없는 터치 기기는 막대를 숨기면 스크롤되는 칸인지 알 수 없어 기본 모양을 둔다. */
   @media (hover: hover) {
-    .sidebar, .list-pane, .detail-pane, .onb-main { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+    /* 막대가 나타나도 내용 폭이 변하지 않게 막대 자리를 처음부터 비워 둔다(scrollbar-gutter). */
+    .sidebar, .list-pane, .detail-pane, .onb-main { scrollbar-width: thin; scrollbar-color: transparent transparent; scrollbar-gutter: stable; }
     .sidebar:hover, .list-pane:hover, .detail-pane:hover, .onb-main:hover {
       scrollbar-color: color-mix(in srgb, var(--text-3) 55%, transparent) transparent;
     }
