@@ -612,7 +612,7 @@ function Profile({ model }: { model: SettingsModel }) {
       </Setting>
     </Section>
     <Section id="s-school" title="학교 정보">
-      <Setting name="학년 및 학기" help="인턴 공고의 지원 자격을 가릴 때만 써요. 이름이나 학번은 받지 않아요">
+      <Setting name="학년 및 학기" help="인턴 공고의 지원 자격을 가릴 때만 써요">
         <div className="flex flex-col gap-[8px]">
           <Choice label="학년" value={profile.year} disabled={!ready}
             options={YEARS.map((year) => [year, year === 5 ? '5학년 이상' : `${year}학년`] as const)} onPick={(year) => save({ year })} />
