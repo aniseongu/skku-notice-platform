@@ -85,6 +85,7 @@
     .setting-control > .ghost-button, .setting-control > .solid-button, .setting-control .segmented, .setting-control > .time-control { align-self: flex-end; }
     .setting-control > .inline-row { justify-content: flex-end; }
     .setting-control > .field-note, .setting-control > .setting-state { text-align: right; }
+    .setting-control > .connection-summary { justify-content: flex-end; }
     /* 안내 목록은 오른쪽 열에 왼쪽 정렬로 두면 오른쪽 끝에 맞춘 조작과 어긋나므로 전체 폭 아래에 둔다. */
     .setting:has(> .setting-control > .rule-list) { grid-template-columns: minmax(0, 1fr); gap: 8px; }
     .box > .settings-lead { padding-top: 12px; margin: 0 0 4px; }
