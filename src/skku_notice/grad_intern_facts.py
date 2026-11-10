@@ -15,7 +15,6 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import date
 
-from skku_notice.gemini_client import gemini_client
 from skku_notice.grad_intern_rules import ORG_TYPES, TASK_CATEGORIES, WORK_MODES, InternFacts
 
 MAX_TEXT = 6000
@@ -182,9 +181,10 @@ def call_gemini(title: str, body: str, model: str, api_key: str, client: object 
     """Gemini 한 번. 실패나 형식 오류는 None이고 호출한 쪽이 다시 시도한다."""
     if not api_key:
         return None
-    from google.genai import (
-        types,  # OCR 대기열 판단(ocr_collection)이 이 모듈을 가볍게 가져오도록 여기서 불러온다
-    )
+    # OCR 서버 환경에는 google-genai가 없어서, ocr_collection이 이 모듈을 가져와도 되도록 여기서 불러온다.
+    from google.genai import types
+
+    from skku_notice.gemini_client import gemini_client
 
     payload = json.dumps({"title": title, "body": body[:MAX_TEXT]}, ensure_ascii=False)
     try:
