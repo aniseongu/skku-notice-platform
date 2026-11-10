@@ -163,16 +163,16 @@ export function Onboarding({ app }: { app: AppController }) {
     body = <div className="onb-group">
       {isSoftwareOriginal({ programs: draft.programs }) ? <>
         <h2>입학 연도</h2>
-        <p className="card-note">소프트웨어학과 인턴십 졸업요건이 학번에 따라 달라서 물어봐요. 학번 전체는 받지 않아요</p>
+        <p className="card-note">입학 연도마다 졸업요건이 달라서 물어봐요. 학번 전체는 받지 않아요</p>
         <Segmented label="입학 연도" options={ADMISSION} columns={4} value={draft.admissionYear} onChange={(admissionYear) => setDraft({ ...draft, admissionYear })} />
       </> : null}
       <h2>학교 신3품 인턴십</h2>
-      <p className="card-note">인성 필수 외에 글로벌·창의·AI·인턴십 중 두 영역을 골라요. 인턴십 영역을 채웠다면 이 요건은 안 보여 드려요</p>
+      <p className="card-note">글로벌·창의·AI·인턴십 중 인턴십 영역을 채웠나요? 채웠다면 인턴 공고에서 이 요건을 빼 드려요</p>
       <Segmented label="학교 신3품 인턴십" options={THREE_P} columns={3} value={threePAnswer(draft)}
         onChange={(value) => setDraft({ ...draft, ...threePFields(value as ThreePAnswer) })} />
       {isSoftwareOriginal({ programs: draft.programs }) ? <>
         <h2>학과 졸업 인턴십</h2>
-        <p className="card-note">소프트웨어학과 졸업평가의 인턴십 요건이에요. 이미 채웠다면 인턴 공고에서 안 보여 드려요</p>
+        <p className="card-note">학과 졸업 인턴십을 마쳤나요? 마쳤다면 인턴 공고에서 이 요건을 빼 드려요</p>
         <Segmented label="학과 졸업 인턴십" options={DEPT_DONE} columns={2}
           value={draft.deptInternshipDone === null ? null : draft.deptInternshipDone ? 'yes' : 'no'}
           onChange={(value) => setDraft({ ...draft, deptInternshipDone: value === 'yes' })} />
@@ -261,7 +261,7 @@ export function Onboarding({ app }: { app: AppController }) {
           </div>
           {manual
             ? <button type="button" className="onb-x" aria-label="닫기" onClick={() => app.dismissOnboarding()}><svg className="i" aria-hidden="true"><use href="icons/sprite.svg#close" /></svg></button>
-            : <button type="button" className="onb-skip" onClick={() => app.dismissOnboarding()}>나중에 하기</button>}
+            : <button type="button" className="onb-skip border-0 bg-transparent text-ink-2" onClick={() => app.dismissOnboarding()}>나중에 하기</button>}
         </div>
       </div>
       <div className="onb-body">

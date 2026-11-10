@@ -22,6 +22,7 @@
   .order-list.editing li { background: color-mix(in oklch, var(--sunken) 55%, transparent); }
   .head-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
   .settings-lead { margin: -2px 0 8px; font-size: 13px; line-height: 19px; color: var(--text-2); }
+  .box > .settings-lead { padding-top: 12px; margin: 0 0 4px; }
   .box { border-radius: var(--r-lg); background: var(--surface); padding: 0 var(--gutter); }
   .setting { display: flex; flex-direction: column; gap: 10px; padding: 16px 0; }
   .setting + .setting { border-top: 1px solid var(--line); }
@@ -100,7 +101,6 @@
     .setting-control > .connection-summary { justify-content: flex-end; }
     /* 안내 목록은 오른쪽 열에 왼쪽 정렬로 두면 오른쪽 끝에 맞춘 조작과 어긋나므로 전체 폭 아래에 둔다. */
     .setting:has(> .setting-control > .rule-list) { grid-template-columns: minmax(0, 1fr); gap: 8px; }
-    .box > .settings-lead { padding-top: 12px; margin: 0 0 4px; }
     .setting:has(> .setting-control > .connection-summary) > .setting-text { padding-top: 11px; }
   }
   /* 분류 칩: 켠 것은 옅은 면과 굵은 글자(검은 채움은 하나만 고르는 칩에만), 끈 것은 가로줄로도 알린다.
