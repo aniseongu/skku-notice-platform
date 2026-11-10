@@ -398,3 +398,32 @@ def test_freshness_gate_ignores_catalog_boards_nobody_follows():
 
     assert job.recently_collected(CATALOG, Store(), NOW) is True
     assert job.recently_collected(CATALOG, Store(), NOW, subscribed={"dept-a"}) is False
+
+
+def test_a_notice_the_school_redates_keeps_its_first_seen_posting_date(monkeypatch):
+    store = MemoryStore()
+    monkeypatch.setattr(job.time, "sleep", lambda _: None)
+    monkeypatch.setattr(job, "fetch_list", lambda *_: "list")
+    monkeypatch.setattr(job, "fetch_detail", lambda *_: "detail")
+    monkeypatch.setattr(
+        job, "parse_detail",
+        lambda *_: SimpleNamespace(body_text="본문", body_html="<p>본문</p>", attachments=(), images=()),
+    )
+    monkeypatch.setattr(job, "parse_list", lambda *_: [NOTICE])
+    assert job.run_collection(SETTINGS, store, NOW) == (1, 0)
+    assert store.rows["school/123"]["posted_on"] == "2026-11-06"
+    # 학교가 글을 고쳐 목록의 날짜를 오늘로 바꿔도 처음 본 게시일을 지키고, 다른 값은 그대로 갱신한다.
+    redated = Notice("school", "123", "학교 공지", "학사", NOTICE.url, date(2026, 11, 10), True)
+    monkeypatch.setattr(job, "parse_list", lambda *_: [redated])
+    assert job.run_collection(SETTINGS, store, NOW) == (1, 0)
+    row = store.rows["school/123"]
+    assert row["posted_on"] == "2026-11-06"
+    assert row["pinned"] is True
+
+
+def test_a_new_notice_uses_the_listed_date_and_a_broken_saved_date_is_replaced():
+    listed = date(2026, 11, 10)
+    assert job._first_posted_on({}, listed) == listed
+    assert job._first_posted_on({"posted_on": None}, listed) == listed
+    assert job._first_posted_on({"posted_on": "not-a-date"}, listed) == listed
+    assert job._first_posted_on({"posted_on": "2026-11-06"}, listed) == date(2026, 11, 6)

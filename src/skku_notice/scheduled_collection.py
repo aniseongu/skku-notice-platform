@@ -3,7 +3,7 @@
 import os
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -187,7 +187,10 @@ def run_collection(
             for notice in notices:
                 notice_id = f"{source['id']}/{notice.article_no}"
                 old = previous.get(notice_id, {})
-                deadline = extract_deadline(notice.title, notice.posted_on)
+                # 학교 목록은 고친 글의 날짜를 오늘로 바꿔 보여 준다. 원본(alert)처럼 처음 본 게시일을 지켜
+                # 고친 글이 새 글처럼 "오늘"에 올라오지 않게 한다. 수정은 changed_at과 "수정됨"으로 알린다.
+                posted_on = _first_posted_on(old, notice.posted_on)
+                deadline = extract_deadline(notice.title, posted_on)
                 metadata = {
                     "id": notice_id,
                     "source_id": source["id"],
@@ -195,7 +198,7 @@ def run_collection(
                     "title": notice.title,
                     "category": notice.category,
                     "url": notice.url,
-                    "posted_on": notice.posted_on.isoformat(),
+                    "posted_on": posted_on.isoformat(),
                     "pinned": notice.pinned,
                     "deadline": deadline.isoformat() if deadline else None,
                 }
@@ -395,6 +398,14 @@ def run_external_collection(settings: dict, store: NoticeStore, now: datetime, p
             failed += 1
             print(f"{source_id}: 외부 수집 실패 ({type(exc).__name__})", flush=True)
     return total, failed
+
+
+def _first_posted_on(old: dict, listed: date) -> date:
+    """이미 저장한 글이면 저장된 게시일, 처음 보는 글이면 목록의 날짜."""
+    try:
+        return date.fromisoformat(str(old["posted_on"])[:10])
+    except (KeyError, TypeError, ValueError):
+        return listed
 
 
 def _recent(posted_on: str, now: datetime) -> bool:
