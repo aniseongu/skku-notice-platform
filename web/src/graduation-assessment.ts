@@ -140,7 +140,6 @@ export function isInternshipNotice(notice: { title: string; source_id?: string }
 
 /** 목록 표지: 내가 채워야 할 요건에 이 공고가 맞는지. */
 export type GraduationBadge = 'ok' | 'review' | 'no';
-export const BADGE_LABEL: Record<GraduationBadge, string> = { ok: '졸업 충족', review: '졸업 확인', no: '졸업 미달' };
 export interface GraduationStatuses { dept: Status | null; p3: Status | null }
 
 /** 보이는 영역의 판정을 하나로 합친다. 아직 판정이 없으면(현장실습 모집처럼 열어서 봐야 알 수 있는 공고) review. 하나라도 가능하면 ok, 아니면 확인 필요가 있으면 review, 모두 안 맞으면 no. */
@@ -152,12 +151,21 @@ export function badgeOf(statuses: GraduationStatuses | undefined, tracks: Visibl
   return shown.some((v) => v === 'NEEDS_REVIEW') ? 'review' : 'no';
 }
 
-/** 목록·상세 머리에 실제로 적을 표지. 정보가 되는 것만 적는다:
- *  - "확인 필요"는 아는 게 없다는 말이라 적지 않는다(자세한 판정은 상세의 졸업요건 칸이 보여 준다).
- *  - 이 학생과 관련 없다고(해당 없음) 이미 판정한 글에는 적지 않는다. 한 줄에 판정이 둘이면 서로 경쟁한다. */
-export function shownBadge(badge: GraduationBadge | null, verdict: string | null | undefined): GraduationBadge | null {
-  if (badge !== 'ok' && badge !== 'no') return null;
-  return verdict === 'not_relevant' ? null : badge;
+/** 목록·상세 머리에 적는 졸업요건 결과. 영역마다 "3품 인턴십 충족", "솦 인턴십 미달"처럼 한 묶음으로 적고,
+ *  "해당"이나 "졸업 충족"을 따로 적지 않는다(학교에서는 소프트웨어학과를 솦이라고 줄여 부른다).
+ *  정보가 되는 것만 적는다: 확인 필요·해당 없음(NOT_APPLICABLE)은 적지 않고, 이 학생과 관련 없다고(해당 없음) 이미 판정한 글에도 적지 않는다. */
+export interface GradPart { key: 'p3' | 'dept'; name: string; met: boolean }
+export const TRACK_NAME = { p3: '3품 인턴십', dept: '솦 인턴십' } as const;
+export function gradParts(statuses: GraduationStatuses | undefined, tracks: VisibleTracks, verdict?: string | null): GradPart[] {
+  if (!statuses || verdict === 'not_relevant') return [];
+  const parts: GradPart[] = [];
+  for (const key of ['p3', 'dept'] as const) {
+    if (!tracks[key]) continue;
+    const status = statuses[key];
+    if (status === 'LIKELY' || status === 'CONDITIONAL') parts.push({ key, name: TRACK_NAME[key], met: true });
+    else if (status === 'NOT_ELIGIBLE') parts.push({ key, name: TRACK_NAME[key], met: false });
+  }
+  return parts;
 }
 
 /** 내 판정 결과의 요약만 한 번에 읽는다(목록 표지와 "졸업요건 충족만 보기"에 쓴다). */

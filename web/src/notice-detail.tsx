@@ -2,7 +2,7 @@ import { Reason } from './reason';
 import { createRoot, type Root } from 'react-dom/client';
 import { cleanTitle, deadlineDetail, deadlinePassed, deadlineText, daysLeft, koreanDate, safeUrl, type Notice, type NoticeBody, type Verdict } from './data';
 import { useState } from 'react';
-import type { GraduationBadge } from './graduation-assessment';
+import type { GradPart } from './graduation-assessment';
 import { GraduationSection, type GraduationModel } from './graduation-assessment-view';
 import { cleanHtml, fileType, IMAGE_MISSING, replaceBrokenImage } from './rich';
 
@@ -23,7 +23,7 @@ export interface NoticeDetailModel {
   retry: () => void;
   /** 소프트웨어학과 원전공이 인턴 공고를 열었을 때만 있다. */
   graduation?: GraduationModel;
-  grad?: GraduationBadge | null;
+  grad?: GradPart[];
 }
 
 /** 그림의 대체 텍스트: 자동으로 읽은 글이 있으면 앞부분을 함께 알려 준다. */
@@ -77,7 +77,7 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
   const title = cleanTitle(notice.title_ko || notice.title);
   const passed = notice.deadline ? deadlinePassed(notice.deadline) : false;
   const urgent = !!notice.deadline && !passed && daysLeft(notice.deadline, model.today) <= 3;
-  const hasReason = interests.length > 0 || !!ai || !!model.rule || !!model.grad;
+  const hasReason = interests.length > 0 || !!ai || !!model.rule || (model.grad?.length ?? 0) > 0;
   return <div className="detail">
     <p className="meta flex min-w-0 flex-wrap gap-[6px] mb-[6px] text-[13px] leading-[18px] font-medium text-ink-3"><span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{model.source}</span>{notice.category ? <span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{notice.category}</span> : null}</p>
     <h2 className="detail-title" title={title}>{title}</h2>

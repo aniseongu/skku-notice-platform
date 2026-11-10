@@ -20,7 +20,7 @@ import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from '
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
 import { byokAvailable, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
-import { loadGraduation, loadGraduationStatuses, badgeOf, requestGraduation, isInternshipNotice, type GraduationBadge, type GraduationStatuses, isSoftwareOriginal, visibleTracks, type GraduationAssessment } from './graduation-assessment';
+import { loadGraduation, loadGraduationStatuses, badgeOf, gradParts, requestGraduation, isInternshipNotice, type GradPart, type GraduationBadge, type GraduationStatuses, isSoftwareOriginal, visibleTracks, type GraduationAssessment } from './graduation-assessment';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import type { Draft } from './onboarding-flow';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
@@ -567,6 +567,10 @@ export class AppController extends Reactive {
   graduationOnly = remember('view-grad') === '1';
   /** 목록에 졸업요건 표지를 보여 줄 수 있는 사용자인지: 로그인했고 아직 채우지 않은 요건이 있다. */
   gradEnabled(): boolean { const v = visibleTracks(this.profile); return !!authClient && !!this.authUserId && (v.dept || v.p3); }
+  /** 목록·상세에 적을 졸업요건 결과(영역별). 키워드 인턴과 겹치지 않게 shownInterests가 이 값을 보고 인턴 키워드를 뺀다. */
+  gradPartsFor(notice: Notice, verdict?: string | null): GradPart[] {
+    return this.showsGraduation(notice) ? gradParts(this.graduationStatuses.get(notice.id), visibleTracks(this.profile), verdict) : [];
+  }
   gradBadge(notice: Notice): GraduationBadge | null {
     return this.showsGraduation(notice) ? badgeOf(this.graduationStatuses.get(notice.id), visibleTracks(this.profile)) : null;
   }
@@ -587,9 +591,10 @@ export class AppController extends Reactive {
   }
 
   /** 화면에 "관심 ○○"로 보여 줄 키워드. 외부 인턴 공고는 전부 인턴이라 키워드 인턴은 알려 주는 게 없어서 뺀다(키워드로 거르는 데는 그대로 쓴다). */
-  shownInterests(notice: Notice): string[] {
+  shownInterests(notice: Notice, hasGrad = false): string[] {
     const all = this.interests(notice);
-    return this.isExternal(notice) ? all.filter((word) => !GENERIC_INTERN.test(word)) : all;
+    // 외부 인턴 공고, 그리고 졸업요건 결과를 적는 글에서는 키워드 인턴이 같은 말을 되풀이하므로 뺀다.
+    return this.isExternal(notice) || hasGrad ? all.filter((word) => !GENERIC_INTERN.test(word)) : all;
   }
 
   filtered(notices = this.notices): Notice[] {

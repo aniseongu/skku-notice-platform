@@ -341,7 +341,7 @@ function Notifications({ model }: { model: SettingsModel }) {
   return <div className="settings">
     <Back model={model} />
     <Section id="s-notify" title="이 기기">
-      <Setting name="이 기기 알림" help="앱을 닫아도 브라우저가 켜져 있으면 알림으로 받아요">
+      <Setting name="이 기기 알림" help="앱을 닫아도 브라우저가 켜져 있으면 알림으로 받아요. 이 기기에만 적용돼요">
         {!model.userId ? <p className="field-note">로그인하면 이 기기로 알림을 받을 수 있어요</p> : <>
           <span className="setting-state">{on ? '켜져 있어요' : '꺼져 있어요'} · 브라우저 권한 {permissionText(model.pushStatus)}</span>
           <div className="inline-row">
@@ -355,7 +355,6 @@ function Notifications({ model }: { model: SettingsModel }) {
           {model.pushStatus === 'denied' ? <p className="field-note">브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요</p> : null}
           {model.pushError ? <p className="field-note error" role="alert">{model.pushError}</p> : null}
           {on && model.subscriptions.length === 0 ? <p className="field-note">받을 게시판을 고르면 새 공지를 알려드려요</p> : null}
-          <p className="field-note">알림 수신은 이 기기에만 적용해요</p>
         </>}
       </Setting>
       {model.userId && info ? <>
@@ -367,7 +366,7 @@ function Notifications({ model }: { model: SettingsModel }) {
         <Setting name="하루 요약 시간" help="모든 기기에 같은 시간을 적용해요. 할 일이 없어도 알려요">
           <p className="setting-name visually-hidden" id="summary-time-label">하루 요약 시간</p>
           <SummaryTime info={info} />
-          {info.summaryTime === null ? <p className="field-note">연결 키에서 아이캠퍼스 토큰을 저장하면 바꿀 수 있어요</p> : <p className="field-note">확인이 늦어지면 알림도 늦어져요</p>}
+          {info.summaryTime === null ? <p className="field-note">아이캠퍼스를 연결하면 바꿀 수 있어요</p> : <p className="field-note">확인이 늦어지면 알림도 늦어져요</p>}
           {info.error ? <p className="field-note error" role="alert">{info.error}</p> : null}
         </Setting>
       </> : null}
@@ -376,7 +375,8 @@ function Notifications({ model }: { model: SettingsModel }) {
           <li>받는 게시판의 새 공지를 알려요</li>
           <li>관심 키워드와 맞는 공지는 소리로, 나머지는 조용히 알려요</li>
           <li>학교가 고친 중요한 글은 한 번 더 알려요</li>
-          <li>Gemini 키를 넣으면 나에게 맞는 공지도 소리로 알려요. 인턴 공고는 맞는 것만 알려요</li>
+          <li>Gemini 키가 있으면 나와 맞는 공지도 소리로 알려요</li>
+          <li>인턴 공고는 나와 맞는 것만 알려요</li>
         </ul>
       </Setting>
     </Section>
@@ -398,7 +398,7 @@ function BoardsSection({ model }: { model: SettingsModel }) {
   const canMove = order.boards.length >= 2;
   return <Section id="s-boards" title="받을 게시판"
     action={canMove ? <button type="button" className="head-action" onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : undefined}>
-    <p className="settings-lead">알림을 받고 목록에 모아 볼 게시판이에요. 목록과 왼쪽 메뉴에 이 순서로 보여요</p>
+    <p className="settings-lead">알림을 받고 목록에 모아 볼 게시판이에요. 이 순서로 보여요</p>
     {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <>
       {model.error ? <><p className="field-note error" role="alert">{model.error}</p>
         <button type="button" className="ghost-button" onClick={model.retry}>다시 불러오기</button></> : null}

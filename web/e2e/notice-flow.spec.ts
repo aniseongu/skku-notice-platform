@@ -1118,8 +1118,8 @@ test('software original major is asked for the admission year and the internship
   await page.locator('notice-rows-screen a.row').nth(1).click();
   const section = page.getByRole('region', { name: '졸업요건 확인' });
   await expect(section).toBeVisible();
-  await expect(section.getByText('학과 졸업 인턴십 · 확인 필요', { exact: true })).toBeVisible();
-  const p3 = section.getByText('신3품 인턴십 · 어려울 수 있음', { exact: true });
+  await expect(section.getByText('솦 인턴십 · 확인 필요', { exact: true })).toBeVisible();
+  const p3 = section.getByText('3품 인턴십 · 어려울 수 있음', { exact: true });
   await expect(p3).toBeVisible();
   await expect(section.getByText('최대 240시간이라 280시간에 못 미쳐요')).toBeVisible();
   // 안 되는 쪽은 빨강 계열 글자다(배지나 카드가 아니다).

@@ -39,6 +39,7 @@ ORG_SENTENCE = re.compile(r"(?:^|[\n.]\s*)([가-힣A-Za-z][가-힣A-Za-z0-9&·]{
 # 포스터 글: "넷마블네오에서 첫 플레이를 시작하세요", 연도와 함께 단독 줄로 나온 이름("2026넷마블네오")
 ORG_POSTER = re.compile(r"(?:^|[\n.])\s*([가-힣A-Za-z][가-힣A-Za-z0-9&·]{1,11})\s*에서\s[^\n]{0,24}?(?:시작|지원|도전|만나|함께)")
 ORG_YEAR_LINE = re.compile(r"^\s*20\d\d\s*([가-힣][가-힣A-Za-z0-9]{1,11})\s*$", re.M)
+NON_COMPANY_NAME = re.compile(r"대학교|대학원|대학|연구실|학과|센터|학생|인턴십|채용|모집")
 CREDIT = re.compile(r"(\d(?:\.\d)?)\s*학점")
 
 
@@ -294,6 +295,16 @@ def build_facts(title: str, body: str, ai: dict | None) -> Extracted:
 
     if org_name is None and isinstance(static.get("organization_name"), str):
         org_name = static["organization_name"]
+    if org_name is None:
+        bracket = TITLE_ORG.match(title or "")
+        if bracket and not TITLE_GENERIC.search(bracket.group(1)):
+            org_name = bracket.group(1).strip()
+
+    # 회사 이름이 적혀 있으면 회사로 본다(소유자 지시 2026-11-11: (주)·주식회사 표기는 없어도 된다). 키가 없어 Gemini가 기관 종류를
+    # 못 채운 경우에도 같다. 대학교·연구실·센터처럼 회사가 아닌 이름은 제외한다.
+    if org_name and "organization_type" not in values and not NON_COMPANY_NAME.search(org_name):
+        values["organization_type"] = "incorporated_company"
+        evidence.append({"field": "organization", "quote": org_name})
 
     # 법인 여부: 이 서비스에 올라오는 기업·연구소 공고는 모두 법인으로 본다(소유자 지시). 모델의 단언은 쓰지 않고
     # 근거 문장이 있는 기관 종류에서만 파생한다. 대학 내 연구소와 개인 활동은 기관 종류 단계에서 걸러진다.

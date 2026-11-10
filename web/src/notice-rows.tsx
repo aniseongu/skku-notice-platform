@@ -1,7 +1,7 @@
 import { createRoot, type Root } from 'react-dom/client';
 import { cleanTitle, deadlinePassed, deadlineText, daysLeft, safeUrl, type Notice, type Verdict } from './data';
 import { Reason } from './reason';
-import type { GraduationBadge } from './graduation-assessment';
+import type { GradPart } from './graduation-assessment';
 
 export interface NoticeRowModel {
   notice: Notice;
@@ -14,7 +14,7 @@ export interface NoticeRowModel {
   interests: string[];
   ai: { verdict: Verdict; reason: string } | null;
   rule: string | null;
-  grad?: GraduationBadge | null;
+  grad?: GradPart[];
 }
 export interface NoticeRowsModel {
   rows: NoticeRowModel[];
@@ -42,7 +42,7 @@ function NoticeRows({ model }: { model: NoticeRowsModel }) {
     const tags = [n.category, n.pinned ? '고정' : '', n.changed_at ? '수정됨' : '', !model.savedView && row.saved ? '저장함' : ''].filter(Boolean).join(', ');
     const passed = n.deadline ? deadlinePassed(n.deadline) : false;
     const urgent = !!n.deadline && !passed && daysLeft(n.deadline, model.today) <= 3;
-    const hasReason = row.interests.length > 0 || !!row.ai || !!row.rule || !!row.grad;
+    const hasReason = row.interests.length > 0 || !!row.ai || !!row.rule || (row.grad?.length ?? 0) > 0;
     const bg = model.selecting && row.selected ? 'bg-[color-mix(in_oklch,var(--accent)_16%,var(--surface))] shadow-[inset_3px_0_0_var(--accent)]' : row.current && !model.selecting ? 'bg-sunken' : row.read ? 'bg-read' : 'bg-surface';
     const hover = row.current ? '' : 'min-[720px]:hover:bg-hover';
     const border = index > 0 ? 'border-t border-line' : 'min-[720px]:border-t min-[720px]:border-line';

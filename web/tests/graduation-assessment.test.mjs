@@ -122,12 +122,14 @@ test('표지는 보이는 영역의 판정만 합친다', () => {
   assert.equal(badgeOf2(undefined, all), 'review');
 });
 
-import { shownBadge } from '../src/graduation-assessment.ts';
-test('표지는 정보가 되는 것만 적는다: 확인 필요와 해당 없음 판정 글에는 적지 않는다', () => {
-  assert.equal(shownBadge('ok', 'relevant'), 'ok');
-  assert.equal(shownBadge('no', 'maybe'), 'no');
-  assert.equal(shownBadge('ok', null), 'ok');
-  assert.equal(shownBadge('review', 'relevant'), null);
-  assert.equal(shownBadge('ok', 'not_relevant'), null);
-  assert.equal(shownBadge(null, 'relevant'), null);
+import { gradParts } from '../src/graduation-assessment.ts';
+test('졸업요건 결과는 영역별로 한 묶음으로 적고, 확인 필요·해당 없음 글에는 적지 않는다', () => {
+  const all = { dept: true, p3: true };
+  const st = (dept, p3) => ({ dept, p3 });
+  assert.deepEqual(gradParts(st('LIKELY', 'CONDITIONAL'), all, 'relevant').map((p) => `${p.name} ${p.met ? '충족' : '미달'}`), ['3품 인턴십 충족', '솦 인턴십 충족']);
+  assert.deepEqual(gradParts(st('NOT_ELIGIBLE', 'LIKELY'), all, null).map((p) => `${p.name} ${p.met ? '충족' : '미달'}`), ['3품 인턴십 충족', '솦 인턴십 미달']);
+  assert.deepEqual(gradParts(st('NEEDS_REVIEW', 'NOT_APPLICABLE'), all, 'relevant'), []);
+  assert.deepEqual(gradParts(st('LIKELY', 'LIKELY'), { dept: false, p3: true }, 'relevant').map((p) => p.key), ['p3']);
+  assert.deepEqual(gradParts(st('LIKELY', 'LIKELY'), all, 'not_relevant'), []);
+  assert.deepEqual(gradParts(undefined, all, 'relevant'), []);
 });
