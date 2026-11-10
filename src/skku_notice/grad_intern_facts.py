@@ -31,6 +31,11 @@ PART_TIME = re.compile(r"파트\s*타임|시간제|part[\s-]?time", re.I)
 TOTAL_HOURS = re.compile(r"(?:총|합계)\s*(\d{2,4})\s*시간")
 # "5개월", "근무 기간: 6개월", "3개월간" 등. 모집 인원이나 마감 안내의 개월 수와 섞이지 않게 근무·인턴 말이 가까이 있을 때만 읽는다.
 MONTHS = re.compile(r"(?:근무|인턴(?:십)?|실습|활동|기간|진행)[^\n]{0,12}?(\d{1,2})\s*개월|(\d{1,2})\s*개월\s*(?:간|동안)?\s*(?:진행|근무|인턴|실습)")
+WEEKS = re.compile(r"(?:근무|인턴(?:십)?|실습|활동|기간|진행)[^\n]{0,12}?(\d{1,2})\s*주(?!\s*(?:\d|일|\d일))|(\d{1,2})\s*주\s*(?:간|동안)\s*(?:진행|근무|인턴|실습)?")
+WORK_DAYS = re.compile(r"(?:총\s*)?(?:근무\s*일수|근무일)\s*[:：]?\s*(?:총\s*)?(\d{2,3})\s*일|총\s*(\d{2,3})\s*일\s*(?:간\s*)?근무")
+# 회사 이름: "회사명: ○○", "기업명 ○○", 그리고 법인 표기가 붙은 이름. 그림 글자(OCR)는 띄어쓰기가 흔들려 공백을 허용한다.
+ORG_LABEL = re.compile(r"(?:회사|기업|기관|업체|법인)\s*(?:명|이름)\s*[:：]?\s*([^\n,;/|]{2,30})")
+ORG_LEGAL = re.compile(r"(?:\(주\)|㈜|주식회사)[ \t]*([가-힣A-Za-z0-9&·.\-]{1,20})|([가-힣A-Za-z0-9&·.\-]{2,20})[ \t]*(?:\(주\)|㈜|주식회사)")
 CREDIT = re.compile(r"(\d(?:\.\d)?)\s*학점")
 
 
@@ -70,7 +75,7 @@ class Extracted:
             "end_date": self.facts.end_date.isoformat() if self.facts.end_date else None,
             "explicitly_stated_hours": self.facts.explicitly_stated_hours,
             "academic_credit": self.facts.academic_credit,
-            "duration_months": self.facts.duration_months,
+            "duration_months": self.facts.duration_months, "duration_days": self.facts.duration_days,
         }
 
 
@@ -95,12 +100,28 @@ def static_facts(title: str, body: str) -> dict:
         month_hits = {int(m.group(1) or m.group(2)) for m in MONTHS.finditer(text)}
         if len(month_hits) == 1 and 1 <= (months := month_hits.pop()) <= 24:
             found["duration_months"] = months
+            found.setdefault("duration_days", months * 30)
             found["evidence"].append({"field": "period", "quote": MONTHS.search(text).group(0)})
+    if "start_date" not in found and "duration_days" not in found:
+        week_hits = {int(m.group(1) or m.group(2)) for m in WEEKS.finditer(text)}
+        if len(week_hits) == 1 and 1 <= (weeks := week_hits.pop()) <= 52:
+            found["duration_days"] = weeks * 7
+            found["evidence"].append({"field": "period", "quote": WEEKS.search(text).group(0)})
+        day_hits = {int(m.group(1) or m.group(2)) for m in WORK_DAYS.finditer(text)}
+        if len(day_hits) == 1 and 5 <= (workdays := day_hits.pop()) <= 365:
+            found["duration_days"] = workdays * 7 // 5  # 근무일수는 평일 기준이라 달력 일수로 바꾼다
+            found["evidence"].append({"field": "period", "quote": WORK_DAYS.search(text).group(0)})
     hours = {int(m.group(1)) for m in TOTAL_HOURS.finditer(text)}
     if len(hours) == 1:
         found["explicitly_stated_hours"] = hours.pop()
         match = TOTAL_HOURS.search(text)
         found["evidence"].append({"field": "hours", "quote": match.group(0)})
+    for pattern in (ORG_LABEL, ORG_LEGAL):
+        match = pattern.search(text)
+        name = next((g for g in (match.groups() if match else ()) if g), "").strip(" .-:：")
+        if name and len(name) >= 2:
+            found["organization_name"] = name[:40]
+            break
     return found
 
 
@@ -177,7 +198,7 @@ def build_facts(title: str, body: str, ai: dict | None) -> Extracted:
     text = f"{title}\n{body}"[:MAX_TEXT]
     static = static_facts(title, body)
     evidence: list[dict] = [e for e in static["evidence"] if quote_in_text(e["quote"], text)]
-    values: dict = {k: v for k, v in static.items() if k != "evidence"}
+    values: dict = {k: v for k, v in static.items() if k not in ("evidence", "organization_name")}
     missing: list[str] = []
     org_name: str | None = None
     tasks: list[str] = []
@@ -206,6 +227,7 @@ def build_facts(title: str, body: str, ai: dict | None) -> Extracted:
         if isinstance(months, int) and not isinstance(months, bool) and 1 <= months <= 24 and supported("period") \
                 and "start_date" not in values and "duration_months" not in values:
             values["duration_months"] = months
+            values["duration_days"] = months * 30
         hours = ai.get("explicitly_stated_hours")
         if isinstance(hours, int) and not isinstance(hours, bool) and 1 <= hours <= 5000 and supported("hours") \
                 and "explicitly_stated_hours" not in values:
@@ -226,6 +248,9 @@ def build_facts(title: str, body: str, ai: dict | None) -> Extracted:
         if isinstance(raw_tasks, list):
             tasks = [t.strip()[:120] for t in raw_tasks if isinstance(t, str) and quote_in_text(t, text)][:5]
 
+    if org_name is None and isinstance(static.get("organization_name"), str):
+        org_name = static["organization_name"]
+
     # 법인 여부: 이 서비스에 올라오는 기업·연구소 공고는 모두 법인으로 본다(소유자 지시). 모델의 단언은 쓰지 않고
     # 근거 문장이 있는 기관 종류에서만 파생한다. 대학 내 연구소와 개인 활동은 기관 종류 단계에서 걸러진다.
     if values.get("organization_type") in ("incorporated_company", "incorporated_institute"):
@@ -242,9 +267,10 @@ def build_facts(title: str, body: str, ai: dict | None) -> Extracted:
         task_category=values.get("task_category", "unknown"),
         academic_credit=values.get("academic_credit"),
         duration_months=values.get("duration_months") if "start_date" not in values else None,
+        duration_days=values.get("duration_days") if "start_date" not in values else None,
     )
     for name, empty in (("기관 종류", facts.organization_type == "unknown"), ("근무 형태", facts.work_mode == "unknown"),
-                        ("근무 기간", facts.start_date is None and facts.duration_months is None), ("담당 업무", facts.task_category == "unknown")):
+                        ("근무 기간", facts.start_date is None and facts.duration_days is None), ("담당 업무", facts.task_category == "unknown")):
         if empty:
             missing.append(name)
     return Extracted(facts, org_name, tasks, evidence, missing, ai_used=ai is not None)

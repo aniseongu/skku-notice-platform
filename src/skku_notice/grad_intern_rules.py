@@ -68,6 +68,8 @@ class InternFacts:
     academic_credit: float | None = None
     # 공고에 "5개월"처럼 기간만 적힌 경우의 개월 수(시작·종료일이 없을 때만 쓴다)
     duration_months: int | None = None
+    # 개월·주·근무일수로 적힌 기간을 날짜 수로 바꾼 값(시작·종료일이 없을 때만)
+    duration_days: int | None = None
     # 교내 연구실: 월별 계획 시간. ("semester"|"vacation", 시간)
     monthly_hours: tuple[tuple[str, int], ...] = ()
 
@@ -158,8 +160,8 @@ def _work_check(facts: InternFacts) -> Check:
 
 def _company_time_check(facts: InternFacts) -> Check:
     days = inclusive_days(facts.start_date, facts.end_date)
-    if days is None and facts.duration_months:
-        days = facts.duration_months * 30  # 날짜 없이 개월 수만 적힌 공고
+    if days is None and facts.duration_days:
+        days = facts.duration_days  # 날짜 없이 개월·주·근무일수만 적힌 공고
     if facts.work_mode == "full_time":
         if days is None:
             return Check("DEPT-COMPANY-FT", UNKNOWN, "전일제이지만 근무 기간을 확인하지 못했어요")
@@ -282,11 +284,11 @@ def _p3_hours_check(facts: InternFacts) -> Check:
         if cap < P3_MIN_HOURS:
             return Check("3P-HOURS", FAIL, f"평일 하루 8시간으로 계산해도 최대 {cap}시간이라 280시간에 못 미쳐요")
         return Check("3P-HOURS", UNKNOWN, "기간은 충분할 수 있지만 실제 인정 시간은 공휴일과 출근 기록으로 정해져요")
-    if facts.work_mode == "full_time" and facts.duration_months:
-        cap = facts.duration_months * 21 * P3_MAX_DAILY_HOURS
+    if facts.work_mode == "full_time" and facts.duration_days:
+        cap = facts.duration_days * 5 // 7 * P3_MAX_DAILY_HOURS
         if cap < P3_MIN_HOURS:
-            return Check("3P-HOURS", FAIL, f"{facts.duration_months}개월은 평일 하루 8시간으로 계산해도 최대 {cap}시간이라 280시간에 못 미쳐요")
-        return Check("3P-HOURS", UNKNOWN, f"공고에 {facts.duration_months}개월로 적혀 있어요. 실제 인정 시간은 출근 기록으로 정해져요")
+            return Check("3P-HOURS", FAIL, f"공고의 기간 {facts.duration_days}일은 평일 하루 8시간으로 계산해도 최대 {cap}시간이라 280시간에 못 미쳐요")
+        return Check("3P-HOURS", UNKNOWN, f"공고에 {facts.duration_days}일 정도로 적혀 있어요. 실제 인정 시간은 출근 기록으로 정해져요")
     return Check("3P-HOURS", UNKNOWN, "근무 시간을 공고에서 확인하지 못했어요")
 
 

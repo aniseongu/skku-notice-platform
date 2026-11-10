@@ -136,3 +136,15 @@ def test_개월_수만_적힌_공고의_기간을_읽는다():
     facts = dataclasses.replace(extracted.facts, organization_type="incorporated_company", corporate_status_verified=True, task_category="data_ai")
     result = assess_department(GradProfile(2022, "original_major", True, True), facts)
     assert any(c.rule_id == "DEPT-COMPANY-FT" and c.result == "pass" for c in result.checks)
+
+
+def test_그림_글자에서_회사_이름과_근무_일수를_읽는다():
+    from skku_notice.grad_intern_facts import build_facts
+
+    ocr = "회사명: 넷마블네오\n근무 기간 8주 전일제\n"
+    extracted = build_facts("게임 기획 인턴", ocr, None)
+    assert extracted.organization_name == "넷마블네오"
+    assert extracted.facts.duration_days == 56
+    days = build_facts("인턴", "㈜카카오 근무일수 30일", None)
+    assert days.organization_name == "카카오"
+    assert days.facts.duration_days == 42
