@@ -1147,12 +1147,8 @@ test('selection mode click order: enter → tick → count → action → toast 
   await expect(bar).toBeVisible();
   await expect(bar.getByText('전체 선택')).toBeVisible();
   await expect(bar.getByText('공지를 골라 주세요')).toBeVisible();
-  // 아무것도 안 골랐을 때: 데스크톱은 비활성 단추 둘, 휴대폰은 아래 단추 막대를 숨긴다.
-  if (narrow) await expect(bar.getByRole('button', { name: /공지 0개 읽음으로 표시$/ })).toBeHidden();
-  else {
-    await expect(bar.getByRole('button', { name: /공지 0개 읽음으로 표시$/ })).toBeDisabled();
-    await expect(bar.getByRole('button', { name: /공지 0개 읽지 않음으로 표시$/ })).toBeDisabled();
-  }
+  // 아무것도 안 골랐을 때는 행동 단추가 없다(고르면 해당하는 단추만 나온다).
+  await expect(bar.getByRole('button', { name: /으로 표시$/ })).toHaveCount(0);
   if (narrow) await expect(tabbar).toBeHidden();                       // 휴대폰은 선택 중 아래 탭 바 대신 단추 막대
 
   // 3. 두 줄을 고르면 개수와 일부 선택 표시가 바뀐다. 하나를 풀면 1개.
