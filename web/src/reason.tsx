@@ -13,8 +13,10 @@ export function Reason({ interests, ai, rule, read = false }: {
     return <span className="reason"><b className={`interest ${read ? READ : `${BOLD} text-accent`}`}>관심 {interests.join(', ')}</b>{ai && ai.verdict !== 'not_relevant' ? ai.reason : ''}</span>;
   }
   if (ai) {
-    const tone = ai.verdict === 'relevant' ? 'text-accent' : ai.verdict === 'maybe' ? 'text-soon' : '';
-    return <span className={`reason ${ai.verdict} ${ai.verdict === 'not_relevant' ? 'text-ink-3' : ''}`}><b className={read ? READ : `${BOLD} ${tone}`}>{VERDICT_LABEL[ai.verdict]}</b>{ai.reason}</span>;
+    // 해당 없음은 가장 연하게: 굵지 않고 흐린 회색. 읽었는지와 관계없이 같다.
+    if (ai.verdict === 'not_relevant') return <span className="reason not_relevant text-ink-3"><b className={`${LABEL} font-normal`}>{VERDICT_LABEL[ai.verdict]}</b>{ai.reason}</span>;
+    const tone = ai.verdict === 'relevant' ? 'text-accent' : 'text-soon';
+    return <span className={`reason ${ai.verdict}`}><b className={read ? READ : `${BOLD} ${tone}`}>{VERDICT_LABEL[ai.verdict]}</b>{ai.reason}</span>;
   }
   return rule ? <span className="reason rule"><b className={read ? READ : `${BOLD} text-ink-2`}>기준</b>{rule}</span> : null;
 }
