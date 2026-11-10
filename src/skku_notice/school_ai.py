@@ -50,8 +50,12 @@ SYSTEM = (
 )
 
 
-def _valid_deadline(value: object) -> str | None:
-    """Gemini's deadline as an ISO string, or None when it cannot be trusted (unparseable or far from today)."""
+def _valid_deadline(value: object, kind: str | None = None) -> str | None:
+    """Gemini's deadline as an ISO string, or None when it cannot be trusted (unparseable or far from today).
+
+    "일정"(행사 시작일)이 오늘보다 앞선 날짜면 잘못 읽은 것으로 본다. 이런 값은 글을 올라온 날에 바로 목록에서
+    숨겨 버린다(예: 오늘 올라온 글의 일정을 어제로 읽음). "마감"은 지난 날짜도 7일까지 그대로 둔다.
+    """
     if not isinstance(value, str) or not value.strip():
         return None
     try:
@@ -62,6 +66,8 @@ def _valid_deadline(value: object) -> str | None:
     now = datetime.now(UTC)
     # 오늘보다 한참 앞이거나 1년도 더 뒤면 잘못 읽은 것으로 본다(원본 deadline_ai와 같다).
     if not (now - timedelta(days=7) <= at <= now + timedelta(days=400)):
+        return None
+    if kind == "일정" and at.astimezone(KST).date() < now.astimezone(KST).date():
         return None
     return at.astimezone(UTC).isoformat()
 
@@ -115,7 +121,7 @@ def judge_school_notices(
             )
             text = "\n".join(line for line in lines if line)[:300] or None
             kind = reply.get("deadline_kind")
-            at = _valid_deadline(reply.get("deadline_at")) if kind in {"마감", "일정"} else None
+            at = _valid_deadline(reply.get("deadline_at"), kind) if kind in {"마감", "일정"} else None
             judgments[key] = Judgment(
                 verdict, clean, model, summary=text,
                 deadline=at, deadline_kind=kind if at else None,
