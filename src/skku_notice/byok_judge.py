@@ -83,7 +83,13 @@ class JudgeStore(NoticeStore):
 
     def enqueue_graduation(self, limit: int) -> int:
         response = self._request("POST", "rpc/enqueue_graduation_assessments", json={"p_limit": limit})
-        return int(response.json() or 0)
+        total = int(response.json() or 0)
+        try:  # 판정 뒤에 요약이 생긴 글을 다시 판정한다(함수가 아직 없으면 건너뛴다)
+            again = self._request("POST", "rpc/requeue_graduation_after_summary", json={"p_limit": 3})
+            total += int(again.json() or 0)
+        except StoreError:
+            pass
+        return total
 
     def graduation_requests(self, limit: int) -> list[dict]:
         return self._request("POST", "rpc/list_graduation_requests", json={"p_limit": limit}).json()

@@ -202,3 +202,13 @@ def test_회사_이름만_있어도_회사로_보고_대학교_이름은_회사�
     assert company.facts.corporate_status_verified is True
     campus = build_facts("인턴 모집", "한양대학교에서 연구 인턴을 모집합니다.", None)
     assert campus.facts.organization_type == "unknown"
+
+
+def test_요약_한_문장만으로도_회사_이름과_개월_수를_읽고_프롬프트에_예시가_있다():
+    from skku_notice.grad_intern_facts import SYSTEM, build_facts
+
+    body = "요약: 넷마블네오에서 게임개발 및 기획 직무의 채용전환형 AI 인턴십을 모집합니다. 5개월간 진행되는 이번 인턴십에 관심 있는 학생은 지원하시기 바랍니다."
+    extracted = build_facts("AI 인턴십 모집", body, None)
+    assert extracted.organization_name == "넷마블네오" and extracted.facts.organization_type == "incorporated_company"
+    assert extracted.facts.duration_months == 5
+    assert "넷마블네오" in SYSTEM and "요약:" in SYSTEM
