@@ -157,3 +157,36 @@ def test_주_표기_없는_회사_이름도_문장에서_읽는다():
     extracted = build_facts("AI 인턴십", text, None)
     assert extracted.organization_name == "넷마블네오"
     assert extracted.facts.duration_days == 150
+
+
+POSTER_OCR = """netmarble
+Neo
+COMING
+SOON
+11.11
+서류 접수시작
+2026넷마블네오
+AI로 만드는 게임의 미래,
+넷마블네오에서 첫 플레이를 시작하세요.
+통합 직무 채용
+위고무을융를 얼
+|인턴십 5개월 | 서류 접수11.11 ~11.24
+인턴십 자세히 보러 가기"""
+
+
+def test_포스터_그림_글자에서_회사_이름과_개월_수를_읽는다():
+    from skku_notice.grad_intern_facts import build_facts
+
+    extracted = build_facts("2026 넷마블 AI 인턴십", POSTER_OCR, None)
+    assert extracted.organization_name == "넷마블네오"
+    assert extracted.facts.duration_months == 5
+    assert extracted.facts.duration_days == 150
+    assert extracted.facts.start_date is None  # 서류 접수 기간은 근무 기간이 아니다
+
+
+def test_근거_문장은_그림_글자의_한두_글자_오타를_허용하되_엉뚱한_문장은_버린다():
+    from skku_notice.grad_intern_facts import quote_in_text
+
+    assert quote_in_text("인턴십 5개월 | 서류 접수 11.11 ~ 11.24", POSTER_OCR)
+    assert quote_in_text("넷마블네오에서 첫 플레이틀 시작하세요", POSTER_OCR)  # 한 글자 오타
+    assert not quote_in_text("연봉 4천만원 이상 정규직 전환 보장", POSTER_OCR)

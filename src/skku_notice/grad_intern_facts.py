@@ -14,6 +14,7 @@ import sys
 import unicodedata
 from dataclasses import dataclass
 from datetime import date
+from difflib import SequenceMatcher
 
 from skku_notice.grad_intern_rules import ORG_TYPES, TASK_CATEGORIES, WORK_MODES, InternFacts
 
@@ -35,6 +36,9 @@ ORG_LABEL = re.compile(r"(?:회사|기업|기관|업체|법인)\s*(?:명|이름)
 ORG_LEGAL = re.compile(r"(?:\(주\)|㈜|주식회사)[ \t]*([가-힣A-Za-z0-9&·.\-]{1,20})|([가-힣A-Za-z0-9&·.\-]{2,20})[ \t]*(?:\(주\)|㈜|주식회사)")
 # "넷마블네오에서 ... 인턴십을 모집합니다" 같은 문장의 주어
 ORG_SENTENCE = re.compile(r"(?:^|[\n.]\s*)([가-힣A-Za-z][가-힣A-Za-z0-9&·]{1,14})\s*(?:에서|은|는)\s[^.\n]{0,40}?(?:모집|채용)")
+# 포스터 글: "넷마블네오에서 첫 플레이를 시작하세요", 연도와 함께 단독 줄로 나온 이름("2026넷마블네오")
+ORG_POSTER = re.compile(r"(?:^|[\n.])\s*([가-힣A-Za-z][가-힣A-Za-z0-9&·]{1,11})\s*에서\s[^\n]{0,24}?(?:시작|지원|도전|만나|함께)")
+ORG_YEAR_LINE = re.compile(r"^\s*20\d\d\s*([가-힣][가-힣A-Za-z0-9]{1,11})\s*$", re.M)
 CREDIT = re.compile(r"(\d(?:\.\d)?)\s*학점")
 
 
@@ -42,9 +46,30 @@ def _squash(text: str) -> str:
     return re.sub(r"\s+", "", unicodedata.normalize("NFKC", text or ""))
 
 
+def _fuzzy_contains(needle: str, haystack: str, threshold: float = 0.85) -> bool:
+    """needle과 거의 같은 구간이 haystack에 있는지. 그림 글자(OCR)는 한두 글자가 틀려서 글자 그대로 비교하면 맞는 값도 버린다.
+
+    근거 문장을 퍼지 매칭으로 원문과 대조하는 방식은 extracture 같은 오픈소스 추출기가 쓰는 것과 같다(rapidfuzz의
+    partial ratio). 서버 환경에 의존성을 늘리지 않으려고 표준 라이브러리 difflib로 구현했다.
+    """
+    n = len(needle)
+    if n < 6 or len(haystack) < n:
+        return False
+    step = max(1, n // 4)
+    for start in range(0, len(haystack) - n + 1, step):
+        window = haystack[start : start + n + 2]
+        matcher = SequenceMatcher(None, needle, window, autojunk=False)
+        if matcher.real_quick_ratio() >= threshold and matcher.quick_ratio() >= threshold and matcher.ratio() >= threshold:
+            return True
+    return False
+
+
 def quote_in_text(quote: object, text: str) -> bool:
-    """근거 문장이 공고 원문에 실제로 있는지(공백 차이는 무시)."""
-    return isinstance(quote, str) and len(_squash(quote)) >= 2 and _squash(quote) in _squash(text)
+    """근거 문장이 공고 원문에 실제로 있는지(공백 차이는 무시, 그림 글자의 한두 글자 오타는 허용)."""
+    if not isinstance(quote, str) or len(_squash(quote)) < 2:
+        return False
+    needle, haystack = _squash(quote), _squash(text)
+    return needle in haystack or _fuzzy_contains(needle, haystack)
 
 
 def _iso(year: str, month: str, day: str) -> date | None:
@@ -130,7 +155,7 @@ def static_facts(title: str, body: str) -> dict:
         found["explicitly_stated_hours"] = hours.pop()
         match = TOTAL_HOURS.search(text)
         found["evidence"].append({"field": "hours", "quote": match.group(0)})
-    for pattern in (ORG_LABEL, ORG_LEGAL, ORG_SENTENCE):
+    for pattern in (ORG_LABEL, ORG_LEGAL, ORG_SENTENCE, ORG_POSTER, ORG_YEAR_LINE):
         match = pattern.search(text)
         name = next((g for g in (match.groups() if match else ()) if g), "").strip(" .-:：")
         if name and len(name) >= 2:

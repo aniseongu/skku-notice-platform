@@ -44,7 +44,7 @@ function BodyImage({ src, alt }: { src: string; alt: string }) {
   return <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} />;
 }
 
-/** 글자가 거의 없는(줄표뿐인) 본문은 본문이 없는 것으로 본다. 그림과 그림에서 읽은 글을 보여 준다. */
+/** 글자가 거의 없는(줄표뿐인) 본문은 본문이 없는 것으로 본다. 그림을 보여 준다. */
 const readable = (text: string | null | undefined): boolean => (text ?? '').replace(/<[^>]*>/g, '').match(/[0-9A-Za-z가-힣]/g)?.length! >= 3;
 
 function Body({ body: rawBody, heading = '본문' }: { body: NoticeBody; heading?: string }) {
@@ -92,10 +92,7 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
     {model.graduation ? <GraduationSection title={title} model={model.graduation} /> : null}
     {body === 'loading' ? <p className="detail-note">본문을 불러오고 있어요</p> : !loaded ? <><p className="detail-note" role="status">본문을 불러오지 못했어요. 다시 불러오거나 원문을 확인해 주세요</p><button type="button" className="text-button" onClick={model.retry}>본문 다시 불러오기</button></>
       : loaded.translation?.body ? <><section className="detail-section body-text" aria-label="한국어로 옮긴 본문"><h3>본문 (한국어로 옮긴 글)</h3><p className="detail-note first">Gemini 번역이에요. 정확한 내용은 아래 영어 원문을 확인해 주세요</p>{loaded.translation.body.split(/\n+/).filter(Boolean).map((para, index) => <p key={index}>{para}</p>)}</section><div className="original-body" lang="en"><Body body={loaded} heading="영어 원문" /></div></> : <Body body={loaded} />}
-    {loaded?.ocr_text?.length ? <section className="detail-section body-text" aria-labelledby="sec-ocr">
-      <h3 id="sec-ocr">그림에서 읽은 글</h3><p className="detail-note first">그림 속 글자를 자동으로 읽어서 틀릴 수 있어요. 그림과 원문이 정확해요</p>
-      {loaded.ocr_text.flatMap((text) => text.split(/\n+/).filter(Boolean)).map((line, index) => <p key={index}>{line}</p>)}
-    </section> : null}
+    {/* 그림에서 읽은 글은 판정에만 쓰고 화면에는 보이지 않는다(틀린 글자가 섞여 있고 그림이 더 정확하다). */}
     {loaded?.attachments?.length ? <section className="detail-section" aria-labelledby="sec-files"><h3 id="sec-files">첨부 {loaded.attachments.length}개</h3><ul className="attachments">{loaded.attachments.map((file, index) => <li key={index}><a className="file" href={safeUrl(file.url)} target="_blank" rel="noopener"><span className="file-type">{fileType(file.name, file.type)}</span><span className="file-name">{file.name}</span>{file.size ? <span className="file-size">{file.size}</span> : null}</a></li>)}</ul><p className="detail-note first">누르면 학교 공지 사이트의 원본 파일을 받아요</p></section> : null}
     <dl className="facts" aria-label="글 정보"><div><dt>게시일</dt><dd>{koreanDate(notice.posted_on)}</dd></div>
       {notice.previous_title ? <div><dt>이전 제목</dt><dd>{cleanTitle(notice.previous_title)}</dd></div> : null}

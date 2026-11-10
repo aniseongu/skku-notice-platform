@@ -25,8 +25,9 @@ test('notice HTML is sanitized in React detail', async ({ page }) => {
   });
   await expect(page.locator('#xss-check .rich')).toBeVisible();
   await expect(page.locator('#xss-check [onerror], #xss-check a[href^="javascript:"], #xss-check script')).toHaveCount(0);
-  // 자동으로 읽은 글은 글자 그대로(태그가 아닌 글자로) 보인다.
-  await expect(page.locator('#xss-check [aria-labelledby="sec-ocr"]')).toContainText('<script>악성 내용</script>');
+  // 그림에서 읽은 글은 화면에 보이지 않는다(판정에만 쓴다). 악성 글자가 들어 있어도 태그로 풀리지 않는다.
+  await expect(page.locator('#xss-check [aria-labelledby="sec-ocr"]')).toHaveCount(0);
+  await expect(page.locator('#xss-check')).not.toContainText('<script>악성 내용</script>');
 });
 
 test('detail shows my Gemini summary first in the plain original style and describes pictures by their text', async ({ page }) => {
