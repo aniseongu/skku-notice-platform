@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import time
 from datetime import UTC, datetime
 
@@ -67,7 +68,13 @@ def run_graduation(store, master_key: str, now: datetime, client_factory=None, s
             continue
 
         ai, ai_status, model = None, "no_key", None
-        if key and not key.get("disabled_at"):
+        # 공고에서 뽑은 사실은 사용자와 무관하다: 다른 사용자나 이전 판정이 이미 Gemini로 뽑았으면 호출 없이 다시 쓴다.
+        text_hash = hashlib.md5(f"{req['title']}|{req.get('body') or ''}".encode()).hexdigest()
+        shared = store.cached_ai_facts(notice_id, text_hash, EXTRACTOR_VERSION) if hasattr(store, "cached_ai_facts") else None
+        if shared is not None:
+            ai, ai_status = shared, "used"
+            counts["grad_shared"] = counts.get("grad_shared", 0) + 1
+        elif key and not key.get("disabled_at"):
             used = key["used_today"] if key.get("used_on") == today else 0
             # 하루 한도의 절반까지만 졸업요건에 쓰고, 나머지는 인턴 공고 판정에 남겨 둔다.
             if used >= DAILY_CALLS // 2:
@@ -97,6 +104,8 @@ def run_graduation(store, master_key: str, now: datetime, client_factory=None, s
                     else:
                         ai_status, model = "used", key["model"]
                         counts["grad_ai"] += 1
+                        if hasattr(store, "save_ai_facts"):
+                            store.save_ai_facts(notice_id, text_hash, EXTRACTOR_VERSION, ai, key["model"])
 
         result = assess(profile_from_row(req), req["title"], req.get("body") or "", ai)
         store.save_assessment({

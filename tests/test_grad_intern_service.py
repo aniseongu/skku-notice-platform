@@ -163,3 +163,26 @@ def test_each_run_queues_new_requests_first_without_any_button():
     store, models = Store([], None), Models(AI)
     counts = run(store, models)
     assert store.enqueued == 10 and counts["grad_queued"] == 2
+
+
+def test_같은_공고의_사실은_공유_캐시로_다시_쓰고_Gemini를_부르지_않는다():
+    class SharedStore(Store):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.facts_saved = []
+            self.shared = None
+
+        def cached_ai_facts(self, notice_id, text_hash, version):
+            return self.shared
+
+        def save_ai_facts(self, notice_id, text_hash, version, reply, model):
+            self.facts_saved.append((notice_id, version, model))
+
+    req = {"user_id": "u1", "notice_id": "n1", "title": "[넷마블네오] AI 인턴십", "body": "5개월간 진행", "programs": [],
+           "admission_year": 2023, "university_3p_internship_selected": True, "input_hash": "h1"}
+    models = Models(text="{}")
+    store = SharedStore([req], key=None)
+    store.shared = {"organization_name": "넷마블네오", "organization_type": "incorporated_company", "evidence": []}
+    counts = svc.run_graduation(store, MASTER, NOW, client_factory=lambda key: type("C", (), {"models": models})(), sleep=lambda s: None)
+    assert models.calls == 0 and counts["grad_shared"] == 1 and store.saved[0]["ai_status"] == "used"
+    assert EXTRACTOR_VERSION  # 캐시 키에 추출기 버전이 들어간다

@@ -105,6 +105,27 @@ class JudgeStore(NoticeStore):
             "select": "input_hash,ruleset_version,extractor_version,ai_status"}).json()
         return rows[0] if rows else None
 
+    def cached_ai_facts(self, notice_id: str, text_hash: str, version: str) -> dict | None:
+        """같은 공고 글과 추출기 버전이면 이미 뽑은 사실을 다시 쓴다(사용자와 무관해서 공유한다)."""
+        try:
+            params = {"notice_id": f"eq.{notice_id}", "text_hash": f"eq.{text_hash}",
+                      "extractor_version": f"eq.{version}", "select": "reply", "limit": "1"}
+            rows = self._request("GET", "platform_notice_ai_facts", params=params).json()
+        except StoreError:
+            return None  # 표가 아직 없으면 캐시 없이 동작한다
+        reply = rows[0].get("reply") if rows else None
+        return reply if isinstance(reply, dict) else None
+
+    def save_ai_facts(self, notice_id: str, text_hash: str, version: str, reply: dict, model: str) -> None:
+        try:
+            conflict = {"on_conflict": "notice_id,text_hash,extractor_version"}
+            row = {"notice_id": notice_id, "text_hash": text_hash, "extractor_version": version,
+                   "reply": reply, "model": model}
+            self._request("POST", "platform_notice_ai_facts", params=conflict, json=[row],
+                          headers={"Prefer": "resolution=ignore-duplicates,return=minimal"})
+        except StoreError:
+            pass
+
     def save_assessment(self, row: dict) -> None:
         self._request(
             "POST", "user_notice_graduation_assessments", params={"on_conflict": "user_id,notice_id"},
