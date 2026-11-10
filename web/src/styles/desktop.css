@@ -63,13 +63,8 @@
     .group-head { min-height: 0; margin: 0; padding: 6px 24px; }
     .group-head h2 { font-size: 12px; line-height: 16px; }
     .rows { border-radius: 0; background: none; }
-    .row { padding: 12px 24px; }
-    .rows li .row { border-top: 1px solid var(--line); }
 
     @media (hover: hover) {
-      .row:hover:not([aria-current="true"]) {
-        background: color-mix(in oklch, var(--sunken) 70%, var(--surface));
-      }
       .batch-row:has(.row:hover:not([aria-current="true"])) .selection-check {
         background: color-mix(in oklch, var(--sunken) 70%, var(--surface));
       }
@@ -95,22 +90,5 @@
     .detail { padding: 24px 32px; }
     .detail-head .solid-button, .detail-head .ghost-button { min-height: 36px; padding: 0 14px; font-size: 14px; }
     .detail-head .save-button { width: 36px; height: 36px; border-radius: var(--r-md); }
-    /* 넓은 목록 행: [메타 열 120px] [제목과 판정] [D-day] */
-    .row {
-      grid-template-columns: 120px minmax(0, 1fr) 48px;
-      grid-template-areas: "meta title dday" "meta reason dday";
-      gap: 2px 24px; padding: 12px 24px;
-    }
-    .row:has(> .dday) .title { margin-top: 0; }
-    /* 판정 줄이 없는 행은 그 줄 자리(18px)를 남기지 않는다. 그래서 행 높이가 제목 줄 수만 따른다. */
-    .row:has(> .sub:empty) { grid-template-areas: "meta title dday"; }
-    .row .meta { min-width: 0; flex-direction: column; flex-wrap: nowrap; gap: 0; padding-top: 2px; }
-    .row .meta span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .row .meta .board { color: var(--text-2); font-weight: 600; }
-    .row.read .meta .board { color: var(--text-3); font-weight: 500; }
-    .row .title { font-size: 15px; line-height: 22px; }
-    .row .dday { align-self: start; padding-top: 2px; text-align: right; }
-    /* 판정은 한 줄(ux-rules 2절). 넘치면 줄여서 행 높이가 제목 줄 수만 따르게 한다. */
-    .row .sub { font-size: 13px; line-height: 19px; margin-top: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   }
 }

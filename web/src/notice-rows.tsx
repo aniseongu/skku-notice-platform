@@ -1,5 +1,6 @@
 import { createRoot, type Root } from 'react-dom/client';
-import { cleanTitle, deadlinePassed, deadlineText, daysLeft, safeUrl, VERDICT_LABEL, type Notice, type Verdict } from './data';
+import { cleanTitle, deadlinePassed, deadlineText, daysLeft, safeUrl, type Notice, type Verdict } from './data';
+import { Reason } from './reason';
 
 export interface NoticeRowModel {
   notice: Notice;
@@ -22,28 +23,37 @@ export interface NoticeRowsModel {
   toggleSelection: (id: string) => void;
 }
 
-function Reason({ row }: { row: NoticeRowModel }) {
-  if (row.interests.length) return <span className="reason"><b className="interest">관심 {row.interests.join(', ')}</b>{row.ai && row.ai.verdict !== 'not_relevant' ? row.ai.reason : ''}</span>;
-  if (row.ai) return <span className={`reason ${row.ai.verdict}`}><b>{VERDICT_LABEL[row.ai.verdict]}</b>{row.ai.reason}</span>;
-  return row.rule ? <span className="reason rule"><b>기준</b>{row.rule}</span> : null;
-}
+// 줄 배치: 휴대폰은 [메타 | D-day] > 제목 > 판정, 720px부터는 [메타 열 120px] [제목과 판정] [D-day 48px].
+export const ROW_LAYOUT = 'grid grid-cols-[minmax(0,1fr)_auto] [grid-template-areas:"meta_dday""title_title""reason_reason"] gap-x-[12px] gap-y-[2px] px-[16px] py-[14px] text-inherit no-underline min-[720px]:grid-cols-[120px_minmax(0,1fr)_48px] min-[720px]:gap-x-[24px] min-[720px]:px-[24px] min-[720px]:py-[12px]';
+const DESKTOP_AREAS = 'min-[720px]:[grid-template-areas:"meta_title_dday"_"meta_reason_dday"]';
+const DESKTOP_AREAS_NO_REASON = 'min-[720px]:[grid-template-areas:"meta_title_dday"]';
+
+const META = '[grid-area:meta] flex min-w-0 flex-wrap gap-[6px] text-[13px] leading-[18px] font-medium text-ink-3 min-[720px]:flex-col min-[720px]:flex-nowrap min-[720px]:gap-0 min-[720px]:pt-[2px]';
+const META_SPAN = 'min-w-0 max-w-full [overflow-wrap:anywhere] min-[720px]:overflow-hidden min-[720px]:text-ellipsis min-[720px]:whitespace-nowrap';
 
 function NoticeRows({ model }: { model: NoticeRowsModel }) {
-  return <ol className="rows">{model.rows.map((row) => {
+  return <ol className="rows">{model.rows.map((row, index) => {
     const n = row.notice;
     const title = cleanTitle(n.title_ko || n.title);
     const tags = [n.category, n.pinned ? '고정' : '', n.changed_at ? '수정됨' : '', !model.savedView && row.saved ? '저장함' : ''].filter(Boolean).join(', ');
     const passed = n.deadline ? deadlinePassed(n.deadline) : false;
     const urgent = !!n.deadline && !passed && daysLeft(n.deadline, model.today) <= 3;
+    const hasReason = row.interests.length > 0 || !!row.ai || !!row.rule;
+    const bg = row.current ? 'bg-sunken' : row.read ? 'bg-read' : 'bg-surface';
+    const hover = row.current ? '' : 'min-[720px]:hover:bg-hover';
+    const border = index > 0 ? 'border-t border-line' : 'min-[720px]:border-t min-[720px]:border-line';
+    const ddayColor = urgent ? 'text-danger' : row.read ? 'text-ink-2' : passed ? 'text-ink-3' : '';
+    const ddayWeight = row.read ? 'font-semibold' : passed ? 'font-medium' : 'font-bold';
     return <li key={n.id} className={model.selecting ? 'batch-row' : ''}>
       {model.selecting ? <label className="selection-check"><input type="checkbox" aria-label={`${title} 선택`} checked={row.selected}
         onChange={() => model.toggleSelection(n.id)} /></label> : null}
-      <a className={`row ${row.dim ? 'dim' : ''} ${row.read ? 'read' : 'unread'}`} href={safeUrl(n.url)} target="_blank" rel="noopener"
+      <a className={`row ${row.dim ? 'dim' : ''} ${row.read ? 'read' : 'unread'} ${ROW_LAYOUT} ${hasReason ? DESKTOP_AREAS : DESKTOP_AREAS_NO_REASON} ${border} ${bg} ${hover} active:bg-sunken focus-visible:outline-offset-[-2px]`} href={safeUrl(n.url)} target="_blank" rel="noopener"
         data-id={n.id} aria-current={row.current ? 'true' : 'false'} onClick={(event) => model.open(event.nativeEvent, n)}>
         <span className="visually-hidden">{row.read ? '읽은 공지' : '읽지 않은 공지'}</span>
-        <span className="meta"><span className="board">{row.source}</span>{tags ? <span className="cat" title={tags}>{tags}</span> : null}</span>
-        <span className="title">{title}</span><span className="sub"><Reason row={row} /></span>
-        {n.deadline ? <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''}`}>{deadlineText(n.deadline, model.today)}</span> : null}
+        <span className={`meta ${META}`}><span className={`board ${META_SPAN} ${row.read ? '' : 'min-[720px]:text-ink-2 min-[720px]:font-semibold'}`}>{row.source}</span>{tags ? <span className={`cat ${META_SPAN}`} title={tags}>{tags}</span> : null}</span>
+        <span className={`title [grid-area:title] line-clamp-2 text-[16px] leading-[23px] min-[720px]:text-[15px] min-[720px]:leading-[22px] ${row.read ? 'font-normal text-ink-2' : 'font-semibold'} ${n.deadline ? 'mt-[4px] min-[720px]:mt-0' : ''}`}>{title}</span>
+        <span className="sub [grid-area:reason] mt-[2px] text-[14px] leading-[20px] text-ink-2 empty:hidden min-[720px]:mt-0 min-[720px]:overflow-hidden min-[720px]:text-[13px] min-[720px]:leading-[19px] min-[720px]:text-ellipsis min-[720px]:whitespace-nowrap"><Reason interests={row.interests} ai={row.ai} rule={row.rule} read={row.read} /></span>
+        {n.deadline ? <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''} [grid-area:dday] self-center text-[14px] leading-[18px] tabular-nums min-[720px]:self-start min-[720px]:pt-[2px] min-[720px]:text-right ${ddayWeight} ${ddayColor}`}>{deadlineText(n.deadline, model.today)}</span> : null}
       </a>
     </li>;
   })}</ol>;

@@ -14,7 +14,7 @@ import { LoginScreen, LoginStatus } from './login-screen';
 import type { CanvasMode } from './devices';
 import { bodyInterests, withMyDeadline } from './notice-view';
 import './platform-settings';
-import './notice-rows';
+import { ROW_LAYOUT } from './notice-rows';
 import './notice-detail';
 
 const SHORTCUTS: { group: string; items: [string, string[]][] }[] = [
@@ -249,7 +249,7 @@ const Empty = ({ title, body, action, onAction }: { title: string; body: string;
 function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
   if (app.loading && !app.notices.length) {
     return <ol className="rows">{Array.from({ length: 6 }, (_, i) =>
-      <li className="row skeleton" aria-hidden="true" key={i}><span></span><span></span><span></span></li>)}</ol>;
+      <li className={`row skeleton ${ROW_LAYOUT} min-[720px]:[grid-template-areas:"meta_title_dday"_"meta_reason_dday"]`} aria-hidden="true" key={i}><span></span><span></span><span></span></li>)}</ol>;
   }
   if (app.failed && !app.notices.length) {
     return <Empty title="목록을 불러오지 못했어요" body="공지 데이터를 연결하는 중이에요. 잠시 뒤 다시 확인해 주세요" action="다시 불러오기" onAction={() => { void app.refresh(); }} />;

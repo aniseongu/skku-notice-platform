@@ -1,5 +1,6 @@
+import { Reason } from './reason';
 import { createRoot, type Root } from 'react-dom/client';
-import { cleanTitle, deadlineDetail, deadlinePassed, deadlineText, daysLeft, koreanDate, safeUrl, VERDICT_LABEL, type Notice, type NoticeBody, type Verdict } from './data';
+import { cleanTitle, deadlineDetail, deadlinePassed, deadlineText, daysLeft, koreanDate, safeUrl, type Notice, type NoticeBody, type Verdict } from './data';
 import { useState } from 'react';
 import { GraduationSection, type GraduationModel } from './graduation-assessment-view';
 import { cleanHtml, fileType, IMAGE_MISSING, replaceBrokenImage } from './rich';
@@ -68,15 +69,13 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
   const title = cleanTitle(notice.title_ko || notice.title);
   const passed = notice.deadline ? deadlinePassed(notice.deadline) : false;
   const urgent = !!notice.deadline && !passed && daysLeft(notice.deadline, model.today) <= 3;
-  const reason = interests.length ? <span className="reason"><b className="interest">관심 {interests.join(', ')}</b>{ai && ai.verdict !== 'not_relevant' ? ai.reason : ''}</span>
-    : ai ? <span className={`reason ${ai.verdict}`}><b>{VERDICT_LABEL[ai.verdict]}</b>{ai.reason}</span>
-      : model.rule ? <span className="reason rule"><b>기준</b>{model.rule}</span> : null;
+  const hasReason = interests.length > 0 || !!ai || !!model.rule;
   return <div className="detail">
-    <p className="meta"><span>{model.source}</span>{notice.category ? <span>{notice.category}</span> : null}</p>
+    <p className="meta flex min-w-0 flex-wrap gap-[6px] mb-[6px] text-[13px] leading-[18px] font-medium text-ink-3"><span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{model.source}</span>{notice.category ? <span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{notice.category}</span> : null}</p>
     <h2 className="detail-title" title={title}>{title}</h2>
     {notice.title_ko ? <p className="detail-original" lang="en">{cleanTitle(notice.title)}</p> : null}
-    {reason ? <p className="detail-reason">{reason}</p> : null}
-    {notice.deadline ? <p className="detail-deadline">{notice.deadline_kind ?? '마감'} {deadlineDetail(notice.deadline)} <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''}`}>{deadlineText(notice.deadline, model.today)}</span></p> : null}
+    {hasReason ? <p className="detail-reason"><Reason interests={interests} ai={ai} rule={model.rule} /></p> : null}
+    {notice.deadline ? <p className="detail-deadline">{notice.deadline_kind ?? '마감'} {deadlineDetail(notice.deadline)} <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''} ml-[6px] text-[14px] leading-[18px] tabular-nums ${passed ? 'font-medium' : 'font-bold'} ${urgent ? 'text-danger' : passed ? 'text-ink-3' : ''}`}>{deadlineText(notice.deadline, model.today)}</span></p> : null}
     {notice.changed_at ? <p className="detail-change">{koreanDate(notice.changed_at.slice(0, 10))}에 원문 {notice.change_kind === '제목' ? '제목이' : '본문이'} 바뀌었어요</p> : null}
     {summary ? <section className="detail-section summary" aria-labelledby="sec-summary"><h3 id="sec-summary">요약</h3>{summary.split('\n').filter(Boolean).map((line, index) => <p key={index}>{line}</p>)}</section>
       : model.summarizing ? <section className="detail-section" aria-labelledby="sec-summary"><h3 id="sec-summary">요약</h3><p className="detail-note first" role="status">요약을 만들고 있어요</p></section>
@@ -92,7 +91,7 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
     {loaded?.attachments?.length ? <section className="detail-section" aria-labelledby="sec-files"><h3 id="sec-files">첨부 {loaded.attachments.length}개</h3><ul className="attachments">{loaded.attachments.map((file, index) => <li key={index}><a className="file" href={safeUrl(file.url)} target="_blank" rel="noopener"><span className="file-type">{fileType(file.name, file.type)}</span><span className="file-name">{file.name}</span>{file.size ? <span className="file-size">{file.size}</span> : null}</a></li>)}</ul><p className="detail-note first">누르면 학교 공지 사이트의 원본 파일을 받아요</p></section> : null}
     <dl className="facts" aria-label="글 정보"><div><dt>게시일</dt><dd>{koreanDate(notice.posted_on)}</dd></div>
       {notice.previous_title ? <div><dt>이전 제목</dt><dd>{cleanTitle(notice.previous_title)}</dd></div> : null}
-      {interests.length ? <div><dt>관심</dt><dd><b className="interest">{interests.join(', ')}</b></dd></div> : null}
+      {interests.length ? <div><dt>관심</dt><dd><b className="interest font-semibold text-accent">{interests.join(', ')}</b></dd></div> : null}
       {model.notified ? <div><dt>알림</dt><dd>알림을 보냈어요</dd></div> : null}</dl>
   </div>;
 }

@@ -93,8 +93,6 @@
   .group-head h2 { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
   .empty-head { justify-content: flex-end; }
   .rows { background: var(--surface); overflow: hidden; }
-  .row { padding: 14px var(--gutter); }
-  .rows li + li .row { border-top: 1px solid var(--line); }
   .batch-row { display: flex; align-items: stretch; background: var(--surface); }
   .batch-row .row { flex: 1; min-width: 0; }
   .batch-row:has(.row.read) .selection-check { background: light-dark(color-mix(in oklch, var(--surface) 25%, var(--sunken)),
