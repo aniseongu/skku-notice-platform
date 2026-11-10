@@ -28,7 +28,7 @@ export interface NoticeRowsModel {
 // 줄 배치: 휴대폰은 [메타 | D-day] > 제목 > 판정, 720px부터는 [메타 열 120px] [제목과 판정] [D-day 48px].
 export const ROW_LAYOUT = 'grid grid-cols-[minmax(0,1fr)_auto] [grid-template-areas:"meta_dday""title_title""reason_reason"] gap-x-[12px] gap-y-[2px] px-[16px] py-[14px] text-inherit no-underline min-[720px]:grid-cols-[120px_minmax(0,1fr)_48px] min-[720px]:gap-x-[24px] min-[720px]:px-[24px] min-[720px]:py-[12px]';
 // 선택 모드: 체크박스 자리를 줄 왼쪽에 36px 만들고 열 사이 간격을 줄여, 분류·제목 열이 평소와 같은 자리에 있게 한다.
-const ROW_LAYOUT_SELECTING = ROW_LAYOUT.replace('min-[720px]:gap-x-[24px]', 'min-[720px]:gap-x-[12px]').replace('min-[720px]:px-[24px]', 'min-[720px]:pl-[36px] min-[720px]:pr-[24px]');
+const ROW_LAYOUT_SELECTING = ROW_LAYOUT.replace('min-[720px]:grid-cols-[120px_minmax(0,1fr)_48px]', 'min-[720px]:grid-cols-[108px_minmax(0,1fr)_48px]').replace('min-[720px]:px-[24px]', 'min-[720px]:pl-[36px] min-[720px]:pr-[24px]');
 const DESKTOP_AREAS = 'min-[720px]:[grid-template-areas:"meta_title_dday"_"meta_reason_dday"]';
 const DESKTOP_AREAS_NO_REASON = 'min-[720px]:[grid-template-areas:"meta_title_dday"]';
 
@@ -43,7 +43,7 @@ function NoticeRows({ model }: { model: NoticeRowsModel }) {
     const passed = n.deadline ? deadlinePassed(n.deadline) : false;
     const urgent = !!n.deadline && !passed && daysLeft(n.deadline, model.today) <= 3;
     const hasReason = row.interests.length > 0 || !!row.ai || !!row.rule || !!row.grad;
-    const bg = model.selecting && row.selected ? 'bg-[color-mix(in_oklch,var(--accent)_8%,var(--surface))] shadow-[inset_3px_0_0_var(--accent)]' : row.current ? 'bg-sunken' : row.read ? 'bg-read' : 'bg-surface';
+    const bg = model.selecting && row.selected ? 'bg-[color-mix(in_oklch,var(--accent)_12%,var(--surface))] shadow-[inset_3px_0_0_var(--accent)]' : row.current && !model.selecting ? 'bg-sunken' : row.read ? 'bg-read' : 'bg-surface';
     const hover = row.current ? '' : 'min-[720px]:hover:bg-hover';
     const border = index > 0 ? 'border-t border-line' : 'min-[720px]:border-t min-[720px]:border-line';
     const ddayColor = urgent ? 'text-danger' : row.read ? 'text-ink-2' : passed ? 'text-ink-3' : '';

@@ -334,16 +334,16 @@ function ViewFilters({ app }: { app: AppController }) {
     const selectedUnread = selectedVisible.filter((notice) => !app.isRead(notice)).length;
     const selectedRead = selectedVisible.length - selectedUnread;
     const count = selectedVisible.length;
-    return <div className="view-options select-options flex-wrap gap-y-[8px] bg-[color-mix(in_oklch,var(--accent)_8%,var(--surface))] py-[4px] min-[720px]:min-h-[48px] min-[720px]:pt-[4px] min-[720px]:pb-0" role="group" aria-label="공지 선택">
+    return <div className="view-options select-options flex-wrap gap-y-[8px] bg-[color-mix(in_oklch,var(--accent)_8%,var(--surface))] min-h-[48px] py-[4px] min-[720px]:pt-[4px] min-[720px]:pb-0" role="group" aria-label="공지 선택">
       <label className={`select-all order-1 ${count ? 'font-semibold text-ink' : ''}`}><input type="checkbox" ref={allBox} checked={everyone} disabled={!list.length}
         onChange={(event) => { app.selectedReads = event.currentTarget.checked ? list.map((notice) => notice.id) : []; }} />
         <span aria-live="polite">{count ? <><b className="font-semibold text-accent">{count}개</b> 선택됨</> : '전체 선택'}</span></label>
-      <button type="button" className={`${SELECT_BTN} order-2 ml-auto border-0 bg-transparent font-medium text-ink-2 hover:bg-hover min-[720px]:order-3 min-[720px]:ml-0`} onClick={() => app.closeSelection()}>선택 끝내기</button>
+      <button type="button" className={`${SELECT_BTN} order-2 ml-auto border-0 bg-transparent font-medium text-ink-2 hover:bg-hover min-[720px]:order-3 min-[720px]:ml-[12px]`} onClick={() => app.closeSelection()}>선택 끝내기</button>
       <div className="order-3 flex gap-[8px] max-[719px]:fixed max-[719px]:inset-x-0 max-[719px]:bottom-0 max-[719px]:pb-[calc(8px+env(safe-area-inset-bottom))] max-[719px]:z-[3] max-[719px]:border-t max-[719px]:border-line max-[719px]:bg-surface max-[719px]:px-[var(--gutter)] max-[719px]:pt-[8px] min-[720px]:order-2 min-[720px]:ml-auto">
-        <button type="button" className={`${SELECT_BTN} border-0 bg-accent font-semibold text-on-accent disabled:bg-sunken disabled:text-ink-3 max-[719px]:flex-1`} disabled={!selectedUnread}
+        <button type="button" className={`${SELECT_BTN} border border-transparent bg-accent font-semibold text-on-accent disabled:border-line disabled:bg-sunken disabled:text-ink-3 max-[719px]:flex-1`} disabled={!selectedUnread}
           aria-label={`선택한 읽지 않은 공지 ${selectedUnread}개 읽음으로 표시`}
           onClick={() => app.markSelectedRead(true)}>읽음으로 표시</button>
-        <button type="button" className={`${SELECT_BTN} border-0 bg-accent font-semibold text-on-accent disabled:bg-sunken disabled:text-ink-3 max-[719px]:flex-1`} disabled={!selectedRead}
+        <button type="button" className={`${SELECT_BTN} border border-transparent bg-accent font-semibold text-on-accent disabled:border-line disabled:bg-sunken disabled:text-ink-3 max-[719px]:flex-1`} disabled={!selectedRead}
           aria-label={`선택한 읽은 공지 ${selectedRead}개 읽지 않음으로 표시`}
           onClick={() => app.markSelectedRead(false)}>안 읽음으로 표시</button>
       </div>
