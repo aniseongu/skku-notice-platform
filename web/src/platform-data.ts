@@ -9,11 +9,12 @@ export async function loadPublicFeed(client: SupabaseClient): Promise<NoticesFil
     if (!withFlag.error) return withFlag;
     return client.from('platform_sources').select('id,name,url,last_success_at').order('id');
   };
+  // 같은 날짜 안의 순서를 원본(alert)처럼 (게시일, 처음 본 시각, 번호) 내림차순으로 고정한다. 정렬은 게시일만 보므로 이 입력 순서가 그대로 남는다.
   const [sourceResult, noticeResult] = await Promise.all([
     readSources(),
     client.from('platform_notices')
       .select('id,source_id,article_no,title,category,url,posted_on,pinned,deadline,first_seen,changed_at,change_kind,previous_title')
-      .order('posted_on', { ascending: false }).limit(1000),
+      .order('posted_on', { ascending: false }).order('first_seen', { ascending: false }).order('id', { ascending: false }).limit(1000),
   ]);
   if (sourceResult.error || noticeResult.error || !sourceResult.data?.length || !noticeResult.data?.length) return null;
   const sourceRows = sourceResult.data as { id: string; name: string; url: string; last_success_at: string | null; external?: boolean }[];
