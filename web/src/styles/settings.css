@@ -82,7 +82,10 @@
     .settings-head-row { padding-right: 0; }
     /* 이름과 설명은 왼쪽, 조작은 오른쪽 끝에 맞춘다. 단추가 칸 가운데에 어정쩡하게 뜨지 않게 오른쪽 열은 내용 폭(최대 520px)이다. */
     .setting { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px); gap: 24px; align-items: start; }
-    .setting-control > .ghost-button, .setting-control > .solid-button { align-self: flex-end; }
+    .setting-control > .ghost-button, .setting-control > .solid-button, .setting-control > .segmented, .setting-control > .time-control { align-self: flex-end; }
+    .setting-control > .inline { justify-content: flex-end; }
+    .setting-control > .field-note, .setting-control > .setting-state { text-align: right; }
+    .box > .settings-lead { padding-top: 12px; margin: 0 0 4px; }
     .setting:has(> .setting-control > .connection-summary) > .setting-text { padding-top: 11px; }
   }
   /* 분류 칩: 켠 것은 옅은 면과 굵은 글자(검은 채움은 하나만 고르는 칩에만), 끈 것은 가로줄로도 알린다.
