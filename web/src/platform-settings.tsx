@@ -248,8 +248,8 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   const ordered = [...groups].sort(([a], [b]) => Number([...otherGroup.values()].includes(a)) - Number([...otherGroup.values()].includes(b)));
   const busy = model.loading;
   return <>
-    {others.length === 0 && !query ? <p className="field-note">모든 게시판을 받고 있어요</p> : <details className="connection-manual board-more-list" open={mine.length === 0}>
-      <summary>게시판 더 보기 ({others.length}개)</summary>
+    {others.length === 0 && !query ? <p className="field-note">모든 게시판을 받고 있어요</p> : <details className="connection-manual group board-more-list" open={mine.length === 0}>
+      <summary className={SUMMARY}>게시판 더 보기 ({others.length}개){chevron('M6 9l6 6 6-6', CHEVRON)}</summary>
       <input className="input" type="search" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off" value={query}
         onChange={(event) => setQuery(event.currentTarget.value)} />
       {ordered.map(([group, items]) => <div className="board-group" key={group} role="group" aria-label={group}>
@@ -414,8 +414,11 @@ function BoardsSection({ model }: { model: SettingsModel }) {
   </Section>;
 }
 
-function chevron(d: string) {
-  return <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20"><path d={d} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+// 펼치는 줄(details)은 브라우저 기본 삼각형 대신 다른 곳과 같은 쉐브론을 쓴다. 열리면 위를 향한다.
+const SUMMARY = 'flex cursor-pointer list-none items-center justify-between [&::-webkit-details-marker]:hidden';
+const CHEVRON = 'text-ink-3 transition-transform group-open:rotate-180';
+function chevron(d: string, className?: string) {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" className={className}><path d={d} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
 function BoardOrderList({ order, editing, onToggle, busy = false }: { order: SettingsModel['boardOrder']; editing: boolean; onToggle?: (id: string) => void; busy?: boolean }) {
@@ -656,7 +659,7 @@ function Profile({ model }: { model: SettingsModel }) {
 
 // bare: 이미 위에 구분선이 있는 묶음 안에서는 자기 윗선과 여백을 없애 선이 두 줄로 겹치지 않게 한다.
 function Guide({ label, steps, bare = false }: { label: string; steps: ReactNode[]; bare?: boolean }) {
-  return <details className={`connection-manual ${bare ? 'mt-0 border-t-0' : ''}`}><summary>{label}</summary><ol className="steps">{steps.map((step, index) => <li key={index}>{step}</li>)}</ol></details>;
+  return <details className={`connection-manual group ${bare ? 'mt-0 border-t-0' : ''}`}><summary className={SUMMARY}>{label}{chevron('M6 9l6 6 6-6', CHEVRON)}</summary><ol className="steps">{steps.map((step, index) => <li key={index}>{step}</li>)}</ol></details>;
 }
 
 const ext = (href: string, text: string) => <a href={href} target="_blank" rel="noopener noreferrer">{text}</a>;
