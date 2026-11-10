@@ -349,16 +349,18 @@ function ViewFilters({ app }: { app: AppController }) {
     }}><Icon name="select-list" />선택</button>;
   if (app.view === 'saved') return <div className="view-options saved-options"><div className="view-actions">{select}<SortSelect app={app} /></div></div>;
   return <div className="view-options" role="group" aria-label="공지 보기 조건">
-    <button type="button" className="view-toggle" aria-pressed={app.unreadOnly} onClick={() => {
-      app.unreadOnly = !app.unreadOnly;
-      app.selectedId = null;
-      remember('view-unread', app.unreadOnly ? '1' : '0');
-    }}><span className="filter-check" aria-hidden="true"></span>읽지 않은 공지만</button>
-    {app.gradEnabled() ? <button type="button" className="view-toggle" aria-pressed={app.graduationOnly} onClick={() => {
-      app.graduationOnly = !app.graduationOnly;
-      app.selectedId = null;
-      remember('view-grad', app.graduationOnly ? '1' : '0');
-    }}><span className="filter-check" aria-hidden="true"></span>졸업요건 충족만</button> : null}
+    <div className="view-filters">
+      <button type="button" className="view-toggle" aria-pressed={app.unreadOnly} onClick={() => {
+        app.unreadOnly = !app.unreadOnly;
+        app.selectedId = null;
+        remember('view-unread', app.unreadOnly ? '1' : '0');
+      }}><span className="filter-check" aria-hidden="true"></span>읽지 않은 공지만</button>
+      {app.gradEnabled() ? <button type="button" className="view-toggle" aria-pressed={app.graduationOnly} onClick={() => {
+        app.graduationOnly = !app.graduationOnly;
+        app.selectedId = null;
+        remember('view-grad', app.graduationOnly ? '1' : '0');
+      }}><span className="filter-check" aria-hidden="true"></span>졸업요건 충족만</button> : null}
+    </div>
     <div className="view-actions">{select}<SortSelect app={app} /></div>
   </div>;
 }
