@@ -112,7 +112,7 @@ class JudgeStore(NoticeStore):
         self._request("PATCH", "user_byok_keys", params={"user_id": f"eq.{user_id}"}, json=fields)
 
 
-# 사용자가 고른 모델이 과부하(500·503·504)일 때만 차례로 시도하는 대체 모델. 키가 허용하지 않으면 원래 오류를 그대로 낸다.
+# 고른 모델이 과부하(500·503·504)일 때만 차례로 시도하는 대체 모델. 키 거부는 대체하지 않는다.
 FALLBACK_MODELS = ("gemini-3.5-flash-lite", "gemini-2.5-flash-lite")
 OVERLOADED = {500, 503, 504}
 
