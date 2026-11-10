@@ -340,7 +340,7 @@ function ViewFilters({ app }: { app: AppController }) {
         <span aria-live="polite">{count ? <><b className="font-semibold text-accent">{count}개</b> 선택됨</> : '전체 선택'}</span>
         {count ? null : <span className="ml-[8px] text-[13px] font-normal text-ink-2">공지를 골라 주세요</span>}</label>
       <button type="button" className={`${SELECT_BTN} order-2 ml-auto border-0 bg-transparent px-[12px] font-medium text-ink-2 hover:bg-hover min-[720px]:order-3 min-[720px]:ml-[12px]`} onClick={() => app.closeSelection()}>선택 끝내기</button>
-      <div className="order-3 flex gap-[8px] min-[720px]:gap-[12px] max-[719px]:fixed max-[719px]:inset-x-0 max-[719px]:bottom-0 max-[719px]:pb-[calc(8px+env(safe-area-inset-bottom))] max-[719px]:z-[3] max-[719px]:border-t max-[719px]:border-line max-[719px]:bg-surface max-[719px]:px-[var(--gutter)] max-[719px]:pt-[8px] min-[720px]:order-2 min-[720px]:ml-auto">
+      <div className={`order-3 flex gap-[8px] min-[720px]:gap-[12px] ${count ? '' : 'max-[719px]:hidden'} max-[719px]:fixed max-[719px]:inset-x-0 max-[719px]:bottom-0 max-[719px]:pb-[calc(8px+env(safe-area-inset-bottom))] max-[719px]:z-[3] max-[719px]:border-t max-[719px]:border-line max-[719px]:bg-surface max-[719px]:px-[var(--gutter)] max-[719px]:pt-[8px] min-[720px]:order-2 min-[720px]:ml-auto`}>
         {count === 0 || selectedUnread > 0 ? <button type="button" className={`${SELECT_BTN} border border-transparent bg-accent font-semibold text-on-accent disabled:border-line disabled:bg-sunken disabled:text-ink-2 disabled:opacity-70 max-[719px]:flex-1`} disabled={!selectedUnread}
           aria-label={`선택한 읽지 않은 공지 ${selectedUnread}개 읽음으로 표시`}
           onClick={() => app.markSelectedRead(true)}>읽음으로 표시</button> : null}

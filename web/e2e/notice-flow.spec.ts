@@ -1127,3 +1127,68 @@ test('software original major is asked for the admission year and the internship
   await expect(section.getByRole('button')).toHaveCount(0);  // 판정은 서버가 미리 해 두므로 누를 것이 없다
   await expect(section).not.toContainText(/인정 완료|합격|승인됨/);
 });
+
+test('selection mode click order: enter → tick → count → action → toast → leave, by mouse and by keyboard', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  const rows = page.locator('notice-rows-screen a.row');
+  await rows.first().waitFor();
+  const bar = page.locator('.select-options');
+  const trigger = page.locator('.select-trigger');
+  const rowBoxes = page.locator('.batch-row input[type=checkbox]');
+  const tabbar = page.locator('nav.tabbar');
+  const narrow = (page.viewportSize()?.width ?? 1000) < 720;
+
+  // 1. 평소에는 선택 막대도 체크 칸도 없다.
+  await expect(bar).toHaveCount(0);
+  await expect(rowBoxes).toHaveCount(0);
+
+  // 2. 마우스: 선택을 누르면 막대와 체크 칸이 생기고, 아무것도 안 골랐을 때 안내와 비활성 단추가 보인다.
+  await trigger.click();
+  await expect(bar).toBeVisible();
+  await expect(bar.getByText('전체 선택')).toBeVisible();
+  await expect(bar.getByText('공지를 골라 주세요')).toBeVisible();
+  // 아무것도 안 골랐을 때: 데스크톱은 비활성 단추 둘, 휴대폰은 아래 단추 막대를 숨긴다.
+  if (narrow) await expect(bar.getByRole('button', { name: /공지 0개 읽음으로 표시$/ })).toBeHidden();
+  else {
+    await expect(bar.getByRole('button', { name: /공지 0개 읽음으로 표시$/ })).toBeDisabled();
+    await expect(bar.getByRole('button', { name: /공지 0개 읽지 않음으로 표시$/ })).toBeDisabled();
+  }
+  if (narrow) await expect(tabbar).toBeHidden();                       // 휴대폰은 선택 중 아래 탭 바 대신 단추 막대
+
+  // 3. 두 줄을 고르면 개수와 일부 선택 표시가 바뀐다. 하나를 풀면 1개.
+  await rowBoxes.nth(0).check();
+  await rowBoxes.nth(2).check();
+  await expect(bar.getByText('2개')).toBeVisible();
+  await expect(bar.getByText('선택됨')).toBeVisible();
+  expect(await bar.locator('.select-all input').evaluate((el: HTMLInputElement) => el.indeterminate)).toBe(true);
+  await rowBoxes.nth(2).uncheck();
+  await expect(bar.getByText('1개')).toBeVisible();
+
+  // 4. 전체 선택은 보이는 줄을 모두 고르고, 한 번 더 누르면 모두 푼다.
+  const total = await rowBoxes.count();
+  await bar.locator('.select-all input').check();
+  await expect(bar.getByText(`${total}개`)).toBeVisible();
+  await bar.locator('.select-all input').uncheck();
+  await expect(bar.getByText('공지를 골라 주세요')).toBeVisible();
+
+  // 5. 선택 끝내기: 막대가 사라지고 포커스가 선택 단추로 돌아온다. 휴대폰은 탭 바도 돌아온다.
+  await bar.getByRole('button', { name: '선택 끝내기' }).click();
+  await expect(bar).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  if (narrow) await expect(tabbar).toBeVisible();
+
+  // 6. 키보드: 선택 단추에서 Enter, 체크 칸에서 Space, 단추에서 Enter. 적용되면 토스트가 뜨고 모드가 끝난다.
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  await expect(bar).toBeVisible();
+  await rowBoxes.nth(0).focus();
+  await page.keyboard.press('Space');
+  await expect(bar.getByText('1개')).toBeVisible();
+  const action = bar.getByRole('button', { name: /(읽음|읽지 않음)으로 표시$/ }).first();
+  await expect(action).toBeEnabled();
+  await action.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText(/1개를 (읽음|읽지 않음)으로 표시했어요/)).toBeVisible();
+  await expect(bar).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
