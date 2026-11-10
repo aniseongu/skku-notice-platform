@@ -117,8 +117,9 @@ test('settings hub opens each page in the app, back works and the theme can be c
   await screen.getByRole('radio', { name: '자동' }).click();
   await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.+/);
   await screen.getByRole('link', { name: /알림/ }).first().click();
-  await expect(screen.getByRole('link', { name: '설정으로' })).toBeVisible();
-  await screen.getByRole('link', { name: '설정으로' }).click();
+  // 뒤로 가기는 머리 줄의 단추 하나뿐이다(본문에 같은 일을 하는 밑줄 링크를 따로 두지 않는다).
+  await expect(screen.getByRole('link', { name: '설정으로' })).toHaveCount(0);
+  await page.getByRole('button', { name: '설정으로 돌아가기' }).first().click();
   await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
 });
 
@@ -287,7 +288,7 @@ test('settings items live in the right place: list scope under display, profile 
   await screen.getByRole('link', { name: /알림/ }).first().click();
   await expect(screen.getByRole('radiogroup', { name: '목록 보기' })).toHaveCount(0);
   // 학년·학기·재학 상태·병역은 프로필 설정 한 곳에 있다.
-  await screen.getByRole('link', { name: '설정으로' }).click();
+  await page.getByRole('button', { name: '설정으로 돌아가기' }).first().click();
   await screen.getByRole('link', { name: /프로필 설정/ }).click();
   for (const name of ['학년', '학기', '재학 상태', '병역']) await expect(screen.getByRole('radiogroup', { name })).toBeVisible();
   // 사이드바의 "키워드 추가하기"는 설정 첫 쪽이 아니라 키워드 쪽으로 바로 간다.
@@ -504,7 +505,7 @@ test('settings X goes up one level and leaves settings only from the first page,
   // 하위 쪽을 여러 번 거쳐도 X는 한 번에 한 단계씩이다(알림 → 설정으로 → 키워드 → X → X).
   await openSettings();
   await screen.getByRole('link', { name: /알림/ }).first().click();
-  await screen.getByRole('link', { name: '설정으로' }).click();
+  await up().click();
   await screen.getByRole('link', { name: /관심 키워드/ }).click();
   await up().click();
   await hub();
@@ -689,7 +690,7 @@ test('the side menu has no profile entry; the profile lives inside settings, and
     await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
     // 여러 쪽을 거쳐도 한 번에 첫 쪽으로 온다.
     await screen.getByRole('link', { name: /알림/ }).first().click();
-    await screen.getByRole('link', { name: '설정으로' }).click();
+    await page.getByRole('button', { name: '설정으로 돌아가기' }).first().click();
     await screen.getByRole('link', { name: /프로필 설정/ }).first().click();
     await menu().click();
     await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();

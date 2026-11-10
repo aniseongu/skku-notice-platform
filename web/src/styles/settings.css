@@ -1,6 +1,6 @@
 @layer settings {
   .settings { padding: 0 var(--gutter) calc(var(--tabbar-h) + 32px); }
-  .settings-head { margin: 28px 0 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
+  .settings-head { margin: 28px 0 8px; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--text-2); }
   /* 묶음 제목과 같은 줄의 글자 단추. 오른쪽 끝은 상자 안쪽 선에 맞춘다. */
   .settings-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 28px 0 8px; padding-right: var(--gutter); }
   .settings-head-row .settings-head { margin: 0; }

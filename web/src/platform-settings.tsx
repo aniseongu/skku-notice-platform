@@ -145,8 +145,9 @@ function SettingsLink({ model, label, help, section }: { model: SettingsModel; l
   </a>;
 }
 
-function Back({ model }: { model: SettingsModel }) {
-  return <a className="settings-back" href="?view=settings" onClick={(event) => { event.preventDefault(); model.openSection(null); }}>설정으로</a>;
+// 뒤로 가기는 머리 줄의 단추(휴대폰은 화살표, 넓은 화면은 X)가 맡는다. 본문에 같은 일을 하는 링크를 또 두지 않는다.
+function Back(_props: { model: SettingsModel }) {
+  return null;
 }
 
 function LoginNote({ model, what }: { model: SettingsModel; what: string }) {
