@@ -15,7 +15,7 @@ SOURCES = {
     "DEPT-DOCS": {"file": DEPT_TERMS_PDF, "page": 5, "article": "제29조"},
     "DEPT-EVALUATION": {"file": DEPT_TERMS_PDF, "page": 6, "article": "제30조"},
     "DEPT-DEADLINE": {"file": DEPT_TERMS_PDF, "page": 6, "article": "제31조"},
-    "3P": {"url": "https://www.skku.edu/skku/campus/skk_comm/notice02.do?articleNo=141724&mode=view"},
+    "3P": {"url": "https://www.skku.edu/skku/campus/skk_comm/notice01.do?mode=view&articleNo=141724"},
 }
 
 DEPT_FIELDS_URL = "https://skb.skku.edu/cse/resources.do?articleNo=160073&mode=view"
