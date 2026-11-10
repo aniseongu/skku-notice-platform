@@ -3,7 +3,7 @@
 
 규칙으로 읽을 수 있는 것(전일제·파트타임, 근무 기간, 총 시간)은 정규식으로 먼저 뽑고, 키가 있으면 Gemini가 나머지
 (기관 종류, 담당 업무 분야, 학점)를 채운다. 모든 핵심 값은 공고 원문에 실제로 있는 근거 문장이 있어야 하며, 없으면
-모르는 값(unknown/None)으로 되돌린다. 모델이 법인이라고 단언해도 공고에 법인 표기가 없으면 확인된 것으로 치지 않는다.
+모르는 값(unknown/None)으로 되돌린다. 기업·연구소 공고는 법인으로 본다(소유자 지시 2026-11-10: 공고에 올라오는 인턴 기관은 모두 법인). 기관 종류 자체는 근거 문장이 있어야 한다.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from datetime import date
 from google.genai import types
 
 from skku_notice.gemini_client import gemini_client
-from skku_notice.grad_intern_rules import COMPANY_TYPES, ORG_TYPES, TASK_CATEGORIES, WORK_MODES, InternFacts
+from skku_notice.grad_intern_rules import ORG_TYPES, TASK_CATEGORIES, WORK_MODES, InternFacts
 
 MAX_TEXT = 6000
 LEGAL_FORM = re.compile(r"\(주\)|㈜|주식회사|유한회사|유한책임회사|합자회사|재단법인|사단법인|\bInc\.?|\bCorp\.?|\bCo\.,?\s*Ltd\.?", re.I)
@@ -213,11 +213,10 @@ def build_facts(title: str, body: str, ai: dict | None) -> Extracted:
         if isinstance(raw_tasks, list):
             tasks = [t.strip()[:120] for t in raw_tasks if isinstance(t, str) and quote_in_text(t, text)][:5]
 
-    # 법인 여부는 모델의 단언이 아니라 공고의 법인 표기로만 확인한다(등기 확인은 아니다).
-    label = org_name or ""
-    legal = bool(LEGAL_FORM.search(label)) or bool(LEGAL_FORM.search(title))
+    # 법인 여부: 이 서비스에 올라오는 기업·연구소 공고는 모두 법인으로 본다(소유자 지시). 모델의 단언은 쓰지 않고
+    # 근거 문장이 있는 기관 종류에서만 파생한다. 대학 내 연구소와 개인 활동은 기관 종류 단계에서 걸러진다.
     if values.get("organization_type") in ("incorporated_company", "incorporated_institute"):
-        values["corporate_status_verified"] = legal
+        values["corporate_status_verified"] = True
     elif values.get("organization_type") == "public_agency":
         values["corporate_status_verified"] = False
 
@@ -234,7 +233,4 @@ def build_facts(title: str, body: str, ai: dict | None) -> Extracted:
                         ("근무 기간", facts.start_date is None), ("담당 업무", facts.task_category == "unknown")):
         if empty:
             missing.append(name)
-    if facts.organization_type in COMPANY_TYPES and not facts.corporate_status_verified \
-            and facts.organization_type != "public_agency":
-        missing.append("법인 여부")
     return Extracted(facts, org_name, tasks, evidence, missing, ai_used=ai is not None)

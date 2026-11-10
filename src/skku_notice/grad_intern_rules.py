@@ -176,7 +176,7 @@ def _corporate_check(facts: InternFacts) -> Check:
     if facts.organization_type == "public_agency":
         return Check("DEPT-CORPORATE", PASS, "공공기관으로 표시돼 있어요")
     if facts.corporate_status_verified:
-        return Check("DEPT-CORPORATE", PASS, "공고에 법인 표기가 있어요(등기 확인은 아니에요)")
+        return Check("DEPT-CORPORATE", PASS, "기업·연구소 공고라 법인으로 봤어요")
     return Check("DEPT-CORPORATE", UNKNOWN, "법인으로 설립된 기관인지 공고에서 확인하지 못했어요")
 
 
