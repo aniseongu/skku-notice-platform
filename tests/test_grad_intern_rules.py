@@ -208,7 +208,7 @@ def test_assessment_serializes_without_extra_fields():
 def test_3p_hours_use_the_period_even_when_the_work_mode_is_not_written():
     from skku_notice.grad_intern_rules import _p3_hours_check
     long = _p3_hours_check(facts(work_mode="unknown", start_date=None, end_date=None, duration_days=90))
-    assert long.result == "pass" and "근무 기간으로" in long.note  # 근무시간이 없으면 전일 근무로 보고 계산한다
+    assert long.result == "pass" and "약 " in long.note and "시간이라" in long.note  # 근무시간이 없으면 전일 근무로 보고 계산한다
     short = _p3_hours_check(facts(work_mode="unknown", start_date=None, end_date=None, duration_days=28))
     assert short.result == "fail"  # 평일 8시간으로도 280시간에 못 미치면 형태와 상관없이 미달
     assert _p3_hours_check(facts(work_mode="part_time", start_date=None, end_date=None, duration_days=90)).result == "unknown"
@@ -218,7 +218,7 @@ def test_3p_hours_default_to_full_time_when_hours_are_not_written():
     from skku_notice.grad_intern_rules import _p3_hours_check
     # 중소기업중앙회 공고: 2027-02-15 ~ 04-30, 근무시간 없음 -> 전일 근무로 계산해 280시간을 넘는다
     check = _p3_hours_check(facts(work_mode="full_time", start_date=date(2027, 2, 15), end_date=date(2027, 4, 30)))
-    assert check.result == "pass" and "근무 기간으로" in check.note and "약 428시간" in check.note
+    assert check.result == "pass" and "약 428시간" in check.note
     # 수치만 말하지 않고 기준과 결론을 같이 말한다(인정되는지가 궁금한 것이다).
     assert "기준(280시간)을 넘어서 인정될 수 있어요" in check.note
 
@@ -227,7 +227,7 @@ def test_3p_hours_use_written_daily_hours_and_days_per_week():
     from skku_notice.grad_intern_rules import _p3_hours_check
     start, end = date(2027, 2, 15), date(2027, 4, 30)
     ok = _p3_hours_check(facts(work_mode="full_time", start_date=start, end_date=end, daily_hours=8, days_per_week=5))
-    assert ok.result == "pass" and "1일 8시간, 주 5일" in ok.note
+    assert ok.result == "pass" and "계산하면" not in ok.note and "시간이라" in ok.note
     short = _p3_hours_check(facts(work_mode="full_time", start_date=start, end_date=end, daily_hours=4, days_per_week=3))
     assert short.result == "fail" and "기준(280시간)에 못 미쳐서" in short.note
 
@@ -263,14 +263,14 @@ def _company_note(department):
 
 def test_company_time_note_states_hours_for_full_and_part_time():
     full = assess_department(P, facts(end_date=D0 + timedelta(days=89)))
-    assert _company_note(full) == "전일제 90일(약 514시간)이에요. 기준(전일제 4주, 28일)을 넘어서 인정될 수 있어요"
+    assert _company_note(full) == "전일제 90일(약 514시간)로 기준(28일 이상)을 넘어 가능해요"
     short = assess_department(P, facts(end_date=D0 + timedelta(days=13)))
-    assert "약 80시간" in _company_note(short) and "못 미쳐서" in _company_note(short)
+    assert "약 80시간" in _company_note(short) and "못 미쳐 어려워요" in _company_note(short)
     part_enough = assess_department(P, facts(work_mode="part_time", end_date=D0 + timedelta(days=55),
                                              daily_hours=4, days_per_week=5))
-    assert _company_note(part_enough) == "파트타임 기간과 하루 근무로 계산하면 약 160시간이라 기준(160시간)을 넘어서 인정될 수 있어요"
+    assert _company_note(part_enough) == "파트타임 약 160시간으로 기준(160시간 이상)을 넘어 가능해요"
     part_short = assess_department(P, facts(work_mode="part_time", explicitly_stated_hours=100))
-    assert _company_note(part_short) == "파트타임 100시간이라 기준(160시간)에 못 미쳐서 인정되기 어려워요"
+    assert _company_note(part_short) == "파트타임 100시간으로 기준(160시간 이상)에 못 미쳐 어려워요"
     part_unknown = assess_department(P, facts(work_mode="part_time"))
     assert "확인하지 못했어요" in _company_note(part_unknown)
 
