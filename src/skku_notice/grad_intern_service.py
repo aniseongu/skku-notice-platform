@@ -16,7 +16,9 @@ from skku_notice.grad_intern_facts import build_facts, call_gemini
 from skku_notice.grad_intern_rules import GradProfile, assess_department, assess_university_3p
 from skku_notice.grad_intern_sources import DEPT_RULESET, EXTRACTOR_VERSION, P3_RULESET
 
-MAX_PER_RUN = 8
+# 규칙만으로 끝나는 판정은 가볍다. 실행당 많이 처리하고, Gemini 같은 AI 호출이 필요한 것만 실행당 일부로 제한한다.
+MAX_PER_RUN = 40
+AI_CALLS_PER_RUN = 6
 ENQUEUE_PER_RUN = 10
 SW_COLLEGE, SW_DEPARTMENT = "소프트웨어융합대학", "소프트웨어학과"
 
@@ -83,6 +85,8 @@ def run_graduation(store, master_key: str, now: datetime, client_factory=None, s
             counts["grad_shared"] = counts.get("grad_shared", 0) + 1
         elif rows_for(store, user_id, key):
             rows = rows_for(store, user_id, key)
+            if used_calls >= AI_CALLS_PER_RUN:
+                continue  # 이번 실행의 AI 호출 몫을 다 썼다. 대기 상태로 두고 다음 실행에서 이어서 처리한다.
             half = DAILY_CALLS // 2  # 하루 한도의 절반까지만 졸업요건에 쓰고, 나머지는 인턴 공고 판정에 남겨 둔다.
             user_ai = build_user_ai(store, master_key, user_id, rows, today, now, half,
                                     gemini_client_for=lambda k: _RecordingClient(client_factory(k)),

@@ -149,11 +149,27 @@ def test_rejected_key_is_disabled_and_rules_still_answer():
 
 
 def test_each_run_is_bounded_and_users_do_not_share_results():
-    many = [request(user=f"u{i}") for i in range(9)]
+    many = [request(user=f"u{i}") for i in range(svc.MAX_PER_RUN + 1)]
     store = Store(many, None)
     run(store)
     assert len(store.saved) == svc.MAX_PER_RUN
     assert {row["user_id"] for row in store.saved} == {f"u{i}" for i in range(svc.MAX_PER_RUN)}
+
+
+def test_ai_calls_are_capped_per_run_and_the_rest_stay_pending_while_rule_only_ones_finish():
+    with_key = [request(user=f"k{i}") for i in range(svc.AI_CALLS_PER_RUN + 3)]
+    no_key = [request(user=f"n{i}") for i in range(5)]
+
+    class Mixed(Store):
+        def key_for(self, user_id):
+            return key_row(user_id) if user_id.startswith("k") else None
+
+    store, models = Mixed(with_key + no_key), Models(AI)
+    run(store, models)
+    done = {row["user_id"] for row in store.saved}
+    assert models.calls == svc.AI_CALLS_PER_RUN
+    assert {f"n{i}" for i in range(5)} <= done  # 키가 없는 사용자는 규칙만으로 모두 끝난다
+    assert len([u for u in done if u.startswith("k")]) == svc.AI_CALLS_PER_RUN  # 나머지 키 사용자는 대기로 남는다
 
 
 def test_prompt_is_not_changed_by_instructions_in_the_posting():
