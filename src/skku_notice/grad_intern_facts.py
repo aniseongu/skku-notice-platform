@@ -28,7 +28,12 @@ FULL_TIME = re.compile(r"전일제|풀\s*타임|full[\s-]?time|주\s*5\s*일\s*(
 PART_TIME = re.compile(r"파트\s*타임|시간제|part[\s-]?time", re.I)
 TOTAL_HOURS = re.compile(r"(?:총|합계)\s*(\d{2,4})\s*시간")
 # "5개월", "근무 기간: 6개월", "3개월간" 등. 모집 인원이나 마감 안내의 개월 수와 섞이지 않게 근무·인턴 말이 가까이 있을 때만 읽는다.
-MONTHS = re.compile(r"(?:근무|인턴(?:십)?|실습|활동|기간|진행)[^\n]{0,12}?(\d{1,2})\s*개월|(\d{1,2})\s*개월\s*(?:간|동안)?\s*(?:진행|근무|인턴|실습)")
+MONTHS = re.compile(
+    r"(?:근무|인턴(?:십)?|실습|활동|기간|진행)[^\n]{0,12}?(\d{1,2})\s*개월"
+    # "[근무기간]\n- 3개월", "3. 근무 기간\n\n- 3개월(ASAP)"처럼 이름표 다음 줄에 개월 수가 오는 모양
+    r"|(?:근무|인턴(?:십)?|실습|활동|진행)\s*기간\s*\]?[\s:：\-–•·]{0,12}(\d{1,2})\s*개월"
+    # "3개월 체험형 인턴", "3개월간 진행"처럼 개월 수 뒤에 인턴 종류 말이 한 단어 끼는 모양
+    r"|(\d{1,2})\s*개월\s*(?:간|동안)?\s*(?:체험형|단기|채용\s*전환형|전환형)?\s*(?:진행|근무|인턴|실습)")
 WEEKS = re.compile(r"(?:근무|인턴(?:십)?|실습|활동|기간|진행)[^\n]{0,12}?(\d{1,2})\s*주(?!\s*(?:\d|일|\d일))|(\d{1,2})\s*주\s*(?:간|동안)\s*(?:진행|근무|인턴|실습)?")
 WORK_DAYS = re.compile(r"(?:총\s*)?(?:근무\s*일수|근무일)\s*[:：]?\s*(?:총\s*)?(\d{2,3})\s*일|총\s*(\d{2,3})\s*일\s*(?:간\s*)?근무")
 # 회사 이름: "회사명: ○○", "기업명 ○○", 그리고 법인 표기가 붙은 이름. 그림 글자(OCR)는 띄어쓰기가 흔들려 공백을 허용한다.
@@ -180,7 +185,7 @@ def static_facts(title: str, body: str) -> dict:
             found["start_date"], found["end_date"] = start, end
             found["evidence"].append({"field": "period", "quote": period.group(0)})
     if "start_date" not in found:
-        month_hits = {int(m.group(1) or m.group(2)) for m in MONTHS.finditer(text)}
+        month_hits = {int(next(g for g in m.groups() if g)) for m in MONTHS.finditer(text)}
         if len(month_hits) == 1 and 1 <= (months := month_hits.pop()) <= 24:
             found["duration_months"] = months
             found.setdefault("duration_days", months * 30)

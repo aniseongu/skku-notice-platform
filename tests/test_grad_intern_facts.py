@@ -279,3 +279,12 @@ def test_a_relevant_judgment_with_a_clear_software_reason_becomes_the_work_field
     assert any(e.get("source") == "judgment" for e in got.evidence)
     # 이유에서 업무 분야를 읽을 수 없으면 쓰지 않는다.
     assert gf.build_facts("[㈜가나] 인턴 모집", "", None, ("relevant", "학부생이 지원할 수 있어요")).facts.task_category == "unknown"
+
+
+def test_duration_months_are_read_from_label_on_the_previous_line_and_from_intern_type_words():
+    for body in ("[근무기간]\n- 3개월\n\n[전형절차]", "3. 근무 기간\n\n- 3개월(ASAP)\n\n4. 위치", "참고사항\n• 3개월 체험형 인턴 포지션 이에요.", "근무기간: 3개월"):
+        found = gf.static_facts("[㈜가나] 인턴", body)
+        assert found.get("duration_months") == 3 and found.get("duration_days") == 90, body
+    # 개월 수가 둘이거나 근무와 관계없는 개월 수는 읽지 않는다.
+    for body in ("매장 현장 (2개월)과 본사 프로젝트 실무 (3개월)", "모집 인원 3개월 후 발표"):
+        assert "duration_months" not in gf.static_facts("[㈜가나] 인턴", body), body

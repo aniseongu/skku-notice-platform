@@ -198,3 +198,12 @@ def test_assessment_serializes_without_extra_fields():
     data = assess_department(P, facts()).as_dict()
     assert set(data) == {"status", "rule_version", "label", "checks", "unknowns", "after_completion", "notes", "sources"}
     assert data["rule_version"] == "cse-2025-06-01"
+
+
+def test_3p_hours_use_the_period_even_when_the_work_mode_is_not_written():
+    from skku_notice.grad_intern_rules import _p3_hours_check
+    long = _p3_hours_check(facts(work_mode="unknown", start_date=None, end_date=None, duration_days=90))
+    assert long.result == "unknown" and "전일제인지" in long.note  # 기간은 충분하지만 근무 형태·시간이 없다고 정확히 알린다
+    short = _p3_hours_check(facts(work_mode="unknown", start_date=None, end_date=None, duration_days=28))
+    assert short.result == "fail"  # 평일 8시간으로도 280시간에 못 미치면 형태와 상관없이 미달
+    assert _p3_hours_check(facts(work_mode="part_time", start_date=None, end_date=None, duration_days=90)).result == "unknown"

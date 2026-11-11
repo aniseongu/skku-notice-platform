@@ -284,15 +284,20 @@ def _p3_hours_check(facts: InternFacts) -> Check:
         if hours >= P3_MIN_HOURS:
             return Check("3P-HOURS", PASS, f"공고에 {hours}시간으로 적혀 있어요(실제 인정은 출근 기록 기준이에요)")
         return Check("3P-HOURS", FAIL, f"공고의 {hours}시간은 비교과 현장실습 기준 280시간에 못 미쳐요")
-    if facts.work_mode == "full_time" and facts.start_date and facts.end_date and facts.end_date >= facts.start_date:
+    if facts.work_mode in ("full_time", "unknown") and facts.start_date and facts.end_date and facts.end_date >= facts.start_date:
         cap = weekdays_between(facts.start_date, facts.end_date) * P3_MAX_DAILY_HOURS
         if cap < P3_MIN_HOURS:
             return Check("3P-HOURS", FAIL, f"평일 하루 8시간으로 계산해도 최대 {cap}시간이라 280시간에 못 미쳐요")
+        if facts.work_mode == "unknown":
+            return Check("3P-HOURS", UNKNOWN, "기간은 충분할 수 있어요. 전일제인지와 근무 시간은 공고에 없어서 확인이 필요해요")
         return Check("3P-HOURS", UNKNOWN, "기간은 충분할 수 있지만 실제 인정 시간은 공휴일과 출근 기록으로 정해져요")
-    if facts.work_mode == "full_time" and facts.duration_days:
+    if facts.work_mode in ("full_time", "unknown") and facts.duration_days:
+        # 근무 형태가 안 적혀 있어도 기간으로 상한은 계산한다: 평일 하루 8시간으로도 280시간에 못 미치면 어느 형태로든 안 된다.
         cap = facts.duration_days * 5 // 7 * P3_MAX_DAILY_HOURS
         if cap < P3_MIN_HOURS:
             return Check("3P-HOURS", FAIL, f"공고의 기간 {facts.duration_days}일은 평일 하루 8시간으로 계산해도 최대 {cap}시간이라 280시간에 못 미쳐요")
+        if facts.work_mode == "unknown":
+            return Check("3P-HOURS", UNKNOWN, f"기간은 {facts.duration_days}일 정도로 충분할 수 있어요. 전일제인지와 근무 시간은 공고에 없어서 확인이 필요해요")
         return Check("3P-HOURS", UNKNOWN, f"공고에 {facts.duration_days}일 정도로 적혀 있어요. 실제 인정 시간은 출근 기록으로 정해져요")
     return Check("3P-HOURS", UNKNOWN, "근무 시간을 공고에서 확인하지 못했어요")
 
