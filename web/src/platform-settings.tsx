@@ -699,7 +699,7 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
       {error ? <p className="field-note error" role="alert">{error}</p> : null}
       {guideFirst ? null : guide}
     </> : <>
-      <div className="connection-summary"><span className={`setting-state ${status?.disabled ? 'text-danger' : ''}`}>{state}</span>
+      <div className="connection-summary">{status || loading ? <span className={`setting-state ${status?.disabled ? 'text-danger' : ''}`}>{state}</span> : null}
         <button type="button" className="ghost-button key-action min-h-[44px] px-[14px] py-0" aria-label={`${name} ${status ? (status.disabled && labels.retry ? labels.retry : labels.edit) : labels.add}`} disabled={loading} onClick={() => setEditing(true)}>{status ? (status.disabled && labels.retry ? labels.retry : labels.edit) : labels.add}</button>
         {status ? <button type="button" className={`ghost-button key-action min-h-[44px] px-[14px] py-0 ${labels.broken ? '' : 'text-danger'}`} aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={onRemove}>{labels.remove}</button> : null}
       </div>

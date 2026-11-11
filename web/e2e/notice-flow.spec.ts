@@ -231,12 +231,13 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await expect(screen.getByRole('radio', { name: '2학기' })).toHaveCount(0);
   await expect(screen.getByRole('radio', { name: '복무 전' })).toHaveCount(0);
   await withApp(page, { byokOn: true, byokLoading: false, byokStatus: null });
-  await expect(screen.locator('.setting', { hasText: 'Gemini 키' }).getByText('연결 안 됨')).toBeVisible();
+  await expect(screen.locator('.setting', { hasText: 'Gemini 키' }).getByRole('button', { name: 'Gemini 키 연결하기' })).toBeVisible();
+  await expect(screen.getByText('연결 안 됨')).toHaveCount(0);
   await expect(screen.getByText(/안 넣어도 괜찮아요/)).toBeVisible();
   // 업체나 요금을 고르라는 질문은 없다. 연결이 하나도 없으면 켜기·끄기도 보이지 않는다.
   await expect(screen.getByRole('radiogroup', { name: 'AI 분석' })).toHaveCount(0);
   await expect(screen.getByText('요금')).toHaveCount(0);
-  await expect(screen.locator('.setting', { hasText: '아이캠퍼스 토큰' }).getByText('연결 안 됨')).toBeVisible();
+  await expect(screen.locator('.setting', { hasText: '아이캠퍼스 토큰' }).getByRole('button', { name: '아이캠퍼스 토큰 연결하기' })).toBeVisible();
   await screen.getByRole('button', { name: 'Gemini 키 연결하기' }).click();
   const save = screen.getByRole('button', { name: '연결하기', exact: true });
   await expect(save).toBeDisabled();
