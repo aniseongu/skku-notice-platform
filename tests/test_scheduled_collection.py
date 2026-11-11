@@ -473,8 +473,8 @@ def test_dormant_boards_lose_their_last_success_time_so_they_do_not_make_the_fee
             seen.append((method, path, kwargs.get("params"), kwargs.get("json")))
 
     Fake().clear_dormant(["biz-notice", "bus-notice"])
-    assert seen == [("PATCH", "platform_sources", {"id": "in.(biz-notice,bus-notice)", "last_success_at": "not.is.null"},
-                     {"last_success_at": None})]   # 시각이 있는 휴면 게시판만
+    params = {"id": "in.(biz-notice,bus-notice)", "last_success_at": "not.is.null"}   # 시각이 있는 휴면 게시판만
+    assert seen == [("PATCH", "platform_sources", params, {"last_success_at": None})]
     seen.clear()
     Fake().clear_dormant([])
     assert seen == []   # 비울 게시판이 없으면 아무것도 하지 않는다

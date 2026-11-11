@@ -547,8 +547,8 @@ def main() -> int:
             count += external_count
             # 구독자 없는 게시판이 기준 시각을 끌어내리지 않게 한다. 실패해도 수집 결과에는 영향이 없다.
             try:
-                dormant = [s["id"] for s in school_sources(settings) if s.get("on_demand") and s["id"] not in subscribed]
-                store.clear_dormant(dormant)
+                catalog = [s["id"] for s in school_sources(settings) if s.get("on_demand")]
+                store.clear_dormant([source_id for source_id in catalog if source_id not in subscribed])
             except StoreError as exc:
                 print(f"휴면 게시판 정리 건너뜀 ({type(exc).__name__})", flush=True)
             # 보관 기간이 지난 데이터 정리. 실패해도 수집 결과에는 영향이 없다(함수가 아직 없으면 건너뛴다).
