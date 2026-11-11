@@ -19,6 +19,31 @@ from difflib import SequenceMatcher
 from skku_notice.grad_intern_rules import ORG_TYPES, TASK_CATEGORIES, WORK_MODES, InternFacts
 
 MAX_TEXT = 6000
+
+
+def facts_from_dict(data: dict) -> InternFacts | None:
+    """저장해 둔 판정의 사실(Extracted.as_dict)에서 규칙 입력을 되살린다. AI를 다시 부르지 않고 규칙만 다시 돌릴 때 쓴다.
+    교내 연구실의 월별 시간(monthly_hours)은 저장하지 않으므로 그런 판정은 되살릴 수 없다(None)."""
+    try:
+        org = data.get("organization_type") or "unknown"
+        if org in ("skku_sw_lab", "other_university_lab"):
+            return None
+
+        def day(value):
+            return date.fromisoformat(value) if value else None
+
+        def number(value, kind):
+            return None if value is None else kind(value)
+
+        return InternFacts(
+            organization_type=org, corporate_status_verified=bool(data.get("corporate_status_verified")),
+            work_mode=data.get("work_mode") or "unknown", start_date=day(data.get("start_date")), end_date=day(data.get("end_date")),
+            explicitly_stated_hours=number(data.get("explicitly_stated_hours"), int), daily_hours=number(data.get("daily_hours"), int),
+            days_per_week=number(data.get("days_per_week"), int), task_category=data.get("task_category") or "unknown",
+            academic_credit=number(data.get("academic_credit"), float), duration_months=number(data.get("duration_months"), int),
+            duration_days=number(data.get("duration_days"), int))
+    except (TypeError, ValueError):
+        return None
 LEGAL_FORM = re.compile(r"\(주\)|㈜|주식회사|유한회사|유한책임회사|합자회사|재단법인|사단법인|\bInc\.?|\bCorp\.?|\bCo\.,?\s*Ltd\.?", re.I)
 DATE = r"(20\d{2})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})\s*일?"
 # 근무 기간 범위. 오픈소스 시간 표현 추출기들이 하는 대로 한쪽의 생략을 다른 쪽에서 복원한다:

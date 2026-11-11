@@ -458,7 +458,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
     ai: judgement?.ai ?? mine?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
     retry: () => { app.bodies.delete(notice.id); app.requestUpdate(); },
     grad: gradDetail,
-    graduation: app.showsGraduation(notice) ? { tracks: visibleTracks(app.profile), assessment: app.graduationFor(notice), error: app.graduationError } : undefined,
+    graduation: app.showsGraduation(notice) ? { aiKeys: (app.byokStatus && !app.byokStatus.disabled ? 1 : 0) + app.aiKeys.filter((key) => !key.disabled).length, tracks: visibleTracks(app.profile), assessment: app.graduationFor(notice), error: app.graduationError } : undefined,
   }} />;
 }
 

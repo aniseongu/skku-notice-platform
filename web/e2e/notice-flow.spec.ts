@@ -264,6 +264,25 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   expect(await calls(page)).toEqual([['remove']]);
 });
 
+test('connection keys page says how the AI works for 0, 1, 2 and 3 connected keys', async ({ page }) => {
+  await settingsAt(page, '&keys=1');
+  const screen = page.locator('platform-settings-screen');
+  const key = (provider: string) => ({ provider, keyHint: 'abcd', model: 'm', disabled: false, lastError: null, usedToday: 0 });
+  const gemini = { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 };
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false });
+  const states: [string, unknown, unknown[], RegExp][] = [
+    ['아무것도 연결 안 함', null, [], /하나 이상 연결하면/],
+    ['Groq 하나', null, [key('groq')], /그 한도까지만 확인해요/],
+    ['Gemini 하나', gemini, [], /그 한도까지만 확인해요/],
+    ['Gemini + OpenRouter', gemini, [key('openrouter')], /번갈아 쓰고, 한 곳이 막히면/],
+    ['세 개', gemini, [key('groq'), key('openrouter')], /번갈아 쓰고, 한 곳이 막히면/],
+  ];
+  for (const [label, byokStatus, aiKeys, text] of states) {
+    await withApp(page, { byokStatus, aiKeys });
+    await expect(screen.locator('.settings-lead').first(), label).toContainText(text);
+  }
+});
+
 test('settings items live in the right place: list scope under display, profile fields together, shortcuts jump to the page', async ({ page }) => {
   await settingsAt(page);
   const screen = page.locator('platform-settings-screen');

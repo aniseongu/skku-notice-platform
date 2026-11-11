@@ -12,7 +12,7 @@ import time
 from datetime import UTC, datetime
 
 from skku_notice.ai_users import build_user_ai, gather_rows, used_today
-from skku_notice.grad_intern_facts import build_facts, call_gemini
+from skku_notice.grad_intern_facts import build_facts, call_gemini, facts_from_dict
 from skku_notice.grad_intern_rules import GradProfile, assess_department, assess_university_3p
 from skku_notice.grad_intern_sources import DEPT_RULESET, EXTRACTOR_VERSION, P3_RULESET
 
@@ -20,6 +20,7 @@ from skku_notice.grad_intern_sources import DEPT_RULESET, EXTRACTOR_VERSION, P3_
 MAX_PER_RUN = 40
 AI_CALLS_PER_RUN = 6
 ENQUEUE_PER_RUN = 10
+RETRY_PER_RUN, RETRY_AFTER_HOURS = 5, 12  # 한도·장애로 AI 없이 끝난 판정을 12시간 뒤 다시(실행당 5건)
 STALE_PER_RUN = 10  # 규칙 버전이 바뀐 옛 판정을 실행마다 이만큼씩 새 규칙으로 다시 만든다(AI 호출은 위 상한과 일일 한도 안에서만)
 SW_COLLEGE, SW_DEPARTMENT = "소프트웨어융합대학", "소프트웨어학과"
 
@@ -46,6 +47,15 @@ def assess(profile: GradProfile, title: str, body: str, ai: dict | None, judgmen
     }
 
 
+def assess_from_stored(profile: GradProfile, stored: dict) -> dict | None:
+    """저장해 둔 사실로 규칙만 다시 돌린다(AI 호출 0회). 사실을 되살릴 수 없으면 None."""
+    facts = facts_from_dict(stored)
+    if facts is None:
+        return None
+    return {"department": assess_department(profile, facts).as_dict(),
+            "university_3p": assess_university_3p(profile, facts).as_dict(), "facts": stored}
+
+
 def rows_for(store, user_id: str, gemini_row: dict | None) -> dict[str, dict]:
     return gather_rows(store, user_id, gemini_row)
 
@@ -59,10 +69,11 @@ def run_graduation(store, master_key: str, now: datetime, client_factory=None, s
     provider_factory = provider_factory or make_client
 
     client_factory = client_factory or gemini_client
-    counts = {"grad_queued": 0, "grad_stale": 0, "grad_assessed": 0, "grad_cached": 0, "grad_ai": 0, "grad_ai_unavailable": 0}
+    counts = {"grad_queued": 0, "grad_stale": 0, "grad_retry": 0, "grad_rerule": 0, "grad_assessed": 0, "grad_cached": 0, "grad_ai": 0, "grad_ai_unavailable": 0}
     # 버튼 없이 미리 판정한다: 아직 채우지 못한 요건이 있는 사용자의 최근 인턴 공고를 대기열에 넣는다.
     counts["grad_queued"] = store.enqueue_graduation(ENQUEUE_PER_RUN)
     counts["grad_stale"] = store.requeue_stale(DEPT_RULESET, STALE_PER_RUN) if hasattr(store, "requeue_stale") else 0
+    counts["grad_retry"] = store.requeue_retryable(RETRY_AFTER_HOURS, RETRY_PER_RUN) if hasattr(store, "requeue_retryable") else 0
     today = now.astimezone(UTC).date().isoformat()
     used_calls = 0
     for req in store.graduation_requests(MAX_PER_RUN):
@@ -77,11 +88,24 @@ def run_graduation(store, master_key: str, now: datetime, client_factory=None, s
             store.save_assessment({"user_id": user_id, "notice_id": notice_id, "status": "READY"})
             counts["grad_cached"] += 1
             continue
+        # 공고도 프로필도 그대로인데 규칙 문구만 바뀐 판정(자동 갱신)은 저장된 사실로 규칙만 다시 돌린다: AI 호출도, 다른 계산도 없다.
+        if (previous.get("input_hash") == req.get("input_hash") and previous.get("extractor_version") == EXTRACTOR_VERSION
+                and previous.get("ruleset_version") != DEPT_RULESET and isinstance(previous.get("facts"), dict)):
+            rerun = assess_from_stored(profile_from_row(req), previous["facts"])
+            if rerun is not None:
+                store.save_assessment({
+                    "user_id": user_id, "notice_id": notice_id, "status": "READY", "input_hash": req.get("input_hash"),
+                    "ruleset_version": DEPT_RULESET, "extractor_version": EXTRACTOR_VERSION,
+                    "ai_status": previous.get("ai_status"), "model": previous.get("model"),
+                    "department": rerun["department"], "university_3p": rerun["university_3p"], "facts": rerun["facts"],
+                    "assessed_at": now.isoformat()})
+                counts["grad_rerule"] += 1
+                continue
 
         ai, ai_status, model = None, "no_key", None
-        # 공고에서 뽑은 사실은 사용자와 무관하다: 다른 사용자나 이전 판정이 이미 Gemini로 뽑았으면 호출 없이 다시 쓴다.
+        # 이 사용자가 이미 같은 공고 글에서 뽑아 둔 사실은 다시 묻지 않는다. 다른 사용자의 키로 뽑은 것은 쓰지 않는다.
         text_hash = hashlib.md5(f"{req['title']}|{req.get('body') or ''}".encode()).hexdigest()
-        shared = store.cached_ai_facts(notice_id, text_hash, EXTRACTOR_VERSION) if hasattr(store, "cached_ai_facts") else None
+        shared = store.cached_ai_facts(user_id, notice_id, text_hash, EXTRACTOR_VERSION) if hasattr(store, "cached_ai_facts") else None
         if shared is not None:
             ai, ai_status = shared, "used"
             counts["grad_shared"] = counts.get("grad_shared", 0) + 1
@@ -109,7 +133,7 @@ def run_graduation(store, master_key: str, now: datetime, client_factory=None, s
                     ai_status, model = "used", user_ai.client.model
                     counts["grad_ai"] += 1
                     if hasattr(store, "save_ai_facts"):
-                        store.save_ai_facts(notice_id, text_hash, EXTRACTOR_VERSION, ai, model)
+                        store.save_ai_facts(user_id, notice_id, text_hash, EXTRACTOR_VERSION, ai, model)
 
         result = assess(profile_from_row(req), req["title"], req.get("body") or "", ai,
                         (req.get("judgment_verdict"), req.get("judgment_reason")))

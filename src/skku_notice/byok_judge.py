@@ -8,8 +8,9 @@ are recorded on the key row without any secret material.
 import os
 import re
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
+from skku_notice.ai_models import cap_for
 from skku_notice.ai_providers import make_client
 from skku_notice.ai_users import build_user_ai, gather_rows, used_today
 from skku_notice.gemini_client import gemini_client
@@ -139,6 +140,22 @@ class JudgeStore(NoticeStore):
                           json={"status": "PENDING", "requested_at": now})
         return len(rows)
 
+    def requeue_retryable(self, older_than_hours: int, limit: int) -> int:
+        """한도나 장애로 AI 없이 끝난 판정을 시간이 지난 뒤 다시 시도한다(화면의 "내일 다시 확인해요").
+        다시 한도에 걸리면 완료 시각이 새로 찍혀 다시 기다린다. 쓰는 것은 그 사용자의 키뿐이다."""
+        cutoff = (datetime.now(UTC) - timedelta(hours=older_than_hours)).isoformat()
+        rows = self._request("GET", "user_notice_graduation_assessments", params={
+            "status": "eq.READY", "ai_status": "in.(limit,unavailable)", "assessed_at": f"lt.{cutoff}",
+            "select": "user_id,notice_id", "order": "assessed_at.asc",
+            "limit": str(max(1, limit))}).json()
+        now = datetime.now(UTC).isoformat()
+        for row in rows:
+            where = {"user_id": f"eq.{row['user_id']}", "notice_id": f"eq.{row['notice_id']}",
+                     "status": "eq.READY"}
+            self._request("PATCH", "user_notice_graduation_assessments", params=where,
+                          json={"status": "PENDING", "requested_at": now})
+        return len(rows)
+
     def graduation_requests(self, limit: int) -> list[dict]:
         return self._request("POST", "rpc/list_graduation_requests", json={"p_limit": limit}).json()
 
@@ -151,25 +168,28 @@ class JudgeStore(NoticeStore):
     def assessment(self, user_id: str, notice_id: str) -> dict | None:
         rows = self._request("GET", "user_notice_graduation_assessments", params={
             "user_id": f"eq.{user_id}", "notice_id": f"eq.{notice_id}",
-            "select": "input_hash,ruleset_version,extractor_version,ai_status"}).json()
+            "select": "input_hash,ruleset_version,extractor_version,ai_status,model,facts"}).json()
         return rows[0] if rows else None
 
-    def cached_ai_facts(self, notice_id: str, text_hash: str, version: str) -> dict | None:
-        """같은 공고 글과 추출기 버전이면 이미 뽑은 사실을 다시 쓴다(사용자와 무관해서 공유한다)."""
+    def cached_ai_facts(self, user_id: str, notice_id: str, text_hash: str, version: str) -> dict | None:
+        """같은 공고 글과 추출기 버전이면 이 사용자가 이미 뽑은 사실을 다시 쓴다.
+        다른 사용자의 키로 뽑은 결과는 쓰지 않는다."""
         try:
-            params = {"notice_id": f"eq.{notice_id}", "text_hash": f"eq.{text_hash}",
-                      "extractor_version": f"eq.{version}", "select": "reply", "limit": "1"}
+            params = {"user_id": f"eq.{user_id}", "notice_id": f"eq.{notice_id}",
+                      "text_hash": f"eq.{text_hash}", "extractor_version": f"eq.{version}",
+                      "select": "reply", "limit": "1"}
             rows = self._request("GET", "platform_notice_ai_facts", params=params).json()
         except StoreError:
             return None  # 표가 아직 없으면 캐시 없이 동작한다
         reply = rows[0].get("reply") if rows else None
         return reply if isinstance(reply, dict) else None
 
-    def save_ai_facts(self, notice_id: str, text_hash: str, version: str, reply: dict, model: str) -> None:
+    def save_ai_facts(self, user_id: str, notice_id: str, text_hash: str, version: str,
+                      reply: dict, model: str) -> None:
         try:
-            conflict = {"on_conflict": "notice_id,text_hash,extractor_version"}
-            row = {"notice_id": notice_id, "text_hash": text_hash, "extractor_version": version,
-                   "reply": reply, "model": model}
+            conflict = {"on_conflict": "user_id,notice_id,text_hash,extractor_version"}
+            row = {"user_id": user_id, "notice_id": notice_id, "text_hash": text_hash,
+                   "extractor_version": version, "reply": reply, "model": model}
             self._request("POST", "platform_notice_ai_facts", params=conflict, json=[row],
                           headers={"Prefer": "resolution=ignore-duplicates,return=minimal"})
         except StoreError:
@@ -255,7 +275,7 @@ def run_judging(
         if clock() - started > RUN_BUDGET_SECONDS:
             break
         rows = gather_rows(store, user_id, gemini_row)
-        if rows and all(used_today(r, today) >= DAILY_CALLS for r in rows.values()):
+        if rows and all(used_today(r, today) >= cap_for(name, DAILY_CALLS) for name, r in rows.items()):
             counts["limited"] += 1
             continue
         if not rows:

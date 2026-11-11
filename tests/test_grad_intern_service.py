@@ -182,18 +182,19 @@ def test_each_run_queues_new_requests_first_without_any_button():
     assert store.enqueued == 10 and counts["grad_queued"] == 2
 
 
-def test_같은_공고의_사실은_공유_캐시로_다시_쓰고_Gemini를_부르지_않는다():
+def test_같은_사용자가_이미_뽑은_공고_사실은_다시_쓰고_AI를_부르지_않는다():
     class SharedStore(Store):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.facts_saved = []
             self.shared = None
 
-        def cached_ai_facts(self, notice_id, text_hash, version):
+        def cached_ai_facts(self, user_id, notice_id, text_hash, version):
+            self.asked_by = user_id
             return self.shared
 
-        def save_ai_facts(self, notice_id, text_hash, version, reply, model):
-            self.facts_saved.append((notice_id, version, model))
+        def save_ai_facts(self, user_id, notice_id, text_hash, version, reply, model):
+            self.facts_saved.append((user_id, notice_id, version, model))
 
     req = {"user_id": "u1", "notice_id": "n1", "title": "[넷마블네오] AI 인턴십", "body": "5개월간 진행", "programs": [],
            "admission_year": 2023, "university_3p_internship_selected": True, "input_hash": "h1"}
@@ -202,6 +203,7 @@ def test_같은_공고의_사실은_공유_캐시로_다시_쓰고_Gemini를_부
     store.shared = {"organization_name": "넷마블네오", "organization_type": "incorporated_company", "evidence": []}
     counts = svc.run_graduation(store, MASTER, NOW, client_factory=lambda key: type("C", (), {"models": models})(), sleep=lambda s: None)
     assert models.calls == 0 and counts["grad_shared"] == 1 and store.saved[0]["ai_status"] == "used"
+    assert store.asked_by == "u1"  # 캐시는 사용자별이다: 판정하는 사용자의 이름으로만 찾는다
     assert EXTRACTOR_VERSION  # 캐시 키에 추출기 버전이 들어간다
 
 
@@ -255,3 +257,61 @@ def test_requeue_stale_only_flips_ready_rows_of_an_old_ruleset_one_by_one():
     patches = [c for c in calls if c[0] == "PATCH"]
     assert len(patches) == 2 and all(c[2]["status"] == "eq.READY" and c[3]["status"] == "PENDING" for c in patches)
     assert {c[2]["user_id"] for c in patches} == {"eq.u1", "eq.u2"}   # 사용자마다 따로, 그 사용자의 판정만
+
+
+def test_rule_text_change_reruns_rules_from_stored_facts_without_any_ai_call():
+    """공고도 프로필도 그대로이고 규칙 버전만 바뀐 판정은 저장된 사실로 규칙만 다시 돌린다(자동 갱신에서 토큰을 쓰지 않는다)."""
+    stored = {"organization_type": "incorporated_company", "corporate_status_verified": True, "work_mode": "full_time",
+              "task_category": "software_dev", "start_date": "2027-02-15", "end_date": "2027-04-30", "explicitly_stated_hours": None,
+              "daily_hours": None, "days_per_week": None, "academic_credit": None, "duration_months": None, "duration_days": None,
+              "organization_name": "예시", "tasks": [], "evidence": [], "missing_fields": [], "ai_used": True}
+    previous = {"input_hash": "h1", "ruleset_version": "cse-old", "extractor_version": EXTRACTOR_VERSION, "ai_status": "used",
+                "model": "m", "facts": stored}
+    models = Models(text="{}")
+    store = Store([request()], key=key_row(), previous=previous)
+    counts = svc.run_graduation(store, MASTER, NOW, client_factory=lambda key: type("C", (), {"models": models})(), sleep=lambda s: None)
+    assert models.calls == 0 and counts["grad_rerule"] == 1 and counts["grad_ai"] == 0
+    row = store.saved[0]
+    assert row["ruleset_version"] == DEPT_RULESET and row["ai_status"] == "used" and row["facts"] == stored
+    assert "기준(280시간)" in str(row["university_3p"])   # 새 규칙 문장으로 다시 만들어졌다
+
+
+def test_rerun_is_skipped_when_the_input_changed_or_facts_cannot_be_restored():
+    lab = {"organization_type": "skku_sw_lab", "work_mode": "full_time"}   # 월별 시간을 저장하지 않아 되살릴 수 없다
+    assert svc.assess_from_stored(svc.profile_from_row(request()), lab) is None
+    assert svc.assess_from_stored(svc.profile_from_row(request()), {"start_date": "not-a-date"}) is None
+
+
+def test_judgments_that_ended_without_ai_are_retried_after_twelve_hours_with_the_users_own_key():
+    from skku_notice.byok_judge import JudgeStore as RealStore
+
+    calls = []
+
+    class Resp:
+        def __init__(self, data):
+            self._data = data
+
+        def json(self):
+            return self._data
+
+    class Fake(RealStore):
+        def __init__(self):
+            pass
+
+        def _request(self, method, path, **kwargs):
+            calls.append((method, kwargs.get("params"), kwargs.get("json")))
+            return Resp([{"user_id": "u1", "notice_id": "n1"}] if method == "GET" else [])
+
+    assert Fake().requeue_retryable(12, 5) == 1
+    get = calls[0]
+    assert get[1]["ai_status"] == "in.(limit,unavailable)" and get[1]["assessed_at"].startswith("lt.") and get[1]["limit"] == "5"
+    patch = calls[1]
+    assert patch[0] == "PATCH" and patch[1]["user_id"] == "eq.u1" and patch[2]["status"] == "PENDING"   # 그 사용자의 행만
+
+    class RetryStore(Store):
+        def requeue_retryable(self, hours, limit):
+            self.retry_args = (hours, limit)
+            return 2
+
+    store = RetryStore([])
+    assert svc.run_graduation(store, MASTER, NOW)["grad_retry"] == 2 and store.retry_args == (svc.RETRY_AFTER_HOURS, svc.RETRY_PER_RUN)

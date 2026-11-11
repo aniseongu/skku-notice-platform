@@ -12,7 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from skku_notice.ai_models import DEFAULT_MODEL, provider_or_default
+from skku_notice.ai_models import DEFAULT_MODEL, cap_for, provider_or_default
 from skku_notice.ai_providers import make_client
 from skku_notice.ai_router import Candidate, Preferences, RoutedClient
 from skku_notice.byok_crypto import ByokCryptoError, decrypt_api_key
@@ -52,8 +52,8 @@ class UserAi:
         return self.candidates[0].model if self.candidates else None
 
     def capped(self) -> bool:
-        """등록한 모든 키가 오늘 상한에 닿았다."""
-        return all(self.used.get(c.provider, 0) + self.client.usage.get(c.provider, 0) >= self.daily_calls for c in self.candidates)
+        """등록한 모든 키가 오늘 상한(업체마다 다르다)에 닿았다."""
+        return all(self.used.get(c.provider, 0) + self.client.usage.get(c.provider, 0) >= (c.cap or self.daily_calls) for c in self.candidates)
 
     def settle(self, store, now, counts: dict | None = None) -> None:
         """방금 호출을 키 행에 반영한다: 사용량, 거부된 키 비활성, 한도·오류 문구. 성공한 키는 오류 표시를 지운다."""
@@ -141,8 +141,9 @@ def build_user_ai(
             if counts is not None:
                 counts["errors"] = counts.get("errors", 0) + 1
             continue
-        if used[provider] < daily_calls and not _cooling(row, now):
-            candidates.append(Candidate(provider, row.get("model") or DEFAULT_MODEL[provider], api_key, used[provider]))
+        cap = cap_for(provider, daily_calls)
+        if used[provider] < cap and not _cooling(row, now):
+            candidates.append(Candidate(provider, row.get("model") or DEFAULT_MODEL[provider], api_key, used[provider], cap))
 
     def factory(provider: str, api_key: str):
         return gemini_client_for(api_key) if provider == "gemini" else provider_client_for(provider, api_key)

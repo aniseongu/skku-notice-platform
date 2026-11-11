@@ -17,6 +17,7 @@ import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifi
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
+import { aiKeysLead, connectedAiKeys } from './ai-keys';
 
 export interface SettingsModel {
   configured: boolean;
@@ -843,6 +844,8 @@ function Keys({ model }: { model: SettingsModel }) {
   return <div className="settings">
     <Back model={model} />
     <Section id="s-ai" title="AI 연결">
+      {/* 키를 몇 개 연결했느냐에 따라 달라지는 동작을 한 줄로 말한다(구역 제목 바로 아래, 구역마다 하나). */}
+      {model.byok?.available ? <p className="settings-lead">{aiKeysLead(connectedAiKeys(model))}</p> : null}
       <AiRows byok={model.byok} alignEnd={allConnected} />
     </Section>
   </div>;

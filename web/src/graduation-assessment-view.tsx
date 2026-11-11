@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { STATUS_TEXT, displayStatus, reasonOf, type GraduationAssessment, type Track, type VisibleTracks } from './graduation-assessment';
 
 export interface GraduationModel {
+  /** 연결한 AI 키 개수. 한도로 끝났을 때 다른 키를 더 연결하라고 안내할지 정한다. */
+  aiKeys?: number;
   tracks: VisibleTracks;
   assessment: GraduationAssessment | null;
   error: string;
@@ -76,6 +78,6 @@ export function GraduationNotes({ model }: { model: GraduationModel }) {
       {hasP3 ? <p className="m-0">3품은 근무 시간이 280시간 이상인지 확인해요</p> : null}
       {hasDept ? <p className="m-0">솦은 소프트웨어 업무인지와 근무 기간·시간을 확인해요</p> : null}
     </div> : null}
-    {ready.aiStatus && ready.aiStatus !== 'used' ? <p className="m-0 mt-[12px] text-ink-3" role="status">{AI_NOTE[ready.aiStatus]}</p> : null}
+    {ready.aiStatus && ready.aiStatus !== 'used' ? <p className="m-0 mt-[12px] text-ink-3" role="status">{AI_NOTE[ready.aiStatus]}{ready.aiStatus === 'limit' && (model.aiKeys ?? 3) < 3 ? '. 다른 AI 키를 더 연결하면 오늘도 더 확인해요' : ''}</p> : null}
   </div>;
 }

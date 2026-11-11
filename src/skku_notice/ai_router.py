@@ -32,6 +32,12 @@ class Candidate:
     model: str
     api_key: str = field(repr=False)  # repr에 키가 찍히지 않게 한다
     used_today: int = 0
+    cap: int = 0  # 이 키의 오늘 상한(업체마다 다르다). 0이면 모른다
+
+    @property
+    def load(self) -> float:
+        """오늘 상한 중 쓴 비율. 상한이 다른 키를 공평하게 비교하는 기준이다."""
+        return self.used_today / self.cap if self.cap else float(self.used_today)
 
 
 @dataclass
@@ -80,8 +86,9 @@ def select_candidates(candidates: list[Candidate], prefs: Preferences, needs_ima
         pool = [c for c in pool if supports_images(c.provider, c.model)]
         if not pool:
             return [], "model_unavailable"
-    # 오늘 덜 쓴 키를 먼저, 같으면 고정 순서. 어느 업체가 낫다고 하드코딩하지 않는다.
-    pool.sort(key=lambda c: (c.used_today, PROVIDER_ORDER[c.provider]))
+    # 오늘 상한 대비 덜 쓴 키를 먼저, 같으면 고정 순서. 어느 업체가 낫다고 하드코딩하지 않는다.
+    # 절대 횟수가 아니라 비율로 비교해서, 상한이 낮은 키가 먼저 바닥나지 않게 한다(LiteLLM의 업체별 rpm 한도 필터와 같은 생각).
+    pool.sort(key=lambda c: (c.load, PROVIDER_ORDER[c.provider]))
     return pool, None
 
 
@@ -108,7 +115,10 @@ class RoutedClient:
     def generate_content(self, **kwargs):
         ranked, reason = select_candidates(self._candidates, self._prefs, _has_image(kwargs.get("contents")))
         ranked = [c for c in ranked if c.provider not in self.cooldown and c.provider not in self.rejected
-                  and (self._provider_cap is None or c.used_today + self.usage.get(c.provider, 0) < self._provider_cap)]
+                  and (c.used_today + self.usage.get(c.provider, 0) < (c.cap or self._provider_cap or 10**9))]
+        # 이번 실행에서 방금 쓴 호출도 비율에 넣어, 한 키만 계속 쓰다 상한에 닿지 않고 키들을 번갈아 쓴다.
+        ranked.sort(key=lambda c: ((c.used_today + self.usage.get(c.provider, 0)) / c.cap if c.cap
+                                   else float(c.used_today + self.usage.get(c.provider, 0)), PROVIDER_ORDER[c.provider]))
         if not ranked:
             self._fail(reason or "quota_exhausted", None)
             raise NoProvider(self.fallback_reason or "quota_exhausted")

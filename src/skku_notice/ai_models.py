@@ -11,6 +11,18 @@ import re
 PROVIDERS = ("gemini", "groq", "openrouter")
 Provider = str  # "gemini" | "groq" | "openrouter"
 
+# 업체마다 무료 한도가 달라서 모든 키를 같은 숫자로 자르지 않는다. 하루 상한(daily_calls)에 업체별 비율을 곱한다.
+# 2026-11 웹 조사(공식 문서가 표를 내리거나 출처마다 달라 모두 바뀔 수 있다): Gemini Flash-Lite 무료 약 500회/일(분당 15회),
+# Groq 무료는 모델별 약 1,000회/일(분당 30회), OpenRouter 무료 모델은 크레딧이 없으면 50회/일이고 분당 20회는 계정 전체에 걸린다.
+# 그래서 앱 상한은 실제 한도보다 훨씬 낮게 두고, OpenRouter만 더 낮춘다.
+CAP_RATIO = {"gemini": 1.0, "groq": 1.0, "openrouter": 0.6}
+
+
+def cap_for(provider: str, daily_calls: int) -> int:
+    """이 업체의 키 하나에 오늘 쓸 수 있는 호출 수."""
+    return max(1, round(daily_calls * CAP_RATIO.get(provider, 1.0)))
+
+
 DEFAULT_MODEL = {
     "gemini": "gemini-3.1-flash-lite",
     "groq": "openai/gpt-oss-20b",
