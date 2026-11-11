@@ -2,6 +2,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { cleanTitle, deadlinePassed, deadlineText, daysLeft, safeUrl, type Notice, type Verdict } from './data';
 import { Reason } from './reason';
 import type { GradPart } from './graduation-assessment';
+import { CHECKBOX } from './cls';
 
 export interface NoticeRowModel {
   notice: Notice;
@@ -50,10 +51,12 @@ function NoticeRows({ model }: { model: NoticeRowsModel }) {
     const border = index > 0 ? 'border-t border-line' : 'min-[720px]:border-t min-[720px]:border-line';
     const ddayColor = urgent ? 'text-danger' : row.read ? 'text-ink-2' : passed ? 'text-ink-3' : '';
     const ddayWeight = row.read ? 'font-semibold' : passed ? 'font-medium' : 'font-bold';
-    return <li key={n.id} className={model.selecting ? 'batch-row' : ''}>
-      {model.selecting ? <label className="selection-check"><input type="checkbox" aria-label={`${title} 선택`} checked={row.selected}
+    // 선택 칸의 면(휴대폰): 고른 줄과 열린 줄은 짙게, 읽은 줄은 읽은 줄 면, 눌린 줄은 짙게. 넓은 화면은 칸이 줄 위에 겹쳐 면이 없다.
+    const checkBg = row.selected || row.current ? 'max-[719px]:bg-sunken' : row.read ? 'max-[719px]:bg-read' : 'max-[719px]:bg-transparent';
+    return <li key={n.id} className={model.selecting ? 'batch-row flex items-stretch bg-surface min-[720px]:relative max-[719px]:[&:has(.row:active)_.selection-check]:bg-sunken' : ''}>
+      {model.selecting ? <label className={`selection-check box-border grid min-h-[44px] w-[40px] flex-none cursor-pointer [place-items:center_start] pl-[var(--gutter)] min-[720px]:absolute min-[720px]:inset-y-0 min-[720px]:left-0 min-[720px]:z-[1] min-[720px]:w-[48px] min-[720px]:bg-transparent! min-[720px]:pl-[24px] ${checkBg} ${index > 0 ? 'border-t border-line' : ''}`}><input className={CHECKBOX} type="checkbox" aria-label={`${title} 선택`} checked={row.selected}
         onChange={() => model.toggleSelection(n.id)} /></label> : null}
-      <a className={`row ${row.dim ? 'dim' : ''} ${row.read ? 'read' : 'unread'} ${model.selecting ? ROW_LAYOUT_SELECTING : ROW_LAYOUT} ${hasReason ? DESKTOP_AREAS : DESKTOP_AREAS_NO_REASON} ${border} ${bg} ${hover} active:bg-sunken focus-visible:outline-offset-[-2px]`} href={safeUrl(n.url)} target="_blank" rel="noopener"
+      <a className={`row ${row.dim ? 'dim' : ''} ${row.read ? 'read' : 'unread'} ${model.selecting ? `${ROW_LAYOUT_SELECTING} min-w-0 flex-1` : ROW_LAYOUT} ${hasReason ? DESKTOP_AREAS : DESKTOP_AREAS_NO_REASON} ${border} ${bg} ${hover} active:bg-sunken focus-visible:outline-offset-[-2px]`} href={safeUrl(n.url)} target="_blank" rel="noopener"
         data-id={n.id} aria-current={row.current ? 'true' : 'false'} onClick={(event) => model.open(event.nativeEvent, n)}>
         <span className="visually-hidden">{row.read ? '읽은 공지' : '읽지 않은 공지'}</span>
         <span className={`meta ${META}`}><span className={`board ${META_SPAN} ${row.read ? '' : 'min-[720px]:text-ink-2 min-[720px]:font-semibold'}`}>{row.source}</span>{tags ? <span className={`cat ${META_SPAN}`} title={tags}>{tags}</span> : null}</span>

@@ -3,14 +3,7 @@
   @media (min-width: 720px) {
     body { overflow: hidden; }
     .icon-button { width: 36px; height: 36px; border-radius: var(--r-sm); }
-    /* 선택 모드에서 체크박스가 줄 왼쪽 여백(24px) 안에 겹쳐 들어가, 모드를 바꿔도 분류·제목 열이 밀리지 않는다. */
-    .batch-row { position: relative; }
-    .batch-row .selection-check { position: absolute; inset: 0 auto 0 0; width: 48px; padding-left: 24px; z-index: 1; background: none !important; }
-
     @media (hover: hover) {
-      .batch-row:has(.row:hover:not([aria-current="true"])) .selection-check {
-        background: color-mix(in oklch, var(--sunken) 70%, var(--surface));
-      }
       .icon-button:hover:not(:disabled) {
         background: color-mix(in oklch, var(--sunken) 70%, transparent);
       }
