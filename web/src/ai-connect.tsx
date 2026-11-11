@@ -28,9 +28,17 @@ const GUIDE: Record<Id, { url: string; placeholder: string; steps: string[] }> =
 
 const LABELS = { empty: '연결 안 됨', saved: '연결됨', disabled: '', broken: '키가 거절됐어요', retry: '바꾸기', close: '취소', add: '연결하기', edit: '바꾸기', remove: '연결 끊기', save: '연결하기' };
 
-function guideOf(id: Id) {
-  const g = GUIDE[id];
-  return <Guide compact label="키는 어디서 받나요?" steps={[ext(g.url, g.steps[0]), ...g.steps.slice(1), '키는 암호화해서 서버에만 보관하고, 연결하기 전에 한 번 확인해요']} />;
+const link = (id: Id) => <a key={id} href={GUIDE[id].url} target="_blank" rel="noopener noreferrer" className="mr-2 inline-block py-[2px]">{NAME[id]}</a>;
+
+/** 키 받는 방법은 모든 키가 같아서 맨 아래에 하나로 둔다. 연결했든 안 했든 언제든 펼쳐 볼 수 있다. */
+function SharedGuide() {
+  return <div className="setting"><Guide compact label="키는 어디서 받나요?" steps={[
+    <>쓸 곳을 하나 골라 키 만들기 화면을 열고 로그인해요. 처음이면 가입부터 해요<br />{link('groq')}{link('gemini')}{link('openrouter')}</>,
+    '"키 만들기"를 누르고 이름을 아무거나 적어요 (예: 성공). Gemini는 "API 키 만들기"를 눌러요',
+    '만들어진 키를 복사해요. 키는 이때 한 번만 보여요',
+    '위 입력칸에 붙여 넣고 "연결하기"를 눌러요',
+    '키는 암호화해서 서버에만 보관하고, 연결하기 전에 한 번 확인해요',
+  ]} /></div>;
 }
 
 /** AI 연결 줄들. 다른 설정 쪽과 같은 줄(이름, 설명, 오른쪽 조작) 모양이고, 연결한 개수에 따라 필요한 줄만 보인다. */
@@ -51,14 +59,15 @@ export function AiRows({ byok }: { byok?: Byok }) {
       const name = `${NAME[id]} 키`;
       if (id === 'gemini') {
         return <SecretRow key={id} name={name} help={BLURB[id]} placeholder={GUIDE[id].placeholder} status={byok.status} loading={byok.loading} busy={byok.busy}
-          error={byok.error} labels={LABELS} guide={guideOf(id)} valid={looksLikeAiKey}
+          error={byok.error} labels={LABELS} guide={null} valid={looksLikeAiKey}
           onRegister={byok.register} onRemove={byok.remove} />;
       }
       const status = ai.keys.find((key) => key.provider === id) ?? null;
       return <SecretRow key={id} name={name} help={BLURB[id]} placeholder={GUIDE[id].placeholder} status={status} loading={byok.loading} busy={ai.busy}
-        error={last === id ? ai.error : ''} labels={LABELS} guide={guideOf(id)} valid={looksLikeAiKey}
+        error={last === id ? ai.error : ''} labels={LABELS} guide={null} valid={looksLikeAiKey}
         onRegister={(key) => { setLast(id); ai.register(id as AiProvider, key); }} onRemove={() => { setLast(id); ai.remove(id as AiProvider); }} />;
     })}
+    <SharedGuide />
   </>;
 }
 

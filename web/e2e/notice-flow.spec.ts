@@ -249,9 +249,13 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await row.getByRole('button', { name: '보기' }).click();
   await expect(input).toHaveAttribute('type', 'text');
   await row.getByRole('button', { name: '숨기기' }).click();
-  await expect(screen.getByRole('link', { name: /Google AI Studio/ })).toBeHidden();
-  await screen.locator('.setting', { hasText: 'Gemini 키' }).getByText('키는 어디서 받나요?').click();
-  await expect(screen.getByRole('link', { name: /Google AI Studio/ })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
+  // 받는 방법은 키마다 두지 않고 맨 아래에 하나만 있다.
+  await expect(screen.getByText('키는 어디서 받나요?')).toHaveCount(1);
+  await expect(screen.getByRole('link', { name: 'Gemini' })).toBeHidden();
+  await screen.getByText('키는 어디서 받나요?').click();
+  await expect(screen.getByRole('link', { name: 'Gemini' })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
+  await expect(screen.getByRole('link', { name: 'Groq' })).toHaveAttribute('href', 'https://console.groq.com/keys');
+  await expect(screen.getByRole('link', { name: 'OpenRouter' })).toHaveAttribute('href', 'https://openrouter.ai/settings/keys');
   await save.click();
   expect(await calls(page)).toEqual([['register', key]]);
   await withApp(page, { byokStatus: { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 } });
