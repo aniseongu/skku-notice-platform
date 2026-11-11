@@ -39,7 +39,7 @@ SCHEMA = {
 
 
 
-_ENDING_ECHO = re.compile(r"\s*[~〜]\s*(?:예요|이에요|해요|돼요|되어요|있어요|없어요)\s*$")
+_ENDING_ECHO = re.compile(r"\s*[~〜\-–—]\s*(?:예요|이에요|해요|돼요|되어요|있어요|없어요)\s*$")
 
 
 def clean_reason(reason: str) -> str:
