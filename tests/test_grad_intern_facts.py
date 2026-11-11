@@ -305,3 +305,22 @@ def test_table_period_with_short_year_and_hours_per_week_are_read():
 def test_short_period_end_rolls_into_next_year_when_it_is_earlier():
     found = gf.build_facts("인턴", "근무기간 '26. 12. 15. ~ 1. 20.", None).facts
     assert found.start_date == date(2026, 12, 15) and found.end_date == date(2027, 1, 20)
+
+
+def test_period_after_a_label_with_approximate_length_is_read():
+    # 중소기업중앙회 공고(그림 글자): 이름표 뒤에 "약2.5개월("이 끼어 있고 끝 날짜에 연도가 없다. 5개월 같은 다른 숫자가 있어도 날짜가 우선이다.
+    text = "인턴 십: 약2.5개월(2027.02.15.~04.30.)\n서류 합격자 5개월 이내 개별 안내\n근무시간: 09:00~18:00 (1일8시간, 주5일)"
+    found = gf.build_facts("[중소기업중앙회] 인턴", text, None).facts
+    assert found.start_date == date(2027, 2, 15) and found.end_date == date(2027, 4, 30)
+    assert found.duration_days is None
+
+
+def test_period_end_inherits_year_or_rolls_over_and_rejects_nonsense():
+    from skku_notice.grad_intern_facts import PERIOD, period_dates
+    def dates(text):
+        match = PERIOD.search(text)
+        return period_dates(match) if match else None
+    assert dates("근무기간: 2026.12.15 ~ 1.20") == (date(2026, 12, 15), date(2027, 1, 20))
+    assert dates("인턴십 기간 2027년 3월 2일 ~ 2027년 6월 30일") == (date(2027, 3, 2), date(2027, 6, 30))
+    assert dates("근무기간: 2027.03.02 ~ 2029.06.30") is None  # 1년을 넘는 범위는 근무 기간으로 보지 않는다
+    assert dates("근무기간: 2027.02.30 ~ 04.30") is None  # 없는 날짜

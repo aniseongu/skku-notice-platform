@@ -21,15 +21,35 @@ from skku_notice.grad_intern_rules import ORG_TYPES, TASK_CATEGORIES, WORK_MODES
 MAX_TEXT = 6000
 LEGAL_FORM = re.compile(r"\(주\)|㈜|주식회사|유한회사|유한책임회사|합자회사|재단법인|사단법인|\bInc\.?|\bCorp\.?|\bCo\.,?\s*Ltd\.?", re.I)
 DATE = r"(20\d{2})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})\s*일?"
+# 근무 기간 범위. 오픈소스 시간 표현 추출기들이 하는 대로 한쪽의 생략을 다른 쪽에서 복원한다:
+# 연도는 4자리(2027)나 줄임표(\'27)로 적히고, 끝 날짜의 연도는 생략되면 시작 연도를 물려받으며(끝이 더 이르면 다음 해),
+# 이름표와 날짜 사이의 "약 2.5개월(" 같은 말과 요일 "(월)"을 건너뛴다.
+_SEP = r"\s*[.\-/]\s*"
+_YEAR = r"(?:['’‘`](?P<{p}2>\d{{2}})|(?P<{p}4>20\d{{2}}))"
 PERIOD = re.compile(
-    r"(?:근무|인턴(?:십)?|실습|활동|교육)\s*(?:기간|일정)\s*[:：]?\s*" + DATE + r"\s*\(?[가-힣]?\)?\s*[~\-–∼부터]+\s*" + DATE
+    r"(?:(?:근무|인턴(?:\s*십)?|실습|활동|교육)\s*(?:기간|일정)|인턴\s*십)\s*[:：]?\s*"
+    r"(?:약\s*\d+(?:\.\d+)?\s*(?:개월|주|일)\s*)?[(\[]?\s*"
+    + _YEAR.format(p="sy") + r"\s*[.\-/년]\s*(?P<sm>\d{1,2})\s*[.\-/월]\s*(?P<sd>\d{1,2})\s*일?"
+    r"\s*\.?\s*\(?[가-힣]?\)?\s*(?:[~\-–∼]|부터)\s*"
+    r"(?:" + _YEAR.format(p="ey") + r"\s*[.\-/년]\s*)?(?P<em>\d{1,2})\s*[.\-/월]\s*(?P<ed>\d{1,2})\s*일?"
 )
-# 표로 된 공고: "근무기간 '27. 1. 4.(월) ~ 2. 12.(금) 예정"처럼 연도를 두 자리로 줄이고 끝 날짜의 연도를 생략한 경우
-_SD = r"\s*[.\-/]\s*"
-PERIOD_SHORT = re.compile(
-    r"(?:근무|인턴(?:십)?|실습|활동|교육)\s*(?:기간|일정)\s*[:：]?\s*['’‘`](\d{2})" + _SD + r"(\d{1,2})" + _SD + r"(\d{1,2})\s*\.?\s*\(?[가-힣]?\)?"
-    r"\s*[~\-–∼]\s*(?:['’‘`]?(\d{2})" + _SD + r")?(\d{1,2})" + _SD + r"(\d{1,2})"
-)
+
+
+def period_dates(match: re.Match) -> tuple[date, date] | None:
+    """PERIOD 일치에서 (시작, 끝) 날짜를 만든다. 끝의 연도는 시작 연도를 물려받고, 끝이 더 이르면 다음 해로 본다."""
+    year = int(match.group("sy4") or 2000 + int(match.group("sy2")))
+    end_year = match.group("ey4") or (2000 + int(match.group("ey2")) if match.group("ey2") else None)
+    start = _iso(str(year), match.group("sm"), match.group("sd"))
+    end = _iso(str(int(end_year) if end_year else year), match.group("em"), match.group("ed"))
+    if start and not end_year and end is None:
+        return None
+    if start and end and not end_year and end < start:
+        end = _iso(str(year + 1), match.group("em"), match.group("ed"))
+    if start and end and end >= start and (end - start).days <= 366:
+        return start, end
+    return None
+
+
 FULL_TIME = re.compile(r"전일제|풀\s*타임|full[\s-]?time|주\s*5\s*일\s*(?:\(?\s*)?(?:풀|전일)", re.I)
 PART_TIME = re.compile(r"파트\s*타임|시간제|part[\s-]?time", re.I)
 TOTAL_HOURS = re.compile(r"(?:총|합계)\s*(\d{2,4})\s*시간")
@@ -197,21 +217,10 @@ def static_facts(title: str, body: str) -> dict:
         found["work_mode"] = "part_time"
         found["evidence"].append({"field": "work_mode", "quote": part.group(0)})
     period = PERIOD.search(text)
-    if period:
-        start, end = _iso(*period.group(1, 2, 3)), _iso(*period.group(4, 5, 6))
-        if start and end and end >= start:
-            found["start_date"], found["end_date"] = start, end
-            found["evidence"].append({"field": "period", "quote": period.group(0)})
-    if "start_date" not in found and (short := PERIOD_SHORT.search(text)):
-        year = 2000 + int(short.group(1))
-        end_year = 2000 + int(short.group(4)) if short.group(4) else year
-        start = _iso(str(year), short.group(2), short.group(3))
-        end = _iso(str(end_year), short.group(5), short.group(6))
-        if start and end and not short.group(4) and end < start:
-            end = _iso(str(year + 1), short.group(5), short.group(6))
-        if start and end and end >= start:
-            found["start_date"], found["end_date"] = start, end
-            found["evidence"].append({"field": "period", "quote": short.group(0)})
+    dates = period_dates(period) if period else None
+    if period and dates:
+        found["start_date"], found["end_date"] = dates
+        found["evidence"].append({"field": "period", "quote": period.group(0)})
     if "start_date" not in found:
         month_hits = {int(next(g for g in m.groups() if g)) for m in MONTHS.finditer(text)}
         if len(month_hits) == 1 and 1 <= (months := month_hits.pop()) <= 24:
