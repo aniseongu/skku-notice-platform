@@ -870,7 +870,7 @@ function Feedback({ model }: { model: SettingsModel }) {
   const [email, setEmail] = useState('');
   const [mailTouched, setMailTouched] = useState(false);
   const [state, setState] = useState<'idle' | 'sending' | FeedbackResult>('idle');
-  const wrap = 'settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:max-w-[720px] min-[720px]:px-[24px] min-[720px]:pb-[48px]';
+  const wrap = 'settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]';
   if (!model.userId) return <div className={wrap}><Back model={model} /><Section id="s-feedback" title="문의하기"><LoginNote model={model} what="문의하기" /></Section></div>;
   const problem = feedbackProblem(body, email);
   const mailProblem = email.trim() ? feedbackProblem('x', email) : null;
@@ -905,10 +905,10 @@ function Feedback({ model }: { model: SettingsModel }) {
           {mailTouched && mailProblem ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">메일 주소 형식이 맞는지 확인해 주세요</p> : null}
         </Setting>
       </div>
-      <p className="m-0 mt-[12px] px-[4px] text-[13px] leading-[19px] text-ink-3">운영자만 읽을 수 있어요. 하루 5번까지 보낼 수 있어요</p>
+      <p className="m-0 mt-[12px] px-[4px] text-[13px] leading-[19px] text-ink-3 min-[720px]:px-0 min-[720px]:text-right">운영자만 읽을 수 있어요. 하루 5번까지 보낼 수 있어요</p>
     </section>
     {/* 보내기는 휴대폰에서 엄지 자리(아래 고정)에 둔다. 키보드가 올라와도 가려지지 않게 화면 바닥에 붙는다. */}
-    <div className="sticky bottom-0 z-[1] mt-[16px] flex flex-col gap-[8px] bg-bg pt-[12px] pb-[calc(12px+env(safe-area-inset-bottom))] max-[719px]:-mx-[var(--gutter)] max-[719px]:px-[var(--gutter)] max-[719px]:border-t max-[719px]:border-line min-[720px]:static min-[720px]:bg-transparent min-[720px]:p-0">
+    <div className="sticky bottom-0 z-[1] mt-[16px] flex flex-col gap-[8px] bg-bg pt-[12px] pb-[calc(12px+env(safe-area-inset-bottom))] max-[719px]:-mx-[var(--gutter)] max-[719px]:px-[var(--gutter)] max-[719px]:border-t max-[719px]:border-line min-[720px]:static min-[720px]:items-end min-[720px]:bg-transparent min-[720px]:p-0 min-[720px]:text-right">
       <button type="button" className="solid-button inline-flex items-center justify-center py-0 rounded-md border-0 bg-accent text-on-accent text-[16px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2 min-h-[52px] w-full px-4 min-[720px]:w-[240px]" disabled={blocked} onClick={() => { void submit(); }}>{state === 'sending' ? '보내고 있어요' : '보내기'}</button>
       {state === 'ok' ? <p className="m-0 text-[14px] leading-[20px] font-semibold text-accent" role="status">보냈어요. 남겨 주셔서 고마워요</p> : null}
       {state === 'error' ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">보내지 못했어요. 잠시 뒤 다시 시도해 주세요</p> : null}
