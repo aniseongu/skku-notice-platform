@@ -154,8 +154,11 @@ def static_task_category(title: str, body: str) -> tuple[str, str] | None:
         name = max(sw, key=lambda k: sw[k])
         hit = SW_WORDS[name].search(scope)
         return name, hit.group(0) if hit else name
-    if non and not sw and match:  # 담당 업무 칸이 있고 소프트웨어 말이 하나도 없을 때만 소프트웨어가 아니라고 본다
-        return "non_software", non.group(0)
+    if non and not sw:
+        # 소프트웨어 말이 하나도 없고 비SW 말이 있으면 소프트웨어가 아니라고 본다. 담당 업무 칸이 없는 공고는 제목과 앞부분만 보므로,
+        # 그때는 제목에 비SW 말이 있을 때만 단정한다(본문 앞부분의 회사 소개 문구로 단정하지 않는다).
+        if match or NON_SW_WORDS.search(title):
+            return "non_software", non.group(0)
     return None
 
 
@@ -322,7 +325,12 @@ def _pick_date(value: object) -> date | None:
     return day if 2000 <= day.year <= 2100 else None
 
 
-def build_facts(title: str, body: str, ai: dict | None) -> Extracted:
+# 사용자별 LLM 판정(user_notice_judgments)의 이유가 "소프트웨어 개발 직무가 아니다"는 뜻이면 담당 업무 근거로 다시 쓴다.
+# 같은 공고를 다시 읽는 AI 호출이 없다. 대상이 아니라서 not_relevant인 경우(경력 필수 등)는 이 말이 없으므로 쓰지 않는다.
+NON_DEV_REASON = re.compile(r"(?:소프트웨어|개발|IT|프로그래밍)[^.]{0,25}(?:거리가|아니|무관|관련이?\s*(?:없|적))|비\s*개발")
+
+
+def build_facts(title: str, body: str, ai: dict | None, judgment: tuple[str | None, str | None] | None = None) -> Extracted:
     """정규식 사실과 Gemini 사실을 합친다. 근거 문장이 원문에 없는 핵심 값은 모르는 값으로 되돌린다."""
     text = f"{title}\n{body}"[:MAX_TEXT]
     static = static_facts(title, body)
@@ -376,6 +384,19 @@ def build_facts(title: str, body: str, ai: dict | None) -> Extracted:
         raw_tasks = ai.get("tasks")
         if isinstance(raw_tasks, list):
             tasks = [t.strip()[:120] for t in raw_tasks if isinstance(t, str) and quote_in_text(t, text)][:5]
+
+    verdict, reason = judgment or (None, None)
+    if values.get("task_category", "unknown") == "unknown" and isinstance(reason, str):
+        # 같은 사용자의 LLM 판정을 담당 업무 근거로 다시 쓴다(AI 호출 없음). 공고에서 읽은 분야가 있으면 그쪽이 우선이다.
+        if verdict == "not_relevant" and NON_DEV_REASON.search(reason):
+            values["task_category"] = "non_software"
+            evidence.append({"field": "tasks", "quote": reason.strip()[:160], "source": "judgment"})
+        elif verdict == "relevant":
+            # "해당"이라는 판정은 소프트웨어 직무라는 뜻이다. 이유에 적힌 말로 학과의 업무 분야를 정하고, 분야를 알 수 없으면 쓰지 않는다.
+            sw = {name: len(pattern.findall(reason)) for name, pattern in SW_WORDS.items() if pattern.search(reason)}
+            if sw and not NON_DEV_REASON.search(reason):
+                values["task_category"] = max(sw, key=lambda k: sw[k])
+                evidence.append({"field": "tasks", "quote": reason.strip()[:160], "source": "judgment"})
 
     if org_name is None and isinstance(static.get("organization_name"), str):
         org_name = static["organization_name"]

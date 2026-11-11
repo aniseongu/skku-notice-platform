@@ -90,8 +90,9 @@ def test_t08_work_mode_unknown_needs_review_even_if_long():
 
 
 def test_t09_and_t16_missing_or_title_only_task_needs_review():
-    assert dept(facts(task_category="unknown")) == CONDITIONAL
-    assert dept(facts(task_category="other")) == CONDITIONAL
+    # 담당 업무가 SW인지 모르면 조건부 가능으로 올리지 않는다(다른 조건이 다 맞아도 확인 필요).
+    assert dept(facts(task_category="unknown")) == NEEDS_REVIEW
+    assert dept(facts(task_category="other")) == NEEDS_REVIEW
 
 
 def test_t10_unverified_corporation_needs_review():

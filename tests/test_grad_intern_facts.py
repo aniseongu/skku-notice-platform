@@ -253,3 +253,29 @@ def test_코드만으로_근무시간과_개발_말에서_근무_형태와_업�
     assert pt.facts.work_mode == "part_time"
     nine = build_facts("[회사] 인턴", "근무시간 09:00 ~ 18:00\n", None)
     assert nine.facts.work_mode == "full_time"
+
+
+def test_title_only_non_software_postings_are_not_software_and_mixed_ones_stay_unknown():
+    assert gf.static_task_category("[㈜브랜드] 영상 콘텐츠 제작 인턴 모집", "자세한 내용은 아래를 확인하세요")[0] == "non_software"
+    assert gf.static_task_category("[㈜가나] 마케팅 데이터 분석 인턴", "") is None  # 섞여 있으면 단정하지 않는다
+    assert gf.static_task_category("[㈜가나] 인턴 모집", "마케팅 회사입니다 " * 5) is None  # 제목에 근거가 없으면 단정하지 않는다
+
+
+def test_the_users_llm_judgment_is_reused_as_the_work_evidence_without_another_ai_call():
+    reason = "자동차 정비 및 진단 직무를 수행하는 서비스엔지니어 채용으로 소프트웨어 개발 직무와 거리가 멉니다."
+    got = gf.build_facts("[㈜가나] 서비스엔지니어 인턴", "근무: 전일제", None, ("not_relevant", reason))
+    assert got.facts.task_category == "non_software"
+    assert any(e.get("source") == "judgment" for e in got.evidence)
+    # 대상이 아니라서 not_relevant인 경우(경력 필수 등)나 relevant 판정은 담당 업무 근거로 쓰지 않는다.
+    assert gf.build_facts("[㈜가나] 인턴", "", None, ("not_relevant", "경력 3년 이상 필수라 지원할 수 없어요")).facts.task_category == "unknown"
+    assert gf.build_facts("[㈜가나] 인턴", "", None, ("relevant", reason)).facts.task_category == "unknown"
+    # 공고에서 읽은 분야가 있으면 그것이 우선이다.
+    assert gf.build_facts("[㈜가나] 백엔드 개발 인턴", "담당 업무: 서버 개발", None, ("not_relevant", reason)).facts.task_category != "non_software"
+
+
+def test_a_relevant_judgment_with_a_clear_software_reason_becomes_the_work_field():
+    got = gf.build_facts("[㈜가나] 인턴 모집", "근무: 전일제", None, ("relevant", "백엔드 서버 개발 업무라서 소프트웨어 직무예요"))
+    assert got.facts.task_category == "application_embedded"
+    assert any(e.get("source") == "judgment" for e in got.evidence)
+    # 이유에서 업무 분야를 읽을 수 없으면 쓰지 않는다.
+    assert gf.build_facts("[㈜가나] 인턴 모집", "", None, ("relevant", "학부생이 지원할 수 있어요")).facts.task_category == "unknown"

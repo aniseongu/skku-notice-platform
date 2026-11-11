@@ -203,3 +203,13 @@ def test_같은_공고의_사실은_공유_캐시로_다시_쓰고_Gemini를_부
     counts = svc.run_graduation(store, MASTER, NOW, client_factory=lambda key: type("C", (), {"models": models})(), sleep=lambda s: None)
     assert models.calls == 0 and counts["grad_shared"] == 1 and store.saved[0]["ai_status"] == "used"
     assert EXTRACTOR_VERSION  # 캐시 키에 추출기 버전이 들어간다
+
+
+def test_a_not_software_llm_judgment_makes_the_department_result_not_eligible():
+    req = request()
+    req.update(title="[(주)예시] 서비스엔지니어 인턴", body="근무형태: 전일제 근무\n근무기간: 2026.12.21 ~ 2027.02.28",
+               judgment_verdict="not_relevant", judgment_reason="자동차 정비 직무라서 소프트웨어 개발 직무와 거리가 멉니다.")
+    store, models = Store([req], None), Models(AI)
+    run(store, models)
+    assert store.saved[0]["department"]["status"] == "NOT_ELIGIBLE"
+    assert models.calls == 0  # 이미 있는 판정을 읽을 뿐 AI를 더 부르지 않는다

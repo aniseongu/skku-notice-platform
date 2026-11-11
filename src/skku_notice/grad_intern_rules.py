@@ -213,7 +213,9 @@ def _combine(checks: list[Check], rough: bool = False) -> str:
     if any(c.result == FAIL for c in checks):
         return NOT_ELIGIBLE
     if any(c.result == UNKNOWN for c in checks):
-        return CONDITIONAL if rough else NEEDS_REVIEW
+        # 담당 업무가 SW인지 모르면 조건부 가능으로 올리지 않는다. 학과 요건의 핵심이 SW 업무이기 때문이다(명세 A-3).
+        work_unknown = any(c.rule_id == "DEPT-WORK" and c.result == UNKNOWN for c in checks)
+        return CONDITIONAL if rough and not work_unknown else NEEDS_REVIEW
     return LIKELY
 
 

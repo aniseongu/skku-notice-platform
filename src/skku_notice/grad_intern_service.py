@@ -36,8 +36,8 @@ def profile_from_row(row: dict) -> GradProfile:
     return GradProfile(year if isinstance(year, int) else None, track, sw_major, selected if isinstance(selected, bool) else None)
 
 
-def assess(profile: GradProfile, title: str, body: str, ai: dict | None) -> dict:
-    extracted = build_facts(title, body, ai)
+def assess(profile: GradProfile, title: str, body: str, ai: dict | None, judgment: tuple | None = None) -> dict:
+    extracted = build_facts(title, body, ai, judgment)
     return {
         "department": assess_department(profile, extracted.facts).as_dict(),
         "university_3p": assess_university_3p(profile, extracted.facts).as_dict(),
@@ -109,7 +109,8 @@ def run_graduation(store, master_key: str, now: datetime, client_factory=None, s
                     if hasattr(store, "save_ai_facts"):
                         store.save_ai_facts(notice_id, text_hash, EXTRACTOR_VERSION, ai, model)
 
-        result = assess(profile_from_row(req), req["title"], req.get("body") or "", ai)
+        result = assess(profile_from_row(req), req["title"], req.get("body") or "", ai,
+                        (req.get("judgment_verdict"), req.get("judgment_reason")))
         store.save_assessment({
             "user_id": user_id, "notice_id": notice_id, "status": "READY", "input_hash": req.get("input_hash"),
             "ruleset_version": DEPT_RULESET, "extractor_version": EXTRACTOR_VERSION, "ai_status": ai_status,
