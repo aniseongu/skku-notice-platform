@@ -14,6 +14,7 @@ test('feedback is insert-only, bound to the signed-in account, validated and rat
       grant usage on schema auth to authenticated, anon; insert into auth.users values ('${a}'), ('${b}');`);
     await db.exec(await readFile(new URL('../../supabase/migrations/20261112190000_user_feedback.sql', import.meta.url), 'utf8'));
     await db.exec(await readFile(new URL('../../supabase/migrations/20261112200000_user_feedback_limit_lock.sql', import.meta.url), 'utf8'));
+    await db.exec(await readFile(new URL('../../supabase/migrations/20261112220000_user_feedback_email_strict.sql', import.meta.url), 'utf8'));
     await db.exec(`set role authenticated; set request.jwt.claim.sub = '${a}';`);
     await db.exec(`insert into user_feedback(kind, body) values ('question', '로그인이 안 돼요')`);
     await db.exec(`insert into user_feedback(kind, body, reply_email) values ('idea', '다크 모드 좋아요', 'me@example.com')`);
@@ -28,6 +29,10 @@ test('feedback is insert-only, bound to the signed-in account, validated and rat
     await assert.rejects(db.exec(`insert into user_feedback(kind, body) values ('bug', '   ')`), /check constraint/);
     await assert.rejects(db.exec(`insert into user_feedback(kind, body) values ('bug', '${'가'.repeat(501)}')`), /check constraint/);
     await assert.rejects(db.exec(`insert into user_feedback(kind, body, reply_email) values ('bug', 'x', 'not-an-email')`), /check constraint/);
+    // 메일 서비스가 거부할 모양은 처음부터 받지 않는다(쉼표, 꺾쇠, 공백, 한글).
+    for (const bad of ['a,b@c.de', 'x<y>@z.wx', 'a b@c.de', '한글@도메인.한국']) {
+      await assert.rejects(db.exec(`insert into user_feedback(kind, body, reply_email) values ('bug', 'x', '${bad}')`), /check constraint/, bad);
+    }
     // 24시간에 5건까지(이미 2건 보냈다).
     for (let i = 0; i < 3; i++) await db.exec(`insert into user_feedback(kind, body) values ('question', '${i}번째')`);
     await assert.rejects(db.exec(`insert into user_feedback(kind, body) values ('question', '여섯 번째')`), /feedback_limit/);

@@ -172,6 +172,7 @@ def test_feedback_batch_marks_only_sent_rows_and_needs_key_and_address(monkeypat
             return [
                 {"id": "f1", "kind": "question", "body": "하나"},
                 {"id": "f2", "kind": "question", "body": "둘"},
+                {"id": "f3", "kind": "question", "body": "셋", "reply_email": "a,b@c.de"},
             ]
 
         def mark_feedback(self, feedback_id, now):
@@ -183,21 +184,33 @@ def test_feedback_batch_marks_only_sent_rows_and_needs_key_and_address(monkeypat
 
     def fake_post(url, headers, json, timeout):
         posted.append((url, headers["Authorization"], json["to"], json["subject"]))
-        return Response(200 if len(posted) == 1 else 500)
+        return Response({1: 200, 2: 500, 3: 422}.get(len(posted), 200))
 
     monkeypatch.setattr(pc.requests, "post", fake_post)
     now = datetime.now(UTC)
     sender = "성공 <onboarding@resend.dev>"
     counts = pc.run_feedback_batch(FakeStore(), "re_key", "owner@example.com", sender, now)
-    assert counts == {"feedback_sent": 1, "feedback_retry": 1}
-    assert marked == ["f1"]
+    # 1번은 보냄, 2번은 서버 오류라 다시, 3번은 글 때문에 거부(422)라 넘긴다(막힌 글이 뒤를 막지 않게).
+    assert counts == {"feedback_sent": 1, "feedback_retry": 1, "feedback_dropped": 1}
+    assert marked == ["f1", "f3"]
     assert posted[0][:3] == ("https://api.resend.com/emails", "Bearer re_key", ["owner@example.com"])
 
     class Untouched:
         def feedback_pending(self):
             raise AssertionError("읽지 않아야 한다")
 
-    nothing = {"feedback_sent": 0, "feedback_retry": 0}
+    nothing = {"feedback_sent": 0, "feedback_retry": 0, "feedback_dropped": 0}
     assert pc.run_feedback_batch(Untouched(), "", "owner@example.com", "x", now) == nothing
     assert pc.run_feedback_batch(Untouched(), "re_key", "", "x", now) == nothing
     assert pc.run_feedback_batch(Untouched(), "re_key", "not-an-email", "x", now) == nothing
+
+
+def test_reply_to_only_uses_plain_addresses():
+    from skku_notice.push_collection import feedback_mail
+
+    for bad in ["a,b@c.de", "x<y>@z.wx", "a b@c.de", "한글@도메인.한국", "a@b", "a@@b.cd"]:
+        row = {"kind": "bug", "body": "x", "reply_email": bad, "created_at": "t"}
+        assert "reply_to" not in feedback_mail(row), bad
+    address = "first.last+tag@sub.example.co.kr"
+    good = feedback_mail({"kind": "bug", "body": "x", "reply_email": address, "created_at": "t"})
+    assert good["reply_to"] == address

@@ -227,7 +227,8 @@ def run_canvas_batch(store: PushStore, private_key: str, subject: str, now: date
 
 FEEDBACK_KIND_LABEL = {"question": "문의", "bug": "버그", "idea": "바라는 점"}
 RESEND_URL = "https://api.resend.com/emails"
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# 운영자 주소와 답장 메일 모두 이 모양만 받는다(DB의 user_feedback 검사와 같은 기준).
+EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$")
 
 
 def feedback_mail(row: dict) -> dict:
@@ -244,8 +245,13 @@ def feedback_mail(row: dict) -> dict:
     return mail
 
 
-def send_feedback_mail(api_key: str, sender: str, to: str, mail: dict) -> bool:
-    """Resend로 한 통을 보낸다. 실패 사유(키, 응답 본문)는 남기지 않는다."""
+def send_feedback_mail(api_key: str, sender: str, to: str, mail: dict) -> str:
+    """Resend로 한 통을 보낸다. sent, retry(나중에 다시), drop(이 글은 영영 안 된다) 중 하나를 돌려준다.
+
+    400·422처럼 글 자체 때문에 거부되면 drop이라 막힌 글 하나가 뒤의 알림을 막지 않는다.
+    키 문제(401·403), 한도(429), 서버 오류와 네트워크 실패는 retry다.
+    실패 사유(키, 응답 본문)는 남기지 않는다.
+    """
     try:
         response = requests.post(
             RESEND_URL,
@@ -253,9 +259,11 @@ def send_feedback_mail(api_key: str, sender: str, to: str, mail: dict) -> bool:
             json={"from": sender, "to": [to], **mail},
             timeout=15,
         )
-        return 200 <= response.status_code < 300
     except requests.RequestException:
-        return False
+        return "retry"
+    if 200 <= response.status_code < 300:
+        return "sent"
+    return "drop" if response.status_code in (400, 422) else "retry"
 
 
 def run_feedback_batch(
@@ -265,15 +273,16 @@ def run_feedback_batch(
 
     키나 받는 주소가 없으면 읽지도 보내지도 않는다(나중에 설정하면 그때 보낸다).
     """
-    counts = {"feedback_sent": 0, "feedback_retry": 0}
+    counts = {"feedback_sent": 0, "feedback_retry": 0, "feedback_dropped": 0}
     if not api_key or not EMAIL_RE.match(to):
         return counts
     for row in store.feedback_pending():
-        if send_feedback_mail(api_key, sender, to, feedback_mail(row)):
-            store.mark_feedback(row["id"], now)
-            counts["feedback_sent"] += 1
-        else:
+        outcome = send_feedback_mail(api_key, sender, to, feedback_mail(row))
+        if outcome == "retry":
             counts["feedback_retry"] += 1
+            continue
+        store.mark_feedback(row["id"], now)
+        counts["feedback_sent" if outcome == "sent" else "feedback_dropped"] += 1
     return counts
 
 
@@ -301,7 +310,8 @@ def main() -> int:
     print(
         f"Push worker: sent={counts['sent']} expired={counts['expired']} retry={counts['retry']} "
         f"canvas_sent={canvas['canvas_sent']} canvas_failed={canvas['canvas_failed']} "
-        f"feedback_sent={feedback['feedback_sent']} feedback_retry={feedback['feedback_retry']}",
+        f"feedback_sent={feedback['feedback_sent']} feedback_retry={feedback['feedback_retry']} "
+        f"feedback_dropped={feedback['feedback_dropped']}",
         flush=True,
     )
     return int(counts["retry"] > 0)
