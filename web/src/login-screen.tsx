@@ -60,7 +60,8 @@ export function LoginScreen({ app }: { app: AppController }) {
           {mode === 'ios' ? <p className="m-0 text-center text-[14px] leading-[21px] text-ink-2">공유 버튼에서 <b className="font-semibold text-ink">‘홈 화면에 추가’</b>를 고르면<br />앱처럼 쓸 수 있어요</p> : null}
         </div>
         {/* 서비스 정보: 처리방침 말고 눈에 띄지 않게 한 줄. 문의는 공개 이슈로 받는다(개인 연락처를 적지 않는다). */}
-        <p className="m-0 mt-[20px] text-center text-[12px] leading-[18px] text-ink-3"><a className="inline-block px-[6px] py-[13px] -my-[13px] text-ink-3 underline underline-offset-2" href="https://github.com/aniseongu/skku-notice-platform/issues" target="_blank" rel="noopener noreferrer">문의하기</a> · <a className="inline-block px-[6px] py-[13px] -my-[13px] text-ink-3 underline underline-offset-2" href="https://github.com/aniseongu/skku-notice-platform" target="_blank" rel="noopener noreferrer">오픈소스</a></p>
+        <p className="m-0 mt-[20px] text-center text-[12px] leading-[18px] text-ink-3 min-[720px]:mt-[36px]"><a className="inline-block px-[6px] py-[13px] -my-[13px] text-ink-3 underline underline-offset-2" href="https://github.com/aniseongu/skku-notice-platform/issues" target="_blank" rel="noopener noreferrer">문의하기</a> · <a className="inline-block px-[6px] py-[13px] -my-[13px] text-ink-3 underline underline-offset-2" href="https://github.com/aniseongu/skku-notice-platform" target="_blank" rel="noopener noreferrer">오픈소스</a></p>
+        <p className="m-0 mt-[4px] text-center text-[12px] leading-[18px] text-ink-3">성균관대학교와 무관한 개인 프로젝트예요</p>
       </div>
     </div>
   </div>;
