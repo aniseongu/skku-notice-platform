@@ -569,7 +569,7 @@ export class AppController extends Reactive {
     if (statuses) this.graduationStatuses = statuses;
   }
 
-  /** 내 졸업요건 판정 요약(공지 번호별). 목록 표지와 "졸업요건 충족만"에 쓴다. */
+  /** 내 졸업요건 판정 요약(공지 번호별). 목록 표지와 "인턴십 충족만"에 쓴다. */
   graduationStatuses = new Map<string, GraduationStatuses>();
   graduationOnly = remember('view-grad') === '1';
   /** 목록에 졸업요건 표지를 보여 줄 수 있는 사용자인지: 로그인했고 아직 채우지 않은 요건이 있다. */

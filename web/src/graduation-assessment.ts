@@ -169,7 +169,7 @@ export function gradParts(statuses: GraduationStatuses | undefined, tracks: Visi
   return parts;
 }
 
-/** 내 판정 결과의 요약만 한 번에 읽는다(목록 표지와 "졸업요건 충족만 보기"에 쓴다). */
+/** 내 판정 결과의 요약만 한 번에 읽는다(목록 표지와 "인턴십 충족만 보기"에 쓴다). */
 export async function loadGraduationStatuses(client: SupabaseClient, userId: string): Promise<Map<string, GraduationStatuses>> {
   const { data, error } = await client.from('user_notice_graduation_assessments').select('notice_id,department,university_3p,facts')
     .eq('user_id', userId).eq('status', 'READY').limit(1000);

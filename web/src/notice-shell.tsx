@@ -280,7 +280,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
       if (app.query) return <Empty title={`'${app.query}'에 맞는 공지가 없어요`} body="다른 단어로 찾아보세요" action="검색어 지우기" onAction={() => { app.query = ''; }} />;
       if (app.keyword && app.view !== 'saved' && app.unreadOnly) return <Empty title={`'${app.keyword}'에 맞는 읽지 않은 공지가 없어요`} body="읽지 않은 공지만 보기를 끄면 모든 공지를 볼 수 있어요" />;
       if (app.keyword) return <Empty title={`'${app.keyword}'에 맞는 공지가 아직 없어요`} body="새 글이 오면 여기에 모여요" />;
-      if (app.view !== 'saved' && app.graduationOnly && app.gradEnabled()) return <Empty title="졸업요건에 맞는 공고가 아직 없어요" body="졸업요건 충족만 보기를 끄면 모든 공고를 볼 수 있어요" />;
+      if (app.view !== 'saved' && app.graduationOnly && app.gradEnabled()) return <Empty title="인턴십 요건에 맞는 공고가 아직 없어요" body="인턴십 충족만 보기를 끄면 모든 공고를 볼 수 있어요" />;
       if (app.view !== 'saved' && app.unreadOnly) return <Empty title="읽지 않은 공지가 없어요" body="읽지 않은 공지만 보기를 끄면 모든 공지를 볼 수 있어요" />;
       const [heading, body] = {
         all: ['이 게시판에 공지가 없어요', '다른 게시판을 골라 보세요'],
@@ -366,7 +366,7 @@ function ViewFilters({ app }: { app: AppController }) {
         app.graduationOnly = !app.graduationOnly;
         app.selectedId = null;
         remember('view-grad', app.graduationOnly ? '1' : '0');
-      }}><span className="filter-check" aria-hidden="true"></span>졸업요건 충족만</button> : null}
+      }}><span className="filter-check" aria-hidden="true"></span>인턴십 충족만</button> : null}
     </div>
     <div className="view-actions">{select}<SortSelect app={app} /></div>
   </div>;
