@@ -208,11 +208,6 @@ function Overview({ model }: { model: SettingsModel }) {
         <Choice label="목록 보기" value={model.subscriptionsOnly ? 'mine' : 'all'} disabled={model.loading || !!model.error}
           options={[['all', '모든 게시판'], ['mine', '받는 게시판만']]} onPick={(value) => model.setSubscriptionsOnly(value === 'mine')} />
       </Setting> : null}
-      <a className="settings-link" href="privacy.html">
-        <span><span className="setting-name">개인정보 처리방침</span>
-          <span className="setting-help">어떤 정보를 어디에 쓰고 어떻게 지우는지 알려 드려요</span></span>
-        <span className="settings-chevron" aria-hidden="true" />
-      </a>
       {model.canInstall ? <Setting name="앱 설치" help="바탕화면이나 홈 화면에서 바로 열어요">
         <button type="button" className="ghost-button" onClick={model.install}>앱으로 설치하기</button>
       </Setting> : null}
@@ -221,6 +216,14 @@ function Overview({ model }: { model: SettingsModel }) {
       </Setting>
     </Section>
     {model.userId ? <DeleteAccount model={model} /> : null}
+    {/* 맨 아래: 개인정보 처리방침은 설정의 마지막에 둔다. */}
+    <div className="box mt-[24px]">
+        <a className="settings-link" href="privacy.html">
+        <span><span className="setting-name">개인정보 처리방침</span>
+          <span className="setting-help">어떤 정보를 어디에 쓰고 어떻게 지우는지 알려 드려요</span></span>
+        <span className="settings-chevron" aria-hidden="true" />
+      </a>
+    </div>
   </div>;
 }
 
@@ -732,8 +735,8 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
       {status ? <button type="button" className="text-button self-start" disabled={busy} onClick={() => { setEditing(false); setValue(''); setShown(false); }}>{labels.close}</button> : null}
       {guide}
     </> : <>
-      <div className="flex items-center justify-between gap-2">
-        <span className={`inline-flex min-h-[32px] items-center rounded-pill bg-sunken px-3 text-[14px] font-medium ${status?.disabled ? 'text-danger' : 'text-accent'}`}>{state}</span>
+      <div className="flex items-center gap-2">
+        <span className={`inline-flex min-h-[32px] min-w-[128px] items-center justify-center rounded-pill bg-sunken px-3 text-[14px] font-medium ${status?.disabled ? 'text-danger' : 'text-accent'}`}>{state}</span>
         <span className="flex shrink-0 gap-2"><button type="button" className="ghost-button key-action min-h-[44px] px-3 py-0" aria-label={`${name} ${retry}`} disabled={loading} onClick={() => setEditing(true)}>{retry}</button>
         {status ? <button type="button" className="ghost-button key-action min-h-[44px] px-3 py-0 text-danger" aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={onRemove}>{labels.remove}</button> : null}</span>
       </div>
