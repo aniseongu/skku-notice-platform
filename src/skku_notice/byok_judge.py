@@ -263,6 +263,26 @@ class _RecordingClient:
             raise
 
 
+def judge_split(judge, items: list[dict], model, profile, client) -> dict:
+    """한 묶음이 업체의 분당 토큰 한도보다 커서(413) 모든 후보가 거절하면 반으로 나눠 다시 보낸다.
+
+    Groq 무료는 요청 하나의 크기에도 한도가 있어 긴 공지 여섯 개를 묶으면 거절된다.
+    한 건까지 줄여도 거절되는 글은 이번에 건너뛴다(다른 글의 결과는 살린다).
+    다른 오류는 나누지 않고 그대로 둔다."""
+    found = judge(items, model, "routed", profile=profile, client=client)
+    if found or len(items) < 2 or not (client.failed and client.error_code == 413):
+        return found
+    middle = len(items) // 2
+    merged: dict = {}
+    for part in (items[:middle], items[middle:]):
+        merged.update(judge_split(judge, part, model, profile, client))
+        if client.failed and client.error_code != 413:
+            return merged   # 413이 아닌 오류(키 거부, 한도)는 더 두드리지 않는다
+    if merged and client.error_code == 413:
+        client.failed = False   # 일부는 받았다. 너무 큰 글만 다음 실행으로 남긴다
+    return merged
+
+
 def run_judging(
     store: JudgeStore, master_key: str, now: datetime, client_factory=gemini_client,
     sleep=time.sleep, clock=time.monotonic, provider_factory=make_client,
@@ -311,7 +331,7 @@ def run_judging(
                     sleep(PACE_SECONDS)
                 calls += 1
                 items = [{"id": p["notice_id"], "title": p["title"], "body": p["body"]} for p in batch]
-                found = judge(items, ai.primary_model, "routed", profile=profile, client=client)
+                found = judge_split(judge, items, ai.primary_model, profile, client)
                 ai.settle(store, now, counts)
                 if client.failed:
                     break

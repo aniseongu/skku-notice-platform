@@ -31,7 +31,7 @@ class ProviderError(Exception):
         super().__init__(f"{kind} ({code})" if code else kind)
         self.code = code
         self.detail = detail  # 업체가 알려 준 짧은 사유(키는 지운다). 진단 로그에만 쓴다
-        self.kind = kind  # rate_limit | authentication | payment | unavailable | bad_request | bad_output | network
+        self.kind = kind  # rate_limit | authentication | payment | unavailable | too_large | bad_request | bad_output | network
         self.retry_after = retry_after
 
 
@@ -42,6 +42,8 @@ def classify(code: int | None) -> str:
         return "authentication"
     if code == 402:
         return "payment"
+    if code == 413:
+        return "too_large"   # 요청이 이 업체의 분당 토큰 한도보다 크다: 업체가 아픈 것이 아니라 묶음이 크다
     if code in (408, 500, 502, 503, 504, 529):
         return "unavailable"
     if code in (400, 404, 422):

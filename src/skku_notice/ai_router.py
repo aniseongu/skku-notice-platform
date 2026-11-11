@@ -22,7 +22,7 @@ from skku_notice.ai_models import PROVIDERS, supports_images
 from skku_notice.ai_providers import ProviderError, classify, make_client
 
 # 이 사유들일 때만 자동 선택에서 다음 본인 키로 넘어간다. 요청 규격 오류(400)는 키를 바꿔도 같다.
-FALLBACK_KINDS = {"rate_limit", "unavailable", "authentication", "payment", "bad_output", "network", "model_unavailable"}
+FALLBACK_KINDS = {"rate_limit", "unavailable", "authentication", "payment", "bad_output", "network", "model_unavailable", "too_large"}
 PROVIDER_ORDER = {name: index for index, name in enumerate(PROVIDERS)}
 
 
@@ -175,6 +175,6 @@ class RoutedClient:
 
 _REASON = {
     "rate_limit": "quota_exhausted", "authentication": "authentication", "payment": "paid_not_allowed",
-    "unavailable": "provider_unavailable", "network": "provider_unavailable", "bad_output": "provider_unavailable",
+    "too_large": "request_too_large", "unavailable": "provider_unavailable", "network": "provider_unavailable", "bad_output": "provider_unavailable",
     "bad_request": "model_unavailable", "model_unavailable": "model_unavailable",
 }

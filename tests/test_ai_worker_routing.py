@@ -1,5 +1,6 @@
 # ruff: noqa: E501
 import json
+import re
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
@@ -237,3 +238,48 @@ def test_a_key_that_just_failed_rests_for_a_while_and_a_healthy_key_is_used_inst
     net2 = Net({})
     run(AiStore(extra={"u1": [old]}), net2)
     assert net2.hosts() == [GROQ]  # 쿨다운이 지나면 다시 쓴다
+
+
+class SizeLimitedNet(Net):
+    """한 요청에 공지가 둘 이상이거나 `too_big` 글이 들어 있으면 413(분당 토큰 한도)을 낸다. 나머지는 그 글의 id로 답한다."""
+
+    def handle(self, request):
+        payload = json.loads(request.content)
+        content = payload["messages"][-1]["content"]
+        ids = re.findall(r'"id": "(s/\d+)"', content)
+        self.requests.append((request.url.host, request.headers["authorization"].removeprefix("Bearer "), payload["model"]))
+        if len(ids) > 1 or "too_big" in content:
+            return httpx.Response(413, json={"error": {"message": "Request too large"}})
+        reply = json.dumps({"items": [{"id": ids[0], "verdict": "relevant", "reason": "전체 학생이 신청할 수 있어요", "summary": "신청해요",
+                                       "deadline_kind": "없음", "deadline_at": ""}]}, ensure_ascii=False)
+        return httpx.Response(200, json={"model": "served-model", "choices": [{"message": {"content": reply}, "finish_reason": "stop"}]})
+
+
+def _school(count, big=()):
+    return [{"notice_id": f"s/{n}", "title": "장학 안내", "body": "too_big" if n in big else "신청"} for n in range(1, count + 1)]
+
+
+def test_a_too_large_batch_is_split_in_halves_so_a_groq_only_user_still_gets_judged():
+    store = AiStore(extra={"u1": [ai_row("u1", "groq", GROQ_KEY, "openai/gpt-oss-20b")]})
+    store._school = _school(4)
+    net = SizeLimitedNet({})
+    counts, _ = run(store, net)
+    assert counts["judged"] == 4 and sorted(j["notice_id"] for j in store.saved) == ["s/1", "s/2", "s/3", "s/4"]
+    assert net.hosts().count(GROQ) == 7   # 4건(거절) → 2건(거절) → 1건·1건(성공) → 2건(거절) → 1건·1건(성공)
+    assert "disabled_at" not in store.ai_updates[-1][2] and store.ai_updates[-1][2]["last_error"] is None  # 키는 멀쩡하다
+
+
+def test_one_notice_too_large_even_alone_is_skipped_but_the_others_are_kept():
+    store = AiStore(extra={"u1": [ai_row("u1", "groq", GROQ_KEY, "openai/gpt-oss-20b")]})
+    store._school = _school(3, big={2})
+    counts, _ = run(store, SizeLimitedNet({}))
+    assert sorted(j["notice_id"] for j in store.saved) == ["s/1", "s/3"] and counts["judged"] == 2
+
+
+def test_a_413_from_groq_hands_the_same_batch_to_the_users_gemini_key_without_resting_groq():
+    store = AiStore(gem_rows=[gem_row("u1", used=30)], extra={"u1": [ai_row("u1", "groq", GROQ_KEY, "openai/gpt-oss-20b")]})
+    store._school = _school(2)
+    net = SizeLimitedNet({})
+    counts, gem = run(store, net)
+    # 덜 쓴 Groq가 먼저 거절해도(413) 같은 묶음을 Gemini가 받는다. 나누지 않고 한 번에 끝난다.
+    assert counts["judged"] == 1 and net.hosts() == [GROQ] and gem.calls == 1   # 모의 Gemini는 s/1 하나만 답한다
