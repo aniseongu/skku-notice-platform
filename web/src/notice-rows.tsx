@@ -29,8 +29,8 @@ export interface NoticeRowsModel {
 
 // 줄 배치: 휴대폰은 [메타 | D-day] > 제목 > 판정, 720px부터는 [메타 열 120px] [제목과 판정] [D-day 48px].
 export const ROW_LAYOUT = 'grid grid-cols-[minmax(0,1fr)_auto] [grid-template-areas:"meta_dday""title_title""reason_reason"] gap-x-[12px] gap-y-[2px] px-[16px] py-[14px] text-inherit no-underline min-[720px]:grid-cols-[120px_minmax(0,1fr)_48px] min-[720px]:gap-x-[24px] min-[720px]:px-[24px] min-[720px]:py-[12px]';
-// 선택 모드: 체크박스 자리를 줄 왼쪽에 50px 만들어(체크칸이 제목 글자와 같은 왼쪽 선에 오게) 열 사이 간격을 줄여, 분류·제목 열이 평소와 같은 자리에 있게 한다.
-const ROW_LAYOUT_SELECTING = ROW_LAYOUT.replace('min-[720px]:grid-cols-[120px_minmax(0,1fr)_48px]', 'min-[720px]:grid-cols-[94px_minmax(0,1fr)_48px]').replace('min-[720px]:px-[24px]', 'min-[720px]:pl-[50px] min-[720px]:pr-[24px]');
+// 선택 모드: 체크박스 자리를 줄 왼쪽에 48px 만들어(체크칸이 제목 글자와 같은 왼쪽 선에 오게) 열 사이 간격을 줄여, 분류·제목 열이 평소와 같은 자리에 있게 한다.
+const ROW_LAYOUT_SELECTING = ROW_LAYOUT.replace('min-[720px]:grid-cols-[120px_minmax(0,1fr)_48px]', 'min-[720px]:grid-cols-[108px_minmax(0,1fr)_48px]').replace('min-[720px]:gap-x-[24px]', 'min-[720px]:gap-x-[12px]').replace('min-[720px]:px-[24px]', 'min-[720px]:pl-[48px] min-[720px]:pr-[24px]');
 const DESKTOP_AREAS = 'min-[720px]:[grid-template-areas:"meta_title_dday"_"meta_reason_dday"]';
 const DESKTOP_AREAS_NO_REASON = 'min-[720px]:[grid-template-areas:"meta_title_dday"]';
 
