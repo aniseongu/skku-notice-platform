@@ -248,7 +248,6 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await screen.getByRole('button', { name: '보기' }).click();
   await expect(input).toHaveAttribute('type', 'text');
   await screen.getByRole('button', { name: '숨기기' }).click();
-  await screen.getByText('키는 어디서 받나요?').first().click();
   await expect(screen.getByRole('link', { name: /Google AI Studio/ })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
   await save.click();
   expect(await calls(page)).toEqual([['register', key]]);
@@ -1122,7 +1121,7 @@ test('software original major is asked for the admission year and the internship
     app.requestUpdate();
   });
   await page.locator('notice-rows-screen a.row').nth(1).click();
-  const section = page.getByRole('region', { name: '졸업요건 확인' });
+  const section = page.getByRole('region', { name: '인턴십 요건 확인' });
   await expect(section).toBeVisible();
   await expect(section.getByText('솦 인턴십 · 확인 필요', { exact: true })).toBeVisible();
   const p3 = section.getByText('3품 인턴십 · 어려울 수 있음', { exact: true });

@@ -27,8 +27,8 @@ export function GraduationSection({ model }: { title: string; model: GraduationM
   const { assessment, error } = model;
   const ready = assessment?.state === 'ready' ? assessment : null;
   return <section className="detail-section grad" aria-labelledby="sec-grad">
-    <h3 id="sec-grad">졸업요건 확인</h3>
-    {!ready && !error ? <p className="m-0 text-[14px] leading-[21px] text-ink-3" role="status">내 졸업요건에 맞는지 확인하고 있어요</p> : null}
+    <h3 id="sec-grad">인턴십 요건 확인</h3>
+    {!ready && !error ? <p className="m-0 text-[14px] leading-[21px] text-ink-3" role="status">내 인턴십 요건에 맞는지 확인하고 있어요</p> : null}
     {ready ? <>
       {model.tracks.p3 && ready.university3p ? <Result name="3품 인턴십" track={ready.university3p} /> : null}
       {model.tracks.dept && ready.department ? <Result name="솦 인턴십" track={ready.department} /> : null}

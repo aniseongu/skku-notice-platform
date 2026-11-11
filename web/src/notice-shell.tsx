@@ -8,7 +8,7 @@ import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, d
 import { APP_NAME } from './brand';
 import { authClient } from './auth';
 import { keywordCounts } from './keyword-counts';
-import { type AppController, STALE_MS, TABS, remember, settingsSubtitle, settingsTitle } from './app-controller';
+import { type AppController, STALE_MS, TABS, remember, settingsTitle } from './app-controller';
 import type { UserProfile } from './profile';
 import { Avatar } from './ui';
 import { Onboarding } from './onboarding';
@@ -111,7 +111,7 @@ export function NoticeShell({ app }: { app: AppController }) {
               {settings ? null : <Brand className="brand-mark narrow-only mr-[8px] h-[36px] w-[36px] flex-none text-accent" />}
               <div className={TOPBAR_TEXT}>
                 <h1 className={`${TOPBAR_H1} ${settings ? '' : 'max-[719px]:text-[21px] max-[719px]:leading-[28px] max-[719px]:font-extrabold'}`}>{title}</h1>
-                {settings ? <p className={`${UPDATED} text-ink-3`}>{settingsSubtitle()}</p> : <UpdatedLine app={app} count={list.length} />}
+                {settings ? null : <UpdatedLine app={app} count={list.length} />}
               </div>
               {settings ? null : <>
                 <label className="search wide-only min-[720px]:h-[36px] min-[720px]:min-w-[120px] min-[720px]:w-[260px] min-[720px]:flex-[0_1_260px] min-[720px]:px-[12px] min-[720px]:py-0"><Icon name="search" />
