@@ -54,6 +54,36 @@
 |:---:|:---:|
 | <img src="assets/readme/me-mobile-devices-light.jpg" alt="모바일 알림 기기 목록과 받을 게시판 (라이트)" width="320"> | <img src="assets/readme/me-mobile-devices-dark.jpg" alt="모바일 알림 기기 목록과 받을 게시판 (다크)" width="320"> |
 
+### 로그인과 첫 설정
+
+처음 들어오면 Google 로그인 화면이 나오고, 로그인하면 7단계 첫 설정이 시작됩니다. 주전공은 대학을 먼저 고른 뒤 학과를 고르고, 다음 단추가 막혀 있으면 이유를 한 줄로 알려 줍니다. 건너뛸 수 없으며 전공과 AI 키 하나는 꼭 입력해야 끝납니다.
+
+**PC (1440×900)**
+
+| 로그인: 라이트 | 로그인: 다크 |
+|:---:|:---:|
+| <img src="assets/readme/login-desktop-light.jpg" alt="PC 로그인 화면 (라이트)" width="420"> | <img src="assets/readme/login-desktop-dark.jpg" alt="PC 로그인 화면 (다크)" width="420"> |
+
+| 1단계 주전공 | 5단계 받을 공지 |
+|:---:|:---:|
+| <img src="assets/readme/onboarding-desktop-1.jpg" alt="PC 첫 설정 1단계: 대학을 2열로 고르는 화면과 왼쪽 단계 목록" width="420"> | <img src="assets/readme/onboarding-desktop-5.jpg" alt="PC 첫 설정 5단계: 받을 게시판 스위치" width="420"> |
+
+<p align="center"><img src="assets/readme/onboarding-desktop-7.jpg" alt="PC 첫 설정 7단계: Groq, Gemini, OpenRouter 키 입력과 끝내기가 막힌 이유" width="420"></p>
+
+**모바일**
+
+| 로그인: 라이트 | 로그인: 다크 | 1단계 주전공 | 주전공: 학과 고르기 |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/readme/login-mobile-light.jpg" alt="모바일 로그인 (라이트)" width="180"> | <img src="assets/readme/login-mobile-dark.jpg" alt="모바일 로그인 (다크)" width="180"> | <img src="assets/readme/onboarding-mobile-1.jpg" alt="모바일 첫 설정 1단계: 대학 고르기" width="180"> | <img src="assets/readme/onboarding-mobile-2.jpg" alt="모바일 첫 설정: 선택한 대학의 학과 고르기" width="180"> |
+
+| 3단계 학교 정보 | 4단계 인턴십 | 5단계 받을 공지 | 6단계 알림 |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/readme/onboarding-mobile-3.jpg" alt="모바일 첫 설정 3단계: 학년, 재학 상태, 병역" width="180"> | <img src="assets/readme/onboarding-mobile-4.jpg" alt="모바일 첫 설정 4단계: 3품 인턴십" width="180"> | <img src="assets/readme/onboarding-mobile-5.jpg" alt="모바일 첫 설정 5단계: 받을 공지" width="180"> | <img src="assets/readme/onboarding-mobile-6.jpg" alt="모바일 첫 설정 6단계: 알림 켜기" width="180"> |
+
+<p align="center"><img src="assets/readme/onboarding-mobile-7.jpg" alt="모바일 첫 설정 7단계: AI 키 연결" width="180"></p>
+
+로그인 화면은 배포된 사이트의 로그아웃 상태를 Playwright로 캡처했고, 첫 설정은 예시 데이터로 같은 방식으로 캡처했습니다(PC는 1440×900, 모바일은 390×844 화면). 첫 설정 화면의 학과, 게시판 목록, 입력칸은 보여 주기 위한 예시이며 실제 사용자 정보가 아닙니다.
+
 위 화면은 예시 계정과 예시 공지 데이터로 캡처했습니다. 키워드, 판정 이유, 마감, 기기 이름은 보여 주기 위해 넣은 값이며 실제 사용자 정보가 아닙니다. 라이트·다크·자동 모드는 설정에서 고릅니다.
 
 ## 할 수 있는 것
