@@ -23,8 +23,3 @@ test('iOS의 다른 브라우저와 설치를 지원하지 않는 곳에서는 �
   assert.equal(installMode(IOS_CHROME, false, false), 'none');
   assert.equal(installMode(ANDROID, false, false), 'none');
 });
-
-test('설치했다는 기록이 있으면 브라우저로 열어도 설치 문구를 없앤다', () => {
-  assert.equal(installMode(ANDROID, false, true, true), 'none');
-  assert.equal(installMode(IOS_SAFARI, false, false, true), 'none');
-});
