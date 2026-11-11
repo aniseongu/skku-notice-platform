@@ -9,8 +9,6 @@
   .order-box { padding: 4px 0; }
   .order-help { margin: 0; padding: 10px 0; border-top: 1px solid var(--line); color: var(--text-2); }
   .order-list { list-style: none; margin: 0; padding: 0; }
-  .order-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; border-top: 1px solid var(--line); }
-  .order-list li:first-child { border-top: 0; }
   .order-name { min-width: 0; flex: 1; overflow-wrap: anywhere; }
   .order-controls { display: flex; flex: none; align-items: center; margin-right: -10px; }
   .order-move, .order-handle { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--text); }
@@ -19,7 +17,6 @@
   .order-handle { margin: 0 -4px 0 -12px; color: var(--text-2); cursor: grab; touch-action: none; border-radius: var(--r-md); }
   .order-handle:hover, .order-move:hover:not(:disabled) { background: var(--sunken); }
   /* 순서를 바꾸는 중에는 줄이 끌 수 있는 면으로 보이게 한다. */
-  .order-list.editing li { background: color-mix(in oklch, var(--sunken) 55%, transparent); }
   .head-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
   .settings-lead { margin: -2px 0 8px; font-size: 13px; line-height: 19px; color: var(--text-2); }
   .box > .settings-lead { padding-top: 12px; margin: 0 0 4px; }

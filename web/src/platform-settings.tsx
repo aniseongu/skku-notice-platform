@@ -427,15 +427,16 @@ function chevron(d: string, className?: string) {
 
 const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 
-/** 게시판 한 줄. 순서를 바꾸는 중에는 왼쪽 손잡이로 끌고, 아닐 때는 오른쪽에서 받기를 켜고 끈다. */
+/** 게시판 한 줄. 줄마다 테두리가 있는 따로 떨어진 칸이다. 오른쪽 끝에서 받기를 켜고 끄고(평소), 순서를 바꾸는 중에는 같은 자리의 손잡이로 끈다.
+ *  손잡이를 스위치와 같은 오른쪽에 둔 이유: 마우스가 단추 근처에 있는 채로 바로 옮길 수 있게 하려는 것이다(.claude/rules/usability.md). */
 function BoardRow({ board, editing, onToggle, busy }: { board: { id: string; label: string }; editing: boolean; onToggle?: (id: string) => void; busy: boolean }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: board.id, disabled: !editing });
   return <li ref={setNodeRef} data-board-id={board.id} style={{ transform: CSS.Transform.toString(transform), transition }}
-    className={`flex min-h-[56px] items-center gap-[12px] border-t border-line first:border-t-0 ${isDragging ? 'relative z-10 rounded-md border-transparent bg-surface shadow-pop ring-1 ring-accent' : ''}`}>
-    {editing ? <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} aria-label={`${board.label} 순서 옮기기`}
-      className="order-handle -ml-[10px] grid size-[44px] flex-none cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent text-ink-3 hover:bg-sunken active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-accent">
-      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">{[7, 12, 17].flatMap((y) => [9, 15].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.7" />))}</svg></button> : null}
+    className={`flex min-h-[56px] items-center gap-[12px] rounded-md border bg-surface pr-[6px] pl-[16px] ${isDragging ? 'relative z-10 border-accent shadow-pop' : 'border-line'}`}>
     <span className="order-name min-w-0 flex-1 text-[15px] font-semibold [overflow-wrap:anywhere]">{board.label}</span>
+    {editing ? <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} aria-label={`${board.label} 순서 옮기기`}
+      className="order-handle grid size-[44px] flex-none cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent text-ink-3 hover:bg-sunken active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-accent">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">{[7, 12, 17].flatMap((y) => [9, 15].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.7" />))}</svg></button> : null}
     {onToggle && !editing ? <button type="button" role="switch" className="switch-row switch-only" aria-checked="true" aria-label={`${board.label} 받기`} disabled={busy}
       onClick={() => onToggle(board.id)}><span className="switch" aria-hidden="true" /></button> : null}
   </li>;
@@ -470,7 +471,7 @@ function BoardOrderList({ order, editing, onToggle, busy = false }: { order: Set
         },
       }}>
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-        <ul className={`order-list m-0 list-none p-0 ${editing ? 'editing' : ''}`}>
+        <ul className="order-list m-0 flex list-none flex-col gap-[8px] p-0">
           {order.boards.map((board) => <BoardRow key={board.id} board={board} editing={editing} onToggle={onToggle} busy={busy} />)}
         </ul>
       </SortableContext>
