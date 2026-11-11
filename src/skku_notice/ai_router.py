@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from types import SimpleNamespace
@@ -125,6 +126,9 @@ class RoutedClient:
                     kind = "authentication"  # Gemini는 잘못된 키에도 400을 준다(기존 동작과 같다)
                 self.attempts.append({"provider": candidate.provider, "model": candidate.model, "ok": False,
                                       "kind": kind, "code": code})
+                # 진단용: 업체, 모델, 상태와 업체가 알려 준 짧은 사유(키·공지 내용은 없다)
+                print(f"AI 호출 실패: {candidate.provider} {candidate.model} {code or kind} {getattr(exc, 'detail', '')}",
+                      file=sys.stderr)
                 if kind == "authentication":
                     self.rejected.add(candidate.provider)
                 elif kind == "rate_limit":

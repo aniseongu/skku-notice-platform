@@ -26,9 +26,10 @@ MAX_OUTPUT_TOKENS = 4096
 class ProviderError(Exception):
     """제공업체 호출 실패. 문구에는 키나 요청 내용을 넣지 않는다."""
 
-    def __init__(self, code: int | None, kind: str, retry_after: float | None = None):
+    def __init__(self, code: int | None, kind: str, retry_after: float | None = None, detail: str = ""):
         super().__init__(f"{kind} ({code})" if code else kind)
         self.code = code
+        self.detail = detail  # 업체가 알려 준 짧은 사유(키는 지운다). 진단 로그에만 쓴다
         self.kind = kind  # rate_limit | authentication | payment | unavailable | bad_request | bad_output | network
         self.retry_after = retry_after
 
@@ -75,6 +76,17 @@ def _text_of(contents: object) -> str:
     return "\n".join(texts)
 
 
+def _detail(response, api_key: str) -> str:
+    """업체 오류 본문의 error.message 앞부분. 키가 섞여 있으면 지운다."""
+    try:
+        error = response.json().get("error")
+        message = error.get("message") if isinstance(error, dict) else error
+    except (ValueError, AttributeError):
+        return ""
+    text = " ".join(str(message or "").split())[:160]
+    return text.replace(api_key, "***") if api_key else text
+
+
 class _Models:
     def __init__(self, provider: str, api_key: str, http: httpx.Client | None):
         self._provider, self._api_key, self._http = provider, api_key, http
@@ -111,7 +123,8 @@ class _Models:
         if response.status_code >= 400:
             retry = response.headers.get("retry-after", "")
             raise ProviderError(response.status_code, classify(response.status_code),
-                                float(retry) if retry.replace(".", "", 1).isdigit() else None)
+                                float(retry) if retry.replace(".", "", 1).isdigit() else None,
+                                _detail(response, self._api_key))
         try:
             payload = response.json()
             choice = payload["choices"][0]
