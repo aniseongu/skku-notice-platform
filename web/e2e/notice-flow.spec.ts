@@ -1331,15 +1331,18 @@ test('software original major is asked for the admission year and the internship
   await page.locator('notice-rows-screen a.row').nth(1).click();
   const section = page.getByRole('region', { name: '인턴십 요건 확인' });
   await expect(section).toBeVisible();
-  // 안내문: 평소에는 면책 한 줄과 "판정 기준" 단추만 보이고, 누르면 기준 두 줄이 펼쳐진다. 눌리는 영역은 44px 이상이다.
+  // 안내문: 평소에는 면책 한 줄과 "판정 근거" 단추만 보이고, 누르면 읽은 내용과 기준이 펼쳐진다. 눌리는 영역은 44px 이상이다.
   const notes = page.getByLabel('인턴십 요건 안내');
   await expect(notes).toContainText('실제 인정 여부는 학교와 학과에 확인해 주세요');
+  await expect(notes).not.toContainText('Gemini');   // 업체 이름이 아니라 AI 키라고 쓴다
+  await expect(notes).toContainText('AI 키를 연결하면 담당 업무까지 확인해요');
   await expect(notes.getByText('3품은 근무 시간이 280시간 이상인지 확인해요')).toHaveCount(0);
-  const criteria = notes.getByRole('button', { name: /판정 기준/ });
+  const criteria = notes.getByRole('button', { name: /판정 근거/ });
   expect((await criteria.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await criteria.click();
   await expect(criteria).toHaveAttribute('aria-expanded', 'true');
   await expect(notes.getByText('3품은 근무 시간이 280시간 이상인지 확인해요')).toBeVisible();
+  await expect(notes.getByText('공고에 없어 확인하지 못한 내용: 담당 업무')).toBeVisible();   // 무엇을 못 읽었는지 보인다
   await expect(notes.getByText('솦은 소프트웨어 업무인지와 근무 기간·시간을 확인해요')).toBeVisible();
   await expect(section.getByText('솦 인턴십 확인 필요', { exact: true })).toBeVisible();
   const p3 = section.getByText('3품 인턴십 어려움', { exact: true });

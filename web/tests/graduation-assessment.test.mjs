@@ -171,3 +171,12 @@ test('목록 표지는 상세와 같은 기준이다: 조건부라도 확인할 
   assert.deepEqual(gradParts(map.get('a'), { dept: true, p3: true }), []);
   assert.equal(gradParts(map.get('b'), { dept: true, p3: true }).every((part) => part.met), true);
 });
+
+test('가능한 이유는 수치만이 아니라 기준과 결론까지 말하고, 안 되는 이유도 같다', async () => {
+  const { reasonOf } = await import('../src/graduation-assessment.ts');
+  const track = (status, checks) => ({ status, label: '학교 신3품 인턴십: 가능성이 있지만 승인과 증빙이 남아 있어요', checks, unknowns: [], afterCompletion: [], notes: [] });
+  const ok = track('CONDITIONAL', [{ ruleId: '3P-HOURS', result: 'pass', note: '근무 기간으로 계산하면 약 1024시간이라 기준(280시간)을 넘어서 인정될 수 있어요(실제 인정은 출근 기록 기준이에요)' }]);
+  assert.equal(reasonOf(ok), '근무 기간으로 계산하면 약 1024시간이라 기준(280시간)을 넘어서 인정될 수 있어요');
+  const no = track('NOT_ELIGIBLE', [{ ruleId: '3P-HOURS', result: 'fail', note: '근무 기간으로 계산하면 약 120시간이라 기준(280시간)에 못 미쳐서 인정되기 어려워요' }]);
+  assert.match(reasonOf(no), /기준\(280시간\)에 못 미쳐서 인정되기 어려워요/);
+});

@@ -447,7 +447,7 @@ function Notifications({ model }: { model: SettingsModel }) {
           <li>받는 게시판의 새 공지를 알려요</li>
           <li>관심 키워드와 맞는 공지는 소리로, 나머지는 조용히 알려요</li>
           <li>학교가 고친 중요한 글은 한 번 더 알려요</li>
-          <li>Gemini 키가 있으면 나와 맞는 공지도 소리로 알려요</li>
+          <li>AI 키가 있으면 나와 맞는 공지도 소리로 알려요</li>
           <li>인턴 공고는 나와 맞는 것만 알려요</li>
         </ul>
       </Setting>
@@ -576,7 +576,7 @@ const TEXT_FIELDS: { key: ProfileTextField; name: string; help: string; placehol
   { key: 'avoids', name: '받고 싶지 않은 공지', help: '알림이 오지 않았으면 하는 공지를 적어요', placeholder: '예: 대학원생 전용 모집, 졸업생 대상 채용' },
 ];
 
-/** Gemini에게 알려 줄 주관식 3칸. 글자 수를 세어 보여 주고 한 번에 저장한다(쓰는 중에 저장하지 않는다). */
+/** AI에게 알려 줄 주관식 3칸. 글자 수를 세어 보여 주고 한 번에 저장한다(쓰는 중에 저장하지 않는다). */
 function AboutMe({ model }: { model: SettingsModel }) {
   const { profile } = model;
   // 주관식 컬럼이 아직 없는 데이터가 들어와도 깨지지 않게 빈 글로 본다.
@@ -591,7 +591,7 @@ function AboutMe({ model }: { model: SettingsModel }) {
   const ready = model.profileStatus === 'ready';
   return <Section id="s-about" title="나를 소개해요 (선택)">
     <div className="setting">
-      <div className="setting-text"><p className="setting-name">Gemini가 읽는 내용</p>
+      <div className="setting-text"><p className="setting-name">AI가 읽는 내용</p>
         <p className="setting-help">나에게 맞는 공지와 인턴 공고를 고를 때 참고해요. Google로 보내는 내용이라 이름, 학번, 연락처, 주소는 적지 마세요</p></div>
     </div>
     {TEXT_FIELDS.map(({ key, name, help, placeholder }) => {

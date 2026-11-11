@@ -9,11 +9,20 @@ export interface GraduationModel {
   error: string;
 }
 
+// 업체 이름(Gemini 등)이 아니라 "AI 키"라고 쓴다. 그리고 "공고 내용만 봤다"고만 쓰면 무엇을 못 봤는지 모르니, AI가 해 주는 일(담당 업무 확인)을 못 했다고 말한다.
 const AI_NOTE = {
-  no_key: 'Gemini 키를 넣으면 담당 업무까지 확인해요',
-  unavailable: 'Gemini가 응답하지 않아 공고 내용만 봤어요. 잠시 뒤 다시 확인해요',
-  limit: '오늘 Gemini 한도를 다 써서 공고 내용만 봤어요. 내일 다시 확인해요',
+  no_key: 'AI 키를 연결하면 담당 업무까지 확인해요',
+  unavailable: 'AI가 응답하지 않아 담당 업무는 확인하지 못했어요. 잠시 뒤 다시 확인해요',
+  limit: '오늘 AI 사용 한도를 다 써서 담당 업무는 확인하지 못했어요. 내일 다시 확인해요',
 } as const;
+
+const WORK_MODE: Record<string, string> = { full_time: '전일제', part_time: '파트타임' };
+/** 판정에 쓴 공고 내용. "무엇을 보고 판단했는지"가 보여야 믿을 수 있다. 읽은 것이 없으면 빈 문자열이다. */
+function readFacts(facts: GraduationAssessment['facts']): string {
+  if (!facts) return '';
+  const period = facts.startDate && facts.endDate ? `근무 기간 ${facts.startDate} ~ ${facts.endDate}` : '';
+  return [facts.organizationName, period, WORK_MODE[facts.workMode], facts.hours ? `근무 시간 ${facts.hours}시간` : ''].filter(Boolean).join(' · ');
+}
 
 // 목록의 "해당 / 확인 필요 / 해당 없음"(reason.tsx)과 같은 모양: 되면 강조색 굵게, 확인은 주황 굵게, 안 되면 굵지 않은 옅은 회색(이유도 같이 옅게).
 const KEYWORD: Record<string, string> = {
@@ -56,12 +65,14 @@ export function GraduationNotes({ model }: { model: GraduationModel }) {
   const hasP3 = model.tracks.p3 && !!ready.university3p;
   const hasDept = model.tracks.dept && !!ready.department;
   return <div className="mt-[16px] text-[12px] leading-[18px] text-ink-2 [word-break:keep-all]" aria-label="인턴십 요건 안내">
-    <p className="m-0">공고에 적힌 내용만 보고 대략 판단해요. 실제 인정 여부는 학교와 학과에 확인해 주세요{hasP3 || hasDept
+    <p className="m-0">공고에 적힌 근무 기간과 시간으로 대략 판단해요. 실제 인정 여부는 학교와 학과에 확인해 주세요{hasP3 || hasDept
       // 글자는 문장 끝에 붙고, 눌리는 영역은 위아래 여백으로 44px를 채운다(줄 높이는 그대로).
       ? <button type="button" aria-expanded={open} aria-controls="grad-criteria" onClick={() => setOpen((value) => !value)}
-          className="ml-[6px] inline cursor-pointer border-0 bg-transparent p-0 py-[13px] -my-[13px] text-[12px] leading-[18px] font-medium text-ink-3 underline underline-offset-2">판정 기준 {open ? '접기' : '보기'}</button>
+          className="ml-[6px] inline cursor-pointer border-0 bg-transparent p-0 py-[13px] -my-[13px] text-[12px] leading-[18px] font-medium text-ink-3 underline underline-offset-2">판정 근거 {open ? '접기' : '보기'}</button>
       : null}</p>
     {open ? <div id="grad-criteria" className="mt-[8px]">
+      {readFacts(ready.facts) ? <p className="m-0">공고에서 읽은 내용: {readFacts(ready.facts)}</p> : null}
+      {ready.facts?.missing.length ? <p className="m-0">공고에 없어 확인하지 못한 내용: {ready.facts.missing.join(', ')}</p> : null}
       {hasP3 ? <p className="m-0">3품은 근무 시간이 280시간 이상인지 확인해요</p> : null}
       {hasDept ? <p className="m-0">솦은 소프트웨어 업무인지와 근무 기간·시간을 확인해요</p> : null}
     </div> : null}

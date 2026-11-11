@@ -173,15 +173,15 @@ def _company_time_check(facts: InternFacts) -> Check:
         if days is None:
             return Check("DEPT-COMPANY-FT", UNKNOWN, "근무 기간을 공고에서 확인하지 못했어요")
         if days >= MIN_FULL_TIME_DAYS:
-            return Check("DEPT-COMPANY-FT", PASS, f"전일제 {days}일로 4주(28일) 이상이에요")
-        return Check("DEPT-COMPANY-FT", FAIL, f"전일제 {days}일로 4주(28일)에 못 미쳐요")
+            return Check("DEPT-COMPANY-FT", PASS, f"전일제 {days}일이라 기준(4주, 28일)을 넘어서 인정될 수 있어요")
+        return Check("DEPT-COMPANY-FT", FAIL, f"전일제 {days}일이라 기준(4주, 28일)에 못 미쳐서 인정되기 어려워요")
     if facts.work_mode == "part_time":
         hours = facts.explicitly_stated_hours
         if hours is None:
             return Check("DEPT-COMPANY-PT", UNKNOWN, "파트타임이지만 총 근무 시간을 확인하지 못했어요")
         if hours >= MIN_PART_TIME_HOURS:
-            return Check("DEPT-COMPANY-PT", PASS, f"파트타임 {hours}시간으로 160시간 이상이에요")
-        return Check("DEPT-COMPANY-PT", FAIL, f"파트타임 {hours}시간으로 160시간에 못 미쳐요")
+            return Check("DEPT-COMPANY-PT", PASS, f"파트타임 {hours}시간이라 기준(160시간)을 넘어서 인정될 수 있어요")
+        return Check("DEPT-COMPANY-PT", FAIL, f"파트타임 {hours}시간이라 기준(160시간)에 못 미쳐서 인정되기 어려워요")
     return Check("DEPT-COMPANY-TIME", UNKNOWN, "근무 시간을 공고에서 확인하지 못했어요")
 
 
@@ -289,8 +289,8 @@ def _p3_hours_check(facts: InternFacts) -> Check:
     hours = facts.explicitly_stated_hours
     if hours is not None:
         if hours >= P3_MIN_HOURS:
-            return Check("3P-HOURS", PASS, f"공고에 {hours}시간으로 적혀 있어요(실제 인정은 출근 기록 기준이에요)")
-        return Check("3P-HOURS", FAIL, f"공고의 {hours}시간은 비교과 현장실습 기준 280시간에 못 미쳐요")
+            return Check("3P-HOURS", PASS, f"공고에 {hours}시간으로 적혀 있어 기준(280시간)을 넘어서 인정될 수 있어요(실제 인정은 출근 기록 기준이에요)")
+        return Check("3P-HOURS", FAIL, f"공고의 {hours}시간은 기준(280시간)에 못 미쳐서 인정되기 어려워요")
     if facts.work_mode in ("full_time", "unknown"):
         # 근무시간이 공고에 없으면 전일 근무(1일 8시간, 주 5일)로 보고 계산한다(설명에는 쓰지 않는다). 파트타임이라고 적힌 공고는 여기에 오지 않는다.
         stated = bool(facts.daily_hours and facts.days_per_week)
@@ -303,8 +303,8 @@ def _p3_hours_check(facts: InternFacts) -> Check:
             estimate = facts.duration_days * weekly // 7 * daily
         if estimate is not None:
             if estimate < P3_MIN_HOURS:
-                return Check("3P-HOURS", FAIL, f"{basis} 계산하면 약 {estimate}시간이라 280시간에 못 미쳐요")
-            return Check("3P-HOURS", PASS, f"{basis} 계산하면 약 {estimate}시간이에요(실제 인정은 출근 기록 기준이에요)")
+                return Check("3P-HOURS", FAIL, f"{basis} 계산하면 약 {estimate}시간이라 기준(280시간)에 못 미쳐서 인정되기 어려워요")
+            return Check("3P-HOURS", PASS, f"{basis} 계산하면 약 {estimate}시간이라 기준(280시간)을 넘어서 인정될 수 있어요(실제 인정은 출근 기록 기준이에요)")
     return Check("3P-HOURS", UNKNOWN, "근무 시간을 공고에서 확인하지 못했어요")
 
 
