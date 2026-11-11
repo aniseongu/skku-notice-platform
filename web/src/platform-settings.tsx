@@ -695,8 +695,8 @@ function KeyRow({ name, help, state, children, guide }: { name: string; help: st
 const SECRET_LABELS = { empty: '미설정', saved: '저장됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '입력하기', edit: '수정하기', remove: '지우기', save: '저장하기' };
 
 /** 비밀 한 줄: 저장 상태, 입력하기·수정하기·지우기, 눌러서 펼치는 입력칸과 받는 방법(Gemini 키와 아이캠퍼스 토큰이 같이 쓴다). */
-export function SecretRow({ name, help, placeholder, status, loading, busy, error, onRegister, onRemove, guide, valid, note, labels = SECRET_LABELS, extra, guideFirst = false }: {
-  note?: string | null; labels?: typeof SECRET_LABELS; extra?: ReactNode; guideFirst?: boolean;
+export function SecretRow({ name, help, placeholder, status, loading, busy, error, onRegister, onRemove, guide, valid, note, labels = SECRET_LABELS, extra, alignEnd = false }: {
+  note?: string | null; labels?: typeof SECRET_LABELS; extra?: ReactNode; alignEnd?: boolean;
   name: string; help: string; placeholder: string;
   status: { keyHint: string; disabled: boolean; lastError: string | null } | null;
   loading: boolean; busy: boolean; error: string;
@@ -731,13 +731,13 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
       {status ? <button type="button" className="text-button self-start" disabled={busy} onClick={() => { setEditing(false); setValue(''); setShown(false); }}>{labels.close}</button> : null}
       {guide}
     </> : confirming ? <>
-      <p className="m-0 text-[14px] text-ink min-[720px]:text-right">{name} 연결을 끊을까요?</p>
-      <div className="flex gap-2 min-[720px]:justify-end">
+      <p className={`m-0 text-[14px] text-ink ${alignEnd ? 'min-[720px]:text-right' : ''}`}>{name} 연결을 끊을까요?</p>
+      <div className={`flex gap-2 ${alignEnd ? 'min-[720px]:justify-end' : ''}`}>
         <button type="button" className="ghost-button key-action min-h-[44px] px-4 py-0 text-danger" aria-label={`${name} 연결 끊기 확인`} disabled={busy} onClick={onRemove}>끊기</button>
         <button type="button" className="ghost-button key-action min-h-[44px] px-4 py-0" disabled={busy} onClick={() => setConfirming(false)}>취소</button>
       </div>
     </> : <>
-      <div className="flex items-center gap-2 min-[720px]:justify-end">
+      <div className={`flex items-center gap-2 ${alignEnd ? 'min-[720px]:justify-end' : ''}`}>
         <span className={`inline-flex min-h-[32px] min-w-[128px] items-center justify-center rounded-pill bg-sunken px-3 text-[14px] font-medium ${status?.disabled ? 'text-danger' : 'text-accent'}`}>{state}</span>
         <span className="flex shrink-0 gap-2"><button type="button" className="ghost-button key-action min-h-[44px] px-3 py-0" aria-label={`${name} ${retry}`} disabled={loading} onClick={() => setEditing(true)}>{retry}</button>
         {status ? <button type="button" className="ghost-button key-action min-h-[44px] px-3 py-0 text-danger" aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={() => setConfirming(true)}>{labels.remove}</button> : null}</span>
@@ -749,7 +749,7 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
   </Setting>;
 }
 
-function CanvasRow({ model }: { model: SettingsModel }) {
+function CanvasRow({ model, alignEnd }: { model: SettingsModel; alignEnd: boolean }) {
   const { byok } = model;
   const help = '아이캠퍼스의 강의와 과제 마감을 알려드리는 데 써요';
   if (!byok?.available) {
@@ -757,7 +757,7 @@ function CanvasRow({ model }: { model: SettingsModel }) {
       <span className="field-note">지금은 토큰을 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
     </KeyRow>;
   }
-  return <><SecretRow name="아이캠퍼스 토큰" help={help} placeholder="토큰을 붙여 넣어 주세요" status={byok.canvas} loading={byok.loading} busy={byok.canvasBusy}
+  return <><SecretRow name="아이캠퍼스 토큰" help={help} alignEnd={alignEnd} placeholder="토큰을 붙여 넣어 주세요" status={byok.canvas} loading={byok.loading} busy={byok.canvasBusy}
     labels={{ empty: '연결 안 됨', saved: '연결됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '연결하기', edit: '바꾸기', remove: '연결 끊기', save: '연결하기' }}
     error={byok.canvasError} onRegister={byok.registerCanvas} onRemove={byok.removeCanvas} guide={null}
     valid={(value) => /^[0-9A-Za-z~_-]{16,200}$/.test(value)} />
@@ -767,13 +767,16 @@ function CanvasRow({ model }: { model: SettingsModel }) {
 
 function Keys({ model }: { model: SettingsModel }) {
   if (!model.userId) return <div className="settings"><Back model={model} /><Section id="s-keys" title="연결 키"><LoginNote model={model} what="연결 키" /></Section></div>;
+  // Gemini, Groq, OpenRouter, 아이캠퍼스를 모두 연결했을 때만 칩과 버튼을 오른쪽 끝에 붙인다. 하나라도 비어 있으면 그대로 둔다.
+  const ai = model.byok?.ai;
+  const allConnected = !!model.byok?.status && !!model.byok.canvas && !!ai && (['groq', 'openrouter'] as const).every((id) => ai.keys.some((key) => key.provider === id));
   return <div className="settings">
     <Back model={model} />
     <Section id="s-ai" title="AI 연결">
-      <AiRows byok={model.byok} />
+      <AiRows byok={model.byok} alignEnd={allConnected} />
     </Section>
     <Section id="s-keys" title="아이캠퍼스 연결">
-      <CanvasRow model={model} />
+      <CanvasRow model={model} alignEnd={allConnected} />
     </Section>
   </div>;
 }

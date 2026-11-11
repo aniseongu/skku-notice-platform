@@ -53,7 +53,7 @@ function SharedGuide() {
 }
 
 /** AI 연결 줄들. 다른 설정 쪽과 같은 줄(이름, 설명, 오른쪽 조작) 모양이고, 연결한 개수에 따라 필요한 줄만 보인다. */
-export function AiRows({ byok }: { byok?: Byok }) {
+export function AiRows({ byok, alignEnd = false }: { byok?: Byok; alignEnd?: boolean }) {
   const [last, setLast] = useState<Id | null>(null);
   const ai = byok?.ai;
   if (!byok?.available || !ai) {
@@ -64,12 +64,12 @@ export function AiRows({ byok }: { byok?: Byok }) {
       const name = `${NAME[id]} 키`;
       if (id === 'gemini') {
         return <SecretRow key={id} name={name} help={BLURB[id]} placeholder={GUIDE[id].placeholder} status={byok.status} loading={byok.loading} busy={byok.busy}
-          error={byok.error} labels={LABELS} guide={null} valid={looksLikeAiKey}
+          error={byok.error} alignEnd={alignEnd} labels={LABELS} guide={null} valid={looksLikeAiKey}
           onRegister={byok.register} onRemove={byok.remove} />;
       }
       const status = ai.keys.find((key) => key.provider === id) ?? null;
       return <SecretRow key={id} name={name} help={BLURB[id]} placeholder={GUIDE[id].placeholder} status={status} loading={byok.loading} busy={ai.busy}
-        error={last === id ? ai.error : ''} labels={LABELS} guide={null} valid={looksLikeAiKey}
+        error={last === id ? ai.error : ''} alignEnd={alignEnd} labels={LABELS} guide={null} valid={looksLikeAiKey}
         onRegister={(key) => { setLast(id); ai.register(id as AiProvider, key); }} onRemove={() => { setLast(id); ai.remove(id as AiProvider); }} />;
     })}
     <SharedGuide />
