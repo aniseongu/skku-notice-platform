@@ -1,114 +1,20 @@
+/* 설정 화면의 줄·구역·목록은 Tailwind 클래스로 옮겼다(platform-settings.tsx, ui.tsx). 아래는 아직 공용 부품 단계에서 옮기지 않은 입력칸·분할 선택·칩 규칙이다. */
 @layer settings {
-  .settings { padding: 0 var(--gutter) calc(var(--tabbar-h) + 32px); }
-  .settings-head { margin: 28px 0 8px; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--text-2); }
-  /* 묶음 제목과 같은 줄의 글자 단추. 오른쪽 끝은 상자 안쪽 선에 맞춘다. */
-  .settings-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 28px 0 8px; padding-right: var(--gutter); }
-  .settings-head-row .settings-head { margin: 0; }
-  .head-action { min-height: 44px; margin: -13px -8px; padding: 0 8px; border: 0; background: none; color: var(--accent); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
-  .head-action:hover { text-decoration: underline; text-underline-offset: 3px; }
-  .order-box { padding: 4px 0; }
-  .order-help { margin: 0; padding: 10px 0; border-top: 1px solid var(--line); color: var(--text-2); }
-  .order-list { list-style: none; margin: 0; padding: 0; }
-  .order-name { min-width: 0; flex: 1; overflow-wrap: anywhere; }
-  .order-controls { display: flex; flex: none; align-items: center; margin-right: -10px; }
-  .order-move, .order-handle { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--text); }
-  .order-move:disabled { color: var(--text-3); opacity: 0.6; cursor: default; }
-  /* 손잡이는 끌기 전용이라 위아래 단추보다 한 단계 연하게, 앞에 간격을 둔다. */
-  .order-handle { margin: 0 -4px 0 -12px; color: var(--text-2); cursor: grab; touch-action: none; border-radius: var(--r-md); }
-  .order-handle:hover, .order-move:hover:not(:disabled) { background: var(--sunken); }
-  /* 순서를 바꾸는 중에는 줄이 끌 수 있는 면으로 보이게 한다. */
-  .head-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
-  .settings-lead { margin: -2px 0 8px; font-size: 13px; line-height: 19px; color: var(--text-2); }
-  .box > .settings-lead { padding-top: 12px; margin: 0 0 4px; }
-  .box { border-radius: var(--r-lg); background: var(--surface); padding: 0 var(--gutter); }
-  .setting { display: flex; flex-direction: column; gap: 10px; padding: 16px 0; }
-  .setting + .setting { border-top: 1px solid var(--line); }
-  /* 이름 칸과 조작 칸으로 나누지 않고 전체 폭에 위에서 아래로 쌓는 묶음(키워드, 안내 목록 등) */
-  .setting.stacked { display: flex; flex-direction: column; gap: 10px; }
-  .stacked .keyword-list { border-top: 0; }
-  .stacked .keyword-list li:last-child { border-bottom: 0; }
-  .setting-name { font-size: 15px; line-height: 22px; font-weight: 600; }
-  .setting-help { margin-top: 2px; font-size: 14px; line-height: 20px; color: var(--text-2); word-break: keep-all; text-wrap: pretty; }
-  .setting-saved { margin-top: 4px; font-size: 13px; color: var(--accent); font-weight: 600; }
-  .setting-control { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-width: 0; }
-  .device-name-action { min-height: 44px; }
-  .inline-row { display: flex; flex-wrap: wrap; gap: 8px; }
-  /* 입력칸의 기본 최소 폭(약 300px) 때문에 옆 단추가 아래 줄로 떨어지지 않게 한다. */
-  .inline-row .input { flex: 1 1 200px; min-width: 0; }
-  /* 단추는 혼자 있어도 글자 폭만큼. 한 줄에 둔 단추들과 폭 규칙을 같게 한다. */
-  .setting-control > .ghost-button, .setting-control > .solid-button { align-self: flex-start; }
-  .setting-control > :first-child { margin-top: 0; }
-  .setting-control > .setting-saved { line-height: 22px; }
-  .settings-link { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; padding: 16px 0; color: var(--text); text-decoration: none; }
-  .settings-link + .settings-link { border-top: 1px solid var(--line); }
-  .settings-link .setting-name, .settings-link .setting-help { display: block; }
-  .settings-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--r-sm); }
-  .settings-chevron { width: 8px; height: 8px; flex: none; margin-right: 4px; border-top: 1.5px solid var(--text-3); border-right: 1.5px solid var(--text-3); transform: rotate(45deg); }
-  .settings-back { display: inline-flex; align-items: center; min-height: 44px; color: var(--text-2); font-size: 14px; }
-  .setting-state { color: var(--text-2); font-size: 13px; line-height: 22px; font-weight: 500; }
-  .connection-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; min-height: 44px; }
-  .connection-summary .field-note { overflow-wrap: anywhere; }
-  .connection-manual { border-top: 1px solid var(--line); margin-top: 8px; }
-  .connection-manual summary { min-height: 44px; padding: 12px 0; color: var(--text-2); cursor: pointer; font-size: 14px; }
-  .connection-manual > .input { width: 100%; margin-bottom: 8px; }
-  .pairing-camera { width: 100%; max-height: 320px; object-fit: cover; background: var(--sunken); border-radius: var(--r-md); }
   .input {
     min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-md);
     background: var(--surface); color: var(--text); font-size: 15px;
   }
-  .device-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-  .device-list li { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 12px; padding: 10px 0; border-top: 1px solid var(--line); }
-  .device-list li:first-child { border-top: 0; }
-  .device-name { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-  .device-list .field-note { grid-column: 1; margin: 0; }
-  .device-actions { grid-row: 1 / span 2; grid-column: 2; display: flex; gap: 4px; }
-  .device-list li > .inline-row { grid-column: 1 / -1; }
-  .time-control { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
-  .time-numbers { display: flex; align-items: center; gap: 6px; }
-  .time-number { width: 56px; min-width: 0; padding: 10px 6px; text-align: center; font-variant-numeric: tabular-nums; appearance: textfield; }
-  .time-number::-webkit-inner-spin-button, .time-number::-webkit-outer-spin-button { appearance: none; margin: 0; }
-  .time-numbers span { font-size: 14px; color: var(--text-2); }
   textarea.input { resize: vertical; line-height: 1.5; font-size: 14px; }
   .input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .input::placeholder { color: var(--text-3); }
-  .field-note { font-size: 14px; line-height: 20px; color: var(--text-2); }
-  .field-note.ok { color: var(--accent); }
-  .field-note.error { color: var(--danger); }
-  .steps { margin: 0; padding: 12px 16px 12px 36px; border-radius: var(--r-md); background: var(--sunken); font-size: 14px; line-height: 22px; color: var(--text-2); }
-  .steps li + li { margin-top: 6px; }
-  .keyword-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
-  .keyword-list li { display: flex; align-items: center; justify-content: space-between; min-height: 44px; border-bottom: 1px solid var(--line); font-size: 15px; }
   .segmented { display: inline-flex; padding: 3px; border-radius: var(--r-md); background: var(--sunken); align-self: flex-start; }
   .segmented button { min-height: 38px; padding: 0 14px; border: 0; border-radius: 8px; background: none; color: var(--text-2); font-size: 14px; font-weight: 500; }
   .segmented button[aria-checked="true"], .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px oklch(0.2 0.02 var(--h) / 0.12); }
   /* 토스 기준 터치 영역 44px: 손가락으로 누르는 화면(휴대폰)에서만 키운다. 모양은 그대로다. */
   @media (max-width: 719px) { .segmented button { min-height: 44px; } }
-
-  @media (min-width: 720px) {
-    .settings { padding: 0 24px 48px; }
-    .box { padding: 0; background: none; border-top: 1px solid var(--line); border-radius: 0; }
-    .settings-head-row { padding-right: 0; }
-    /* 이름과 설명은 왼쪽, 조작은 오른쪽 끝에 맞춘다. 단추가 칸 가운데에 어정쩡하게 뜨지 않게 오른쪽 열은 내용 폭(최대 520px)이다. */
-    .setting { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px); gap: 24px; align-items: start; }
-    .setting.stacked { display: flex; align-items: stretch; }
-    .setting-control > .ghost-button, .setting-control > .solid-button, .setting-control .segmented, .setting-control > .time-control { align-self: flex-end; }
-    .setting-control > .inline-row { justify-content: flex-end; }
-    .setting-control > .field-note, .setting-control > .setting-state { text-align: right; }
-    .setting-control > .connection-summary { justify-content: flex-end; }
-    /* 안내 목록은 오른쪽 열에 왼쪽 정렬로 두면 오른쪽 끝에 맞춘 조작과 어긋나므로 전체 폭 아래에 둔다. */
-    .setting:has(> .setting-control > .rule-list) { grid-template-columns: minmax(0, 1fr); gap: 8px; }
-    .setting:has(> .setting-control > .connection-summary) > .setting-text { padding-top: 11px; }
-  }
   /* 분류 칩: 켠 것은 옅은 면과 굵은 글자(검은 채움은 하나만 고르는 칩에만), 끈 것은 가로줄로도 알린다.
      mobile 층의 .chip 규칙보다 뒤 층에 둬야 이긴다. */
   .setting-control .chips { flex-wrap: wrap; margin: 0; padding: 0; overflow: visible; }
   .setting-control .chip[aria-pressed="true"] { border-color: var(--line); background: var(--sunken); color: var(--text); font-weight: 600; }
   .setting-control .chip[aria-pressed="false"] { color: var(--text-3); text-decoration: line-through; }
-  /* QR은 화면 모드와 상관없이 흰 바탕에 검은 점(카메라가 잘 읽게) */
-  .qr { width: 208px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-md); background: #fff; }
-  .qr svg { display: block; width: 100%; height: auto; }
-  /* GitHub 연결이 있어야 쓰는 칸은 연결 전에 이름과 도움말, 안내 한 줄만 보인다. */
-  [data-needs-link] > .link-note { display: none; }
-  .unlinked [data-needs-link] > :not(.link-note) { display: none; }
-  .unlinked [data-needs-link] > .link-note { display: block; }
 }

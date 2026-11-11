@@ -20,7 +20,6 @@
 }
 
 @layer platform {
-  .platform-preview { padding: 10px 16px; background: var(--sunken); color: var(--text-2); font-size: 13px; }
   /* 설정 화면은 원본의 구역(.settings-head + .box)과 줄(.setting)을 그대로 쓴다. 아래는 그 안에 들어가는 새 구성요소다. */
   .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 52px; padding: 6px 0; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; color: var(--text); }
   .setting-control > .switch-row:first-child, .box > .switch-row:first-child { border-top: 0; }
@@ -33,16 +32,6 @@
   .avatar { display: inline-grid; place-items: center; flex: none; overflow: hidden; border-radius: 50%; background: var(--sunken); color: var(--text-3); box-shadow: inset 0 0 0 1px var(--line); }
   .avatar img { width: 100%; height: 100%; object-fit: cover; }
   .avatar svg { width: 72%; height: 72%; fill: currentColor; align-self: end; }
-  .account-row { display: flex; align-items: center; gap: 14px; padding: 16px 0; }
-  .account-row .setting-name, .account-row .setting-help { display: block; overflow-wrap: anywhere; }
-  .profile-hero { display: flex; align-items: center; gap: 16px; padding: 20px 0 4px; }
-  .profile-hero p { margin: 0; }
-  .counter { align-self: flex-end; font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
-  .counter.over { color: var(--danger); }
-  .rule-list { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; line-height: 19px; color: var(--text-2); }
-  .key-action { padding: 10px 8px; }
-  .board-group { display: grid; margin-top: 12px; }
-  .board-group-title { margin: 0; padding: 8px 0 4px; font-size: 13px; font-weight: 600; color: var(--text-3); }
   .info-list { display: grid; gap: 2px; margin: 0; }
   .info-list > div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 14px; }
   .info-list dt { flex: none; color: var(--text-3); }
@@ -170,21 +159,4 @@
 @layer platform {
   /* 되돌릴 수 없는 일(계정 삭제)의 확인 버튼은 위험 색으로 구분한다. */
   .solid-button.danger { background: var(--danger-fill); color: oklch(0.99 0.005 25); }
-}
-
-@layer platform {
-  /* 계정 삭제는 설정 맨 아래에 작은 글자로 따로 둔다. 눈에 띄지 않되 찾을 수는 있다. */
-  .delete-account { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; margin-top: 8px; padding: 8px 0 24px; }
-  .delete-account .text-button { color: var(--text-3); font-size: 13px; font-weight: 500; }
-  /* 확인은 다른 설정 묶음과 같은 면으로 감싸 한 층에 둔다. 휴대폰은 두 단추를 같은 폭으로 나누고 실행을 오른쪽(엄지 쪽)에 둔다. */
-  .delete-confirm { display: flex; flex-direction: column; gap: 8px; align-items: stretch; width: 100%; margin-top: 16px; padding: 16px var(--gutter); border-radius: var(--r-lg); background: var(--surface); }
-  .delete-confirm .inline-row { display: grid; grid-template-columns: 1fr 1fr; }
-  @media (min-width: 720px) {
-    .delete-confirm { margin-top: 8px; padding: 16px 0 0; border-top: 1px solid var(--line); border-radius: 0; background: none; align-items: flex-start; }
-    .delete-confirm .setting-help { max-width: 34rem; }
-    .delete-confirm .inline-row { display: flex; }
-    .delete-confirm .inline-row button { min-width: 120px; }
-  }
-  .delete-title { margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; color: var(--text); }
-  .delete-confirm .inline-row { margin-top: 4px; }
 }

@@ -191,13 +191,13 @@ export function Onboarding({ app }: { app: AppController }) {
     const nameOf = (id: string) => sources.find((source) => source.id === id)?.name ?? BOARD_CATALOG.find((board) => board.id === id)?.name ?? OTHER_BOARDS.find((board) => board.id === id)?.name ?? id;
     body = <div className="onb-group">
       <h2>게시판</h2>
-      <div className="box" role="group" aria-label="게시판">
+      <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label="게시판">
         {orderedSources.filter((source) => !OTHER_BOARDS.some((board) => board.id === source.id)).map((source) => <SwitchRow key={source.id} label={source.name}
           checked={draft.boards.includes(source.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, source.id), boardsTouched: true })} />)}
         {orderedSources.length === 0 ? <p className="hint" role="status">게시판 목록을 불러오지 못했어요. 잠시 뒤 설정에서 다시 골라 주세요.</p> : null}
       </div>
       <h2>전공과 상관없는 게시판</h2>
-      <div className="box" role="group" aria-label="기타 게시판">
+      <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label="기타 게시판">
         {OTHER_BOARDS.map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
           checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
       </div>
@@ -212,7 +212,7 @@ export function Onboarding({ app }: { app: AppController }) {
     title = 'AI를 연결해 주세요';
     lead = '두 곳 중 한 곳만 연결하면 돼요';
     const connected = !!app.byokStatus || app.aiKeys.length > 0;
-    body = <div className="onb-group"><div className="box"><AiRows byok={aiConnectModel(app)} /></div>
+    body = <div className="onb-group"><div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0"><AiRows byok={aiConnectModel(app)} /></div>
       {app.onboardingError ? <p className="error-text" role="alert">{app.onboardingError}</p> : null}</div>;
     foot = <>
       {connected ? null : <p className="m-0 text-center text-[14px] text-ink-2" role="status">키를 하나 연결해 주세요</p>}

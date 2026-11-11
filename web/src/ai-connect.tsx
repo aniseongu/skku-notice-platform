@@ -30,7 +30,7 @@ const lnk = (href: string, text: string) => <a key={href} href={href} target="_b
 
 /** 받는 방법 안내. 눌러서 펼치면 순서가 한 번에 다 보인다. 이미 연결했어도 줄 아래에 계속 둔다. */
 export function StepGuide({ label, sub, steps, note }: { label: string; sub: string; steps: ReactNode[]; note: string }) {
-  return <div className="setting stacked"><details className="group w-full">
+  return <div className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch"><details className="group w-full">
     <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between text-[15px] font-semibold text-ink [&::-webkit-details-marker]:hidden"><span className="flex flex-col py-1">{label}<span className="text-[13px] font-normal text-ink-3">{sub}</span></span>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-ink-3 transition-transform group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg></summary>
     <div className="flex flex-col gap-3 pb-2 pt-1">

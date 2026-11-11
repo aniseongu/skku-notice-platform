@@ -4,8 +4,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 /** 원본 설정의 구역(작은 제목 + 상자). 구역 제목이 구역의 이름표가 된다. */
 export function Card({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return <section aria-labelledby={`${id}-title`}>
-    <h2 id={`${id}-title`} className="settings-head">{title}</h2>
-    <div className="box">{children}</div>
+    <h2 id={`${id}-title`} className="settings-head mt-[28px] mb-[8px] text-[14px] leading-[20px] font-semibold text-ink-2">{title}</h2>
+    <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0">{children}</div>
   </section>;
 }
 

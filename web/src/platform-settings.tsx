@@ -117,16 +117,18 @@ const THEMES: [Theme, string][] = [['auto', '자동'], ['light', '밝게'], ['da
 const YEARS = [1, 2, 3, 4, 5];
 const SEMESTERS = [1, 2];
 
+const SETTING_ROW_CLASS = 'setting flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:grid min-[720px]:grid-cols-[minmax(0,1fr)_minmax(0,520px)] min-[720px]:[align-items:start] min-[720px]:gap-[24px] min-[720px]:has-[>.setting-control>.rule-list]:grid-cols-[minmax(0,1fr)] min-[720px]:has-[>.setting-control>.rule-list]:gap-[8px] min-[720px]:has-[>.setting-control>.connection-summary]:[&>.setting-text]:pt-[11px]';
+
 function Section({ id, title, action, children }: { id: string; title: string; action?: ReactNode; children: ReactNode }) {
   return <section aria-labelledby={id}>
-    {action ? <div className="settings-head-row"><h2 id={id} className="settings-head">{title}</h2>{action}</div> : <h2 id={id} className="settings-head">{title}</h2>}
-    <div className="box">{children}</div></section>;
+    {action ? <div className="settings-head-row mt-[28px] mb-[8px] flex items-center justify-between gap-[12px] pr-[var(--gutter)] min-[720px]:pr-0"><h2 id={id} className="settings-head m-0 text-[14px] leading-[20px] font-semibold text-ink-2">{title}</h2>{action}</div> : <h2 id={id} className="settings-head mt-[28px] mb-[8px] text-[14px] leading-[20px] font-semibold text-ink-2">{title}</h2>}
+    <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0">{children}</div></section>;
 }
 
 export function Setting({ name, help, children, className = '' }: { name: string; help?: ReactNode; children?: ReactNode; className?: string }) {
-  return <div className={`setting ${className}`}>
-    <div className="setting-text"><p className="setting-name">{name}</p>{help ? <p className="setting-help">{help}</p> : null}</div>
-    {children ? <div className="setting-control">{children}</div> : null}
+  return <div className={`${SETTING_ROW_CLASS} ${className}`}>
+    <div className="setting-text"><p className="setting-name text-[15px] leading-[22px] font-semibold">{name}</p>{help ? <p className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{help}</p> : null}</div>
+    {children ? <div className="setting-control flex min-w-0 flex-col items-stretch gap-[8px] [&>:first-child]:mt-0 [&>.ghost-button]:self-start [&>.solid-button]:self-start min-[720px]:[&>.ghost-button]:self-end min-[720px]:[&>.solid-button]:self-end min-[720px]:[&_.segmented]:self-end min-[720px]:[&>.time-control]:self-end min-[720px]:[&>.inline-row]:justify-end min-[720px]:[&>.field-note]:text-right min-[720px]:[&>.setting-state]:text-right min-[720px]:[&>.connection-summary]:justify-end">{children}</div> : null}
   </div>;
 }
 
@@ -148,9 +150,9 @@ function SettingsLink({ model, label, help, section }: { model: SettingsModel; l
     event.preventDefault();
     model.openSection(section);
   };
-  return <a className="settings-link" href={href} onClick={open}>
-    <span><span className="setting-name">{label}</span><span className="setting-help">{help}</span></span>
-    <span className="settings-chevron" aria-hidden="true" />
+  return <a className="settings-link flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href={href} onClick={open}>
+    <span><span className="setting-name text-[15px] leading-[22px] font-semibold">{label}</span><span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{help}</span></span>
+    <span className="settings-chevron mr-[4px] size-[8px] flex-none border-t-[1.5px] border-r-[1.5px] border-ink-3 [transform:rotate(45deg)]" aria-hidden="true" />
   </a>;
 }
 
@@ -163,7 +165,7 @@ function LoginNote({ model, what }: { model: SettingsModel; what: string }) {
   return <Setting name="로그인이 필요해요" help={`${what}은 로그인하면 쓸 수 있어요`}>
     {model.configured
       ? <button type="button" className="solid-button" disabled={model.authBusy} onClick={model.signIn}>Google 계정으로 계속하기</button>
-      : <p className="field-note">지금은 로그인할 수 없어요. 잠시 뒤 다시 열어 주세요</p>}
+      : <p className="field-note text-[14px] leading-[20px] text-ink-2">지금은 로그인할 수 없어요. 잠시 뒤 다시 열어 주세요</p>}
   </Setting>;
 }
 
@@ -174,7 +176,7 @@ function profileSummary(profile: UserProfile): string {
 }
 
 function Overview({ model }: { model: SettingsModel }) {
-  return <div className="settings settings-overview">
+  return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px] settings-overview">
     {model.userId && !model.profile.onboardedAt ? <Section id="s-setup" title="첫 설정">
       <Setting name="내 전공에 맞게 설정하기" help="전공과 학년을 알려 주면 받을 게시판과 알림을 맞춰 드려요">
         <button type="button" className="solid-button" onClick={model.openOnboarding}>설정 시작하기</button>
@@ -186,21 +188,21 @@ function Overview({ model }: { model: SettingsModel }) {
     </Section>
     <Section id="s-account" title="계정">
       {model.userId ? <>
-        <div className="account-row">
+        <div className="account-row flex items-center gap-[14px] py-[16px] [&_.setting-name]:block [&_.setting-help]:block [&_.setting-name]:[overflow-wrap:anywhere] [&_.setting-help]:[overflow-wrap:anywhere]">
           <Avatar src={model.avatar} size={56} />
-          <div><span className="setting-name">{model.name ?? model.email ?? '로그인됨'}</span>
-            {model.name && model.email ? <span className="setting-help">{model.email}</span> : null}</div>
+          <div><span className="setting-name text-[15px] leading-[22px] font-semibold">{model.name ?? model.email ?? '로그인됨'}</span>
+            {model.name && model.email ? <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{model.email}</span> : null}</div>
         </div>
         <SettingsLink model={model} label="프로필 설정" help={profileSummary(model.profile)} section="profile" />
         <SettingsLink model={model} label="연결 키" help="Gemini·Groq 키" section="keys" />
         <Setting name="로그아웃" help="이 기기에서만 나가요. 구독과 저장은 계정에 남아요">
           <button type="button" className="ghost-button" disabled={model.authBusy} onClick={model.signOut}>이 기기에서 로그아웃</button>
-          {model.authError ? <p className="field-note error" role="alert">{model.authError}</p> : null}
+          {model.authError ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.authError}</p> : null}
         </Setting>
       </> : <Setting name="계정" help="로그인하면 구독과 저장이 계정에 남아요">
-        {!model.configured ? <p className="field-note">지금은 로그인할 수 없어요. 잠시 뒤 다시 열어 주세요</p>
+        {!model.configured ? <p className="field-note text-[14px] leading-[20px] text-ink-2">지금은 로그인할 수 없어요. 잠시 뒤 다시 열어 주세요</p>
           : <button type="button" className="solid-button" disabled={model.authBusy} onClick={model.signIn}>Google 계정으로 계속하기</button>}
-        {model.authError ? <p className="field-note error" role="alert">{model.authError}</p> : null}
+        {model.authError ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.authError}</p> : null}
       </Setting>}
     </Section>
     <Section id="s-view" title="화면">
@@ -220,11 +222,11 @@ function Overview({ model }: { model: SettingsModel }) {
       <SettingsLink model={model} label="아이캠퍼스" help="과제 마감과 하루 요약 알림" section="canvas" />
       <SettingsLink model={model} label="구글 캘린더" help={model.calendar?.id ? '저장한 공지의 마감을 캘린더에 넣고 있어요' : '저장한 공지의 마감을 구글 캘린더에 넣어요'} section="calendar" />
     </Section>
-    <div className="box mt-[24px]">
-        <a className="settings-link" href="privacy.html">
-        <span><span className="setting-name">개인정보 처리방침</span>
-          <span className="setting-help">어떤 정보를 어디에 쓰고 어떻게 지우는지 알려 드려요</span></span>
-        <span className="settings-chevron" aria-hidden="true" />
+    <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0 mt-[24px]">
+        <a className="settings-link flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href="privacy.html">
+        <span><span className="setting-name text-[15px] leading-[22px] font-semibold">개인정보 처리방침</span>
+          <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">어떤 정보를 어디에 쓰고 어떻게 지우는지 알려 드려요</span></span>
+        <span className="settings-chevron mr-[4px] size-[8px] flex-none border-t-[1.5px] border-r-[1.5px] border-ink-3 [transform:rotate(45deg)]" aria-hidden="true" />
       </a>
     </div>
     {/* 계정 삭제는 되돌릴 수 없어서 설정의 가장 아래에 따로 둔다. */}
@@ -270,9 +272,9 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   const current = group && groups.has(group) ? group : null;   // 묶음의 게시판을 모두 추가했으면 대학 고르기로 돌아간다
   const row = (source: (typeof others)[number]) => <button key={source.id} type="button" className="choice" disabled={busy} aria-label={`${source.label} 추가`} onClick={() => model.toggle(source.id, true)}>
     <span>{source.label}</span><span className="text-[14px] font-semibold text-accent" aria-hidden="true">추가</span></button>;
-  if (others.length === 0) return <p className="field-note">모든 게시판을 받고 있어요</p>;
+  if (others.length === 0) return <p className="field-note text-[14px] leading-[20px] text-ink-2">모든 게시판을 받고 있어요</p>;
   // 접힌 "게시판 더 보기" 줄을 누르면 펼쳐진다. 받는 게시판이 하나도 없으면 처음부터 펼쳐 둔다.
-  return <details className="connection-manual group board-more-list" open={mine.length === 0}>
+  return <details className="connection-manual group board-more-list mt-[8px] border-t border-line [&>.input]:mb-[8px] [&>.input]:w-full" open={mine.length === 0}>
     <summary className={SUMMARY}>게시판 더 보기 ({others.length}개){chevron('M6 9l6 6 6-6', CHEVRON)}</summary>
     <div className="flex flex-col gap-3 pt-3">
       <input className="input" type="search" aria-label="게시판 검색" placeholder="학과나 대학 이름으로 찾기" autoComplete="off" value={query}
@@ -280,7 +282,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
       {needle
         ? found.length
           ? <div className="choice-list" role="group" aria-label="검색 결과">{found.map(row)}</div>
-          : <p className="field-note" role="status">'{query}'에 맞는 게시판이 없어요. 다른 단어로 찾아보세요.</p>
+          : <p className="field-note text-[14px] leading-[20px] text-ink-2" role="status">'{query}'에 맞는 게시판이 없어요. 다른 단어로 찾아보세요.</p>
         : current
           ? <>
             <BackToGroups current={current} onBack={() => setGroup(null)} />
@@ -304,13 +306,13 @@ function SummaryTime({ info }: { info: NonNullable<SettingsModel['devicesInfo']>
     if (composeSummaryTime(period, Number(h), Number(m)) === (info.summaryTime ?? '')) return;
     info.setSummaryTime(period, Number(h), Number(m));
   };
-  return <div className="time-control" role="group" aria-labelledby="summary-time-label">
+  return <div className="time-control flex flex-wrap items-center gap-x-[12px] gap-y-[8px]" role="group" aria-labelledby="summary-time-label">
     <Choice label="오전 또는 오후" value={period} disabled={disabled} options={[['am', '오전'], ['pm', '오후']] as const}
       onPick={(next) => { setPeriod(next); commit(next, hour, minute); }} />
-    <div className="time-numbers">
-      <input className="input time-number" type="number" min={1} max={12} inputMode="numeric" aria-label="시" value={hour} disabled={disabled}
+    <div className="time-numbers flex items-center gap-[6px] [&_span]:text-[14px] [&_span]:text-ink-2">
+      <input className="input time-number w-[56px] min-w-0 px-[6px] py-[10px] text-center tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none" type="number" min={1} max={12} inputMode="numeric" aria-label="시" value={hour} disabled={disabled}
         onChange={(event) => setHour(event.currentTarget.value)} onBlur={() => commit(period, hour, minute)} /><span>시</span>
-      <input className="input time-number" type="number" min={0} max={59} inputMode="numeric" aria-label="분" value={minute} disabled={disabled}
+      <input className="input time-number w-[56px] min-w-0 px-[6px] py-[10px] text-center tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none" type="number" min={0} max={59} inputMode="numeric" aria-label="분" value={minute} disabled={disabled}
         onChange={(event) => setMinute(event.currentTarget.value)} onBlur={() => commit(period, hour, minute)} /><span>분</span>
     </div>
   </div>;
@@ -329,16 +331,16 @@ function DeleteAccount({ model }: { model: SettingsModel }) {
     else if (opened.current) { opened.current = false; triggerRef.current?.focus(); }
   }, [confirming]);
   if (!account) return null;
-  return <div className="delete-account">
-    {confirming ? <div className="delete-confirm" role="group" aria-labelledby="delete-account-title" aria-describedby="delete-account-help" aria-busy={account.busy}>
-      <p id="delete-account-title" className="delete-title">계정을 삭제할까요?</p>
-      <p id="delete-account-help" className="setting-help">구독, 키워드, 저장한 공지까지 계정 정보가 모두 삭제돼요. 삭제한 뒤에는 되돌릴 수 없어요</p>
-      <div className="inline-row">
+  return <div className="delete-account mt-[8px] flex flex-col items-start gap-[10px] pt-[8px] pb-[24px] [&_.text-button]:text-[13px] [&_.text-button]:font-medium [&_.text-button]:text-ink-3">
+    {confirming ? <div className="delete-confirm mt-[16px] flex w-full flex-col items-stretch gap-[8px] rounded-lg bg-surface px-[var(--gutter)] py-[16px] [&_.inline-row]:mt-[4px] [&_.inline-row]:grid [&_.inline-row]:grid-cols-[1fr_1fr] min-[720px]:mt-[8px] min-[720px]:items-start min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:px-0 min-[720px]:pt-[16px] min-[720px]:pb-0 min-[720px]:[&_.setting-help]:max-w-[34rem] min-[720px]:[&_.inline-row]:flex min-[720px]:[&_.inline-row_button]:min-w-[120px]" role="group" aria-labelledby="delete-account-title" aria-describedby="delete-account-help" aria-busy={account.busy}>
+      <p id="delete-account-title" className="delete-title m-0 text-[15px] leading-[22px] font-semibold text-ink">계정을 삭제할까요?</p>
+      <p id="delete-account-help" className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">구독, 키워드, 저장한 공지까지 계정 정보가 모두 삭제돼요. 삭제한 뒤에는 되돌릴 수 없어요</p>
+      <div className="inline-row flex flex-wrap gap-[8px] [&_.input]:min-w-0 [&_.input]:flex-[1_1_200px]">
         <button type="button" className="ghost-button" ref={closeRef} disabled={account.busy} onClick={() => setConfirming(false)}>닫기</button>
         <button type="button" className="solid-button danger" disabled={account.busy} onClick={account.remove}>{account.busy ? '삭제하고 있어요' : '삭제하기'}</button>
       </div>
     </div> : <button type="button" className="text-button" ref={triggerRef} onClick={() => setConfirming(true)}>계정 삭제</button>}
-    {account.error ? <p className="field-note error" role="alert">{account.error}</p> : null}
+    {account.error ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{account.error}</p> : null}
   </div>;
 }
 
@@ -350,15 +352,15 @@ function DeviceRow({ device, info }: { device: Device; info: NonNullable<Setting
   const save = async () => { if (validDeviceName(draft) && await info.rename(device.id, draft)) setEditing(false); };
   return <li>
     {editing
-      ? <div className="inline-row">
+      ? <div className="inline-row flex flex-wrap gap-[8px] [&_.input]:min-w-0 [&_.input]:flex-[1_1_200px]">
         <input className="input" aria-label={`${name} 이름`} value={draft} maxLength={40} autoFocus onChange={(event) => setDraft(event.currentTarget.value)}
           onKeyDown={(event) => { if (event.key === 'Enter') void save(); if (event.key === 'Escape') setEditing(false); }} />
         <button type="button" className="solid-button" disabled={info.busy || !validDeviceName(draft)} onClick={() => void save()}>저장하기</button>
         <button type="button" className="ghost-button" disabled={info.busy} onClick={() => setEditing(false)}>닫기</button>
       </div>
-      : <span className="device-name">{name}{device.id === info.thisId ? <b className="badge">이 기기</b> : null}</span>}
-    <span className="field-note">{device.createdAt ? `${new Date(device.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}에 등록` : ''} · 아캠 알림 {CANVAS_MODES.find(([mode]) => mode === device.canvasMode)?.[1]}</span>
-    {editing ? null : <span className="device-actions">
+      : <span className="device-name flex items-center gap-[8px] font-semibold">{name}{device.id === info.thisId ? <b className="badge">이 기기</b> : null}</span>}
+    <span className="field-note text-[14px] leading-[20px] text-ink-2">{device.createdAt ? `${new Date(device.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}에 등록` : ''} · 아캠 알림 {CANVAS_MODES.find(([mode]) => mode === device.canvasMode)?.[1]}</span>
+    {editing ? null : <span className="device-actions flex gap-[4px] [grid-row:1/span_2] [grid-column:2]">
       <button type="button" className="text-button" disabled={info.busy} aria-label={`${name} 이름 바꾸기`} onClick={() => { setDraft(device.name ?? ''); setEditing(true); }}>이름 바꾸기</button>
       {device.id === info.thisId ? null
         : <button type="button" className="text-button" disabled={info.busy} aria-label={`${name} 지우기`} onClick={() => info.remove(device.id)}>지우기</button>}
@@ -382,15 +384,15 @@ function Canvas({ model }: { model: SettingsModel }) {
   useEffect(() => { if (active) setOpen(true); }, [active]);
   // 펼친 채로 토큰을 저장했는데 이 기기 모드가 꺼짐이면 켜 준다. 스위치만 켜지고 알림은 안 가는 상태를 만들지 않는다.
   useEffect(() => { if (open && pushOn && hasToken && mode === 'off') info?.setMode('reminders'); }, [open, pushOn, hasToken, mode]);
-  if (!model.userId) return <div className="settings"><Section id="s-canvas" title="아이캠퍼스"><LoginNote model={model} what="아이캠퍼스 알림" /></Section></div>;
-  if (!info) return <div className="settings"><Section id="s-canvas" title="아이캠퍼스"><Setting name="아이캠퍼스 알림" help="지금은 설정할 수 없어요. 잠시 뒤 다시 열어 주세요" /></Section></div>;
+  if (!model.userId) return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]"><Section id="s-canvas" title="아이캠퍼스"><LoginNote model={model} what="아이캠퍼스 알림" /></Section></div>;
+  if (!info) return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]"><Section id="s-canvas" title="아이캠퍼스"><Setting name="아이캠퍼스 알림" help="지금은 설정할 수 없어요. 잠시 뒤 다시 열어 주세요" /></Section></div>;
   const pushHelp: Record<string, string> = { unsupported: '이 브라우저는 알림을 지원하지 않아요. 최신 브라우저에서 열어 주세요', denied: '브라우저 설정에서 알림을 허용하면 켤 수 있어요', busy: '연결하고 있어요', checking: '확인하고 있어요', off: '알림을 켜면 이 기기로 받아요' };
   const toggle = (next: boolean) => {
     setOpen(next);
     if (next && hasToken && mode === 'off') info.setMode('reminders');
     if (!next && mode !== null && mode !== 'off') info.setMode('off');
   };
-  return <div className="settings">
+  return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Section id="s-canvas" title="알림">
       <SwitchRow label="아이캠퍼스 알림" description="과제 마감과 하루 요약을 이 기기로 받아요" checked={open} disabled={info.busy} onChange={toggle} />
       {/* 이 기기 알림이 꺼져 있어도 스위치와 설정은 열린다. 실제로 알림이 가려면 이 기기 알림이 필요해서 같은 자리에서 켜게 한다. */}
@@ -403,10 +405,10 @@ function Canvas({ model }: { model: SettingsModel }) {
     {open ? <>
       <Section id="s-canvas-time" title="하루 요약">
         <Setting name="요약 시간" help={hasToken ? '모든 기기에 같은 시간을 적용해요. 할 일이 없어도 알려요' : '토큰을 연결하면 바꿀 수 있어요'}>
-          <p className="setting-name visually-hidden" id="summary-time-label">하루 요약 시간</p>
+          <p className="setting-name text-[15px] leading-[22px] font-semibold visually-hidden" id="summary-time-label">하루 요약 시간</p>
           <div className={hasToken ? '' : 'opacity-50'}><SummaryTime info={info} /></div>
-          {hasToken ? <p className="field-note">확인이 늦어지면 알림도 늦어져요</p> : null}
-          {info.error ? <p className="field-note error" role="alert">{info.error}</p> : null}
+          {hasToken ? <p className="field-note text-[14px] leading-[20px] text-ink-2">확인이 늦어지면 알림도 늦어져요</p> : null}
+          {info.error ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{info.error}</p> : null}
         </Setting>
         {hasToken ? <Setting name="받을 알림" help="요약과 마감을 고르면 하루 전과 3시간 전에도 알려요">
           <Choice label="받을 아이캠퍼스 알림" value={mode === 'summary' ? 'summary' : 'reminders'} disabled={!thisDevice || info.busy}
@@ -423,12 +425,12 @@ function Notifications({ model }: { model: SettingsModel }) {
   const refresh = info?.refresh;
   // 설정 쪽을 열 때와 이 기기 알림을 켜고 끌 때 기기 목록을 다시 읽는다.
   useEffect(() => { if (model.userId) refresh?.(); }, [model.userId, model.pushStatus]);
-  return <div className="settings">
+  return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Back model={model} />
     <Section id="s-notify" title="이 기기">
       <Setting name="이 기기 알림" help="앱을 닫아도 브라우저가 켜져 있으면 알림으로 받아요. 이 기기에만 적용돼요">
-        {!model.userId ? <p className="field-note">로그인하면 이 기기로 알림을 받을 수 있어요</p> : <>
-          <div className="inline-row">
+        {!model.userId ? <p className="field-note text-[14px] leading-[20px] text-ink-2">로그인하면 이 기기로 알림을 받을 수 있어요</p> : <>
+          <div className="inline-row flex flex-wrap gap-[8px] [&_.input]:min-w-0 [&_.input]:flex-[1_1_200px]">
             {on
               ? <><button type="button" className="ghost-button" onClick={model.disablePush}>알림 끄기</button>
                 <button type="button" className="ghost-button" onClick={model.testNotification}>테스트 알림 띄우기</button></>
@@ -436,15 +438,15 @@ function Notifications({ model }: { model: SettingsModel }) {
                 {model.pushStatus === 'busy' ? '연결 중' : model.pushStatus === 'checking' ? '확인하고 있어요' : model.pushRetry ? '다시 시도하기' : '알림 받기'}</button>}
           </div>
           {/* 조작 먼저, 보조 안내는 그 아래(다른 행과 같은 순서). */}
-          <span className="field-note">{on ? '켜져 있어요' : '꺼져 있어요'} · 브라우저 권한 {permissionText(model.pushStatus)}</span>
-          {model.pushStatus === 'unsupported' ? <p className="field-note">이 브라우저는 알림을 지원하지 않아요. 최신 브라우저에서 열어 주세요</p> : null}
-          {model.pushStatus === 'denied' ? <p className="field-note">브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요</p> : null}
-          {model.pushError ? <p className="field-note error" role="alert">{model.pushError}</p> : null}
-          {on && model.subscriptions.length === 0 ? <p className="field-note">받을 게시판을 고르면 새 공지를 알려드려요</p> : null}
+          <span className="field-note text-[14px] leading-[20px] text-ink-2">{on ? '켜져 있어요' : '꺼져 있어요'} · 브라우저 권한 {permissionText(model.pushStatus)}</span>
+          {model.pushStatus === 'unsupported' ? <p className="field-note text-[14px] leading-[20px] text-ink-2">이 브라우저는 알림을 지원하지 않아요. 최신 브라우저에서 열어 주세요</p> : null}
+          {model.pushStatus === 'denied' ? <p className="field-note text-[14px] leading-[20px] text-ink-2">브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요</p> : null}
+          {model.pushError ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.pushError}</p> : null}
+          {on && model.subscriptions.length === 0 ? <p className="field-note text-[14px] leading-[20px] text-ink-2">받을 게시판을 고르면 새 공지를 알려드려요</p> : null}
         </>}
       </Setting>
       <Setting name="받을 공지" help="알림을 보내는 기준이에요">
-        <ul className="rule-list">
+        <ul className="rule-list m-0 grid gap-[4px] pl-[18px] text-[13px] leading-[19px] text-ink-2">
           <li>받는 게시판의 새 공지를 알려요</li>
           <li>관심 키워드와 맞는 공지는 소리로, 나머지는 조용히 알려요</li>
           <li>학교가 고친 중요한 글은 한 번 더 알려요</li>
@@ -455,7 +457,7 @@ function Notifications({ model }: { model: SettingsModel }) {
     </Section>
     {model.userId && info && info.devices.length > 0 ? <Section id="s-devices" title="알림 기기">
       <Setting name="등록된 기기" help="알림을 받도록 켜 둔 기기예요. 이 기기는 위에서 끄고, 다른 기기는 여기서 지워요">
-        <ul className="device-list">
+        <ul className="device-list m-0 grid list-none gap-[4px] p-0 [&>li]:grid [&>li]:grid-cols-[1fr_auto] [&>li]:items-center [&>li]:gap-x-[12px] [&>li]:gap-y-[2px] [&>li]:border-t [&>li]:border-line [&>li]:py-[10px] [&>li:first-child]:border-t-0 [&_.field-note]:col-[1] [&_.field-note]:m-0 [&>li>.inline-row]:col-[1/-1]">
           {info.devices.map((device) => <DeviceRow key={device.id} device={device} info={info} />)}
         </ul>
       </Setting>
@@ -470,20 +472,20 @@ function BoardsSection({ model }: { model: SettingsModel }) {
   const order = model.boardOrder;
   const canMove = order.boards.length >= 2;
   return <Section id="s-boards" title="받을 게시판"
-    action={canMove ? <button type="button" className="head-action" onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : undefined}>
-    <p className="settings-lead">{editing ? '손잡이를 끌어 순서를 바꿔요. 바꾸면 바로 저장돼요' : '알림을 받고 목록에 모아 볼 게시판이에요. 이 순서로 보여요'}</p>
+    action={canMove ? <button type="button" className="head-action -mx-[8px] -my-[13px] min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent [font-family:inherit] [line-height:inherit] [&:hover]:underline [&:hover]:underline-offset-[3px] focus-visible:rounded-sm" onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : undefined}>
+    <p className="settings-lead m-0 mb-[4px] pt-[12px] text-[13px] leading-[19px] text-ink-2">{editing ? '손잡이를 끌어 순서를 바꿔요. 바꾸면 바로 저장돼요' : '알림을 받고 목록에 모아 볼 게시판이에요. 이 순서로 보여요'}</p>
     {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <>
-      {model.error ? <><p className="field-note error" role="alert">{model.error}</p>
+      {model.error ? <><p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.error}</p>
         <button type="button" className="ghost-button" onClick={model.retry}>다시 불러오기</button></> : null}
       {order.boards.length ? <BoardOrderList order={order} editing={editing} onToggle={(id) => model.toggle(id, false)} busy={model.loading} />
-        : <p className="field-note">아직 받는 게시판이 없어요. 아래에서 골라 주세요</p>}
+        : <p className="field-note text-[14px] leading-[20px] text-ink-2">아직 받는 게시판이 없어요. 아래에서 골라 주세요</p>}
       <BoardGroups model={model} />
     </>}
   </Section>;
 }
 
 // 펼치는 줄(details)은 브라우저 기본 삼각형 대신 다른 곳과 같은 쉐브론을 쓴다. 열리면 위를 향한다.
-const SUMMARY = 'flex cursor-pointer list-none items-center justify-between [&::-webkit-details-marker]:hidden';
+const SUMMARY = 'flex min-h-[44px] cursor-pointer list-none items-center justify-between py-[12px] text-[14px] text-ink-2 [&::-webkit-details-marker]:hidden';
 const CHEVRON = 'text-ink-3 transition-transform group-open:rotate-180';
 function chevron(d: string, className?: string) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" className={className}><path d={d} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg>;
@@ -521,7 +523,7 @@ function BoardOrderList({ order, editing, onToggle, busy = false }: { order: Set
     latest.current.move(arrayMove(ids, from, to));
   };
   const position = (id: unknown) => `${ids.indexOf(String(id)) + 1}번째`;
-  return <div className="order-box">
+  return <div className="order-box py-[4px]">
     <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis, restrictToParentElement]} onDragEnd={onDragEnd}
       accessibility={{
         screenReaderInstructions: { draggable: '순서를 바꾸려면 Space를 눌러 집고, 위아래 방향키로 옮긴 뒤 Space로 놓으세요. 취소는 Esc예요.' },
@@ -539,33 +541,33 @@ function BoardOrderList({ order, editing, onToggle, busy = false }: { order: Set
       </SortableContext>
     </DndContext>
     {/* 아래에는 문제가 생겼을 때만 적는다. 저장 성공은 따로 알리지 않는다(바로 저장된다고 위에 이미 적었다). */}
-    {editing && order.status === 'failed' ? <p className="field-note error m-0 mt-[8px]" role="alert">저장하지 못했어요. 다시 옮기면 또 저장해요</p> : null}
+    {editing && order.status === 'failed' ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0 mt-[8px]" role="alert">저장하지 못했어요. 다시 옮기면 또 저장해요</p> : null}
   </div>;
 }
 
 function Keywords({ model }: { model: SettingsModel }) {
   const [draft, setDraft] = useState('');
   const add = () => { if (!draft.trim()) return; model.addKeyword(draft); setDraft(''); };
-  return <div className="settings">
+  return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Back model={model} />
     <Section id="s-keywords" title="관심 키워드">
-      <div className="setting stacked">
-        <p className="setting-help m-0">제목이나 본문에 이 글자가 그대로 들어간 공지를 "관심"으로 표시해요</p>
-        <div className="inline-row">
+      <div className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch">
+        <p className="setting-help text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty] m-0">제목이나 본문에 이 글자가 그대로 들어간 공지를 "관심"으로 표시해요</p>
+        <div className="inline-row flex flex-wrap gap-[8px] [&_.input]:min-w-0 [&_.input]:flex-[1_1_200px]">
           <input className="input" type="text" autoComplete="off" aria-label="새 키워드" placeholder="예: 겨울방학 인턴" value={draft}
             onChange={(event) => setDraft(event.currentTarget.value)}
             onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); add(); } }} />
           <button type="button" className="solid-button" disabled={!draft.trim()} onClick={add}>추가하기</button>
         </div>
-        {model.keywordNote ? <p className="field-note m-0" role="status">{model.keywordNote}</p>
-          : model.userId ? null : <p className="field-note m-0">로그인하면 다른 기기와 같은 키워드를 써요</p>}
+        {model.keywordNote ? <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0" role="status">{model.keywordNote}</p>
+          : model.userId ? null : <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0">로그인하면 다른 기기와 같은 키워드를 써요</p>}
       </div>
-      <div className="setting stacked">
-        <p className="setting-name m-0">내 키워드 {model.keywords.length}개</p>
+      <div className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch">
+        <p className="setting-name text-[15px] leading-[22px] font-semibold m-0">내 키워드 {model.keywords.length}개</p>
         {model.keywords.length
-          ? <ul className="keyword-list">{model.keywords.map((word) => <li key={word}><span>{word}</span>
+          ? <ul className="keyword-list m-0 list-none border-t-0 p-0 [&>li]:flex [&>li]:min-h-[44px] [&>li]:items-center [&>li]:justify-between [&>li]:border-b [&>li]:border-line [&>li]:text-[15px] [&>li:last-child]:border-b-0">{model.keywords.map((word) => <li key={word}><span>{word}</span>
             <button type="button" className="text-button" aria-label={`${word} 삭제`} onClick={() => model.removeKeyword(word)}>삭제</button></li>)}</ul>
-          : <p className="field-note m-0">아직 키워드가 없어요. 위에 입력해서 추가해 보세요</p>}
+          : <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0">아직 키워드가 없어요. 위에 입력해서 추가해 보세요</p>}
       </div>
     </Section>
   </div>;
@@ -591,35 +593,35 @@ function AboutMe({ model }: { model: SettingsModel }) {
   const changed = JSON.stringify([drafts.interests.trim(), drafts.wants.trim(), drafts.avoids.trim()]) !== stored;
   const ready = model.profileStatus === 'ready';
   return <Section id="s-about" title="나를 소개해요 (선택)">
-    <div className="setting">
-      <div className="setting-text"><p className="setting-name">AI가 읽는 내용</p>
-        <p className="setting-help">나에게 맞는 공지와 인턴 공고를 고를 때 참고해요. Google로 보내는 내용이라 이름, 학번, 연락처, 주소는 적지 마세요</p></div>
+    <div className="setting flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:grid min-[720px]:grid-cols-[minmax(0,1fr)_minmax(0,520px)] min-[720px]:[align-items:start] min-[720px]:gap-[24px] min-[720px]:has-[>.setting-control>.rule-list]:grid-cols-[minmax(0,1fr)] min-[720px]:has-[>.setting-control>.rule-list]:gap-[8px] min-[720px]:has-[>.setting-control>.connection-summary]:[&>.setting-text]:pt-[11px]">
+      <div className="setting-text"><p className="setting-name text-[15px] leading-[22px] font-semibold">AI가 읽는 내용</p>
+        <p className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">나에게 맞는 공지와 인턴 공고를 고를 때 참고해요. Google로 보내는 내용이라 이름, 학번, 연락처, 주소는 적지 마세요</p></div>
     </div>
     {TEXT_FIELDS.map(({ key, name, help, placeholder }) => {
       const count = length(drafts[key]);
       return <Setting key={key} name={name} help={help}>
         <textarea className="input" rows={3} aria-label={name} placeholder={placeholder} value={drafts[key]} disabled={!ready}
           aria-describedby={`count-${key}`} onChange={(event) => setDrafts({ ...drafts, [key]: event.currentTarget.value })} />
-        <span id={`count-${key}`} className={`counter ${count > PROFILE_TEXT_LIMIT ? 'over' : ''}`} aria-live="polite">{count}/{PROFILE_TEXT_LIMIT}</span>
+        <span id={`count-${key}`} className={`counter self-end text-[12px] tabular-nums ${count > PROFILE_TEXT_LIMIT ? 'over text-danger' : 'text-ink-3'}`} aria-live="polite">{count}/{PROFILE_TEXT_LIMIT}</span>
       </Setting>;
     })}
     <Setting name="저장">
       <button type="button" className="solid-button" disabled={!ready || !changed || over}
         onClick={() => model.saveProfile({ ...profile, interests: drafts.interests.trim(), wants: drafts.wants.trim(), avoids: drafts.avoids.trim() })}>저장하기</button>
-      {over ? <p className="field-note error" role="alert">{PROFILE_TEXT_LIMIT}자 이하로 적어 주세요</p> : null}
+      {over ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{PROFILE_TEXT_LIMIT}자 이하로 적어 주세요</p> : null}
     </Setting>
   </Section>;
 }
 
 function CalendarPage({ model }: { model: SettingsModel }) {
   const calendar = model.calendar;
-  if (!model.userId) return <div className="settings"><Back model={model} /><Section id="s-calendar" title="구글 캘린더"><LoginNote model={model} what="구글 캘린더" /></Section></div>;
+  if (!model.userId) return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]"><Back model={model} /><Section id="s-calendar" title="구글 캘린더"><LoginNote model={model} what="구글 캘린더" /></Section></div>;
   if (!calendar) return null;
   const connected = !!calendar.id;
   const syncedAt = calendar.syncedAt ? new Date(calendar.syncedAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
   // 서버가 자동으로 맞추려면 연결할 때 받은 구글 장기 열쇠가 서버에 있어야 한다. 예전에 연결한 사람은 한 번 더 연결하면 된다.
   const auto = calendar.auto;
-  return <div className="settings">
+  return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Back model={model} />
     <Section id="s-calendar" title="저장한 공지의 마감">
       <Setting name="구글 캘린더" help={'마감이 남은 저장 공지를 "성대 공지" 캘린더에 넣어요'}>
@@ -628,17 +630,17 @@ function CalendarPage({ model }: { model: SettingsModel }) {
           ? <span role="status" className="inline-flex min-h-[44px] items-center gap-[6px] rounded-md bg-accent px-[16px] text-[15px] font-semibold text-on-accent self-start min-[720px]:self-end">
             <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>연결됨</span>
           : <button type="button" className="ghost-button" aria-label="구글 캘린더에 연결하기" disabled={calendar.busy} onClick={calendar.connect}>연결하기</button>}
-        {connected ? <p className="field-note m-0">{auto.active ? '30분마다 자동으로 맞춰요' : '자동으로 맞추려면 다시 연결해 주세요'}{calendar.savedCount !== undefined ? ` · 저장한 공지 ${calendar.savedCount}개` : ''}{syncedAt ? ` · 마지막 맞춤 ${syncedAt}` : ''}</p> : null}
-        {connected && !auto.active && auto.error ? <p className="field-note error m-0" role="alert">{auto.error}</p> : null}
-        {connected ? <div className="inline-row">
+        {connected ? <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0">{auto.active ? '30분마다 자동으로 맞춰요' : '자동으로 맞추려면 다시 연결해 주세요'}{calendar.savedCount !== undefined ? ` · 저장한 공지 ${calendar.savedCount}개` : ''}{syncedAt ? ` · 마지막 맞춤 ${syncedAt}` : ''}</p> : null}
+        {connected && !auto.active && auto.error ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">{auto.error}</p> : null}
+        {connected ? <div className="inline-row flex flex-wrap gap-[8px] [&_.input]:min-w-0 [&_.input]:flex-[1_1_200px]">
           <button type="button" className="text-button" disabled={calendar.busy} onClick={calendar.disconnect}>연결 끊기</button>
           {!auto.active ? <button type="button" className="ghost-button" disabled={calendar.busy} onClick={calendar.connect}>다시 연결하기</button> : null}
           <button type="button" className="ghost-button" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '맞추고 있어요' : '지금 맞추기'}</button>
         </div> : null}
-        {calendar.message ? <p className="field-note ok m-0" role="status">{calendar.message}</p> : null}
-        {calendar.error ? <p className="field-note error m-0" role="alert">{calendar.error}</p> : null}
+        {calendar.message ? <p className="field-note ok text-[14px] leading-[20px] text-accent m-0" role="status">{calendar.message}</p> : null}
+        {calendar.error ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">{calendar.error}</p> : null}
       </Setting>
-      <div className="setting stacked">
+      <div className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch">
         <Guide bare label="연결하는 방법" steps={[
           '"구글 캘린더에 연결하기"를 눌러 구글 허용 화면으로 가요',
           '"확인되지 않은 앱"이라고 나오면 "고급"을 누른 뒤 "계속"을 눌러요',
@@ -647,7 +649,7 @@ function CalendarPage({ model }: { model: SettingsModel }) {
       </div>
     </Section>
     <Section id="s-calendar-help" title="알아 두세요">
-      <div className="setting stacked"><ul className="rule-list">
+      <div className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch"><ul className="rule-list m-0 grid gap-[4px] pl-[18px] text-[13px] leading-[19px] text-ink-2">
         <li>이 앱이 만든 "성대 공지" 캘린더만 다뤄요. 내 다른 캘린더는 읽지 못해요</li>
         <li>구글이 주는 열쇠는 암호화해 보관하고, 연결을 끊거나 계정을 지우면 지워요</li>
         <li>연결을 끊어도 "성대 공지" 캘린더는 남아요. 필요 없으면 구글 캘린더에서 지워 주세요</li>
@@ -669,9 +671,9 @@ function ProgramEditor({ programs, ready, onChange }: { programs: Program[]; rea
   // 고르는 칸은 누른 줄 바로 아래에 열고, 열리면 화면 안으로 옮긴다. 닫기는 제목 줄에 있어 긴 목록 끝까지 내려가지 않는다.
   const pickerRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (editing) pickerRef.current?.scrollIntoView({ block: 'nearest' }); }, [editing]);
-  const picker = <div ref={pickerRef} className="setting stacked">
+  const picker = <div ref={pickerRef} className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch">
     <div className="flex items-center justify-between gap-2">
-      <p className="setting-name m-0">{editing === 'main' ? '주전공을 골라 주세요' : '복수전공을 골라 주세요'}</p>
+      <p className="setting-name text-[15px] leading-[22px] font-semibold m-0">{editing === 'main' ? '주전공을 골라 주세요' : '복수전공을 골라 주세요'}</p>
       <button type="button" className="text-button min-h-[44px] px-2" onClick={() => setEditing(null)}>닫기</button>
     </div>
     <ProgramPicker current={editing === 'main' ? main : null} onPick={pick} lead={false} listClass="max-h-[min(55vh,420px)] overflow-y-auto" />
@@ -682,7 +684,7 @@ function ProgramEditor({ programs, ready, onChange }: { programs: Program[]; rea
     </Setting>
     {editing === 'main' ? picker : null}
     <Setting name="복수전공" help={doubles.length ? doubles.map(name).join(', ') : '없어요'}>
-      <div className="inline-row">
+      <div className="inline-row flex flex-wrap gap-[8px] [&_.input]:min-w-0 [&_.input]:flex-[1_1_200px]">
         {doubles.map((program) => <button key={programKey(program)} type="button" className="ghost-button" disabled={!ready} aria-label={`${programLabel(program)} 빼기`}
           onClick={() => onChange(programs.filter((p) => programKey(p) !== programKey(program)))}>{programLabel(program)} 빼기</button>)}
         {main && programs.length < MAX_PROGRAMS ? <button type="button" className="ghost-button" disabled={!ready} onClick={() => setEditing(editing === 'double' ? null : 'double')}>추가하기</button> : null}
@@ -696,13 +698,13 @@ function Profile({ model }: { model: SettingsModel }) {
   const { profile } = model;
   const save = (patch: Partial<UserProfile>) => model.saveProfile({ ...profile, ...patch });
   const [main, ...doubles] = profile.programs;
-  if (!model.userId) return <div className="settings"><Back model={model} /><Section id="s-profile" title="프로필 설정"><LoginNote model={model} what="프로필 설정" /></Section></div>;
+  if (!model.userId) return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]"><Back model={model} /><Section id="s-profile" title="프로필 설정"><LoginNote model={model} what="프로필 설정" /></Section></div>;
   const ready = model.profileStatus === 'ready';
-  return <div className="settings">
+  return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Back model={model} />
-    <div className="profile-hero">
+    <div className="profile-hero flex items-center gap-[16px] pt-[20px] pb-[4px] [&_p]:m-0">
       <Avatar src={model.avatar} size={64} />
-      <div><p className="setting-name">{model.name ?? model.email ?? '로그인됨'}</p>{model.name && model.email ? <p className="setting-help">{model.email}</p> : null}</div>
+      <div><p className="setting-name text-[15px] leading-[22px] font-semibold">{model.name ?? model.email ?? '로그인됨'}</p>{model.name && model.email ? <p className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{model.email}</p> : null}</div>
     </div>
     <Section id="s-major" title="전공">
       <ProgramEditor programs={profile.programs} ready={ready} onChange={(programs) => save({ programs })} />
@@ -739,9 +741,9 @@ function Profile({ model }: { model: SettingsModel }) {
       </> : null}
     </Section>
     <AboutMe model={model} />
-    {model.profileMessage ? <p className="field-note ok" role="status">{model.profileMessage}</p> : null}
-    {model.profileError ? <p className="field-note error" role="alert">{model.profileError}</p> : null}
-    {model.profileStatus === 'unavailable' ? <p className="field-note">지금은 프로필을 불러올 수 없어요. 잠시 뒤 다시 열어 주세요</p> : null}
+    {model.profileMessage ? <p className="field-note ok text-[14px] leading-[20px] text-accent" role="status">{model.profileMessage}</p> : null}
+    {model.profileError ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.profileError}</p> : null}
+    {model.profileStatus === 'unavailable' ? <p className="field-note text-[14px] leading-[20px] text-ink-2">지금은 프로필을 불러올 수 없어요. 잠시 뒤 다시 열어 주세요</p> : null}
   </div>;
 }
 
@@ -750,7 +752,7 @@ export function Guide({ label, steps, bare = false, open = false, compact = fals
   if (compact) {
     return <details open={open} className="group"><summary className="flex min-h-[36px] cursor-pointer list-none items-center gap-1 text-[13px] text-ink-3 [&::-webkit-details-marker]:hidden">{label}{chevron('M6 9l6 6 6-6', 'h-4 w-4 text-ink-3 transition-transform group-open:rotate-180')}</summary><ol className="m-0 mb-1 mt-1 flex list-decimal flex-col gap-1 pl-5 text-[13px] text-ink-2">{steps.map((step, index) => <li key={index}>{step}</li>)}</ol></details>;
   }
-  return <details open={open} className={`connection-manual group ${bare ? 'mt-0 border-t-0' : ''}`}><summary className={SUMMARY}>{label}{chevron('M6 9l6 6 6-6', CHEVRON)}</summary><ol className="steps">{steps.map((step, index) => <li key={index}>{step}</li>)}</ol></details>;
+  return <details open={open} className={`connection-manual group ${bare ? 'mt-0 border-t-0' : 'mt-[8px] border-t border-line'} [&>.input]:mb-[8px] [&>.input]:w-full`}><summary className={SUMMARY}>{label}{chevron('M6 9l6 6 6-6', CHEVRON)}</summary><ol className="steps m-0 rounded-md bg-sunken py-[12px] pr-[16px] pl-[36px] text-[14px] leading-[22px] text-ink-2 [&_li+li]:mt-[6px]">{steps.map((step, index) => <li key={index}>{step}</li>)}</ol></details>;
 }
 
 export const ext = (href: string, text: string) => <a href={href} target="_blank" rel="noopener noreferrer">{text}</a>;
@@ -758,7 +760,7 @@ export const ext = (href: string, text: string) => <a href={href} target="_blank
 /** 키 한 줄: 저장 상태와 입력하기·수정하기, 눌러서 펼치는 입력칸, 받는 방법 안내(원본의 연결 키 줄과 같은 모양). */
 function KeyRow({ name, help, state, children, guide }: { name: string; help: string; state: string; children?: ReactNode; guide?: ReactNode }) {
   return <Setting name={name} help={help}>
-    <div className="connection-summary"><span className="setting-state">{state}</span>{children}</div>
+    <div className="connection-summary flex min-h-[44px] flex-wrap items-center gap-x-[16px] gap-y-[8px] [&_.field-note]:[overflow-wrap:anywhere]"><span className="setting-state text-[13px] leading-[22px] font-medium text-ink-2">{state}</span>{children}</div>
     {guide}
   </Setting>;
 }
@@ -798,7 +800,7 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
         <button type="button" className="solid-button min-h-[44px] shrink-0 px-4 disabled:border-line disabled:text-ink-2" aria-label={`${name} ${labels.save}`} disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인 중' : labels.save}</button>
       </div>
       {extra}
-      {error ? <p className="field-note error" role="alert">{error}</p> : null}
+      {error ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{error}</p> : null}
       {status ? <button type="button" className="text-button self-start" disabled={busy} onClick={() => { setEditing(false); setValue(''); setShown(false); }}>{labels.close}</button> : null}
       {guide}
     </> : confirming ? <>
@@ -813,9 +815,9 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
         <span className="flex shrink-0 gap-2"><button type="button" className="ghost-button key-action min-h-[44px] px-3 py-0" aria-label={`${name} ${retry}`} disabled={loading} onClick={() => setEditing(true)}>{retry}</button>
         {status ? <button type="button" className="ghost-button key-action min-h-[44px] px-3 py-0 text-danger" aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={() => setConfirming(true)}>{labels.remove}</button> : null}</span>
       </div>
-      {status?.lastError && !labels.broken ? <p className="field-note error" role="alert">{status.lastError}</p> : null}
-      {note ? <p className="field-note" role="status">{note}</p> : null}
-      {error ? <p className="field-note error" role="alert">{error}</p> : null}
+      {status?.lastError && !labels.broken ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{status.lastError}</p> : null}
+      {note ? <p className="field-note text-[14px] leading-[20px] text-ink-2" role="status">{note}</p> : null}
+      {error ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{error}</p> : null}
     </>}
   </Setting>;
 }
@@ -825,7 +827,7 @@ function CanvasRow({ model, alignEnd }: { model: SettingsModel; alignEnd: boolea
   const help = '과제 마감을 확인하는 데 써요';
   if (!byok?.available) {
     return <KeyRow name="아이캠퍼스 토큰" help={help} state="준비 중" guide={null}>
-      <span className="field-note">지금은 토큰을 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
+      <span className="field-note text-[14px] leading-[20px] text-ink-2">지금은 토큰을 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
     </KeyRow>;
   }
   return <><SecretRow name="아이캠퍼스 토큰" help={help} alignEnd={alignEnd} placeholder="토큰을 붙여 넣어 주세요" status={byok.canvas} loading={byok.loading} busy={byok.canvasBusy}
@@ -837,15 +839,15 @@ function CanvasRow({ model, alignEnd }: { model: SettingsModel; alignEnd: boolea
 }
 
 function Keys({ model }: { model: SettingsModel }) {
-  if (!model.userId) return <div className="settings"><Back model={model} /><Section id="s-keys" title="연결 키"><LoginNote model={model} what="연결 키" /></Section></div>;
+  if (!model.userId) return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]"><Back model={model} /><Section id="s-keys" title="연결 키"><LoginNote model={model} what="연결 키" /></Section></div>;
   // Gemini와 Groq를 모두 연결했을 때만 칩과 버튼을 오른쪽 끝에 붙인다. 하나라도 비어 있으면 그대로 둔다.
   const ai = model.byok?.ai;
   const allConnected = !!model.byok?.status && !!ai && ai.keys.some((key) => key.provider === 'groq');
-  return <div className="settings">
+  return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Back model={model} />
     <Section id="s-ai" title="AI 연결">
       {/* 키를 몇 개 연결했느냐에 따라 달라지는 동작을 한 줄로 말한다(구역 제목 바로 아래, 구역마다 하나). */}
-      {model.byok?.available ? <p className="settings-lead">{aiKeysLead(connectedAiKeys(model))}</p> : null}
+      {model.byok?.available ? <p className="settings-lead m-0 mb-[4px] pt-[12px] text-[13px] leading-[19px] text-ink-2">{aiKeysLead(connectedAiKeys(model))}</p> : null}
       <AiRows byok={model.byok} alignEnd={allConnected} />
     </Section>
   </div>;

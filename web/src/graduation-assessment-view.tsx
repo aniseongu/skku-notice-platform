@@ -57,7 +57,7 @@ export function GraduationSection({ model }: { title: string; model: GraduationM
       {model.tracks.p3 && ready.university3p ? <Result name="3품 인턴십" track={ready.university3p} /> : null}
       {model.tracks.dept && ready.department ? <Result name="솦 인턴십" track={ready.department} job /> : null}
     </> : null}
-    {error ? <p className="field-note error" role="alert">{error}</p> : null}
+    {error ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{error}</p> : null}
   </section>;
 }
 
