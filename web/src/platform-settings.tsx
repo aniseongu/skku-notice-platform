@@ -187,7 +187,7 @@ function Overview({ model }: { model: SettingsModel }) {
             {model.name && model.email ? <span className="setting-help">{model.email}</span> : null}</div>
         </div>
         <SettingsLink model={model} label="프로필 설정" help={profileSummary(model.profile)} section="profile" />
-        <SettingsLink model={model} label="연결 키" help="Gemini·Groq·OpenRouter 키와 아이캠퍼스 토큰" section="keys" />
+        <SettingsLink model={model} label="연결 키" help="Gemini·Groq·OpenRouter 키" section="keys" />
         <Setting name="로그아웃" help="이 기기에서만 나가요. 구독과 저장은 계정에 남아요">
           <button type="button" className="ghost-button" disabled={model.authBusy} onClick={model.signOut}>이 기기에서 로그아웃</button>
           {model.authError ? <p className="field-note error" role="alert">{model.authError}</p> : null}
@@ -339,6 +339,41 @@ function DeviceRow({ device, info }: { device: Device; info: NonNullable<Setting
   </li>;
 }
 
+/** 아이캠퍼스 알림: 스위치를 켜면 키 입력 → 하루 요약 시간 → 받을 알림 순으로 같은 자리에 펼쳐진다.
+ * 스위치는 이 기기의 알림 모드(끔/켬)이고, 키가 저장돼 있어야 알림이 실제로 간다. 키를 지워도 입력칸이 닫히지 않게 펼침 상태는 따로 둔다. */
+function CanvasAlerts({ model, info, pushOn, thisDevice }: { model: SettingsModel; info: NonNullable<SettingsModel['devicesInfo']>; pushOn: boolean; thisDevice: Device | null }) {
+  const hasToken = info.hasCanvasToken;
+  const mode = thisDevice?.canvasMode ?? null;
+  const active = pushOn && hasToken && mode !== null && mode !== 'off';
+  const [open, setOpen] = useState(active);
+  // 서버에서 늦게 불러온 켜짐 상태도 펼침에 반영한다(한 방향만: 끄는 것은 사용자가 스위치로만 한다).
+  useEffect(() => { if (active) setOpen(true); }, [active]);
+  // 펼친 채로 키를 저장했는데 이 기기 모드가 꺼짐이면 켜 준다. 스위치만 켜지고 알림은 안 가는 상태를 만들지 않는다.
+  useEffect(() => { if (open && pushOn && hasToken && mode === 'off') info.setMode('reminders'); }, [open, pushOn, hasToken, mode]);
+  const toggle = (next: boolean) => {
+    setOpen(next);
+    if (next && hasToken && mode === 'off') info.setMode('reminders');
+    if (!next && mode !== null && mode !== 'off') info.setMode('off');
+  };
+  return <Section id="s-canvas" title="아이캠퍼스 알림">
+    <SwitchRow label="아이캠퍼스 알림" description={pushOn ? '과제 마감과 하루 요약을 이 기기로 받아요' : '먼저 이 기기 알림을 켜 주세요'}
+      checked={open && pushOn} disabled={!pushOn || info.busy} onChange={toggle} />
+    {open && pushOn ? <>
+      <CanvasRow model={model} alignEnd={false} />
+      <Setting name="하루 요약 시간" help={hasToken ? '모든 기기에 같은 시간을 적용해요. 할 일이 없어도 알려요' : '키를 연결하면 바꿀 수 있어요'}>
+        <p className="setting-name visually-hidden" id="summary-time-label">하루 요약 시간</p>
+        <SummaryTime info={info} />
+        {hasToken ? <p className="field-note">확인이 늦어지면 알림도 늦어져요</p> : null}
+        {info.error ? <p className="field-note error" role="alert">{info.error}</p> : null}
+      </Setting>
+      {hasToken ? <Setting name="받을 알림" help="요약과 마감을 고르면 하루 전과 3시간 전에도 알려요">
+        <Choice label="받을 아이캠퍼스 알림" value={mode === 'summary' ? 'summary' : 'reminders'} disabled={!thisDevice || info.busy}
+          options={CANVAS_MODES.filter(([value]) => value !== 'off')} onPick={(next: CanvasMode) => info.setMode(next)} />
+      </Setting> : null}
+    </> : null}
+  </Section>;
+}
+
 function Notifications({ model }: { model: SettingsModel }) {
   const on = model.pushStatus === 'on';
   const info = model.devicesInfo;
@@ -366,19 +401,6 @@ function Notifications({ model }: { model: SettingsModel }) {
           {on && model.subscriptions.length === 0 ? <p className="field-note">받을 게시판을 고르면 새 공지를 알려드려요</p> : null}
         </>}
       </Setting>
-      {model.userId && info ? <>
-        <Setting name="이 기기 아이캠퍼스 알림" help="아이캠퍼스의 하루 요약과 마감을 이 기기로 받을지 정해요">
-          <Choice label="이 기기 아이캠퍼스 알림" value={on ? (thisDevice?.canvasMode ?? 'reminders') : null} options={CANVAS_MODES}
-            disabled={!on || !thisDevice || !info.hasCanvasToken || info.busy} onPick={(mode: CanvasMode) => info.setMode(mode)} />
-          <p className="field-note">{!on ? '먼저 이 기기 알림을 켜 주세요' : !info.hasCanvasToken ? '연결 키에서 아이캠퍼스 토큰을 저장해 주세요' : '요약과 마감을 고르면 하루 전과 3시간 전에도 알려요'}</p>
-        </Setting>
-        <Setting name="하루 요약 시간" help="모든 기기에 같은 시간을 적용해요. 할 일이 없어도 알려요">
-          <p className="setting-name visually-hidden" id="summary-time-label">하루 요약 시간</p>
-          <SummaryTime info={info} />
-          {info.summaryTime === null ? <p className="field-note">아이캠퍼스를 연결하면 바꿀 수 있어요</p> : <p className="field-note">확인이 늦어지면 알림도 늦어져요</p>}
-          {info.error ? <p className="field-note error" role="alert">{info.error}</p> : null}
-        </Setting>
-      </> : null}
       <Setting name="받을 공지" help="알림을 보내는 기준이에요">
         <ul className="rule-list">
           <li>받는 게시판의 새 공지를 알려요</li>
@@ -389,6 +411,7 @@ function Notifications({ model }: { model: SettingsModel }) {
         </ul>
       </Setting>
     </Section>
+    {model.userId && info ? <CanvasAlerts model={model} info={info} pushOn={on} thisDevice={thisDevice} /> : null}
     {model.userId && info && info.devices.length > 0 ? <Section id="s-devices" title="알림 기기">
       <Setting name="등록된 기기" help="알림을 받도록 켜 둔 기기예요. 이 기기는 위에서 끄고, 다른 기기는 여기서 지워요">
         <ul className="device-list">
@@ -767,16 +790,13 @@ function CanvasRow({ model, alignEnd }: { model: SettingsModel; alignEnd: boolea
 
 function Keys({ model }: { model: SettingsModel }) {
   if (!model.userId) return <div className="settings"><Back model={model} /><Section id="s-keys" title="연결 키"><LoginNote model={model} what="연결 키" /></Section></div>;
-  // Gemini, Groq, OpenRouter, 아이캠퍼스를 모두 연결했을 때만 칩과 버튼을 오른쪽 끝에 붙인다. 하나라도 비어 있으면 그대로 둔다.
+  // Gemini, Groq, OpenRouter를 모두 연결했을 때만 칩과 버튼을 오른쪽 끝에 붙인다. 하나라도 비어 있으면 그대로 둔다.
   const ai = model.byok?.ai;
-  const allConnected = !!model.byok?.status && !!model.byok.canvas && !!ai && (['groq', 'openrouter'] as const).every((id) => ai.keys.some((key) => key.provider === id));
+  const allConnected = !!model.byok?.status && !!ai && (['groq', 'openrouter'] as const).every((id) => ai.keys.some((key) => key.provider === id));
   return <div className="settings">
     <Back model={model} />
     <Section id="s-ai" title="AI 연결">
       <AiRows byok={model.byok} alignEnd={allConnected} />
-    </Section>
-    <Section id="s-keys" title="아이캠퍼스 연결">
-      <CanvasRow model={model} alignEnd={allConnected} />
     </Section>
   </div>;
 }
