@@ -95,6 +95,18 @@ export function settingsTitle(): string {
 
 export interface InstallPrompt extends Event { prompt(): Promise<void> }
 
+// 선택 모드와 고른 공지도 이 탭에만 기억한다. 새로고침해도 선택하던 그대로 두고, 계정이 바뀌면 지운다.
+interface SavedSelection { user: string; ids: string[] }
+function savedSelection(): SavedSelection | null {
+  try {
+    const value = JSON.parse(sessionStorage.getItem('selection') ?? 'null') as Partial<SavedSelection> | null;
+    return value && typeof value.user === 'string' && Array.isArray(value.ids) ? { user: value.user, ids: value.ids.filter((id) => typeof id === 'string') } : null;
+  } catch { return null; }
+}
+function storeSelection(value: SavedSelection | null) {
+  try { if (value) sessionStorage.setItem('selection', JSON.stringify(value)); else sessionStorage.removeItem('selection'); } catch { /* 저장소를 못 쓰면 기억하지 않는다 */ }
+}
+
 // 고른 공지는 이 탭에만 기억한다. 새로고침하면 보던 공지로 돌아오고, 새 탭은 맨 위에서 시작한다.
 function rememberSelected(id?: string | null): string | null {
   try {
@@ -280,8 +292,9 @@ export class AppController extends Reactive {
   internSort: Sort = loadSort('intern');
   savedSort: Sort = remember('saved-sort') === 'deadline' ? 'deadline' : 'latest';
   unreadOnly = remember('view-unread') === '1';
-  selecting = false;
-  selectedReads: string[] = [];
+  selecting = savedSelection() !== null;
+  selectedReads: string[] = savedSelection()?.ids ?? [];
+  private selectionReady = !authClient;   // 로그인 확인이 없는 환경은 처음부터, 있는 환경은 계정을 확인한 뒤부터 기억한다
   board = remember('board') ?? 'all';
   keyword: string | null = null;
   keywords = loadKeywords();
@@ -312,7 +325,7 @@ export class AppController extends Reactive {
   isWide = wide.matches;
   theme: Theme = (['light', 'dark'].includes(remember('theme') ?? '') ? remember('theme') : 'auto') as Theme;
   // 넓은 화면의 오른쪽 상세 칸을 열어 둘지(닫으면 목록이 넓어진다). 기억한다.
-  detailOpen = remember('detail') !== '0';
+  detailOpen = remember('detail') !== '0' && savedSelection() === null;   // 선택하던 중이면 상세 칸이 저절로 열리지 않게 닫아 둔다
   // 휴대폰에서 앱 안 상세 화면으로 연 글. 뒤로 가기(history)로 닫는다.
   openedId: string | null = null;
   shortcutsOpen = false;
@@ -332,6 +345,7 @@ export class AppController extends Reactive {
 
   /** 화면에 붙을 때 한 번 부른다. 이벤트 구독과 첫 데이터 읽기를 시작한다. */
   start() {
+    this.subscribe(() => { if (this.selectionReady) storeSelection(this.selecting ? { user: this.authUserId ?? 'guest', ids: this.selectedReads } : null); });
     // 새 문서는 목록에서 시작한다. 이전 문서의 상세 history 상태가 설정 닫기에서 되살아나지 않게 맞춘다.
     if (history.state?.notice) history.replaceState(null, '');
     remember('notice-sort', this.sort);
@@ -349,6 +363,7 @@ export class AppController extends Reactive {
         const loggedIn = !!userId && !this.authUserId && this.authReady;
         if (!this.authReady || userId !== this.authUserId) {
           const previousUserId = this.authUserId;
+          const kept = savedSelection(); this.selectionReady = false;   // 아래에서 계정을 바꾸는 동안 저장된 선택을 덮어쓰지 않는다
           this.authUserId = userId;
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
@@ -381,7 +396,8 @@ export class AppController extends Reactive {
           this.query = '';
           this.board = remember('board') ?? 'all';
           this.unreadOnly = remember('view-unread') === '1';
-          this.selecting = false; this.selectedReads = [];
+          if (!(kept && kept.user === (userId ?? 'guest'))) { this.selecting = false; this.selectedReads = []; }
+          this.selectionReady = true;
         }
         this.authEmail = session?.user.email ?? null;
         // 구글 로그인 직후에만 접근 토큰이 온다. 캘린더 연결을 누르고 돌아온 경우에만 받아 두고 곧바로 일정을 맞춘다.

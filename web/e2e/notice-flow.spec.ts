@@ -1567,3 +1567,18 @@ test('changing a list condition (filter check, sort) closes the open detail pane
   await rows.nth(1).click();   // 같은 행을 다시 누르면 닫히는 기존 동작은 그대로
   await expect(title).toBeHidden();
 });
+
+test('selection mode survives a reload with the same ticks, and the detail pane stays closed', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await expect(page.locator('notice-rows-screen a.row').first()).toBeVisible();
+  await page.locator('button.select-trigger').click();
+  await page.locator('.selection-check input').first().check();
+  await page.reload();
+  await expect(page.locator('.select-all')).toBeVisible();
+  await expect(page.locator('.select-all')).toContainText('1개 선택됨');
+  await expect(page.locator('.selection-check input').first()).toBeChecked();
+  await expect(page.locator('.detail-pane notice-detail-screen .detail-title')).toBeHidden();
+  await page.getByRole('button', { name: '선택 끝내기' }).click();
+  await page.reload();
+  await expect(page.locator('.select-all')).toHaveCount(0);
+});
