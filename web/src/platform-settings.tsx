@@ -202,7 +202,8 @@ function Overview({ model }: { model: SettingsModel }) {
       <Setting name="화면 모드" help="자동은 휴대폰과 PC 설정을 따라요">
         <Choice label="화면 모드" options={THEMES} value={model.theme} onPick={model.setTheme} />
       </Setting>
-      {model.canInstall ? <Setting name="앱 설치" help="바탕화면이나 홈 화면에서 바로 열어요">
+      {/* 컴퓨터(넓은 화면)는 주소창에 브라우저가 설치 단추를 이미 보여 주고, 설치 없이도 알림이 와서 설정에는 두지 않는다. 휴대폰에서만 보인다. */}
+      {model.canInstall ? <Setting name="앱 설치" help="홈 화면에서 바로 열어요" className="min-[720px]:hidden">
         <button type="button" className="ghost-button" onClick={model.install}>앱으로 설치하기</button>
       </Setting> : null}
       <Setting name="단축키" help="키보드로 빠르게 이동해요" className="kbd-only">
