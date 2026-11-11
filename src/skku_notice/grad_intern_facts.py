@@ -31,9 +31,9 @@ TOTAL_HOURS = re.compile(r"(?:총|합계)\s*(\d{2,4})\s*시간")
 MONTHS = re.compile(
     r"(?:근무|인턴(?:십)?|실습|활동|기간|진행)[^\n]{0,12}?(\d{1,2})\s*개월"
     # "[근무기간]\n- 3개월", "3. 근무 기간\n\n- 3개월(ASAP)"처럼 이름표 다음 줄에 개월 수가 오는 모양
-    r"|(?:근무|인턴(?:십)?|실습|활동|진행)\s*기간\s*\]?[\s:：\-–•·]{0,12}(\d{1,2})\s*개월"
+    r"|(?:근무|인턴(?:십)?|실습|활동|진행)\s{0,2}기간[\s:：\-–•·\[\]]{0,16}(\d{1,2})\s{0,2}개월"
     # "3개월 체험형 인턴", "3개월간 진행"처럼 개월 수 뒤에 인턴 종류 말이 한 단어 끼는 모양
-    r"|(\d{1,2})\s*개월\s*(?:간|동안)?\s*(?:체험형|단기|채용\s*전환형|전환형)?\s*(?:진행|근무|인턴|실습)")
+    r"|(\d{1,2})\s{0,2}개월\s{0,2}(?:간|동안)?\s{0,2}(?:체험형|단기|채용\s{0,2}전환형|전환형)?\s{0,2}(?:진행|근무|인턴|실습)")
 WEEKS = re.compile(r"(?:근무|인턴(?:십)?|실습|활동|기간|진행)[^\n]{0,12}?(\d{1,2})\s*주(?!\s*(?:\d|일|\d일))|(\d{1,2})\s*주\s*(?:간|동안)\s*(?:진행|근무|인턴|실습)?")
 WORK_DAYS = re.compile(r"(?:총\s*)?(?:근무\s*일수|근무일)\s*[:：]?\s*(?:총\s*)?(\d{2,3})\s*일|총\s*(\d{2,3})\s*일\s*(?:간\s*)?근무")
 # 회사 이름: "회사명: ○○", "기업명 ○○", 그리고 법인 표기가 붙은 이름. 그림 글자(OCR)는 띄어쓰기가 흔들려 공백을 허용한다.
@@ -149,10 +149,20 @@ SW_WORDS: dict[str, re.Pattern[str]] = {
 NON_SW_WORDS = re.compile(r"영업|마케팅|회계|재무|인사|총무|상품\s*기획|MD\b|매장|점포|고객\s*(?:응대|관리)|\bCS\b|물류|생산\s*관리|설비|전기\s*(?:공사|설비)|디자인|콘텐츠\s*제작|경영\s*지원|행정|사무\s*보조|운영\s*지원|가맹점|브랜드|PR\b|홍보|번역|통역|연구\s*보조")
 
 
+_WIDE_SPACE = re.compile(r"[ \t\u00a0\u3000]{4,}")
+_BLANK_LINES = re.compile(r"\n[ \t]*(?:\n[ \t]*){3,}")
+
+
+def squeeze(text: str) -> str:
+    """공백·빈 줄이 아주 길게 이어진 글을 줄인다. 정규식이 긴 공백에서 오래 걸리는 것을 막고, 읽는 내용은 바뀌지 않는다."""
+    return _BLANK_LINES.sub("\n\n\n", _WIDE_SPACE.sub("   ", text or ""))
+
+
 def static_task_category(title: str, body: str) -> tuple[str, str] | None:
     """(분야, 근거 문장) 또는 None. 코드만으로 뚜렷하게 정할 수 있을 때만 답한다."""
-    match = TASK_SECTION.search(body or "")
-    scope = match.group(1) if match else f"{title}\n{(body or '')[:500]}"
+    body = squeeze(body)[:MAX_TEXT]
+    match = TASK_SECTION.search(body)
+    scope = match.group(1) if match else f"{title}\n{body[:500]}"
     sw = {name: len(pattern.findall(scope)) for name, pattern in SW_WORDS.items() if pattern.search(scope)}
     non = NON_SW_WORDS.search(scope)
     if sw and not non:
@@ -169,7 +179,7 @@ def static_task_category(title: str, body: str) -> tuple[str, str] | None:
 
 def static_facts(title: str, body: str) -> dict:
     """정규식으로 읽을 수 있는 사실. 모호하면 비워 둔다(예: 전일제와 파트타임이 함께 적힌 공고)."""
-    text = f"{title}\n{body}"[:MAX_TEXT]
+    text = f"{title}\n{squeeze(body)}"[:MAX_TEXT]
     found: dict = {"evidence": []}
     full, part = FULL_TIME.search(text), PART_TIME.search(text)
     if full and not part:
