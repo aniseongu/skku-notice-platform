@@ -255,11 +255,11 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await row.getByRole('button', { name: '숨기기' }).click();
   // 받는 방법은 키마다 두지 않고 맨 아래에 하나만 있다.
   await expect(screen.getByText('키는 어디서 받나요?')).toHaveCount(1);
-  await expect(screen.getByRole('link', { name: 'Gemini' })).toBeHidden();
+  await expect(screen.getByRole('link', { name: 'Gemini 키 만들기' })).toBeHidden();
   await screen.getByText('키는 어디서 받나요?').click();
-  await expect(screen.getByRole('link', { name: 'Gemini' })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
-  await expect(screen.getByRole('link', { name: 'Groq' })).toHaveAttribute('href', 'https://console.groq.com/keys');
-  await expect(screen.getByRole('link', { name: 'OpenRouter' })).toHaveAttribute('href', 'https://openrouter.ai/settings/keys');
+  await expect(screen.getByRole('link', { name: 'Gemini 키 만들기' })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
+  await expect(screen.getByRole('link', { name: 'Groq 키 만들기' })).toHaveAttribute('href', 'https://console.groq.com/keys');
+  await expect(screen.getByRole('link', { name: 'OpenRouter 키 만들기' })).toHaveAttribute('href', 'https://openrouter.ai/settings/keys');
   await save.click();
   expect(await calls(page)).toEqual([['register', key]]);
   await withApp(page, { byokStatus: { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 } });
@@ -279,7 +279,7 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   const token = `1234~${'Z'.repeat(40)}`;
   await canvasInput.fill(token);
   await screen.getByText('토큰은 어디서 받나요?').click();
-  await expect(screen.getByRole('link', { name: /아이캠퍼스 계정 설정/ })).toHaveAttribute('href', 'https://canvas.skku.edu/profile/settings');
+  await expect(screen.getByRole('link', { name: '아이캠퍼스 설정 열기' })).toHaveAttribute('href', 'https://canvas.skku.edu/profile/settings');
   await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' }).click();
   expect(await calls(page)).toEqual([['registerCanvas', token]]);
   await withApp(page, { canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null } });
