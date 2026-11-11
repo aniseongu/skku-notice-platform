@@ -1153,7 +1153,6 @@ test('selection mode click order: enter → tick → count → action → toast 
   await trigger.click();
   await expect(bar).toBeVisible();
   await expect(bar.getByText('전체 선택')).toBeVisible();
-  await expect(bar.getByText('공지를 골라 주세요')).toBeVisible();
   // 아무것도 안 골랐을 때는 행동 단추가 없다(고르면 해당하는 단추만 나온다).
   await expect(bar.getByRole('button', { name: /으로 표시$/ })).toHaveCount(0);
   if (narrow) await expect(tabbar).toBeHidden();                       // 휴대폰은 선택 중 아래 탭 바 대신 단추 막대
@@ -1172,7 +1171,6 @@ test('selection mode click order: enter → tick → count → action → toast 
   await bar.locator('.select-all input').check();
   await expect(bar.getByText(`${total}개`)).toBeVisible();
   await bar.locator('.select-all input').uncheck();
-  await expect(bar.getByText('공지를 골라 주세요')).toBeVisible();
 
   // 5. 선택 끝내기: 막대가 사라지고 포커스가 선택 단추로 돌아온다. 휴대폰은 탭 바도 돌아온다.
   await bar.getByRole('button', { name: '선택 끝내기' }).click();

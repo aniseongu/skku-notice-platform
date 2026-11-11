@@ -20,7 +20,7 @@ import { ROW_LAYOUT } from './notice-rows';
 import './notice-detail';
 
 // 선택 모드의 단추: 터치 44px(넓은 화면 36px), 주 행동은 채운 단추, 보조는 옅은 면, 끝내기는 글자만.
-const SELECT_BTN = 'min-h-[44px] rounded-[10px] px-[14px] text-[15px] whitespace-nowrap min-[720px]:min-h-[40px] min-[720px]:text-[14px]';
+const SELECT_BTN = 'inline-flex items-center justify-center gap-[6px] [&_.i]:size-[18px] min-h-[44px] rounded-[10px] px-[14px] text-[15px] whitespace-nowrap min-[720px]:min-h-[40px] min-[720px]:text-[14px]';
 
 const SHORTCUTS: { group: string; items: [string, string[]][] }[] = [
   { group: '목록', items: [['다음 공지', ['J']], ['이전 공지', ['K']], ['원문 열기', ['Enter']], ['저장하기', ['S']], ['상세 칸 닫기', ['Esc']]] },
@@ -328,18 +328,18 @@ function ViewFilters({ app }: { app: AppController }) {
     const selectedRead = selectedVisible.length - selectedUnread;
     const count = selectedVisible.length;
     return <div className="view-options select-options min-[720px]:bg-[var(--glass)] min-[720px]:backdrop-blur-[20px] min-[720px]:backdrop-saturate-[1.6] min-[720px]:sticky min-[720px]:top-[var(--head-h)] min-[720px]:z-[2] flex-wrap gap-y-[8px] border-b border-line min-h-[48px] py-[4px] min-[720px]:pt-[4px] min-[720px]:pb-0" role="group" aria-label="공지 선택">
-      <label className={`select-all order-1 ${count ? 'font-medium text-ink' : ''}`}><input type="checkbox" ref={allBox} checked={everyone} disabled={!list.length}
+      <label className={`select-all order-1 ml-[-5px] min-[720px]:ml-[-15px] ${count ? 'font-medium text-ink' : ''}`}><input type="checkbox" ref={allBox} checked={everyone} disabled={!list.length}
         onChange={(event) => { app.selectedReads = event.currentTarget.checked ? list.map((notice) => notice.id) : []; }} />
         <span aria-live="polite">{count ? `${count}개 선택됨` : '전체 선택'}</span>
-        {count ? null : <span className="ml-[12px] text-[14px] font-normal text-ink">공지를 골라 주세요</span>}</label>
-      <button type="button" className={`${SELECT_BTN} order-2 ml-auto border-0 bg-transparent px-[16px] font-medium text-ink-2 hover:bg-hover min-[720px]:order-3 min-[720px]:ml-[4px] min-[720px]:px-[12px]`} onClick={() => app.closeSelection()}>선택 끝내기</button>
+</label>
+      <button type="button" className={`${SELECT_BTN} order-2 ml-auto border-0 bg-transparent px-[16px] font-medium text-ink-2 hover:bg-hover min-[720px]:order-3 min-[720px]:ml-[4px] min-[720px]:px-[12px]`} onClick={() => app.closeSelection()}><Icon name="close" />선택 끝내기</button>
       <div className={`order-3 flex gap-[8px] min-[720px]:gap-[12px] ${count ? '' : 'hidden'} max-[719px]:fixed max-[719px]:inset-x-0 max-[719px]:bottom-0 max-[719px]:pb-[calc(16px+env(safe-area-inset-bottom))] max-[719px]:z-[3] max-[719px]:bg-[var(--glass)] max-[719px]:backdrop-blur-[20px] max-[719px]:backdrop-saturate-[1.6] max-[719px]:border-t max-[719px]:border-line max-[719px]:px-[var(--gutter)] max-[719px]:pt-[8px] min-[720px]:order-2 min-[720px]:ml-auto`}>
-        {selectedUnread > 0 ? <button type="button" className={`${SELECT_BTN} solid-button min-[720px]:min-h-[44px] min-[720px]:min-w-[44px] min-[720px]:rounded-[var(--r-md)] min-[720px]:border-0 min-[720px]:bg-transparent min-[720px]:px-[12px] min-[720px]:text-[14px] min-[720px]:hover:bg-hover min-[720px]:font-semibold min-[720px]:text-accent max-[719px]:flex-1`} disabled={!selectedUnread}
+        {selectedUnread > 0 ? <button type="button" className={`${SELECT_BTN} solid-button min-[720px]:min-h-[44px] min-[720px]:min-w-[44px] min-[720px]:rounded-[var(--r-md)] min-[720px]:border-0 min-[720px]:bg-transparent min-[720px]:px-[12px] min-[720px]:text-[14px] min-[720px]:hover:bg-hover min-[720px]:font-medium min-[720px]:text-ink max-[719px]:flex-1`} disabled={!selectedUnread}
           aria-label={`선택한 읽지 않은 공지 ${selectedUnread}개 읽음으로 표시`}
-          onClick={() => app.markSelectedRead(true)}>읽음으로 표시</button> : null}
-        {selectedRead > 0 ? <button type="button" className={`${SELECT_BTN} ghost-button min-[720px]:min-h-[44px] min-[720px]:min-w-[44px] min-[720px]:rounded-[var(--r-md)] min-[720px]:border-0 min-[720px]:bg-transparent min-[720px]:px-[12px] min-[720px]:text-[14px] min-[720px]:hover:bg-hover min-[720px]:font-medium min-[720px]:text-ink-2 max-[719px]:flex-1`} disabled={!selectedRead}
+          onClick={() => app.markSelectedRead(true)}><Icon name="mail-open" />읽음으로 표시</button> : null}
+        {selectedRead > 0 ? <button type="button" className={`${SELECT_BTN} ghost-button min-[720px]:min-h-[44px] min-[720px]:min-w-[44px] min-[720px]:rounded-[var(--r-md)] min-[720px]:border-0 min-[720px]:bg-transparent min-[720px]:px-[12px] min-[720px]:text-[14px] min-[720px]:hover:bg-hover min-[720px]:font-medium min-[720px]:text-ink max-[719px]:flex-1`} disabled={!selectedRead}
           aria-label={`선택한 읽은 공지 ${selectedRead}개 읽지 않음으로 표시`}
-          onClick={() => app.markSelectedRead(false)}>안 읽음으로 표시</button> : null}
+          onClick={() => app.markSelectedRead(false)}><Icon name="mail" />안 읽음으로 표시</button> : null}
       </div>
     </div>;
   }
