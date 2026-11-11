@@ -227,6 +227,13 @@ function Overview({ model }: { model: SettingsModel }) {
           <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">어떤 정보를 어디에 쓰고 어떻게 지우는지 알려 드려요</span></span>
         <span className={`settings-chevron ${CHEVRON_RIGHT}`} aria-hidden="true" />
       </a>
+      {/* 로그인 전 화면 맨 아래에 있던 링크를 로그인 뒤에도 찾을 수 있게 같은 묶음에 둔다. 새 탭으로 열린다. */}
+      {([['문의하기', '궁금한 점이나 바라는 점을 남겨 주세요', 'https://github.com/aniseongu/skku-notice-platform/issues'], ['오픈소스', '만든 과정과 코드를 볼 수 있어요', 'https://github.com/aniseongu/skku-notice-platform']] as const).map(([label, help, href]) =>
+        <a key={href} className="settings-link flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href={href} target="_blank" rel="noopener noreferrer">
+          <span><span className="setting-name text-[15px] leading-[22px] font-semibold">{label}</span>
+            <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{help}</span></span>
+          <span className={`settings-chevron ${CHEVRON_RIGHT}`} aria-hidden="true" />
+        </a>)}
     </div>
     {/* 계정 삭제는 되돌릴 수 없어서 설정의 가장 아래에 따로 둔다. */}
     {model.userId ? <DeleteAccount model={model} /> : null}
