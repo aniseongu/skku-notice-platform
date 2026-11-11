@@ -122,7 +122,7 @@ export function NoticeShell({ app }: { app: AppController }) {
               {settings ? null : <Brand className="brand-mark narrow-only min-[720px]:hidden! mr-[8px] h-[36px] w-[36px] flex-none text-accent" />}
               <div className={TOPBAR_TEXT}>
                 <h1 className={`${TOPBAR_H1} ${settings ? '' : 'max-[719px]:text-[21px] max-[719px]:leading-[28px] max-[719px]:font-extrabold'}`}>{title}</h1>
-                {settings ? null : <UpdatedLine app={app} count={list.length} pending={app.tab() === 'saved' ? 0 : app.pendingCount(list)} />}
+                {settings ? null : <UpdatedLine app={app} count={list.length} />}
               </div>
               {settings ? null : <>
                 <label className="search flex h-[44px] items-center gap-[8px] rounded-md bg-sunken px-[16px] text-ink-3 focus-within:outline-2 focus-within:outline-accent [&_.i]:size-[20px] [&_input]:h-full [&_input]:min-w-0 [&_input]:flex-1 [&_input]:border-0 [&_input]:bg-transparent [&_input]:text-ink [&_input]:[outline:0] [&_input]:placeholder:text-ink-3 wide-only max-[719px]:hidden min-[720px]:flex min-[720px]:h-[36px] min-[720px]:min-w-[120px] min-[720px]:w-[260px] min-[720px]:flex-[0_1_260px] min-[720px]:px-[12px] min-[720px]:py-0"><Icon name="search" />
@@ -257,7 +257,8 @@ function SideGroup({ app, id, title, count, children }: { app: AppController; id
   </>;
 }
 
-function UpdatedLine({ app, count, pending = 0 }: { app: AppController; count?: number; pending?: number }) {
+// 이 줄은 목록이 언제 기준인지만 말한다. 판정 중인 공지는 그 줄 안에서 "AI가 확인하고 있어요"로 알리고, 내부 처리 건수는 여기에 적지 않는다.
+function UpdatedLine({ app, count }: { app: AppController; count?: number }) {
   if (app.loading && !app.generatedAt) return <p className={`${UPDATED} text-ink-3`}>공지를 불러오고 있어요</p>;
   if (!app.generatedAt) return <p className={`${UPDATED} text-ink-3`}>받은 시각을 알 수 없어요</p>;
   const stale = Date.now() - Date.parse(app.generatedAt) > STALE_MS;
@@ -266,7 +267,7 @@ function UpdatedLine({ app, count, pending = 0 }: { app: AppController; count?: 
   }).format(new Date(app.generatedAt));
   const total = count === undefined ? '' : `${count}건, `;
   // "확인 필요"(판정)와 겹치지 않게 수집 지연은 다른 말로 쓴다.
-  return <p className={`${UPDATED} ${stale ? 'stale text-ink-2' : 'text-ink-3'}`}>{stale ? `${time} 이후 새 공지를 못 가져왔어요` : `${total}${time} 기준${pending ? ` · AI 확인 중 ${pending}건` : ''}`}</p>;
+  return <p className={`${UPDATED} ${stale ? 'stale text-ink-2' : 'text-ink-3'}`}>{stale ? `${time} 이후 새 공지를 못 가져왔어요` : `${total}${time} 기준`}</p>;
 }
 
 const Empty = ({ title, body, action, onAction }: { title: string; body: string; action?: string; onAction?: () => void }) =>

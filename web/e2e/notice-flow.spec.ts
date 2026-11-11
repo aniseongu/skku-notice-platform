@@ -533,7 +533,7 @@ test('first-run setup cannot be skipped: no skip button, Escape does nothing; se
   await expect(page.getByText('주전공을 골라 주세요')).toHaveCount(0);
 });
 
-test('a notice waiting for its turn says so while an AI key exists, and says nothing without a key or outside the queue window', async ({ page }) => {
+test('a notice waiting for its turn says so on its own row while an AI key exists, and the list header never counts them', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   const rows = page.locator('notice-rows-screen a.row');
   await rows.first().waitFor();
@@ -557,10 +557,9 @@ test('a notice waiting for its turn says so while an AI key exists, and says not
   await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).byokStatus = { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 }; });
   await expect(reason(ids[0])).toContainText('AI가 확인하고 있어요');   // 방금 수집됐고 판정 전
   await expect(reason(ids[1])).toHaveCount(0);                          // 대기 범위 밖이면 거짓으로 약속하지 않는다
-  // 진행 상황은 목록 위 한 줄에 같이 보인다(기다리는 공지가 하나도 없으면 말하지 않는다).
-  await expect(page.locator('p.updated').first()).toContainText(/AI 확인 중 \d+건/);
-  await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).byokStatus = null; });
+  // 진행 상황은 그 공지의 줄에서만 말한다. 목록 위 한 줄은 언제 기준인지만 말하고 내부 처리 건수는 적지 않는다.
   await expect(page.locator('p.updated').first()).not.toContainText('AI 확인 중');
+  await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).byokStatus = null; });
   await expect(reason(ids[2])).toContainText('해당');                    // 판정이 있으면 그 라벨
   await expect(reason(ids[2])).not.toContainText('확인하고 있어요');
 });

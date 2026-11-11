@@ -618,7 +618,6 @@ export class AppController extends Reactive {
   }
 
   /** 목록에서 판정 차례를 기다리는 공지 수(진행 상황을 한 줄로 알린다). */
-  pendingCount(list: Notice[]): number { return list.filter((notice) => this.judgePending(notice)).length; }
 
   /** 내 판정과 관심 키워드를 다시 읽는다. 로그인할 때와 공지를 새로 불러올 때 부른다. */
   async refreshMine(userId: string, epoch: number): Promise<void> {
