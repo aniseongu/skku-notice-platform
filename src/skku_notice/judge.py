@@ -1,6 +1,7 @@
 """Batch Gemini relevance judgments; failures leave rule matching in charge."""
 
 import json
+import re
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
@@ -36,6 +37,15 @@ SCHEMA = {
     "required": ["items"],
 }
 
+
+
+_ENDING_ECHO = re.compile(r"\s*[~〜]\s*(?:예요|이에요|해요|돼요|되어요|있어요|없어요)\s*$")
+
+
+def clean_reason(reason: str) -> str:
+    """판정 이유에서 제어 문자와, 프롬프트의 어미 예시를 그대로 따라 붙인 꼬리("~돼요")를 지운다."""
+    text = "".join(c for c in reason if unicodedata.category(c) not in {"Cc", "Cf"}).strip()
+    return _ENDING_ECHO.sub("", text).strip()[:120]
 
 @dataclass(frozen=True)
 class Judgment:

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
 from skku_notice.ai_models import DEFAULT_MODEL, provider_or_default
 from skku_notice.ai_providers import make_client
@@ -18,6 +19,8 @@ from skku_notice.byok_crypto import ByokCryptoError, decrypt_api_key
 
 LABEL = {"gemini": "Gemini", "groq": "Groq", "openrouter": "OpenRouter"}
 REJECTED_CODES = {400, 401, 403}
+# 최근에 실패한 키는 잠시 쉰다. 안 그러면 같은 실패를 10분마다 되풀이해서 한도만 쓴다.
+FAILURE_COOLDOWN = timedelta(minutes=20)
 
 
 def preferences_from_row(row: dict | None) -> Preferences:
@@ -86,6 +89,17 @@ class UserAi:
             counts["ai_fallback"] = counts.get("ai_fallback", 0) + 1
 
 
+def _cooling(row: dict, now: datetime) -> bool:
+    """마지막 실패가 쿨다운 안이면 True. 성공하면 error_at이 비워져 곧바로 풀린다."""
+    if not row.get("last_error") or not isinstance(row.get("error_at"), str):
+        return False
+    try:
+        at = datetime.fromisoformat(row["error_at"].replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return at.tzinfo is not None and now - at < FAILURE_COOLDOWN
+
+
 def _update(store, user_id: str, provider: str, fields: dict) -> None:
     if provider == "gemini":
         store.update_key(user_id, fields)
@@ -127,7 +141,7 @@ def build_user_ai(
             if counts is not None:
                 counts["errors"] = counts.get("errors", 0) + 1
             continue
-        if used[provider] < daily_calls:
+        if used[provider] < daily_calls and not _cooling(row, now):
             candidates.append(Candidate(provider, row.get("model") or DEFAULT_MODEL[provider], api_key, used[provider]))
 
     def factory(provider: str, api_key: str):

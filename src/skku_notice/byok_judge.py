@@ -70,7 +70,7 @@ class JudgeStore(NoticeStore):
             "GET",
             "user_byok_keys",
             params={
-                "select": "user_id,ciphertext,model,used_on,used_today",
+                "select": "user_id,ciphertext,model,used_on,used_today,last_error,error_at",
                 "disabled_at": "is.null",
                 "order": "user_id",
                 "limit": str(MAX_USERS_PER_RUN),
@@ -91,7 +91,8 @@ class JudgeStore(NoticeStore):
         try:
             return self._request("GET", "user_ai_keys", params={
                 "user_id": f"eq.{user_id}",
-                "select": "provider,ciphertext,model,disabled_at,used_on,used_today"}).json()
+                "select": "provider,ciphertext,model,disabled_at,used_on,used_today,last_error,error_at",
+            }).json()
         except StoreError:
             return []
 
@@ -127,7 +128,8 @@ class JudgeStore(NoticeStore):
 
     def key_for(self, user_id: str) -> dict | None:
         rows = self._request("GET", "user_byok_keys", params={
-            "user_id": f"eq.{user_id}", "select": "ciphertext,model,disabled_at,used_on,used_today"}).json()
+            "user_id": f"eq.{user_id}",
+            "select": "ciphertext,model,disabled_at,used_on,used_today,last_error,error_at"}).json()
         return rows[0] if rows else None
 
     def assessment(self, user_id: str, notice_id: str) -> dict | None:

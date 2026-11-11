@@ -1,6 +1,6 @@
 # ruff: noqa: E501
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import httpx
@@ -224,3 +224,17 @@ def test_a_groq_ciphertext_moved_into_the_openrouter_row_does_not_open():
     net = Net({})
     counts, _ = run(store, net)
     assert net.requests == [] and counts["errors"] == 1
+
+
+def test_a_key_that_just_failed_rests_for_a_while_and_a_healthy_key_is_used_instead():
+    recent = (NOW - timedelta(minutes=5)).isoformat()
+    sick = ai_row("u1", "groq", GROQ_KEY, "openai/gpt-oss-20b")
+    sick.update(last_error="Groq 판정을 잠시 못 했어요. 다시 시도해요.", error_at=recent)
+    store = AiStore(extra={"u1": [sick, ai_row("u1", "openrouter", OR_KEY, "openrouter/free")]})
+    net = Net({})
+    counts, _ = run(store, net)
+    assert counts["judged"] == 1 and net.hosts() == [OPENROUTER]  # 쉬는 Groq에는 요청하지 않는다
+    old = dict(sick, error_at=(NOW - timedelta(minutes=30)).isoformat())
+    net2 = Net({})
+    run(AiStore(extra={"u1": [old]}), net2)
+    assert net2.hosts() == [GROQ]  # 쿨다운이 지나면 다시 쓴다
