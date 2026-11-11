@@ -34,3 +34,25 @@ export function dropDuplicates(list: readonly Notice[]): Notice[] {
   }
   return hidden.size ? list.filter((notice) => !hidden.has(notice.id)) : [...list];
 }
+
+/** 같은 공지끼리 서로 찾는 색인(글 번호 → 같은 공지인 다른 글들). 읽음과 저장을 묶음 전체에 맞출 때 쓴다. 순서와 상관없이 서로 같은 글이다. */
+export function groupMates(list: readonly Notice[]): Map<string, Notice[]> {
+  const groups = new Map<string, Notice[]>();
+  const add = (key: string, notice: Notice) => { const group = groups.get(key); if (group) group.push(notice); else groups.set(key, [notice]); };
+  for (const notice of list) {
+    if (notice.dup_key) add(`k:${notice.dup_key}`, notice);
+    if (notice.dup_text_key) add(`t:${notice.dup_text_key}`, notice);
+  }
+  const mates = new Map<string, Map<string, Notice>>();
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    for (const notice of group) {
+      for (const other of group) {
+        if (other === notice || Math.abs(day(other) - day(notice)) > WINDOW_DAYS) continue;
+        const found = mates.get(notice.id) ?? new Map<string, Notice>();
+        found.set(other.id, other); mates.set(notice.id, found);
+      }
+    }
+  }
+  return new Map([...mates].map(([id, found]) => [id, [...found.values()]]));
+}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { dropDuplicates } from '../src/dup-notices.ts';
+import { dropDuplicates, groupMates } from '../src/dup-notices.ts';
 
 const notice = (id, key, seen, posted = '2026-11-10', text = null) => ({ id, source_id: id.split('/')[0], article_no: '1', title: 't', category: null, url: 'https://x', posted_on: posted, pinned: false, deadline: null, first_seen: seen, dup_key: key, dup_text_key: text });
 
@@ -27,4 +27,14 @@ test('이 목록에 없는 게시판의 글은 대표가 되지 못한다(목록
 test('제목이 달라도 그림 글자 열쇠가 같으면 같은 글이고, 먼저 감지된 글이 대표다', () => {
   const list = [notice('biz/1', 's:다른제목', '2026-11-11T01:00Z', '2026-11-11', 's:ocr1'), notice('skku/1', 's:제목', '2026-11-10T01:00Z', '2026-11-10', 's:ocr1'), notice('cse/1', 's:또다른', '2026-11-10T03:00Z', '2026-11-10', 's:ocr2')];
   assert.deepEqual(dropDuplicates(list).map((n) => n.id), ['skku/1', 'cse/1']);
+});
+
+test('같은 공지로 묶인 글끼리 서로 찾을 수 있고, 묶이지 않은 글은 색인에 없다', () => {
+  const list = [notice('skku/1', 's:a', '2026-11-10T01:00Z'), notice('biz/1', 's:a', '2026-11-11T01:00Z', '2026-11-11'), notice('cse/1', 's:b', '2026-11-10T03:00Z'),
+    notice('lk/1', null, '2026-11-10T05:00Z', '2026-11-10', 'x:ocr'), notice('ja/1', null, '2026-11-10T06:00Z', '2026-11-10', 'x:ocr')];
+  const mates = groupMates(list);
+  assert.deepEqual(mates.get('skku/1').map((n) => n.id), ['biz/1']);
+  assert.deepEqual(mates.get('biz/1').map((n) => n.id), ['skku/1']);      // 대표가 아니어도 서로 찾는다
+  assert.deepEqual(mates.get('lk/1').map((n) => n.id), ['ja/1']);
+  assert.equal(mates.has('cse/1'), false);
 });

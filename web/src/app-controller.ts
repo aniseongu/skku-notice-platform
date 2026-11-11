@@ -28,7 +28,7 @@ import type { Draft } from './onboarding-flow';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
 import { localKey, setLocalOwner } from './local-scope.ts';
 import type { Subscription } from '@supabase/supabase-js';
-import { dropDuplicates } from './dup-notices';
+import { dropDuplicates, groupMates } from './dup-notices';
 import { orderNotices, type Sort } from './notice-order';
 import { Reactive, defineReactive } from './reactive';
 
@@ -524,9 +524,16 @@ export class AppController extends Reactive {
     if (syncable.length) this.uploadStates((guard) => pushRead(authClient!, syncable.map((id) => ({ id, read })), guard));
   }
 
+  /** 같은 공지로 묶인 다른 글들(읽음과 저장을 묶음 전체에 맞춘다). 목록을 새로 받았을 때만 다시 만든다. */
+  private matesCache: { source: Notice[]; map: Map<string, Notice[]> } | null = null;
+  mates(id: string): Notice[] {
+    if (this.matesCache?.source !== this.notices) this.matesCache = { source: this.notices, map: groupMates(this.notices) };
+    return this.matesCache.map.get(id) ?? [];
+  }
+
   markRead(notice: Notice) {
     if (this.isRead(notice)) return;
-    this.updateRead([notice.id], true);
+    this.updateRead([notice.id, ...this.mates(notice.id).map((mate) => mate.id)], true);   // 같은 공지의 다른 게시판 글도 읽음으로
   }
 
   toggleReadSelection(id: string) {
@@ -538,7 +545,7 @@ export class AppController extends Reactive {
     const selected = new Set(this.selectedReads);
     const changed = this.visible().filter((notice) => selected.has(notice.id) && this.isRead(notice) !== read);
     if (!changed.length) return;
-    this.updateRead(changed.map((notice) => notice.id), read);
+    this.updateRead(changed.flatMap((notice) => [notice.id, ...this.mates(notice.id).map((mate) => mate.id)]), read);
     this.closeSelection();
     this.showToast(`${changed.length}개를 ${read ? '읽음' : '읽지 않음'}으로 표시했어요`);
   }
@@ -549,18 +556,31 @@ export class AppController extends Reactive {
     this.updateComplete.then(() => qs<HTMLButtonElement>('.select-trigger')?.focus({ preventScroll: true }));
   }
 
-  isRead(notice: Notice): boolean { return this.readState === null || isNoticeRead(this.readState, notice.id, notice.changed_at); }
+  /** 같은 공지로 묶인 글 중 하나라도 읽었으면 읽은 공지다(다른 게시판 사본이 다시 읽지 않음으로 보이지 않게). */
+  isRead(notice: Notice): boolean {
+    const state = this.readState;
+    if (state === null || isNoticeRead(state, notice.id, notice.changed_at)) return true;
+    return this.mates(notice.id).some((mate) => isNoticeRead(state, mate.id, mate.changed_at));
+  }
 
-  isSaved(notice: Notice): boolean { return this.saved.some((item) => item.id === notice.id); }
+  /** 같은 공지로 묶인 글 중 하나라도 저장했으면 저장한 공지다. */
+  isSaved(notice: Notice): boolean {
+    return this.saved.some((item) => item.id === notice.id) || this.mates(notice.id).some((mate) => this.saved.some((item) => item.id === mate.id));
+  }
 
   toggleSave(notice: Notice) {
-    const next = toggleSaved(this.saved, notice);
+    // 저장은 공지 하나로 센다. 묶음 중 저장된 글이 있으면 모두 지우고, 없으면 지금 보이는 글을 저장한다.
+    const savedMembers = [notice, ...this.mates(notice.id)].filter((member) => this.saved.some((item) => item.id === member.id));
+    let next: typeof this.saved | null = this.saved;
+    if (savedMembers.length) for (const member of savedMembers) next = toggleSaved(next ?? this.saved, member);
+    else next = toggleSaved(this.saved, notice);
     if (!next) { this.showToast('저장할 수 있는 공지가 가득 찼어요. 안 쓰는 저장을 지워 주세요'); return; }
-    const added = next.length > this.saved.length;
+    const added = !savedMembers.length;
     this.saved = next;
     storeSaved(next);
     this.showToast(added ? '저장했어요' : '저장을 지웠어요');
-    this.uploadStates((guard) => pushSaved(authClient!, [{ id: notice.id, saved: added }], guard));
+    const changes = added ? [{ id: notice.id, saved: true }] : savedMembers.map((member) => ({ id: member.id, saved: false }));
+    this.uploadStates((guard) => pushSaved(authClient!, changes, guard));
   }
 
   /** 저장한 글. 지금 목록에 있으면 최신 정보로, 밀려났으면 저장할 때 정보로 보여 준다. */
