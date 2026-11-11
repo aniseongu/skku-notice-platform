@@ -461,7 +461,7 @@ function BoardSelect({ app }: { app: AppController }) {
 /** 공유 단추: 휴대폰은 기기의 공유 창(카카오톡·메시지 등), 공유 창이 없는 PC 브라우저는 링크 복사 */
 function ShareButton({ app, notice }: { app: AppController; notice: Notice }) {
   return <button type="button" className="icon-button share-button grid place-items-center flex-none size-[44px] rounded-md border border-line bg-surface text-ink active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft"
-    aria-label="공유하기" title="공유하기" onClick={() => { void app.share(notice); }}><Icon name="share" /></button>;
+    aria-label="공유하기" title="공유하기" onClick={() => { void app.share(notice); }}><Icon name={app.linkCopied ? 'check' : 'share'} /></button>;
 }
 
 function SaveButton({ app, notice }: { app: AppController; notice: Notice }) {

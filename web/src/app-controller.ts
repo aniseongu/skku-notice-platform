@@ -183,7 +183,7 @@ export class AppController extends Reactive {
     notices: { state: true }, sources: { state: true }, matched: { state: true }, generatedAt: { state: true },
     view: { state: true }, board: { state: true }, keyword: { state: true }, keywords: { state: true }, query: { state: true },
     loading: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
-    toast: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
+    toast: { state: true }, linkCopied: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, authName: { state: true }, authAvatar: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
@@ -342,6 +342,9 @@ export class AppController extends Reactive {
   myTranslations = new Map<string, MyTranslation>();
   private translationRequest = 0;
   toastTimer = 0;
+  /** 링크를 복사한 직후 잠깐 true: 공유 단추가 체크로 바뀌어 누른 자리에서 결과를 보여 준다 */
+  linkCopied = false;
+  copiedTimer = 0;
   // 상세 칸에 실제로 보이는 글(고른 글이 없으면 첫 글). 목록 행 표시와 맞춘다.
   shownId: string | null = null;
 
@@ -1656,8 +1659,11 @@ export class AppController extends Reactive {
       document.body.append(box); box.select();
       const ok = document.execCommand('copy');
       box.remove();
-      if (!ok) { this.showToast('복사하지 못했어요'); return; }
+      if (!ok) { this.showToast('복사하지 못했어요. 원문 열기에서 주소를 확인해 주세요'); return; }
     }
+    this.linkCopied = true;
+    clearTimeout(this.copiedTimer);
+    this.copiedTimer = window.setTimeout(() => { this.linkCopied = false; }, 2000);
     this.showToast('원문 링크를 복사했어요');
   }
 

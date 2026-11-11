@@ -1688,3 +1688,4 @@ test('share button in the open detail: opens the device share sheet, stays quiet
   await expect(page.locator('.toast')).toContainText('링크를 복사했어요');
   expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toMatch(/^https?:\/\//);
 });
+  await expect(page.getByRole('button', { name: '공유하기' }).locator('use')).toHaveAttribute('href', /#check$/);   // 누른 자리에서도 결과가 보인다
