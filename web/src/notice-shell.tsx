@@ -130,7 +130,7 @@ export function NoticeShell({ app }: { app: AppController }) {
           </div>
 
           {settings ? <platform-settings-screen model={settingsModel(app)} /> : <>
-            <div className={`tools narrow-only ${app.selecting ? 'max-[719px]:hidden' : ''}`}>
+            <div className="tools narrow-only">
               <label className="search"><Icon name="search" />
                 <input type="search" placeholder="공지 찾기" autoComplete="off" aria-label="공지 검색" value={app.query}
                   onChange={(event) => { app.query = event.currentTarget.value; app.selectedId = null; app.selectedReads = []; }} /></label>
@@ -350,7 +350,7 @@ function ViewFilters({ app }: { app: AppController }) {
     }}><Icon name="select-list" />선택</button>;
   if (app.view === 'saved') return <div className="view-options saved-options"><div className="view-actions">{select}<SortSelect app={app} /></div></div>;
   return <div className="view-options" role="group" aria-label="공지 보기 조건">
-    <div className="view-filters">
+    <div className="view-filters ml-[-5px] min-[720px]:ml-[-15px]">
       <button type="button" className="view-toggle" aria-pressed={app.unreadOnly} onClick={() => {
         app.unreadOnly = !app.unreadOnly;
         app.selectedId = null;
