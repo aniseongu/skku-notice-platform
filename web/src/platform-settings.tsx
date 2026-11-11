@@ -181,8 +181,6 @@ function Overview({ model }: { model: SettingsModel }) {
     </Section> : null}
     <Section id="s-preferences" title="내 설정">
       <SettingsLink model={model} label="알림" help="받을 게시판과 이 기기 알림" section="notifications" />
-      <SettingsLink model={model} label="아이캠퍼스" help="과제 마감과 하루 요약 알림" section="canvas" />
-      <SettingsLink model={model} label="구글 캘린더" help={model.calendar?.id ? '저장한 공지의 마감을 캘린더에 넣고 있어요' : '저장한 공지의 마감을 구글 캘린더에 넣어요'} section="calendar" />
       <SettingsLink model={model} label="관심 키워드" help={model.keywords.length ? `${model.keywords.length}개 키워드를 쓰고 있어요` : '관심 있는 공지를 골라 봐요'} section="keywords" />
     </Section>
     <Section id="s-account" title="계정">
@@ -215,6 +213,11 @@ function Overview({ model }: { model: SettingsModel }) {
       <Setting name="단축키" help="키보드로 빠르게 이동해요" className="kbd-only">
         <button type="button" className="ghost-button" aria-keyshortcuts="?" onClick={model.showShortcuts}>단축키 보기</button>
       </Setting>
+    </Section>
+    {/* 자주 쓰지 않는 연결은 "기타"로 묶어 아래에 둔다(알림과 관심 키워드가 위쪽 "내 설정"에 남는다). */}
+    <Section id="s-etc" title="기타">
+      <SettingsLink model={model} label="아이캠퍼스" help="과제 마감과 하루 요약 알림" section="canvas" />
+      <SettingsLink model={model} label="구글 캘린더" help={model.calendar?.id ? '저장한 공지의 마감을 캘린더에 넣고 있어요' : '저장한 공지의 마감을 구글 캘린더에 넣어요'} section="calendar" />
     </Section>
     <div className="box mt-[24px]">
         <a className="settings-link" href="privacy.html">

@@ -524,6 +524,23 @@ test('refresh button and R refetch the notice list, lock while loading, and keep
   expect(await rows.count()).toBe(count);                             // 실패해도 지금 목록은 그대로다
 });
 
+test('settings home puts the daily settings first and groups iCampus and Google Calendar under "기타" further down', async ({ page }) => {
+  await settingsAt(page);
+  const screen = page.locator('platform-settings-screen');
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, profile: { programs: [{ college: '경영대학', department: '경영학과' }], year: 2, semester: 1, enrollmentStatus: '재학', militaryService: '해당 없음', onboardedAt: 'x', interests: '', wants: '', avoids: '' } });
+  const heads = await screen.locator('h2.settings-head').allInnerTexts();
+  expect(heads).toEqual(['내 설정', '계정', '화면', '기타']);
+  const mine = screen.getByRole('region', { name: '내 설정' }), etc = screen.getByRole('region', { name: '기타' });
+  expect(await mine.getByRole('link').allInnerTexts().then((list) => list.map((text) => text.split('\n')[0]))).toEqual(['알림', '관심 키워드']);
+  expect(await etc.getByRole('link').allInnerTexts().then((list) => list.map((text) => text.split('\n')[0]))).toEqual(['아이캠퍼스', '구글 캘린더']);
+  const y = async (loc: import('@playwright/test').Locator) => (await loc.boundingBox())!.y;
+  expect(await y(etc)).toBeGreaterThan(await y(mine));
+  expect(await y(etc)).toBeGreaterThan(await y(screen.getByRole('region', { name: '계정' })));
+  // 기타 안의 항목도 한 번 눌러 자기 페이지로 간다.
+  await etc.getByRole('link', { name: /아이캠퍼스/ }).click();
+  await expect(page).toHaveURL(/section=canvas/);
+});
+
 test('settings opened straight from the side menu shortcut closes with one X instead of showing the settings home', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '왼쪽 메뉴는 넓은 화면에만 있다');
   const list = page.locator('notice-rows-screen a.row').first();
