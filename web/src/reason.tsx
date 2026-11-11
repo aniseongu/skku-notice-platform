@@ -4,6 +4,8 @@ import { VERDICT_LABEL, type Verdict } from './data';
 import type { GradPart } from './graduation-assessment';
 
 const LABEL = 'mr-[6px]';
+/** 키워드와 이유 사이의 옅은 구분점. 낭독기가 읽지 않게 숨긴다. 이유가 있을 때만 그린다. */
+const Dot = ({ show }: { show: boolean }) => (show ? <span aria-hidden className="mr-[6px] text-ink-3">·</span> : null);
 // 읽은 글: 색은 그대로 두고 바탕 쪽으로 18%만 옅게 섞는다. Tailwind는 완성된 클래스 이름만 찾으므로 문자열을 이어 붙이지 않는다.
 const FADED: Record<string, string> = {
   'text-accent': 'text-[color-mix(in_oklch,var(--accent)_82%,var(--surface))]',
@@ -25,15 +27,15 @@ export function Reason({ interests, ai, rule, read = false, grad = [] }: {
   const parts = grad.length ? <GradParts parts={grad} read={read} /> : null;
   const sentence = ai && ai.verdict !== 'not_relevant' ? ai.reason : '';
   if (interests.length) {
-    return <span className="reason"><b className={`interest ${strong(read, 'text-accent')}`}>관심 {interests.join(', ')}</b>{parts}{sentence}</span>;
+    return <span className="reason"><b className={`interest ${strong(read, 'text-accent')}`}>관심 {interests.join(', ')}</b>{parts}<Dot show={!!sentence} />{sentence}</span>;
   }
   // 졸업요건 결과가 있으면 그것이 "해당"의 구체적인 말이라 판정 이름을 따로 적지 않는다(한 묶음으로 적는다).
-  if (parts) return <span className="reason grad">{parts}{sentence}</span>;
+  if (parts) return <span className="reason grad">{parts}<Dot show={!!sentence} />{sentence}</span>;
   if (ai) {
     // 해당 없음은 가장 연하게: 굵지 않고 흐린 회색. 읽었는지와 관계없이 같다.
-    if (ai.verdict === 'not_relevant') return <span className="reason not_relevant text-ink-3"><b className={`${LABEL} font-normal`}>{VERDICT_LABEL[ai.verdict]}</b>{ai.reason}</span>;
+    if (ai.verdict === 'not_relevant') return <span className="reason not_relevant text-ink-3"><b className={`${LABEL} font-normal`}>{VERDICT_LABEL[ai.verdict]}</b><Dot show={!!ai.reason} />{ai.reason}</span>;
     const tone = ai.verdict === 'relevant' ? 'text-accent' : 'text-soon';
-    return <span className={`reason ${ai.verdict}`}><b className={strong(read, tone)}>{VERDICT_LABEL[ai.verdict]}</b>{ai.reason}</span>;
+    return <span className={`reason ${ai.verdict}`}><b className={strong(read, tone)}>{VERDICT_LABEL[ai.verdict]}</b><Dot show={!!ai.reason} />{ai.reason}</span>;
   }
-  return rule ? <span className="reason rule"><b className={strong(read, 'text-ink-2')}>기준</b>{rule}</span> : null;
+  return rule ? <span className="reason rule"><b className={strong(read, 'text-ink-2')}>기준</b><Dot show={!!rule} />{rule}</span> : null;
 }

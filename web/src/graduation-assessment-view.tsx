@@ -28,7 +28,7 @@ const MUTED = new Set(['NOT_ELIGIBLE', 'NOT_APPLICABLE']);
 /** "3품 인턴십 가능" 키워드 바로 옆에 이유가 이어지는 한 문단. */
 function Result({ name, track }: { name: string; track: Track }) {
   return <p className={`m-0 mb-[8px] text-[14px] leading-[21px] [word-break:keep-all] ${MUTED.has(track.status) ? 'text-ink-3' : 'text-ink-2'}`} data-status={track.status}>
-    <b className={`mr-[6px] ${KEYWORD[track.status] ?? 'font-semibold text-ink-2'}`}>{name} {STATUS_TEXT[track.status]}</b>{reasonOf(track)}
+    <b className={`mr-[6px] ${KEYWORD[track.status] ?? 'font-semibold text-ink-2'}`}>{name} {STATUS_TEXT[track.status]}</b><span aria-hidden className="mr-[6px] text-ink-3">·</span>{reasonOf(track)}
   </p>;
 }
 
