@@ -12,9 +12,4 @@
   .segmented button[aria-checked="true"], .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px oklch(0.2 0.02 var(--h) / 0.12); }
   /* 토스 기준 터치 영역 44px: 손가락으로 누르는 화면(휴대폰)에서만 키운다. 모양은 그대로다. */
   @media (max-width: 719px) { .segmented button { min-height: 44px; } }
-  /* 분류 칩: 켠 것은 옅은 면과 굵은 글자(검은 채움은 하나만 고르는 칩에만), 끈 것은 가로줄로도 알린다.
-     mobile 층의 .chip 규칙보다 뒤 층에 둬야 이긴다. */
-  .setting-control .chips { flex-wrap: wrap; margin: 0; padding: 0; overflow: visible; }
-  .setting-control .chip[aria-pressed="true"] { border-color: var(--line); background: var(--sunken); color: var(--text); font-weight: 600; }
-  .setting-control .chip[aria-pressed="false"] { color: var(--text-3); text-decoration: line-through; }
 }

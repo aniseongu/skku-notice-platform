@@ -17,6 +17,7 @@ import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifi
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
+import { BADGE, CHEVRON_RIGHT, CHOICE, SWITCH, SWITCH_ONLY } from './cls';
 import { aiKeysLead, connectedAiKeys } from './ai-keys';
 
 export interface SettingsModel {
@@ -152,7 +153,7 @@ function SettingsLink({ model, label, help, section }: { model: SettingsModel; l
   };
   return <a className="settings-link flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href={href} onClick={open}>
     <span><span className="setting-name text-[15px] leading-[22px] font-semibold">{label}</span><span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{help}</span></span>
-    <span className="settings-chevron mr-[4px] size-[8px] flex-none border-t-[1.5px] border-r-[1.5px] border-ink-3 [transform:rotate(45deg)]" aria-hidden="true" />
+    <span className={`settings-chevron ${CHEVRON_RIGHT}`} aria-hidden="true" />
   </a>;
 }
 
@@ -226,7 +227,7 @@ function Overview({ model }: { model: SettingsModel }) {
         <a className="settings-link flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href="privacy.html">
         <span><span className="setting-name text-[15px] leading-[22px] font-semibold">개인정보 처리방침</span>
           <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">어떤 정보를 어디에 쓰고 어떻게 지우는지 알려 드려요</span></span>
-        <span className="settings-chevron mr-[4px] size-[8px] flex-none border-t-[1.5px] border-r-[1.5px] border-ink-3 [transform:rotate(45deg)]" aria-hidden="true" />
+        <span className={`settings-chevron ${CHEVRON_RIGHT}`} aria-hidden="true" />
       </a>
     </div>
     {/* 계정 삭제는 되돌릴 수 없어서 설정의 가장 아래에 따로 둔다. */}
@@ -270,7 +271,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   const found = needle ? others.filter((source) => source.label.replace(/\s+/g, '').toLowerCase().includes(needle)) : [];
   const busy = model.loading;
   const current = group && groups.has(group) ? group : null;   // 묶음의 게시판을 모두 추가했으면 대학 고르기로 돌아간다
-  const row = (source: (typeof others)[number]) => <button key={source.id} type="button" className="choice" disabled={busy} aria-label={`${source.label} 추가`} onClick={() => model.toggle(source.id, true)}>
+  const row = (source: (typeof others)[number]) => <button key={source.id} type="button" className={CHOICE} disabled={busy} aria-label={`${source.label} 추가`} onClick={() => model.toggle(source.id, true)}>
     <span>{source.label}</span><span className="text-[14px] font-semibold text-accent" aria-hidden="true">추가</span></button>;
   if (others.length === 0) return <p className="field-note text-[14px] leading-[20px] text-ink-2">모든 게시판을 받고 있어요</p>;
   // 접힌 "게시판 더 보기" 줄을 누르면 펼쳐진다. 받는 게시판이 하나도 없으면 처음부터 펼쳐 둔다.
@@ -281,12 +282,12 @@ function BoardGroups({ model }: { model: SettingsModel }) {
         onChange={(event) => setQuery(event.currentTarget.value)} />
       {needle
         ? found.length
-          ? <div className="choice-list" role="group" aria-label="검색 결과">{found.map(row)}</div>
+          ? <div className="choice-list grid overflow-hidden rounded-lg bg-surface" role="group" aria-label="검색 결과">{found.map(row)}</div>
           : <p className="field-note text-[14px] leading-[20px] text-ink-2" role="status">'{query}'에 맞는 게시판이 없어요. 다른 단어로 찾아보세요.</p>
         : current
           ? <>
             <BackToGroups current={current} onBack={() => setGroup(null)} />
-            <div className="choice-list" role="group" aria-label={`${current} 게시판`}>{(groups.get(current) ?? []).map(row)}</div>
+            <div className="choice-list grid overflow-hidden rounded-lg bg-surface" role="group" aria-label={`${current} 게시판`}>{(groups.get(current) ?? []).map(row)}</div>
           </>
           : <GroupGrid label="대학 선택" names={names} onPick={setGroup} />}
     </div>
@@ -358,7 +359,7 @@ function DeviceRow({ device, info }: { device: Device; info: NonNullable<Setting
         <button type="button" className="solid-button" disabled={info.busy || !validDeviceName(draft)} onClick={() => void save()}>저장하기</button>
         <button type="button" className="ghost-button" disabled={info.busy} onClick={() => setEditing(false)}>닫기</button>
       </div>
-      : <span className="device-name flex items-center gap-[8px] font-semibold">{name}{device.id === info.thisId ? <b className="badge">이 기기</b> : null}</span>}
+      : <span className="device-name flex items-center gap-[8px] font-semibold">{name}{device.id === info.thisId ? <b className={BADGE}>이 기기</b> : null}</span>}
     <span className="field-note text-[14px] leading-[20px] text-ink-2">{device.createdAt ? `${new Date(device.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}에 등록` : ''} · 아캠 알림 {CANVAS_MODES.find(([mode]) => mode === device.canvasMode)?.[1]}</span>
     {editing ? null : <span className="device-actions flex gap-[4px] [grid-row:1/span_2] [grid-column:2]">
       <button type="button" className="text-button" disabled={info.busy} aria-label={`${name} 이름 바꾸기`} onClick={() => { setDraft(device.name ?? ''); setEditing(true); }}>이름 바꾸기</button>
@@ -501,8 +502,8 @@ function BoardRow({ board, editing, onToggle, busy }: { board: { id: string; lab
     {editing ? <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} aria-label={`${board.label} 순서 옮기기`}
       className="order-handle grid size-[44px] flex-none cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent text-ink-3 hover:bg-sunken active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-accent">
       <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">{[7, 12, 17].flatMap((y) => [9, 15].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.7" />))}</svg></button> : null}
-    {onToggle && !editing ? <button type="button" role="switch" className="switch-row switch-only" aria-checked="true" aria-label={`${board.label} 받기`} disabled={busy}
-      onClick={() => onToggle(board.id)}><span className="switch" aria-hidden="true" /></button> : null}
+    {onToggle && !editing ? <button type="button" role="switch" className={SWITCH_ONLY} aria-checked="true" aria-label={`${board.label} 받기`} disabled={busy}
+      onClick={() => onToggle(board.id)}><span className={SWITCH} aria-hidden="true" /></button> : null}
   </li>;
 }
 
@@ -602,7 +603,7 @@ function AboutMe({ model }: { model: SettingsModel }) {
       return <Setting key={key} name={name} help={help}>
         <textarea className="input" rows={3} aria-label={name} placeholder={placeholder} value={drafts[key]} disabled={!ready}
           aria-describedby={`count-${key}`} onChange={(event) => setDrafts({ ...drafts, [key]: event.currentTarget.value })} />
-        <span id={`count-${key}`} className={`counter self-end text-[12px] tabular-nums ${count > PROFILE_TEXT_LIMIT ? 'over text-danger' : 'text-ink-3'}`} aria-live="polite">{count}/{PROFILE_TEXT_LIMIT}</span>
+        <span id={`count-${key}`} className={`counter [align-self:flex-end] text-[12px] tabular-nums ${count > PROFILE_TEXT_LIMIT ? 'over text-danger' : 'text-ink-3'}`} aria-live="polite">{count}/{PROFILE_TEXT_LIMIT}</span>
       </Setting>;
     })}
     <Setting name="저장">

@@ -6,7 +6,7 @@ import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } fro
 import { applyBoardOrder } from './board-order';
 import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, deadlinePassed, postedGroup, safeUrl, todayKst } from './data';
 import { APP_NAME } from './brand';
-import { CHECKBOX } from './cls';
+import { CHECKBOX, CHIP, CHIPS, CHIP_ADD } from './cls';
 import { authClient } from './auth';
 import { keywordCounts } from './keyword-counts';
 import { type AppController, STALE_MS, TABS, remember, settingsTitle } from './app-controller';
@@ -143,12 +143,12 @@ export function NoticeShell({ app }: { app: AppController }) {
               <label className="search"><Icon name="search" />
                 <input type="search" placeholder="공지 찾기" autoComplete="off" aria-label="공지 검색" value={app.query}
                   onChange={(event) => { app.query = event.currentTarget.value; app.selectedId = null; app.selectedReads = []; }} /></label>
-              <div className="chips" role="group" aria-label="관심 키워드">
-                {app.keywords.length ? <button type="button" className="chip" aria-pressed={!app.keyword} onClick={() => app.setKeyword(null)}>모두</button> : null}
-                {app.keywords.map((word) => <button type="button" className="chip" key={word} aria-pressed={app.keyword === word}
+              <div className={CHIPS} role="group" aria-label="관심 키워드">
+                {app.keywords.length ? <button type="button" className={CHIP} aria-pressed={!app.keyword} onClick={() => app.setKeyword(null)}>모두</button> : null}
+                {app.keywords.map((word) => <button type="button" className={CHIP} key={word} aria-pressed={app.keyword === word}
                   aria-label={`${word}, 공지 ${keywordTotals.counts[word]}개`}
                   onClick={() => app.setKeyword(app.keyword === word ? null : word)}>{word} {keywordTotals.counts[word]}</button>)}
-                <button type="button" className="chip-add" onClick={() => app.openSettings('keywords')}><Icon name="plus" />키워드 추가하기</button>
+                <button type="button" className={CHIP_ADD} onClick={() => app.openSettings('keywords')}><Icon name="plus" />키워드 추가하기</button>
               </div>
             </div>
             <ViewFilters app={app} />

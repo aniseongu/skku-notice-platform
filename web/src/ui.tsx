@@ -1,5 +1,6 @@
 // 설정과 온보딩이 같이 쓰는 작은 구성요소. 모양은 styles.css의 platform 층에 있다.
 import { useEffect, useState, type ReactNode } from 'react';
+import { BADGE, CHEVRON_RIGHT, CHIP, CHIPS, CHOICE, CHOICE_CHECK, SWITCH, SWITCH_ROW } from './cls';
 
 /** 원본 설정의 구역(작은 제목 + 상자). 구역 제목이 구역의 이름표가 된다. */
 export function Card({ id, title, children }: { id: string; title: string; children: ReactNode }) {
@@ -13,19 +14,20 @@ export function Card({ id, title, children }: { id: string; title: string; child
 export function SwitchRow({ checked, onChange, label, description, badge, disabled }: {
   checked: boolean; onChange: (next: boolean) => void; label: string; description?: string; badge?: string; disabled?: boolean;
 }) {
-  return <button type="button" role="switch" className="switch-row" aria-checked={checked} disabled={disabled} onClick={() => onChange(!checked)}>
-    <span className="switch-text"><span className="switch-label">{label}{badge ? <>{" "}<span className="badge">{badge}</span></> : null}</span>
-      {description ? <span className="switch-note">{description}</span> : null}</span>
-    <span className="switch" aria-hidden="true" />
+  return <button type="button" role="switch" className={SWITCH_ROW} aria-checked={checked} disabled={disabled} onClick={() => onChange(!checked)}>
+    <span className="switch-text grid gap-[2px]"><span className="switch-label inline-flex items-center gap-[8px] text-[15px] font-semibold">{label}{badge ? <>{" "}<span className={BADGE}>{badge}</span></> : null}</span>
+      {description ? <span className="switch-note text-[13px] text-ink-3">{description}</span> : null}</span>
+    <span className={SWITCH} aria-hidden="true" />
   </button>;
 }
+
 
 /** 몇 개 안 되는 값 중 하나를 고른다(학년, 재학 상태 등). */
 export function Segmented<T extends string | number>({ label, options, value, onChange, columns }: {
   label: string; options: readonly { value: T; label: string }[]; value: T | null; onChange: (next: T) => void; columns?: number;
 }) {
-  return <div className="seg" data-columns={columns} role="group" aria-label={label}>
-    {options.map((option) => <button type="button" key={String(option.value)} aria-pressed={value === option.value}
+  return <div className="seg flex flex-wrap gap-[8px] data-[columns=3]:grid data-[columns=3]:grid-cols-[repeat(3,minmax(0,1fr))]" data-columns={columns} role="group" aria-label={label}>
+    {options.map((option) => <button type="button" className={`min-h-[44px] flex-[1_1_4.5rem] rounded-md border px-[12px] py-0 ${value === option.value ? 'border-ink bg-ink font-bold text-bg' : 'border-line bg-surface font-medium text-ink'}`} key={String(option.value)} aria-pressed={value === option.value}
       onClick={() => onChange(option.value)}>{option.label}</button>)}
   </div>;
 }
@@ -37,19 +39,19 @@ export function Segmented<T extends string | number>({ label, options, value, on
 export function ChoiceList({ label, items, selected, onSelect, nav }: {
   label: string; items: readonly { id: string; label: string; note?: string; description?: string }[]; selected?: string | null; onSelect: (id: string) => void; nav?: boolean;
 }) {
-  return <div className="choice-list" role={nav ? 'group' : 'radiogroup'} aria-label={label}>
-    {items.map((item) => <button type="button" className="choice" key={item.id} onClick={() => onSelect(item.id)}
+  return <div className="choice-list grid overflow-hidden rounded-lg bg-surface" role={nav ? 'group' : 'radiogroup'} aria-label={label}>
+    {items.map((item) => <button type="button" className={CHOICE} key={item.id} onClick={() => onSelect(item.id)}
       {...(nav ? {} : { role: 'radio', 'aria-checked': selected === item.id })}>
-      <span>{item.label}{item.note ? <span className="choice-note">{item.note}</span> : null}{item.description ? <span className="choice-desc">{item.description}</span> : null}</span>
-      {nav ? <span className="choice-chevron" aria-hidden="true" /> : <span className="choice-check" aria-hidden="true" />}
+      <span>{item.label}{item.note ? <span className="choice-note block text-[13px] font-normal text-ink-3">{item.note}</span> : null}{item.description ? <span className="choice-desc block text-[13px] font-normal text-ink-2">{item.description}</span> : null}</span>
+      {nav ? <span className={`choice-chevron ${CHEVRON_RIGHT}`} aria-hidden="true" /> : <span className={CHOICE_CHECK} aria-hidden="true" />}
     </button>)}
   </div>;
 }
 
 /** 여러 개를 고른다(관심 키워드). */
 export function ChipGroup({ label, options, selected, onToggle }: { label: string; options: readonly string[]; selected: readonly string[]; onToggle: (value: string) => void }) {
-  return <div className="chips chip-wrap" role="group" aria-label={label}>
-    {options.map((option) => <button type="button" className="chip" key={option} aria-pressed={selected.includes(option)} onClick={() => onToggle(option)}>{option}</button>)}
+  return <div className={`${CHIPS} flex-wrap`} role="group" aria-label={label}>
+    {options.map((option) => <button type="button" className={CHIP} key={option} aria-pressed={selected.includes(option)} onClick={() => onToggle(option)}>{option}</button>)}
   </div>;
 }
 
@@ -70,7 +72,7 @@ export function Avatar({ src, size = 48 }: { src?: string | null; size?: number 
     image.src = src;
     return () => { alive = false; };
   }, [src]);
-  return <span className="avatar" style={{ width: size, height: size }} aria-hidden="true" data-loaded={loaded}>
+  return <span className="avatar inline-grid flex-none place-items-center overflow-hidden rounded-[50%] bg-sunken text-ink-3 [box-shadow:inset_0_0_0_1px_var(--line)] [&_img]:h-full [&_img]:w-full [&_img]:object-cover [&_svg]:h-[72%] [&_svg]:w-[72%] [&_svg]:[align-self:end] [&_svg]:fill-current" style={{ width: size, height: size }} aria-hidden="true" data-loaded={loaded}>
     {src && loaded
       ? <img src={src} alt="" referrerPolicy="no-referrer" draggable={false} />
       : <svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="9" r="4.2" /><path d="M3.5 22c.6-4.9 4.3-8 8.5-8s7.9 3.1 8.5 8z" /></svg>}
@@ -82,7 +84,7 @@ export function GroupGrid({ label, names, onPick }: { label: string; names: read
   return <div role="group" aria-label={label} className="grid grid-cols-2 gap-2">
     {names.map((name) => <button key={name} type="button" onClick={() => onPick(name)}
       className="flex min-h-[48px] items-center justify-between gap-1 rounded-md border border-line bg-surface px-3 text-left text-[14px] font-medium text-ink break-keep [&:last-child:nth-child(odd)]:col-span-2">
-      <span>{name}</span><span className="choice-chevron" aria-hidden="true" /></button>)}
+      <span>{name}</span><span className={`choice-chevron ${CHEVRON_RIGHT}`} aria-hidden="true" /></button>)}
   </div>;
 }
 
