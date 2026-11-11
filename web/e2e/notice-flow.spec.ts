@@ -1693,3 +1693,22 @@ test('share button in the open detail: opens the device share sheet, stays quiet
   await expect(page.getByRole('button', { name: '공유하기' }).locator('use')).toHaveAttribute('href', /#check$/);   // 누른 자리에서도 결과가 보인다
   expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toMatch(/^https?:\/\//);
 });
+
+test('opening settings keeps the left menu as it was (tab, pressed keyword, board list), with settings highlighted too', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 800 });
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => { (document.querySelector('notice-app') as unknown as { keywords: string[] }).keywords = ['장학', '인턴']; });
+  const side = page.locator('.sidebar');
+  await side.getByRole('button', { name: /^인턴 공고\s*\d*$/ }).click();
+  await side.getByRole('button', { name: /^장학, 공지/ }).click();
+  await expect(side.getByText('인턴 공고 사이트')).toBeVisible();
+  await side.getByRole('button', { name: '설정' }).click();
+  await expect(page.locator('platform-settings-screen')).toBeVisible();
+  // 설정 안에서도 쓰던 상태가 그대로 보인다: 인턴 공고 탭, 눌러 둔 키워드, 인턴용 사이트 목록.
+  await expect(side.getByText('인턴 공고 사이트')).toBeVisible();
+  await expect(side.getByRole('button', { name: /^인턴 공고\s*\d*$/ })).toHaveClass(/bg-sunken/);
+  await expect(side.getByRole('button', { name: /^장학, 공지/ })).toHaveClass(/bg-sunken/);
+  await expect(side.getByRole('button', { name: '설정' })).toHaveClass(/bg-sunken/);
+  await expect(side.getByRole('button', { name: /^성대 공지\s*\d*$/ })).not.toHaveClass(/bg-sunken/);
+});

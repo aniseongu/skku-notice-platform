@@ -95,17 +95,17 @@ export function NoticeShell({ app }: { app: AppController }) {
       <aside className="sidebar hidden border-r border-line bg-mica px-[12px] pt-0 pb-[12px] min-[720px]:flex min-[720px]:min-h-0 min-[720px]:flex-col min-[720px]:overflow-y-auto" aria-label="탐색">
         <div className="pane-head brand min-[720px]:-mx-[12px] min-[720px]:mt-0 min-[720px]:mb-[12px] min-[720px]:flex min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:items-center min-[720px]:gap-[8px] min-[720px]:border-b min-[720px]:border-line min-[720px]:px-[24px] min-[720px]:text-[17px] min-[720px]:font-bold min-[720px]:tracking-[-0.02em] min-[720px]:[&_.brand-mark]:text-accent min-[720px]:[&_.brand-mark]:size-[32px]"><Brand />{APP_NAME}</div>
         <nav className="side-group flex flex-col gap-[1px]" aria-label="보기">
-          {TABS.map((t, index) => <SideItem key={t.id} label={t.label} count={counts[t.id]} active={app.view === t.id}
+          {TABS.map((t, index) => <SideItem key={t.id} label={t.label} count={counts[t.id]} active={app.tab() === t.id}
             onClick={() => app.setView(t.id)} shortcut={String(index + 1)} icon={t.icon} />)}
         </nav>
         <SideGroup app={app} id="keywords" title="관심 키워드" count={keywordTotals.total}>
           {app.keywords.map((word) => <SideItem key={word} label={word} count={keywordTotals.counts[word]}
-            active={app.keyword === word && !settings} onClick={() => app.setKeyword(app.keyword === word ? null : word)}
+            active={app.keyword === word} onClick={() => app.setKeyword(app.keyword === word ? null : word)}
             ariaLabel={`${word}, 공지 ${keywordTotals.counts[word]}개`} />)}
           <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('keywords')}>{app.keywords.length ? '키워드 관리하기' : '키워드 추가하기'}</button>
         </SideGroup>
         <SideGroup app={app} id="boards" title={app.tab() === 'intern' ? '인턴 공고 사이트' : '게시판'} count={app.tabSources().length}>
-          {boardChoices(app).map((b) => <SideItem key={b.id} label={b.label} count={null} active={app.activeBoard() === b.id && !settings}
+          {boardChoices(app).map((b) => <SideItem key={b.id} label={b.label} count={null} active={app.activeBoard() === b.id}
             onClick={() => { app.setBoard(b.id); if (settings) app.leaveSettings(); }} />)}
           {app.tab() === 'intern' ? null : <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('notifications')}>게시판 더 고르기</button>}
         </SideGroup>

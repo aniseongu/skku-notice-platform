@@ -290,6 +290,8 @@ export class AppController extends Reactive {
   generatedAt: string | null = null;
   view: View = new URLSearchParams(location.search).get('view') === 'settings'
     ? 'settings' : [normalizeTab(new URLSearchParams(location.search).get('tab')), normalizeTab(remember('tab'))].find(isTab) ?? 'all';
+  /** 설정에 들어가기 전에 보던 목록 보기. 설정 안에서도 왼쪽 메뉴가 쓰던 상태(탭, 게시판 목록) 그대로 보이게 한다. */
+  listTab: Tab = [normalizeTab(new URLSearchParams(location.search).get('tab')), normalizeTab(remember('tab'))].find(isTab) ?? 'all';
   sort: Sort = loadSort('all');
   internSort: Sort = loadSort('intern');
   savedSort: Sort = remember('saved-sort') === 'deadline' ? 'deadline' : 'latest';
@@ -1480,7 +1482,7 @@ export class AppController extends Reactive {
 
   sortFor(tab: Tab): Sort { return tab === 'saved' ? this.savedSort : tab === 'intern' ? this.internSort : this.sort; }
 
-  tab(): Tab { return this.view === 'settings' ? 'all' : this.view; }
+  tab(): Tab { return this.view === 'settings' ? this.listTab : this.view; }
   visible(): Notice[] {
     const decorate = (items: Notice[]) => items.map((notice) => {
       const translated = this.myTranslations.get(notice.id);
@@ -1493,6 +1495,7 @@ export class AppController extends Reactive {
     const entering = view === 'settings' && this.view !== 'settings';
     this.selecting = false; this.selectedReads = [];
     this.view = view;
+    if (view !== 'settings') this.listTab = view;
     this.openedId = null;
     this.boardMenuOpen = false;
     this.sortMenuOpen = false;
@@ -1613,6 +1616,7 @@ export class AppController extends Reactive {
     remember('intern-sort', this.internSort);
     if (view !== this.view) {
       this.view = view; this.selectedId = null; this.selecting = false; this.selectedReads = [];
+      if (view !== 'settings') this.listTab = view;
       // 설정에서 나오거나 탭이 바뀌어 돌아올 때도 상세 칸은 닫힌 채로 연다(setView와 같다). 열어 둔 설정은 그대로 두고 이번만 닫는다.
       if (view !== 'settings') this.detailOpen = false;
     }
