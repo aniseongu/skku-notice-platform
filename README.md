@@ -81,10 +81,10 @@ Google 계정으로 로그인합니다.
 - **알림**: 웹 푸시(VAPID)로 새 공지를 보냅니다. 관심 키워드가 맞는 공지는 소리로, 나머지는 조용히 보내고 학교가 고친 중요한 글은 한 번 더 알립니다.
 - **기기별 알림 관리**: 이 기기의 알림을 직접 켜고 끄며, 테스트 알림으로 도착하는 모습을 확인합니다. 등록된 기기 목록에서 기기 이름을 바꾸고 다른 기기를 지울 수 있습니다. 로그아웃하면 이 기기의 알림 등록을 해제하고 계정이 바뀌면 이전 계정의 기기 구독을 정리합니다. 키워드는 설정에서 바로 추가·삭제하고 계정에 순서대로 저장합니다.
 - **화면과 설치**: 라이트·다크·자동 모드, 앱 설치(PWA), 성대 공지 탭에 "모든 게시판"이나 "받는 게시판만" 보기를 고를 수 있습니다. 서버 연결에 실패하면 마지막 공지 스냅샷을 보여 줍니다.
-- **내 AI 키**: Gemini, Groq, OpenRouter 중 하나 이상을 직접 넣으면 성대 공지와 인턴 공고가 나에게 맞는지 판정해, 맞는 공지를 소리로 알립니다(무료 모델만 씁니다). 키를 여러 개 넣으면 상한 대비 덜 쓴 키부터 번갈아 쓰고, 한 곳이 막히면 다른 곳으로 넘어갑니다. 상한은 업체마다 다르게 두었고, 이미 판정한 공지는 다시 호출하지 않습니다. 키는 암호화해 서버에만 보관하며 브라우저가 읽을 수 없고, 그 사용자 본인의 공지 처리에만 쓰입니다.
+- **내 AI 키**: 사용자가 직접 넣은 AI 키로 성대 공지와 인턴 공고가 나에게 맞는지 판정해, 맞는 공지를 소리로 알립니다(무료 모델만 씁니다). 키를 여러 개 넣으면 상한 대비 덜 쓴 키부터 번갈아 쓰고, 한 곳이 막히면 다른 곳으로 넘어갑니다. 상한은 업체마다 다르게 두었고, 이미 판정한 공지는 다시 호출하지 않습니다. 키는 암호화해 서버에만 보관하며 브라우저가 읽을 수 없고, 그 사용자 본인의 공지 처리에만 쓰입니다.
 - **판정 순서와 보관**: 새로 가입해 밀린 공지가 많아도 구독한 게시판의 마감이 가까운 공지부터 판정하고, 이미 마감된 공지에는 키를 쓰지 않습니다. 서버의 공지는 마감 30일 뒤(마감이 없으면 처음 본 지 90일 뒤) 지우며, 사용자가 저장한 공지는 지우지 않습니다.
 - **인턴십 졸업요건 확인**: 소프트웨어학과 원전공이나 학교 3품 인턴십 요건을 채우지 않은 사용자에게, 인턴 공고에 적힌 근무 기간·시간으로 요건에 맞는지 대략 판단해 이유와 근거를 보여 줍니다. 실제 인정 여부는 학교와 학과에 확인해야 합니다.
-- **아이캠퍼스 토큰(선택)**: 사용자가 직접 만든 아이캠퍼스(Canvas) 토큰으로 마감이 가까운 과제와 퀴즈를 알립니다. 설정의 "기타" 아래 "아이캠퍼스" 페이지에서 알림, 토큰, 하루 요약 순서로 정합니다. 기기마다 "끄기, 하루 요약, 요약과 마감" 중 받을 방식을 고르고, 하루 요약 시간은 직접 정합니다. 토큰은 Gemini 키와 같은 방식으로 보호합니다.
+- **아이캠퍼스 토큰(선택)**: 사용자가 직접 만든 아이캠퍼스(Canvas) 토큰으로 마감이 가까운 과제와 퀴즈를 알립니다. 설정의 "기타" 아래 "아이캠퍼스" 페이지에서 알림, 토큰, 하루 요약 순서로 정합니다. 기기마다 "끄기, 하루 요약, 요약과 마감" 중 받을 방식을 고르고, 하루 요약 시간은 직접 정합니다. 토큰은 AI 키와 같은 방식으로 보호합니다.
 - **구글 캘린더(선택)**: 구글 로그인으로 허용하면 저장한 공지의 마감을 "성대 공지" 캘린더에 넣습니다. 한 번 연결하면 서버가 30분마다 저장한 공지를 확인해서 자동으로 맞춥니다(구글이 주는 장기 열쇠를 암호화해 보관하며, 연결을 끊거나 계정을 지우면 지워집니다). 이 앱이 만든 캘린더 안의 일정만 다루고 내 다른 캘린더는 읽지 못합니다.
 - **공지 요약**: AI 키가 있으면 공지 상세에 1~3문장 요약이 자동으로 만들어지고, 실패하면 다시 시도할 수 있습니다.
 - **프로필 설정**: 전공, 학년, 재학 상태, 병역과 관심 분야(주관식)를 바꿉니다. AI 판정과 인턴십 졸업요건 확인에만 쓰이며 이름, 학번, 연락처는 받지 않습니다(입학 연도만 받습니다).
@@ -109,9 +109,6 @@ Google 계정으로 로그인합니다.
 [![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Gemini](https://img.shields.io/badge/Gemini-8E75B2?style=flat-square&logo=googlegemini&logoColor=white)](https://ai.google.dev/)
-[![Groq](https://img.shields.io/badge/Groq-F55036?style=flat-square)](https://groq.com/)
-[![OpenRouter](https://img.shields.io/badge/OpenRouter-6467F2?style=flat-square)](https://openrouter.ai/)
 [![Cloudflare Pages](https://img.shields.io/badge/Cloudflare_Pages-F38020?style=flat-square&logo=cloudflarepages&logoColor=white)](https://pages.cloudflare.com/)
 [![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-F80000?style=flat-square)](https://www.oracle.com/cloud/free/)
 [![Playwright](https://img.shields.io/badge/Playwright-2EAD33?style=flat-square)](https://playwright.dev/)
