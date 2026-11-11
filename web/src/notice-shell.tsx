@@ -6,6 +6,7 @@ import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } fro
 import { applyBoardOrder } from './board-order';
 import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, deadlinePassed, postedGroup, safeUrl, todayKst } from './data';
 import { APP_NAME } from './brand';
+import type { FeedbackKind } from './feedback';
 import { installMode, isStandalone } from './install-hint';
 import { CHECKBOX, CHIP, CHIPS, CHIP_ADD } from './cls';
 import { authClient } from './auth';
@@ -159,12 +160,12 @@ export function NoticeShell({ app }: { app: AppController }) {
       </main>
 
       <aside className={`detail-pane hidden min-[720px]:min-h-0 min-[720px]:overflow-y-auto min-[1080px]:bg-bg ${oneColumn ? '' : 'min-[1080px]:block'}`} aria-label="공지 상세">
-        <div className="pane-head detail-head min-[720px]:flex min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:items-center min-[720px]:gap-[8px] min-[720px]:border-b min-[720px]:border-line min-[1080px]:justify-between min-[1080px]:pr-[32px] min-[1080px]:pl-[20px] min-[1080px]:[&_.save-button]:size-[36px] min-[1080px]:[&_.save-button]:rounded-md min-[1080px]:[&_.solid-button]:min-h-[36px] min-[1080px]:[&_.solid-button]:px-[14px] min-[1080px]:[&_.solid-button]:text-[14px] min-[1080px]:[&_.ghost-button]:min-h-[36px] min-[1080px]:[&_.ghost-button]:px-[14px] min-[1080px]:[&_.ghost-button]:text-[14px]">
+        <div className="pane-head detail-head min-[720px]:flex min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:items-center min-[720px]:gap-[8px] min-[720px]:border-b min-[720px]:border-line min-[1080px]:justify-between min-[1080px]:pr-[32px] min-[1080px]:pl-[20px] min-[1080px]:[&_:is(.save-button,.share-button)]:size-[36px] min-[1080px]:[&_:is(.save-button,.share-button)]:rounded-md min-[1080px]:[&_.solid-button]:min-h-[36px] min-[1080px]:[&_.solid-button]:px-[14px] min-[1080px]:[&_.solid-button]:text-[14px] min-[1080px]:[&_.ghost-button]:min-h-[36px] min-[1080px]:[&_.ghost-button]:px-[14px] min-[1080px]:[&_.ghost-button]:text-[14px]">
           {selected ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft" aria-label="상세 칸 닫기" title="상세 칸 닫기 (Esc)" aria-keyshortcuts="Escape"
             onClick={() => app.setDetail(false)}><Icon name="close" /></button> : null}
           {selected ? <div className="detail-actions min-[1080px]:flex min-[1080px]:gap-[8px]">
             <SaveButton app={app} notice={selected} />
-            <button type="button" className="ghost-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={() => { void app.copyLink(selected); }}>링크 복사하기</button>
+            <ShareButton app={app} notice={selected} />
             <a className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" href={safeUrl(selected.url)} target="_blank" rel="noopener" aria-keyshortcuts="Enter">원문 열기<Kbd keys={['Enter']} className="ml-[8px]" onSolid /></a></div> : null}
         </div>
         {selected ? <Detail app={app} notice={selected} /> : <p className="detail-note detail-empty m-0 grid min-h-[60%] place-items-center px-[32px] py-[24px] text-[14px] leading-[19px] text-ink-3">공지를 고르면 여기에 보여요</p>}
@@ -193,6 +194,7 @@ function settingsModel(app: AppController) {
     configured: !!authClient, userId: app.authUserId, email: app.authEmail, name: app.authName, avatar: app.authAvatar,
     authBusy: app.authBusy, authError: app.authError,
     signIn: () => { void app.signIn(); }, signOut: () => { void app.signOut(); },
+    sendFeedback: (kind: FeedbackKind, body: string, email: string) => app.sendFeedback(kind, body, email),
     section: app.settingsSection, openSection: (section: string | null) => app.openSettingsSection(section),
     theme: app.theme, setTheme: (theme: 'auto' | 'light' | 'dark') => app.setTheme(theme),
     canInstall: !!app.install && !isStandalone(), iosInstall: installMode(navigator.userAgent, isStandalone(), !!app.install) === 'ios', install: () => { void app.runInstall(); }, showShortcuts: () => { app.shortcutsOpen = true; },
@@ -456,6 +458,12 @@ function BoardSelect({ app }: { app: AppController }) {
   </div>;
 }
 
+/** 공유 단추: 휴대폰은 기기의 공유 창(카카오톡·메시지 등), 공유 창이 없는 PC 브라우저는 링크 복사 */
+function ShareButton({ app, notice }: { app: AppController; notice: Notice }) {
+  return <button type="button" className="icon-button share-button grid place-items-center flex-none size-[44px] rounded-md border border-line bg-surface text-ink active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft"
+    aria-label="공유하기" title="공유하기" onClick={() => { void app.share(notice); }}><Icon name="share" /></button>;
+}
+
 function SaveButton({ app, notice }: { app: AppController; notice: Notice }) {
   const saved = app.isSaved(notice);
   return <button type="button" className="icon-button save-button grid place-items-center flex-none size-[44px] rounded-md border border-line bg-surface text-ink active:bg-sunken aria-pressed:bg-transparent aria-pressed:text-accent disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft" aria-pressed={saved}
@@ -492,11 +500,9 @@ function ReadingView({ app, notice }: { app: AppController; notice: Notice }) {
       <div className={TOPBAR_TEXT}><h1 className={TOPBAR_H1}>공지</h1></div>
     </header>
     <div className="reading px-[var(--gutter)] pt-[16px] pb-[calc(96px+env(safe-area-inset-bottom))]"><Detail app={app} notice={notice} /></div>
-    <div className="read-actions glass fixed inset-x-0 bottom-0 z-[3] flex gap-[8px] border-t border-line px-[var(--gutter)] pt-[12px] pb-[calc(12px+env(safe-area-inset-bottom))] [&>*]:flex-1 [&>.save-button]:flex-none">
+    <div className="read-actions glass fixed inset-x-0 bottom-0 z-[3] flex gap-[8px] border-t border-line px-[var(--gutter)] pt-[12px] pb-[calc(12px+env(safe-area-inset-bottom))] [&>*]:flex-1 [&>:is(.save-button,.share-button)]:flex-none">
       <SaveButton app={app} notice={notice} />
-      {'share' in navigator
-        ? <button type="button" className="ghost-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={() => { void app.share(notice); }}>공유하기</button>
-        : <button type="button" className="ghost-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={() => { void app.copyLink(notice); }}>링크 복사하기</button>}
+      <ShareButton app={app} notice={notice} />
       <a className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" href={safeUrl(notice.url)} target="_blank" rel="noopener">원문 열기</a>
     </div>
   </Fragment>;

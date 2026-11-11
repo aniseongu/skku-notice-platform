@@ -19,6 +19,7 @@ import { composeSummaryTime, deleteDevice, loadDevices, loadSummaryTime, saveCan
 import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from './my-notices';
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
 import { AI_PROVIDERS, DEFAULT_AI_PREFERENCES, loadAiKeyStatuses, loadAiPreferences, registerAiKey, removeAiKey, saveAiPreferences, type AiKeyStatus, type AiPreferences, type AiProvider } from './ai-providers';
+import { sendFeedback, type FeedbackKind, type FeedbackResult } from './feedback';
 import { byokAvailable, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
 import { keywordMatchesNotice } from './keyword-match';
@@ -72,7 +73,7 @@ export function settingsSectionFromUrl(): string | null {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'keys';
   const section = params.get('section');
-  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile'].includes(section) ? section : null;
+  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile', 'feedback'].includes(section) ? section : null;
 }
 
 /** 설정 머리의 부제. 쪽마다 그 쪽에서 하는 일을 말한다. */
@@ -84,6 +85,7 @@ export function settingsSubtitle(): string {
     case 'calendar': return '저장한 공지의 마감을 구글 캘린더에 넣어요';
     case 'profile': return '내 정보와 AI에게 알려 줄 내용을 적어요';
     case 'keys': return 'AI 키를 관리해요';
+    case 'feedback': return '궁금한 점이나 바라는 점을 남겨 주세요';
     default: return '알림과 연결을 정해요';
   }
 }
@@ -91,7 +93,7 @@ export function settingsSubtitle(): string {
 export function settingsTitle(): string {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return '연결 키';
-  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
+  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정', feedback: '문의하기' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
 }
 
 export interface InstallPrompt extends Event { prompt(): Promise<void> }
@@ -1164,6 +1166,9 @@ export class AppController extends Reactive {
   }
 
   /** 계정과 모든 정보를 지우고 이 기기에서도 로그아웃한다. 화면에서 두 번 확인한 뒤에만 부른다. */
+  /** 앱 안 문의를 보낸다. 화면(설정의 문의하기)이 결과를 문구로 바꿔 보여 준다. */
+  sendFeedback(kind: FeedbackKind, body: string, email: string): Promise<FeedbackResult> { return sendFeedback(authClient, kind, body, email); }
+
   async deleteAccount(): Promise<void> {
     const userId = this.authUserId;
     if (!authClient || !userId || this.accountBusy) return;
@@ -1641,18 +1646,31 @@ export class AppController extends Reactive {
   }
 
   async copyLink(notice: Notice) {
+    const url = safeUrl(notice.url);
     try {
-      await navigator.clipboard.writeText(safeUrl(notice.url));
-      this.showToast('원문 링크를 복사했어요');
+      await navigator.clipboard.writeText(url);
     } catch {
-      this.showToast('복사하지 못했어요');
+      // 권한이나 보안 연결 문제로 막히면 선택 복사로 한 번 더 시도한다.
+      const box = document.createElement('textarea');
+      box.value = url; box.setAttribute('readonly', ''); box.style.cssText = 'position:fixed;opacity:0';
+      document.body.append(box); box.select();
+      const ok = document.execCommand('copy');
+      box.remove();
+      if (!ok) { this.showToast('복사하지 못했어요'); return; }
     }
+    this.showToast('원문 링크를 복사했어요');
   }
 
-  // 휴대폰은 카카오톡 같은 앱으로 바로 보내는 공유 창을 쓴다. 없으면 링크를 복사한다.
+  // 기기의 공유 창(카카오톡, 메시지, 에어드롭 등)이 있으면 그것으로 보낸다. 없거나 쓸 수 없으면 링크를 복사한다.
   async share(notice: Notice) {
-    if (!navigator.share) { this.copyLink(notice); return; }
-    try { await navigator.share({ title: cleanTitle(notice.title_ko || notice.title), url: safeUrl(notice.url) }); } catch { /* 닫으면 그대로 둔다 */ }
+    const data = { title: cleanTitle(notice.title_ko || notice.title), url: safeUrl(notice.url) };
+    if (typeof navigator.share !== 'function' || (navigator.canShare && !navigator.canShare(data))) { await this.copyLink(notice); return; }
+    try {
+      await navigator.share(data);
+    } catch (error) {
+      if ((error as DOMException)?.name === 'AbortError') return; // 사용자가 공유 창을 닫은 것
+      await this.copyLink(notice);
+    }
   }
 
   showToast(text: string, link: string | null = null, linkLabel = '') {

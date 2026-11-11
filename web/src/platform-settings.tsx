@@ -17,6 +17,7 @@ import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifi
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
+import { FEEDBACK_KINDS, FEEDBACK_LIMIT, feedbackProblem, type FeedbackKind, type FeedbackResult } from './feedback';
 import { BADGE, CHEVRON_RIGHT, CHOICE, SWITCH, SWITCH_ONLY } from './cls';
 import { aiKeysLead, connectedAiKeys } from './ai-keys';
 
@@ -37,6 +38,7 @@ export interface SettingsModel {
   theme: 'auto' | 'light' | 'dark';
   setTheme: (theme: 'auto' | 'light' | 'dark') => void;
   canInstall: boolean;
+  sendFeedback: (kind: FeedbackKind, body: string, email: string) => Promise<FeedbackResult>;
   /** iOS Safari: 설치 창이 없어 홈 화면 추가 방법만 알려 준다. */
   iosInstall?: boolean;
   install: () => void;
@@ -227,13 +229,13 @@ function Overview({ model }: { model: SettingsModel }) {
           <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">어떤 정보를 어디에 쓰고 어떻게 지우는지 알려 드려요</span></span>
         <span className={`settings-chevron ${CHEVRON_RIGHT}`} aria-hidden="true" />
       </a>
-      {/* 로그인 전 화면 맨 아래에 있던 링크를 로그인 뒤에도 찾을 수 있게 같은 묶음에 둔다. 새 탭으로 열린다. */}
-      {([['문의하기', '궁금한 점이나 바라는 점을 남겨 주세요', 'https://github.com/aniseongu/skku-notice-platform/issues'], ['오픈소스', '만든 과정과 코드를 볼 수 있어요', 'https://github.com/aniseongu/skku-notice-platform']] as const).map(([label, help, href]) =>
-        <a key={href} className="settings-link flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href={href} target="_blank" rel="noopener noreferrer">
-          <span><span className="setting-name text-[15px] leading-[22px] font-semibold">{label}</span>
-            <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{help}</span></span>
-          <span className={`settings-chevron ${CHEVRON_RIGHT}`} aria-hidden="true" />
-        </a>)}
+      {/* 문의하기는 앱 안 양식(꺾쇠), 오픈소스는 GitHub로 나가므로 나가는 표시와 낭독용 안내를 따로 둔다. */}
+      <SettingsLink model={model} label="문의하기" help="궁금한 점이나 바라는 점을 남겨 주세요" section="feedback" />
+      <a className="settings-link flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href="https://github.com/aniseongu/skku-notice-platform" target="_blank" rel="noopener noreferrer">
+        <span><span className="setting-name text-[15px] leading-[22px] font-semibold">오픈소스</span>
+          <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">GitHub에서 코드를 볼 수 있어요<span className="visually-hidden"> (새 창으로 열려요)</span></span></span>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mr-[2px] flex-none text-ink-3"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>
+      </a>
     </div>
     {/* 계정 삭제는 되돌릴 수 없어서 설정의 가장 아래에 따로 둔다. */}
     {model.userId ? <DeleteAccount model={model} /> : null}
@@ -859,6 +861,49 @@ function Keys({ model }: { model: SettingsModel }) {
   </div>;
 }
 
+function Feedback({ model }: { model: SettingsModel }) {
+  const [kind, setKind] = useState<FeedbackKind>('question');
+  const [body, setBody] = useState('');
+  const [email, setEmail] = useState('');
+  const [state, setState] = useState<'idle' | 'sending' | FeedbackResult>('idle');
+  const wrap = 'settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]';
+  if (!model.userId) return <div className={wrap}><Back model={model} /><Section id="s-feedback" title="문의하기"><LoginNote model={model} what="문의하기" /></Section></div>;
+  const problem = feedbackProblem(body, email);
+  const submit = async () => {
+    if (problem || state === 'sending') return;
+    setState('sending');
+    const result = await model.sendFeedback(kind, body, email);
+    if (result === 'ok') { setBody(''); }
+    setState(result);
+  };
+  const over = body.length > FEEDBACK_LIMIT;
+  return <div className={wrap}>
+    <Back model={model} />
+    <Section id="s-feedback" title="남길 내용">
+      <Setting name="종류">
+        <Choice label="종류" options={FEEDBACK_KINDS} value={kind} onPick={(next) => { setKind(next); if (state !== 'sending') setState('idle'); }} />
+      </Setting>
+      <Setting name="내용">
+        <textarea className="input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink resize-y leading-[1.5] text-[14px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px]" rows={5} aria-label="내용" placeholder="무엇이든 편하게 적어 주세요" value={body} aria-describedby="fb-count"
+          onChange={(event) => { setBody(event.currentTarget.value); if (state !== 'sending') setState('idle'); }} />
+        <span id="fb-count" className={`counter [align-self:flex-end] text-[12px] tabular-nums ${over ? 'over text-danger' : 'text-ink-3'}`} aria-live="polite">{body.length}/{FEEDBACK_LIMIT}</span>
+      </Setting>
+      <Setting name="답장받을 메일 (선택)" help="답장이 필요하면 적어 주세요. 적지 않으면 답장은 드릴 수 없어요">
+        <input className="input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink text-[15px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px]" type="email" autoComplete="email" aria-label="답장받을 메일" placeholder="이메일 주소" value={email}
+          onChange={(event) => { setEmail(event.currentTarget.value); if (state !== 'sending') setState('idle'); }} />
+      </Setting>
+      <div className="flex flex-col gap-[8px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line">
+        <button type="button" className="solid-button inline-flex items-center justify-center py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2 min-h-[44px] w-full px-4 min-[720px]:w-auto min-[720px]:self-end" disabled={!!problem || state === 'sending'} onClick={() => { void submit(); }}>{state === 'sending' ? '보내고 있어요' : '보내기'}</button>
+        {state === 'ok' ? <p className="field-note ok text-[14px] leading-[20px] text-accent m-0" role="status">보냈어요. 남겨 주셔서 고마워요</p> : null}
+        {state === 'limit' ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">오늘은 5번까지 보낼 수 있어요. 내일 다시 보내 주세요</p> : null}
+        {state === 'error' ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">보내지 못했어요. 잠시 뒤 다시 시도해 주세요</p> : null}
+        {problem && body.trim() !== '' ? <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0" role="status">{problem}</p> : null}
+      </div>
+    </Section>
+    <p className="m-0 mt-[16px] text-[14px] leading-[20px] text-ink-2">{ext('https://github.com/aniseongu/skku-notice-platform/issues', 'GitHub 이슈로도 남길 수 있어요')}</p>
+  </div>;
+}
+
 export function PlatformSettings({ model }: { model: SettingsModel }) {
   switch (model.section) {
     case 'notifications': return <Notifications model={model} />;
@@ -867,6 +912,7 @@ export function PlatformSettings({ model }: { model: SettingsModel }) {
     case 'calendar': return <CalendarPage model={model} />;
     case 'profile': return <Profile model={model} />;
     case 'keys': return <Keys model={model} />;
+    case 'feedback': return <Feedback model={model} />;
     default: return <Overview model={model} />;
   }
 }

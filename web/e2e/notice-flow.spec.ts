@@ -1608,3 +1608,81 @@ test('selection mode survives a reload with the same ticks, and the detail pane 
   await page.reload();
   await expect(page.locator('.select-all')).toHaveCount(0);
 });
+
+test('contact page: in-app form sends kind, body and optional reply mail, explains limits and failures; the open-source row leaves the app', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    const w = window as unknown as { sent: unknown[][]; next: string };
+    w.sent = []; w.next = 'ok';
+    app.authUserId = 'account-a'; app.profileStatus = 'ready'; app.onboardingDismissed = true;
+    app.sendFeedback = (kind: string, body: string, email: string) => { w.sent.push([kind, body, email]); return Promise.resolve(w.next); };
+  });
+  await page.goto('/?view=settings&api=sample/api/v1');
+  const screen = page.locator('platform-settings-screen');
+  await screen.waitFor();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    const w = window as unknown as { sent: unknown[][]; next: string };
+    w.sent = []; w.next = 'ok';
+    app.authUserId = 'account-a'; app.profileStatus = 'ready'; app.onboardingDismissed = true;
+    app.sendFeedback = (kind: string, body: string, email: string) => { w.sent.push([kind, body, email]); return Promise.resolve(w.next); };
+  });
+  // 설정 홈: 문의하기는 앱 안 이동, 오픈소스는 새 창으로 나가는 줄이다.
+  const open = screen.getByRole('link', { name: /오픈소스/ });
+  await expect(open).toHaveAttribute('target', '_blank');
+  await expect(open).toContainText('새 창으로 열려요');
+  await expect(screen.getByRole('link', { name: /문의하기/ })).not.toHaveAttribute('target', '_blank');
+  await screen.getByRole('link', { name: /문의하기/ }).click();
+  await expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled();            // 내용이 없으면 막혀 있다
+  await screen.getByRole('textbox', { name: '내용' }).fill('로그인이 안 돼요');
+  await expect(screen.getByRole('button', { name: '보내기' })).toBeEnabled();
+  await screen.getByRole('radio', { name: '버그' }).click();
+  await screen.getByRole('textbox', { name: '답장받을 메일' }).fill('not-an-email');
+  await expect(screen.getByText('메일 주소를 다시 확인해 주세요')).toBeVisible();
+  await expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled();
+  await screen.getByRole('textbox', { name: '답장받을 메일' }).fill('me@example.com');
+  await screen.getByRole('button', { name: '보내기' }).click();
+  await expect(screen.getByText('보냈어요. 남겨 주셔서 고마워요')).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { sent: unknown[][] }).sent)).toEqual([['bug', '로그인이 안 돼요', 'me@example.com']]);
+  await expect(screen.getByRole('textbox', { name: '내용' })).toHaveValue('');           // 보낸 뒤에는 비운다
+  await page.evaluate(() => { (window as unknown as { next: string }).next = 'limit'; });
+  await screen.getByRole('textbox', { name: '내용' }).fill('또 보내요');
+  await screen.getByRole('button', { name: '보내기' }).click();
+  await expect(screen.getByText('오늘은 5번까지 보낼 수 있어요. 내일 다시 보내 주세요')).toBeVisible();
+  await page.evaluate(() => { (window as unknown as { next: string }).next = 'error'; });
+  await screen.getByRole('button', { name: '보내기' }).click();
+  await expect(screen.getByText('보내지 못했어요. 잠시 뒤 다시 시도해 주세요')).toBeVisible();
+  await expect(screen.getByRole('textbox', { name: '내용' })).toHaveValue('또 보내요');   // 실패하면 쓴 글을 지우지 않는다
+});
+
+test('share button in the open detail: opens the device share sheet, stays quiet when closed, and copies the link when there is no sheet', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    (window as unknown as { shared: unknown[] }).shared = [];
+    const mode = new URLSearchParams(location.search).get('share');
+    if (mode === 'none') Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+    else Object.defineProperty(navigator, 'share', { configurable: true, value: async (data: unknown) => {
+      (window as unknown as { shared: unknown[] }).shared.push(data);
+      if (mode === 'abort') throw new DOMException('closed', 'AbortError');
+    } });
+    Object.defineProperty(navigator, 'canShare', { value: undefined, configurable: true });
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (text: string) => { (window as unknown as { copied: string }).copied = text; } }, configurable: true });
+  });
+  const open = async (share: string) => {
+    await page.goto(`/?api=sample/api/v1&share=${share}`);
+    await page.locator('notice-rows-screen a.row').nth(1).click();
+    return page.locator(testInfo.project.name === 'mobile' ? '.read-actions' : '.detail-head').getByRole('button', { name: '공유하기' });
+  };
+  await (await open('ok')).click();
+  const shared = await page.evaluate(() => (window as unknown as { shared: { title: string; url: string }[] }).shared);
+  expect(shared).toHaveLength(1);
+  expect(shared[0].url).toMatch(/^https?:\/\//);
+  await expect(page.locator('.toast')).not.toContainText('복사');
+  await (await open('abort')).click();
+  await expect(page.locator('.toast')).not.toContainText('복사');
+  await (await open('none')).click();
+  await expect(page.locator('.toast')).toContainText('링크를 복사했어요');
+  expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toMatch(/^https?:\/\//);
+});
