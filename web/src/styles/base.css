@@ -84,52 +84,9 @@
   .toast-actions button { min-width: 44px; justify-content: center; padding: 0 4px; border: 0; background: none; }
   .wco-bar { display: none; }
 
-  /* 상세(넓은 화면 오른쪽 칸, 휴대폰 앱 안 상세 화면 공용) */
-  .detail-title { font-size: 20px; line-height: 28px; font-weight: 700; letter-spacing: -0.02em; }
-  .detail-reason { margin-top: 10px; font-size: 14px; line-height: 21px; color: var(--text-2); }
-  .detail-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
-  .detail-section h3 { margin: 0 0 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
-  .summary p { margin: 0 0 4px; font-size: 15px; line-height: 24px; }
-  .body-text p { margin: 0 0 10px; font-size: 15px; line-height: 26px; color: var(--text); white-space: pre-line; }
-  .body-text img { display: block; max-width: 100%; height: auto; margin: 0 0 12px; border-radius: var(--r-sm); background: var(--sunken); }
-  .detail-deadline { margin-top: 6px; font-size: 14px; line-height: 21px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  /* 글 정보는 맨 아래, 내용보다 작게 */
-  .facts { margin: 24px 0 0; padding-top: 4px; border-top: 1px solid var(--line); }
-  .facts div { display: grid; grid-template-columns: 56px 1fr; gap: 12px; padding: 4px 0; font-size: 13px; line-height: 19px; color: var(--text-2); }
-  .facts dt { color: var(--text-3); font-weight: 500; }
-  .facts dd { margin: 0; }
-  .attachments { margin: 0; padding: 0; list-style: none; }
-  .attachments li + li { border-top: 1px solid var(--line); }
-  .file { display: flex; align-items: center; gap: 10px; min-height: 48px; color: var(--text); text-decoration: none; font-size: 14px; }
-  .file-type {
-    flex: none; min-width: 40px; padding: 2px 0; border: 1px solid var(--line); border-radius: 4px;
-    font-size: 11px; font-weight: 600; text-align: center; color: var(--text-2);
-  }
-  .file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .file-size { flex: none; font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
-
-  /* 정제한 본문 HTML과 첨부 마크다운 */
-  .rich { font-size: 15px; line-height: 26px; color: var(--text); overflow-wrap: anywhere; }
-  .rich p { margin: 0 0 10px; }
-  .rich h1, .rich h2, .rich h3, .rich h4 { margin: 16px 0 8px; font-size: 15px; line-height: 22px; font-weight: 700; }
-  .rich ul, .rich ol { margin: 0 0 10px; padding-left: 20px; }
-  .rich a { color: var(--accent); }
-  .rich img { display: block; max-width: 100%; height: auto; margin: 0 0 12px; border-radius: var(--r-sm); }
-  .image-missing { display: block; margin: 0 0 12px; padding: 12px 14px; border-radius: var(--r-sm); background: var(--sunken); font-size: 13px; line-height: 19px; color: var(--text-2); }
-  .rich hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
-  .rich blockquote { margin: 0 0 10px; padding: 0 0 0 12px; color: var(--text-2); }
-  /* 넓은 표는 상자 안에서만 가로로 밀린다(화면 전체가 밀리지 않게) */
-  .rich table { display: block; max-width: 100%; overflow-x: auto; margin: 0 0 12px; border-collapse: collapse; font-size: 13px; line-height: 19px; }
-  .rich th, .rich td { padding: 6px 8px; border: 1px solid var(--line); vertical-align: top; text-align: left; }
-  .rich th { background: var(--sunken); font-weight: 600; }
+  /* 상세 본문은 Tailwind 클래스로 옮겼다(notice-detail.tsx, cls.ts). 상세 칸이 비었을 때의 안내 글만 남긴다. */
   .detail-note { margin-top: 20px; font-size: 13px; line-height: 19px; color: var(--text-3); }
-  /* 학교가 고친 글: 마감 줄 아래 한 줄. 경고가 아니라 사실이라 조용한 글자색(DESIGN 8절, 문제가 없는데 ! 금지) */
-  .detail-change { margin-top: 4px; font-size: 13px; line-height: 19px; color: var(--text-2); }
-  /* 영어 공지의 원문 제목: 옮긴 제목 아래 한 줄, 조용한 글자색 */
-  .detail-original { margin-top: 4px; font-size: 13px; line-height: 19px; color: var(--text-3); }
   .detail-empty { margin: 0; padding: 24px 32px; }
-  .detail-note.first { margin: 0 0 10px; }
-  .body-text .detail-note { font-size: 13px; line-height: 19px; color: var(--text-2); }
 
   /* 단축키 표시(Primer KeybindingHint 참고): 키 하나에 kbd 하나, 사방 같은 1px 테두리, 작은 흐린 글자 */
   .kbd-group { display: inline-flex; gap: 4px; }

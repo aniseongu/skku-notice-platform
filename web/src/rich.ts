@@ -1,6 +1,7 @@
 // 서버가 nh3로 정제한 본문 HTML을 화면에 그리기 전에 한 번 더 거른다(D-016).
 // 학교 게시판에서 온 내용이라 허용 목록 밖의 태그, 속성, 주소는 모두 버린다.
 import DOMPurify from 'dompurify';
+import { IMAGE_MISSING_CLASS } from './cls';
 
 const ALLOWED_TAGS = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
   'a', 'img', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'hr', 'span', 'div'];
@@ -43,7 +44,7 @@ export function replaceBrokenImage(event: Event): void {
     return;
   }
   const note = document.createElement('span');
-  note.className = 'image-missing';
+  note.className = IMAGE_MISSING_CLASS;
   note.textContent = IMAGE_MISSING;
   image.replaceWith(note);
 }

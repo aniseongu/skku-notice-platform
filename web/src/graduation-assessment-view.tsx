@@ -1,6 +1,7 @@
 // 공지 상세의 "졸업요건 확인". 서버가 수집할 때 미리 판정해 두고, 이 화면은 결과를 글로만 보여 준다(버튼 없음).
 // 영역 이름, 판정 키워드(되면 초록·안 되면 빨강), 이유가 한 문단에 이어진다. 색만으로 구분하지 않도록 판정도 글로 쓴다.
 import { useState } from 'react';
+import { DETAIL_SECTION, SECTION_TITLE } from './cls';
 import { STATUS_TEXT, displayStatus, jobNote, reasonOf, type GraduationAssessment, type Track, type VisibleTracks } from './graduation-assessment';
 
 export interface GraduationModel {
@@ -49,8 +50,8 @@ function Result({ name, track, job = false }: { name: string; track: Track; job?
 export function GraduationSection({ model }: { title: string; model: GraduationModel }) {
   const { assessment, error } = model;
   const ready = assessment?.state === 'ready' ? assessment : null;
-  return <section className="detail-section grad" aria-labelledby="sec-grad">
-    <h3 id="sec-grad">인턴십 요건 확인</h3>
+  return <section className={`${DETAIL_SECTION} grad`} aria-labelledby="sec-grad">
+    <h3 id="sec-grad" className={SECTION_TITLE}>인턴십 요건 확인</h3>
     {!ready && !error ? <p className="m-0 text-[14px] leading-[21px] text-ink-3" role="status">내 인턴십 요건에 맞는지 확인하고 있어요</p> : null}
     {ready ? <>
       {model.tracks.p3 && ready.university3p ? <Result name="3품 인턴십" track={ready.university3p} /> : null}
