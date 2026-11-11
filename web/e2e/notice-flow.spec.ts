@@ -245,7 +245,7 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   expect(await screen.innerText()).not.toContain(key);
   await expect(screen.getByLabel('Gemini 키', { exact: true })).toHaveCount(0);
   await withApp(page, { byokStatus: { keyHint: 'DDDD', model: 'm', disabled: true, lastError: 'Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요.', usedToday: 0 } });
-  await expect(screen.locator('[data-provider], .setting', { hasText: 'Gemini 키' }).first().getByText('키가 거절됐어요')).toBeVisible();
+  await expect(screen.locator('[data-provider], .setting', { hasText: 'Gemini 키' }).first().getByText('키를 확인해 주세요')).toBeVisible();
   await screen.getByRole('button', { name: 'Gemini 키 연결 끊기' }).click();
   expect(await calls(page)).toEqual([['remove']]);
   // 아이캠퍼스 토큰도 같은 흐름이다. 형식이 맞지 않으면 저장할 수 없다.

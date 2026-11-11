@@ -749,7 +749,7 @@ function CanvasRow({ model }: { model: SettingsModel }) {
       <span className="field-note">지금은 토큰을 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
     </KeyRow>;
   }
-  return <><SecretRow name="아이캠퍼스 토큰" help={help} placeholder="숫자~로 시작하는 토큰" status={byok.canvas} loading={byok.loading} busy={byok.canvasBusy}
+  return <><SecretRow name="아이캠퍼스 토큰" help={help} placeholder="토큰을 붙여 넣어 주세요" status={byok.canvas} loading={byok.loading} busy={byok.canvasBusy}
     labels={{ empty: '연결 안 됨', saved: '연결됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '연결하기', edit: '바꾸기', remove: '연결 끊기', save: '연결하기' }}
     error={byok.canvasError} onRegister={byok.registerCanvas} onRemove={byok.removeCanvas} guide={null}
     valid={(value) => /^[0-9A-Za-z~_-]{16,200}$/.test(value)} />
