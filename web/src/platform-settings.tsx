@@ -648,7 +648,7 @@ function ProgramEditor({ programs, ready, onChange }: { programs: Program[]; rea
       <p className="setting-name m-0">{editing === 'main' ? '주전공을 골라 주세요' : '복수전공을 골라 주세요'}</p>
       <button type="button" className="text-button min-h-[44px] px-2" onClick={() => setEditing(null)}>닫기</button>
     </div>
-    <ProgramPicker current={editing === 'main' ? main : null} onPick={pick} listClass="max-h-[min(55vh,420px)] overflow-y-auto" />
+    <ProgramPicker current={editing === 'main' ? main : null} onPick={pick} lead={false} listClass="max-h-[min(55vh,420px)] overflow-y-auto" />
   </div>;
   return <>
     <Setting name="주전공" help={main ? name(main) : '아직 없어요'}>
