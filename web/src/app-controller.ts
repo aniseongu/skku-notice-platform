@@ -1398,6 +1398,8 @@ export class AppController extends Reactive {
     if (entering) history.pushState({ view: 'settings', depth: 1 }, '', `${location.pathname}?view=settings`);
     else if (view !== 'settings') history.replaceState(null, '', `${location.pathname}?tab=${view}`);
     this.selectedId = null;
+    // 탭을 옮기면 상세 칸은 닫고 목록만 보여 준다(첫 공지가 저절로 열려 읽은 글로 오해되지 않게). 사용자가 정해 둔 열림 설정은 그대로 두고 이번만 닫는다.
+    if (view !== 'settings') this.detailOpen = false;
     window.scrollTo({ top: 0 });
     qsel('.list-pane')?.scrollTo({ top: 0 });
   }

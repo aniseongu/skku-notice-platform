@@ -1247,3 +1247,18 @@ test('first-run setup keeps answers when going back and forward, and a stored "n
   await dialog.getByRole('button', { name: '다음' }).click();
   await expect(dialog.getByRole('radio', { name: '없어요', exact: true })).toHaveAttribute('aria-checked', 'true');
 });
+
+test('switching the tab shows only the list (detail pane closed, no notice opened or marked read); a row click opens the detail again', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 800 });
+  await page.goto('/?api=sample/api/v1');
+  const rows = page.locator('notice-rows-screen a.row');
+  await rows.first().waitFor();
+  const pane = page.locator('.app');
+  await page.getByRole('button', { name: /인턴 공고/ }).first().click();
+  await expect(pane).toHaveClass(/no-detail/);                                   // 인턴 공고: 목록만
+  await page.getByRole('button', { name: /성대 공지/ }).first().click();
+  await expect(pane).toHaveClass(/no-detail/);                                   // 성대 공지: 목록만
+  await expect(page.locator('notice-rows-screen a.row[aria-current="true"]')).toHaveCount(0);
+  await rows.first().click();
+  await expect(pane).not.toHaveClass(/no-detail/);                               // 행을 누르면 상세가 열린다
+});
