@@ -76,3 +76,21 @@ export function Avatar({ src, size = 48 }: { src?: string | null; size?: number 
       : <svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="9" r="4.2" /><path d="M3.5 22c.6-4.9 4.3-8 8.5-8s7.9 3.1 8.5 8z" /></svg>}
   </span>;
 }
+
+/** 대학(묶음) 고르기: 2열 격자다. 17개를 한 줄씩 늘어놓으면 스크롤해야 해서 한 화면에 들어오게 하고, 홀수 마지막 칸은 전체 폭으로 둔다. 전공 고르기와 게시판 추가가 같이 쓴다. */
+export function GroupGrid({ label, names, onPick }: { label: string; names: readonly string[]; onPick: (name: string) => void }) {
+  return <div role="group" aria-label={label} className="grid grid-cols-2 gap-2">
+    {names.map((name) => <button key={name} type="button" onClick={() => onPick(name)}
+      className="flex min-h-[48px] items-center justify-between gap-1 rounded-md border border-line bg-surface px-3 text-left text-[14px] font-medium text-ink break-keep [&:last-child:nth-child(odd)]:col-span-2">
+      <span>{name}</span><span className="choice-chevron" aria-hidden="true" /></button>)}
+  </div>;
+}
+
+/** 고른 묶음(대학)을 위에 보이고 눌러서 다른 묶음으로 돌아간다. 긴 목록 아래까지 내려가지 않고 같은 자리에서 되돌아간다. */
+export function BackToGroups({ current, noun = '대학', onBack }: { current: string; noun?: string; onBack: () => void }) {
+  return <button type="button" aria-label={`다른 ${noun} 고르기`} onClick={onBack}
+    className="flex min-h-[48px] w-full items-center justify-between gap-2 rounded-md border border-line bg-surface px-3 text-left text-[15px] font-semibold text-ink">
+    <span className="flex items-center gap-2"><span className="choice-chevron rotate-180" aria-hidden="true" />{current}</span>
+    <span className="text-[14px] font-normal text-ink-2">다른 {noun} 고르기</span>
+  </button>;
+}

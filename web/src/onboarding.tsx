@@ -12,7 +12,7 @@ import {
   stepIndex, toggleValue, withPrograms, type Draft, type DoubleAnswer, type Step,
 } from './onboarding-flow';
 import { APP_NAME } from './brand';
-import { Card, ChipGroup, ChoiceList, Segmented, SwitchRow } from './ui';
+import { BackToGroups, Card, ChipGroup, ChoiceList, GroupGrid, Segmented, SwitchRow } from './ui';
 
 const STEP_LABELS = ['주전공', '복수전공', '학교 정보', '인턴십', '받을 공지', '알림', 'AI 키'] as const;
 
@@ -36,14 +36,8 @@ export function ProgramPicker({ onPick, current, listClass = '', lead = true }: 
   useEffect(() => { document.querySelector('.onb-main')?.scrollTo({ top: 0 }); listRef.current?.scrollTo({ top: 0 }); }, [college]);
   if (!found) {
     return <div className="onb-group">
-      {lead ? <p className="onb-lead">대학을 먼저 고르면 학과가 나와요</p> : null}
-      {/* 대학은 17개라 한 줄씩 늘어놓으면 스크롤해야 한다. 2열로 두어 한 화면에 모두 보이게 한다. */}
       <div ref={listRef} className={listClass}>
-        <div role="group" aria-label="대학 선택" className="grid grid-cols-2 gap-2">
-          {COLLEGES.map((item) => <button key={item.name} type="button" onClick={() => { setCollege(item.name); setQuery(''); }}
-            className="flex min-h-[48px] items-center justify-between gap-1 rounded-md border border-line bg-surface px-3 text-left text-[14px] font-medium text-ink break-keep">
-            <span>{item.name}</span><span className="choice-chevron" aria-hidden="true" /></button>)}
-        </div>
+        <GroupGrid label="대학 선택" names={COLLEGES.map((item) => item.name)} onPick={(name) => { setCollege(name); setQuery(''); }} />
       </div>
     </div>;
   }
@@ -51,10 +45,7 @@ export function ProgramPicker({ onPick, current, listClass = '', lead = true }: 
   const noDepartments = found.departments.length === 0;
   const departments = filterDepartments(found.departments, query);
   return <div className="onb-group">
-    <button type="button" aria-label="다른 대학 고르기" onClick={() => setCollege(null)}
-      className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-md border border-line bg-surface px-3 text-left text-[15px] font-semibold text-ink">
-      <span>{found.name}</span><span className="text-[13px] font-normal text-ink-3">다른 대학 고르기</span>
-    </button>
+    <BackToGroups current={found.name} onBack={() => setCollege(null)} />
     {found.departments.length > SEARCH_THRESHOLD
       ? <input type="search" className="onb-search" aria-label="학과 검색" placeholder="학과 이름으로 찾기" autoComplete="off"
         value={query} onChange={(event) => setQuery(event.currentTarget.value)} /> : null}

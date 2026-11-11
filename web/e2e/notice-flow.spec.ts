@@ -147,7 +147,7 @@ test('notification settings show each device state and call the right actions', 
   expect(await calls(page)).toEqual([['enable']]);
 });
 
-test('board subscriptions are switches grouped by college with search', async ({ page }) => {
+test('board subscriptions: my boards are switches, and more boards are added college first like choosing a major', async ({ page }) => {
   await settingsAt(page, '&section=notifications');
   const screen = page.locator('platform-settings-screen');
   await withApp(page, { authUserId: 'account-a', subscriptions: ['skku-notice01'], toggleSubscription: 'fn:toggle' });
@@ -155,14 +155,25 @@ test('board subscriptions are switches grouped by college with search', async ({
   await expect(mine).toHaveCount(1);
   await expect(mine.first()).toHaveAttribute('aria-checked', 'true');
   await mine.first().click();
-  await screen.locator('details.connection-manual > summary').click();
-  const more = screen.getByRole('switch', { checked: false }).filter({ hasNotText: '아이캠퍼스' });
-  await expect(more.first()).toBeVisible();
+  // 접힌 줄을 누르면 전공 고르기와 같은 대학 격자가 펼쳐진다(스위치 목록이 아니다).
+  await expect(screen.getByRole('group', { name: '대학 선택' })).toBeHidden();
+  await screen.locator('details.board-more-list > summary').click();
+  const colleges = screen.getByRole('group', { name: '대학 선택' }).getByRole('button');
+  await expect(colleges.first()).toBeVisible();
+  expect(await colleges.count()).toBeGreaterThanOrEqual(1);   // 샘플 데이터는 묶음이 적다
+  // 검색하면 대학을 거치지 않고 이름이 맞는 게시판이 바로 나온다.
   const search = screen.getByRole('searchbox', { name: '게시판 검색' });
   await search.fill('없는게시판이름');
   await expect(screen.getByText("'없는게시판이름'에 맞는 게시판이 없어요")).toBeVisible();
   await search.fill('');
-  await more.first().click();
+  // 대학을 고르면 그 대학의 게시판이 나오고, 맨 위의 "다른 대학 고르기"로 같은 자리에서 돌아간다.
+  const name = (await colleges.first().innerText()).trim();
+  await colleges.first().click();
+  await expect(screen.getByRole('group', { name: `${name} 게시판` })).toBeVisible();
+  await screen.getByRole('button', { name: '다른 대학 고르기' }).click();
+  await expect(screen.getByRole('group', { name: '대학 선택' })).toBeVisible();
+  await colleges.first().click();
+  await screen.getByRole('group', { name: `${name} 게시판` }).getByRole('button').first().click();
   const recorded = await calls(page);
   expect(recorded[0]).toEqual(['toggle', 'skku-notice01', false]);
   expect(recorded[1][0]).toBe('toggle');
@@ -841,13 +852,14 @@ test('core settings tasks finish within their click budget and in the expected o
   expect((await calls(page))[0]).toEqual(['saveProfile', expect.objectContaining({ year: 3 })]);
   await page.goBack();
   await hub();
-  // 5) 게시판 하나 더 받기: 알림 → 게시판 더 보기 → 스위치 = 3클릭
+  // 5) 게시판 하나 더 받기: 알림 → 게시판 더 보기 → 대학 → 게시판 = 4클릭(전공 고르기와 같은 흐름). 검색하면 대학을 건너뛴다.
   await withApp(page, {});
   log.length = 0;
   await click('알림', screen.getByRole('link', { name: /알림/ }).first());
-  await click('게시판 더 보기', screen.locator('details.connection-manual > summary'));
-  await click('게시판 켜기', screen.getByRole('switch', { checked: false }).filter({ hasNotText: '아이캠퍼스' }).first());
-  expect(log.length).toBe(3);
+  await click('게시판 더 보기', screen.locator('details.board-more-list > summary'));
+  await click('대학', screen.getByRole('group', { name: '대학 선택' }).getByRole('button').first());
+  await click('게시판 추가', screen.locator('.choice-list[aria-label$=" 게시판"] button').first());
+  expect(log.length).toBe(4);
   expect((await calls(page)).some((call) => call[0] === 'toggle' && call[2] === true)).toBe(true);
 });
 

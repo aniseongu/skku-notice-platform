@@ -8,7 +8,7 @@ import type { AiKeyStatus, AiPreferences, AiProvider } from './ai-providers';
 import { type ByokStatus, type CanvasStatus } from './byok';
 import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, validDeviceName, type CanvasMode, type Device } from './devices';
 import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
-import { MAX_PROGRAMS, programKey, programLabel, type Program } from './skku-programs';
+import { COLLEGES, MAX_PROGRAMS, programKey, programLabel, type Program } from './skku-programs';
 import { ProgramPicker } from './onboarding';
 import { BOARD_CATALOG, COLLEGE_BOARD, DEPARTMENT_BOARD, OTHER_BOARDS } from './skku-boards';
 // 순서 바꾸기는 dnd-kit(MIT)을 쓴다: 손잡이로 끌기(마우스·터치)와 키보드(Space로 집고 방향키로 옮기고 Space로 놓기), 낭독기 안내가 들어 있다.
@@ -16,7 +16,7 @@ import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, 
 import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Avatar, SwitchRow } from './ui';
+import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
 
 export interface SettingsModel {
   configured: boolean;
@@ -237,7 +237,10 @@ const permissionText = (status: SettingsModel['pushStatus']) =>
       : Notification.permission === 'granted' ? '허용' : Notification.permission === 'denied' ? '차단' : '아직 선택하지 않음';
 
 /** 받지 않는 게시판 고르기. 받는 게시판은 위의 순서 목록에서 끄고 옮긴다. */
+/** 게시판 추가(접힌 "게시판 더 보기"를 누르면 열린다): 전공 고르기와 같은 방식이다. 대학(묶음)을 2열 격자로 먼저 고르고, 그 묶음의 게시판을 눌러 바로 추가한다.
+ * 검색하면 대학을 거치지 않고 이름이 맞는 게시판이 바로 나온다. 추가하면 위 "받을 게시판"에 들어가고 이 목록에서는 빠진다. */
 function BoardGroups({ model }: { model: SettingsModel }) {
+  const [group, setGroup] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const collegeOf = useMemo(() => {
     const map = new Map<string, string>();
@@ -248,29 +251,43 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   const known = new Set(BOARD_CATALOG.map((board) => board.id));
   const otherGroup = new Map(OTHER_BOARDS.map((board) => [board.id, board.group]));
   const mine = model.sources.filter((source) => model.subscriptions.includes(source.id));
-  const needle = query.replace(/\s+/g, '').toLowerCase();
-  const others = model.sources.filter((source) => !model.subscriptions.includes(source.id)
-    && (!needle || source.label.replace(/\s+/g, '').toLowerCase().includes(needle)));
+  const others = model.sources.filter((source) => !model.subscriptions.includes(source.id));
   const groups = new Map<string, typeof others>();
   for (const source of others) {
-    const group = otherGroup.get(source.id) ?? collegeOf.get(source.id) ?? (known.has(source.id) ? '기타' : '학교 공통');
-    groups.set(group, [...(groups.get(group) ?? []), source]);
+    const name = otherGroup.get(source.id) ?? collegeOf.get(source.id) ?? (known.has(source.id) ? '기타' : '학교 공통');
+    groups.set(name, [...(groups.get(name) ?? []), source]);
   }
-  // 부트캠프처럼 전공과 상관없는 게시판은 단과대·학과 묶음 뒤에 둔다.
-  const ordered = [...groups].sort(([a], [b]) => Number([...otherGroup.values()].includes(a)) - Number([...otherGroup.values()].includes(b)));
+  // 대학은 학교의 단과대학 순서로, 그 뒤에 학교 공통·부트캠프 같은 묶음을 둔다.
+  const collegeOrder = COLLEGES.map((college) => college.name);
+  const names = [...groups.keys()].sort((a, b) => {
+    const rank = (name: string) => (collegeOrder.includes(name) ? collegeOrder.indexOf(name) : 100 + [...otherGroup.values()].indexOf(name) + (otherGroup.size ? 0 : 0));
+    return rank(a) - rank(b);
+  });
+  const needle = query.replace(/\s+/g, '').toLowerCase();
+  const found = needle ? others.filter((source) => source.label.replace(/\s+/g, '').toLowerCase().includes(needle)) : [];
   const busy = model.loading;
-  return <>
-    {others.length === 0 && !query ? <p className="field-note">모든 게시판을 받고 있어요</p> : <details className="connection-manual group board-more-list" open={mine.length === 0}>
-      <summary className={SUMMARY}>게시판 더 보기 ({others.length}개){chevron('M6 9l6 6 6-6', CHEVRON)}</summary>
-      <input className="input" type="search" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off" value={query}
+  const current = group && groups.has(group) ? group : null;   // 묶음의 게시판을 모두 추가했으면 대학 고르기로 돌아간다
+  const row = (source: (typeof others)[number]) => <button key={source.id} type="button" className="choice" disabled={busy} aria-label={`${source.label} 추가`} onClick={() => model.toggle(source.id, true)}>
+    <span>{source.label}</span><span className="text-[14px] font-semibold text-accent" aria-hidden="true">추가</span></button>;
+  if (others.length === 0) return <p className="field-note">모든 게시판을 받고 있어요</p>;
+  // 접힌 "게시판 더 보기" 줄을 누르면 펼쳐진다. 받는 게시판이 하나도 없으면 처음부터 펼쳐 둔다.
+  return <details className="connection-manual group board-more-list" open={mine.length === 0}>
+    <summary className={SUMMARY}>게시판 더 보기 ({others.length}개){chevron('M6 9l6 6 6-6', CHEVRON)}</summary>
+    <div className="flex flex-col gap-3 pt-3">
+      <input className="input" type="search" aria-label="게시판 검색" placeholder="학과나 대학 이름으로 찾기" autoComplete="off" value={query}
         onChange={(event) => setQuery(event.currentTarget.value)} />
-      {ordered.map(([group, items]) => <div className="board-group" key={group} role="group" aria-label={group}>
-        <p className="board-group-title">{group}</p>
-        {items.map((source) => <SwitchRow key={source.id} label={source.label} checked={false} disabled={busy} onChange={() => model.toggle(source.id, true)} />)}
-      </div>)}
-      {others.length === 0 ? <p className="field-note" role="status">{query ? `'${query}'에 맞는 게시판이 없어요` : '모든 게시판을 받고 있어요'}</p> : null}
-    </details>}
-  </>;
+      {needle
+        ? found.length
+          ? <div className="choice-list" role="group" aria-label="검색 결과">{found.map(row)}</div>
+          : <p className="field-note" role="status">'{query}'에 맞는 게시판이 없어요. 다른 단어로 찾아보세요.</p>
+        : current
+          ? <>
+            <BackToGroups current={current} onBack={() => setGroup(null)} />
+            <div className="choice-list" role="group" aria-label={`${current} 게시판`}>{(groups.get(current) ?? []).map(row)}</div>
+          </>
+          : <GroupGrid label="대학 선택" names={names} onPick={setGroup} />}
+    </div>
+  </details>;
 }
 
 /** 하루 요약 시간: 원본처럼 오전·오후, 시, 분을 따로 고른다. 바꾸는 즉시 저장한다. */
