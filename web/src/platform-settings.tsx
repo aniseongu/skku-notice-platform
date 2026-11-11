@@ -614,7 +614,8 @@ function AboutMe({ model }: { model: SettingsModel }) {
         <span id={`count-${key}`} className={`counter [align-self:flex-end] text-[12px] tabular-nums ${count > PROFILE_TEXT_LIMIT ? 'over text-danger' : 'text-ink-3'}`} aria-live="polite">{count}/{PROFILE_TEXT_LIMIT}</span>
       </Setting>;
     })}
-    <Setting name="저장">
+    {/* 이름과 단추가 한 줄뿐인 줄은 PC에서 세로 가운데로 맞춘다(이름이 위에 붙고 단추만 아래로 처지지 않게). */}
+    <Setting name="저장" className="min-[720px]:items-center!">
       <button type="button" className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!ready || !changed || over}
         onClick={() => model.saveProfile({ ...profile, interests: drafts.interests.trim(), wants: drafts.wants.trim(), avoids: drafts.avoids.trim() })}>저장하기</button>
       {over ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{PROFILE_TEXT_LIMIT}자 이하로 적어 주세요</p> : null}
@@ -887,6 +888,7 @@ function Feedback({ model }: { model: SettingsModel }) {
   // 막힌 단추 아래에는 풀리는 조건을 한 줄로 적는다(메일 오류는 메일 칸 아래에 따로 보인다).
   const reason = state === 'limit' ? '오늘은 5번까지 보낼 수 있어요. 내일 다시 보내 주세요' : problem && !mailProblem ? '내용을 적으면 보낼 수 있어요' : mailProblem ? '메일 주소를 고치면 보낼 수 있어요' : '';
   const over = body.length > FEEDBACK_LIMIT;
+  const message = state === 'ok' ? '보냈어요. 남겨 주셔서 고마워요' : state === 'error' ? '보내지 못했어요. 잠시 뒤 다시 시도해 주세요' : reason || '운영자만 읽을 수 있어요. 하루 5번까지 보낼 수 있어요';
   return <div className={wrap}>
     <Back model={model} />
     <section aria-label="문의 내용" className="mt-[24px]">
@@ -904,16 +906,12 @@ function Feedback({ model }: { model: SettingsModel }) {
             onBlur={() => setMailTouched(true)} onChange={(event) => { setEmail(event.currentTarget.value); edited(); }} />
           {mailTouched && mailProblem ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">메일 주소 형식이 맞는지 확인해 주세요</p> : null}
         </Setting>
+        {/* 보내기도 다른 설정 줄과 같은 모양이다: 이름과 설명은 왼쪽, 단추는 오른쪽. 안내(한도, 막힌 이유, 결과)는 단추 위아래가 아니라 이 줄의 설명 한 곳에서만 말한다. */}
+        <Setting name="운영자에게 보내기" className="min-[720px]:items-center!" help={<span className={`${state === 'ok' ? 'font-semibold text-accent' : state === 'error' ? 'text-danger' : ''}`} role={state === 'error' ? 'alert' : 'status'}>{message}</span>}>
+          <button type="button" className="solid-button inline-flex items-center justify-center py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2 min-h-[44px] px-4" disabled={blocked} onClick={() => { void submit(); }}>{state === 'sending' ? '보내고 있어요' : '보내기'}</button>
+        </Setting>
       </div>
-      <p className="m-0 mt-[12px] px-[4px] text-[13px] leading-[19px] text-ink-3 min-[720px]:px-0 min-[720px]:text-right">운영자만 읽을 수 있어요. 하루 5번까지 보낼 수 있어요</p>
     </section>
-    {/* 보내기는 휴대폰에서 엄지 자리(아래 고정)에 둔다. 키보드가 올라와도 가려지지 않게 화면 바닥에 붙는다. */}
-    <div className="sticky bottom-0 z-[1] mt-[16px] flex flex-col gap-[8px] bg-bg pt-[12px] pb-[calc(12px+env(safe-area-inset-bottom))] max-[719px]:-mx-[var(--gutter)] max-[719px]:px-[var(--gutter)] max-[719px]:border-t max-[719px]:border-line min-[720px]:static min-[720px]:items-end min-[720px]:bg-transparent min-[720px]:p-0 min-[720px]:text-right">
-      <button type="button" className="solid-button inline-flex items-center justify-center py-0 rounded-md border-0 bg-accent text-on-accent text-[16px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2 min-h-[52px] w-full px-4 min-[720px]:w-[240px]" disabled={blocked} onClick={() => { void submit(); }}>{state === 'sending' ? '보내고 있어요' : '보내기'}</button>
-      {state === 'ok' ? <p className="m-0 text-[14px] leading-[20px] font-semibold text-accent" role="status">보냈어요. 남겨 주셔서 고마워요</p> : null}
-      {state === 'error' ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">보내지 못했어요. 잠시 뒤 다시 시도해 주세요</p> : null}
-      {reason && state !== 'ok' && state !== 'error' ? <p className="m-0 text-[14px] leading-[20px] text-ink-2" role="status">{reason}</p> : null}
-    </div>
     <p className="m-0 mt-[8px] text-[14px] leading-[20px] text-ink-2"><a className="inline-flex min-h-[44px] items-center text-accent underline" href="https://github.com/aniseongu/skku-notice-platform/issues" target="_blank" rel="noopener noreferrer">GitHub에도 남길 수 있어요<span className="visually-hidden"> (새 창으로 열려요)</span></a></p>
   </div>;
 }
