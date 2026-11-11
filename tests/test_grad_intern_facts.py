@@ -346,3 +346,37 @@ def test_english_job_list_is_non_software():
 def test_period_with_cjk_year_month_marks():
     found = gf.static_facts("t", "근무 기간\n2027年 1月 11일 ~ 6月 18일")
     assert str(found["start_date"]) == "2027-01-11" and str(found["end_date"]) == "2027-06-18"
+
+
+KBIZ_OCR = (
+    "2027년\n채용공고\n중소기업중앙회\n정규직(5급)채용연계형\n접수기간\n2026.11.13.(금)-\n지원하기\n일반사무26명\n11.27.(금)17:00\n"
+    "공고목차보기11개항목\n채용규모\n직무기술서\n일반사무\n26명\n별첨참조\n02.지원자격\n자격요건\n·다음조건을모두충족하는자\n"
+    "병역필 또는면제자로서 해외여행에 결격사유가 없는자\nㅇ본부및 지역본부근무 가능한자\n"
+    "·ADP(데이터분석전문가), DAP(데이터아키텍처전문가), 정보관리기술사,\n"
+)
+
+
+def test_table_style_office_role_is_read_even_when_the_label_and_value_are_on_different_lines():
+    """표로 된 공고에서 모집분야 값이 줄이 갈라져 있어도, 뚜렷한 사무 직무 표기는 소프트웨어가 아닌 직무로 읽는다."""
+    found = gf.static_task_category("[중소기업중앙회]2027년정규직(5급)채용연계형인턴직원채용", KBIZ_OCR)
+    assert found is not None and found[0] == "non_software"
+    assert found[1] in KBIZ_OCR   # 근거 글귀는 원문에 실제로 있다
+    # 이름표 바로 다음 줄에 값이 있는 형태만 있어도 읽는다.
+    only_label = gf.static_task_category("인턴 채용", "채용규모\n직무기술서\n일반사무\n별첨참조\n")
+    assert only_label is not None and only_label[0] == "non_software"
+
+
+def test_office_role_rule_does_not_decide_when_it_roles_exist_or_the_words_are_just_prose():
+    # 디지털·IT 직무가 함께 있으면 코드로 정하지 않는다(섞인 직무를 단정하지 않는다).
+    mixed = gf.static_task_category("[은행] 인턴", "채용분야\n일반사무 250명\n디지털·IT(50명)\n")
+    assert mixed is None or mixed[0] == "mixed_it"
+    dev = gf.static_task_category("인턴", "모집분야\n일반사무 10명\n앱 개발 5명\n")
+    assert dev is None or dev[0] != "non_software"
+    # 직무 표기가 아닌 문장(사무실, 인사말)에는 반응하지 않는다.
+    assert gf.static_task_category("인턴 모집", "사무실 근무 환경이 쾌적합니다. 인사드립니다. 행정 절차 안내") is None
+
+
+def test_the_facts_for_the_office_role_posting_name_the_task_and_stop_asking_for_it():
+    extracted = gf.build_facts("[중소기업중앙회]2027년정규직(5급)채용연계형인턴직원채용", KBIZ_OCR, None)
+    assert extracted.facts.task_category == "non_software"
+    assert "담당 업무" not in extracted.missing   # "공고에 없어 확인하지 못한 내용"에 더 이상 나오지 않는다

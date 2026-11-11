@@ -433,3 +433,28 @@ def test_external_postings_also_keep_their_first_seen_date(monkeypatch):
     monkeypatch.setattr(job.time, "sleep", lambda _: None)
     job.run_external_collection(settings, store, NOW, post=lambda *a: None)
     assert store.rows["intern/9"]["posted_on"] == "2026-11-05"
+
+
+def test_purge_expired_calls_the_database_function_and_tolerates_odd_replies():
+    from skku_notice.scheduled_collection import NoticeStore
+
+    seen = []
+
+    class Resp:
+        def __init__(self, data):
+            self._data = data
+
+        def json(self):
+            return self._data
+
+    class Fake(NoticeStore):
+        def __init__(self, reply):
+            self.reply = reply
+
+        def _request(self, method, path, **kwargs):
+            seen.append((method, path, kwargs.get("json")))
+            return Resp(self.reply)
+
+    assert Fake({"notices": 3, "ocr_cache": 1}).purge_expired() == {"notices": 3, "ocr_cache": 1}
+    assert seen[0] == ("POST", "rpc/purge_expired_data", {})   # 인자 없이 기본 기준을 쓴다
+    assert Fake(None).purge_expired() == {}

@@ -127,6 +127,12 @@ class NoticeStore:
                 headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
             )
 
+    def purge_expired(self) -> dict:
+        """보관 기간이 지난 공지와 딸린 데이터를 지운다(마감 30일 뒤, 마감 없으면 90일 뒤, 저장한 공지 제외).
+        배치라 수집 때마다 불러도 가볍다. 지운 번호는 기록해, 다시 수집돼도 새 글로 들어오지 않는다."""
+        data = self._request("POST", "rpc/purge_expired_data", json={}).json()
+        return data if isinstance(data, dict) else {}
+
     def close(self):
         self.client.close()
 
@@ -526,6 +532,14 @@ def main() -> int:
             # 실패해도 학교 수집 결과와 종료 코드에는 영향을 주지 않는다.
             external_count, _external_failed = run_external_collection(settings, store, now)
             count += external_count
+            # 보관 기간이 지난 데이터 정리. 실패해도 수집 결과에는 영향이 없다(함수가 아직 없으면 건너뛴다).
+            try:
+                purged = store.purge_expired()
+                if any(purged.values()):
+                    done = ", ".join(f"{name} {value}건" for name, value in purged.items() if value)
+                    print(f"정리: {done}", flush=True)
+            except StoreError as exc:
+                print(f"정리 건너뜀 ({type(exc).__name__})", flush=True)
         finally:
             store.close()
     except (OSError, ValueError, yaml.YAMLError, StoreError) as exc:

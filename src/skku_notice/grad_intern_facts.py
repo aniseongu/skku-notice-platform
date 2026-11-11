@@ -215,9 +215,23 @@ def squeeze(text: str) -> str:
 IT_TRACK = re.compile(r"디지털\s*[·ㆍ・,/]?\s*IT\s*(?:\(\s*\d+\s*명|관련|분야|직무|부문)|IT\s*(?:분야|직무)\s*(?:모집|지원|배치)")
 
 
+# 표로 된 공고(그림 글자 포함)는 "모집분야 | 일반사무 | 26명"처럼 이름표와 값이 다른 줄에 흩어져 "담당 업무: ..." 한 줄 형태로 읽히지 않는다.
+# 그래서 "<뚜렷한 사무·행정 직무> <n>명"과 "직무기술서/모집분야" 바로 다음 줄의 직무명을 따로 읽는다. 확정하는 것은 소프트웨어가 아닌 쪽뿐이고,
+# 개발·전산·IT·데이터 직무 표기가 하나라도 있으면 코드로 정하지 않는다(섞인 직무를 단정하지 않는다).
+_OFFICE_ROLE = (r"(?:일반\s*사무|사무\s*행정|행정\s*사무|사무\s*직|행정\s*직|사무|행정|경영\s*지원|사무\s*지원|영업|회계|인사|총무|마케팅|홍보|금융\s*일반)")
+ROLE_HEADCOUNT = re.compile(_OFFICE_ROLE + r"\s*\d{1,3}\s*명")
+ROLE_AFTER_LABEL = re.compile(r"(?:모집\s*(?:분야|직무|부문)|채용\s*(?:분야|직무)|직무\s*기술서)\s*[:：|]?\s*\n\s*" + _OFFICE_ROLE)
+IT_ROLE_MARK = re.compile(r"(?:개발|전산|정보\s*통신|IT|디지털|데이터|소프트웨어|SW)[^\n]{0,10}\d{1,3}\s*명")
+
+
 def static_task_category(title: str, body: str) -> tuple[str, str] | None:
     """(분야, 근거 문장) 또는 None. 코드만으로 뚜렷하게 정할 수 있을 때만 답한다."""
     body = squeeze(body)[:MAX_TEXT]
+    # 뚜렷한 직무 표기("일반사무 26명")가 가장 믿을 만한 근거다. 우대·가점 자격증 목록의 단어("데이터분석전문가")에 흔들리지 않게 먼저 본다.
+    role = ROLE_HEADCOUNT.search(body) or ROLE_AFTER_LABEL.search(body)
+    if role and not IT_TRACK.search(body) and not IT_ROLE_MARK.search(body):
+        quote = role.group(0)
+        return "non_software", quote.split("\n")[-1].strip() or quote   # 근거 문장은 원문에 있는 한 줄이어야 한다
     match = TASK_SECTION.search(body)
     scope = match.group(1) if match else f"{title}\n{body[:500]}"
     sw = {name: len(pattern.findall(scope)) for name, pattern in SW_WORDS.items() if pattern.search(scope)}
