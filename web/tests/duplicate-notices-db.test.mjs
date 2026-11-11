@@ -12,12 +12,14 @@ test('duplicate notices: first seen wins, school needs the same body, external n
       create table platform_sources (id text primary key, external boolean not null default false);
       create table platform_notices (id text primary key, source_id text not null, title text not null, posted_on date not null,
         first_seen timestamptz not null, body text, dup_key text);
+      create table platform_notice_images (notice_id text, image_url text, status text, content_sha256 text);
       create table user_source_subscriptions (user_id uuid, source_id text);
       create table user_notice_judgments (user_id uuid, notice_id text);
       create table user_notice_translations (user_id uuid, notice_id text);
       insert into platform_sources values ('skku','f'), ('biz','f'), ('cse','f'), ('ja','t'), ('lk','t');`.replace("'f'", 'false').replace("'f'", 'false').replace("'f'", 'false').replace("'t'", 'true').replace("'t'", 'true'));
     await db.exec('set check_function_bodies = off');
     await db.exec(await readFile(new URL('../../supabase/migrations/20261112110000_duplicate_notices.sql', import.meta.url), 'utf8'));
+    await db.exec(await readFile(new URL('../../supabase/migrations/20261112120000_duplicate_notices_image_only.sql', import.meta.url), 'utf8'));
     const long = '장학금 신청 안내입니다. 신청 기간과 제출 서류를 확인하세요. '.repeat(4);
     await db.exec(`insert into platform_notices (id, source_id, title, posted_on, first_seen, body) values
       ('skku/1','skku','[장학] 2026학년도 동계 장학금 신청 안내','2026-11-10','2026-11-10 01:00+00','${long}'),
@@ -55,5 +57,17 @@ test('duplicate notices: first seen wins, school needs the same body, external n
     assert.equal((await db.query("select count(*)::int n from user_notice_judgments where notice_id = 'skku/1'")).rows[0].n, 0);
     assert.equal((await db.query("select count(*)::int n from user_notice_translations")).rows[0].n, 0);
     assert.equal((await db.query("select count(*)::int n from user_notice_judgments where notice_id = 'biz/9'")).rows[0].n, 1);
+    // 본문이 사진뿐인 학교 글: 같은 사진이면 같은 글이고, 사진이 읽히기 전이나 다른 사진이면 합치지 않는다.
+    await db.exec(`insert into platform_notices (id, source_id, title, posted_on, first_seen, body) values
+      ('skku/20','skku','2026학년도 동계 현장실습 안내 포스터','2026-11-10','2026-11-10 01:00+00','—'),
+      ('biz/20','biz','2026학년도 동계 현장실습 안내 포스터','2026-11-10','2026-11-10 03:00+00',''),
+      ('cse/20','cse','2026학년도 동계 현장실습 안내 포스터','2026-11-10','2026-11-10 04:00+00','—');
+      insert into platform_notice_images values ('skku/20','a.png','ready','${'a'.repeat(64)}');`);
+    const key = async (id) => (await db.query('select dup_key k from platform_notices where id = $1', [id])).rows[0].k;
+    assert.match(await key('skku/20'), /:i/); assert.equal(await key('biz/20'), null);   // 그림이 읽히기 전에는 합치지 않는다
+    await db.exec(`insert into platform_notice_images values ('biz/20','b.png','ready','${'a'.repeat(64)}'), ('cse/20','c.png','ready','${'c'.repeat(64)}')`);
+    assert.equal(await key('biz/20'), await key('skku/20'));   // 같은 그림 → 같은 글(그림 해시가 생기면 열쇠를 다시 만든다)
+    assert.notEqual(await key('cse/20'), await key('skku/20')); // 다른 그림 → 다른 글
+    assert.equal(await loser('biz/20'), true); assert.equal(await loser('skku/20'), false); assert.equal(await loser('cse/20'), false);
   } finally { await db.close(); }
 });
