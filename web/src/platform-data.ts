@@ -13,7 +13,7 @@ export async function loadPublicFeed(client: SupabaseClient): Promise<NoticesFil
   const [sourceResult, noticeResult] = await Promise.all([
     readSources(),
     client.from('platform_notices')
-      .select('id,source_id,article_no,title,category,url,posted_on,pinned,deadline,first_seen,changed_at,change_kind,previous_title,dup_key')
+      .select('id,source_id,article_no,title,category,url,posted_on,pinned,deadline,first_seen,changed_at,change_kind,previous_title,dup_key,dup_text_key')
       .order('posted_on', { ascending: false }).order('first_seen', { ascending: false }).order('id', { ascending: false }).limit(1000),
   ]);
   if (sourceResult.error || noticeResult.error || !sourceResult.data?.length || !noticeResult.data?.length) return null;

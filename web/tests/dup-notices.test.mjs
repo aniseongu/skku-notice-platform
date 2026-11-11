@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { dropDuplicates } from '../src/dup-notices.ts';
 
-const notice = (id, key, seen, posted = '2026-11-10') => ({ id, source_id: id.split('/')[0], article_no: '1', title: 't', category: null, url: 'https://x', posted_on: posted, pinned: false, deadline: null, first_seen: seen, dup_key: key });
+const notice = (id, key, seen, posted = '2026-11-10', text = null) => ({ id, source_id: id.split('/')[0], article_no: '1', title: 't', category: null, url: 'https://x', posted_on: posted, pinned: false, deadline: null, first_seen: seen, dup_key: key, dup_text_key: text });
 
 test('같은 열쇠의 글은 가장 먼저 감지된 글 하나만 남긴다', () => {
   const list = [notice('biz/1', 's:a', '2026-11-11T01:00Z', '2026-11-11'), notice('skku/1', 's:a', '2026-11-10T01:00Z'), notice('cse/1', 's:b', '2026-11-10T05:00Z')];
@@ -22,4 +22,9 @@ test('게시일이 3일 넘게 떨어지면 다른 글이고, 열쇠가 없으�
 test('이 목록에 없는 게시판의 글은 대표가 되지 못한다(목록 안에서만 묶는다)', () => {
   const visible = [notice('biz/1', 's:a', '2026-11-11T01:00Z', '2026-11-11')];   // skku/1은 구독하지 않아 목록에 없다
   assert.deepEqual(dropDuplicates(visible).map((n) => n.id), ['biz/1']);
+});
+
+test('제목이 달라도 그림 글자 열쇠가 같으면 같은 글이고, 먼저 감지된 글이 대표다', () => {
+  const list = [notice('biz/1', 's:다른제목', '2026-11-11T01:00Z', '2026-11-11', 's:ocr1'), notice('skku/1', 's:제목', '2026-11-10T01:00Z', '2026-11-10', 's:ocr1'), notice('cse/1', 's:또다른', '2026-11-10T03:00Z', '2026-11-10', 's:ocr2')];
+  assert.deepEqual(dropDuplicates(list).map((n) => n.id), ['skku/1', 'cse/1']);
 });

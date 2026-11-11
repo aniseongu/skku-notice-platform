@@ -18,6 +18,8 @@ export interface Notice {
   first_seen: string | null;
   // 같은 공지를 여러 게시판에 올렸는지 알아보는 서버의 열쇠(제목, 학교 글은 본문 앞부분 포함). 없으면 합치지 않는다.
   dup_key?: string | null;
+  // 본문이 사진뿐인 글의 그림 글자(OCR)로 만든 열쇠. 제목이 달라도 이 열쇠가 같으면 같은 공지다.
+  dup_text_key?: string | null;
   // 영어 공지를 Gemini가 옮긴 제목(추가 필드). 없으면 원문 제목을 쓴다.
   title_ko?: string | null;
   // 제목에 마감이 없을 때 Gemini가 본문에서 읽은 날짜의 종류(추가 필드, D-023). 없으면 마감.

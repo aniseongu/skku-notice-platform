@@ -212,7 +212,7 @@ export function Onboarding({ app }: { app: AppController }) {
     title = 'AI를 연결해 주세요';
     lead = '두 곳 중 한 곳만 연결하면 돼요';
     const connected = !!app.byokStatus || app.aiKeys.length > 0;
-    body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]"><div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0"><AiRows byok={aiConnectModel(app)} /></div>
+    body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]"><div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0 min-[720px]:[&_.setting]:grid-cols-[minmax(0,1fr)] min-[720px]:[&_.setting]:gap-[8px]"><AiRows byok={aiConnectModel(app)} /></div>
       {app.onboardingError ? <p className="error-text text-[14px] text-danger" role="alert">{app.onboardingError}</p> : null}</div>;
     foot = <>
       {connected ? null : <p className="m-0 text-center text-[14px] text-ink-2" role="status">키를 하나 연결해 주세요</p>}
