@@ -6,6 +6,7 @@ import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } fro
 import { applyBoardOrder } from './board-order';
 import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, deadlinePassed, postedGroup, safeUrl, todayKst } from './data';
 import { APP_NAME } from './brand';
+import { installMode, isStandalone } from './install-hint';
 import { CHECKBOX, CHIP, CHIPS, CHIP_ADD } from './cls';
 import { authClient } from './auth';
 import { keywordCounts } from './keyword-counts';
@@ -194,7 +195,7 @@ function settingsModel(app: AppController) {
     signIn: () => { void app.signIn(); }, signOut: () => { void app.signOut(); },
     section: app.settingsSection, openSection: (section: string | null) => app.openSettingsSection(section),
     theme: app.theme, setTheme: (theme: 'auto' | 'light' | 'dark') => app.setTheme(theme),
-    canInstall: !!app.install, install: () => { void app.runInstall(); }, showShortcuts: () => { app.shortcutsOpen = true; },
+    canInstall: !!app.install && !isStandalone(), iosInstall: installMode(navigator.userAgent, isStandalone(), !!app.install) === 'ios', install: () => { void app.runInstall(); }, showShortcuts: () => { app.shortcutsOpen = true; },
     sources: app.sources.filter((source) => !source.external).map((source) => ({ id: source.id, label: boardName(source, source.id) })),
     boardOrder: { boards: applyBoardOrder(app.schoolSources(), app.boardOrder).map((source) => ({ id: source.id, label: boardName(source, source.id) })),
       status: app.authUserId && app.boardOrderAccount ? app.boardOrderStatus : '' as const, move: (ids: string[]) => app.setBoardOrder(ids) },

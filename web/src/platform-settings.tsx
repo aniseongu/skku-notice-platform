@@ -37,6 +37,8 @@ export interface SettingsModel {
   theme: 'auto' | 'light' | 'dark';
   setTheme: (theme: 'auto' | 'light' | 'dark') => void;
   canInstall: boolean;
+  /** iOS Safari: 설치 창이 없어 홈 화면 추가 방법만 알려 준다. */
+  iosInstall?: boolean;
   install: () => void;
   showShortcuts: () => void;
   // 게시판
@@ -208,6 +210,8 @@ function Overview({ model }: { model: SettingsModel }) {
       {model.canInstall ? <Setting name="앱 설치" help="홈 화면에서 바로 열어요" className="min-[720px]:hidden">
         <button type="button" className="ghost-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.install}>앱으로 설치하기</button>
       </Setting> : null}
+      {/* 로그인 뒤에도 설치는 팝업이나 배너로 다시 묻지 않고, 설정의 "화면"에서 원할 때 찾게 한다. 설치한 앱으로 열면 두 줄 모두 보이지 않는다. */}
+      {model.iosInstall && !model.canInstall ? <Setting name="앱 설치" help="공유 버튼에서 ‘홈 화면에 추가’를 고르면 앱처럼 쓸 수 있어요" className="min-[720px]:hidden" /> : null}
       <Setting name="단축키" help="키보드로 빠르게 이동해요" className="kbd-only">
         <button type="button" className="ghost-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" aria-keyshortcuts="?" onClick={model.showShortcuts}>단축키 보기</button>
       </Setting>

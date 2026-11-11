@@ -18,11 +18,10 @@ export function LoginStatus({ text }: { text: string }) {
 export function LoginScreen({ app }: { app: AppController }) {
   const busy = app.authBusy;
   // 휴대폰에서만 "앱으로 설치하기"를 보인다. 주 행동은 Google 단추 하나이고 설치는 그 아래 조용한 보조 행동이다.
-  const reserve = /Android/.test(navigator.userAgent) && installMode(navigator.userAgent, isStandalone(), true) !== 'none';
   const mode = installMode(navigator.userAgent, isStandalone(), !!app.install);
   // 토스 첫 화면 구성(TDS Top: 위 그림, 28px 제목, 17px 설명, 아래 고정 단추 하나)을 따른다. 가운데에는 이 앱이 하는 일을 알림 예시 하나로 보여 준다.
-  return <div className="flex flex-col min-h-dvh bg-bg min-[720px]:items-center min-[720px]:justify-center">
-    <div className="flex flex-1 flex-col w-full px-[20px] py-0 min-[720px]:flex-none min-[720px]:max-w-[420px] min-[720px]:px-0 min-[720px]:py-[48px]">
+  return <div className="flex flex-col min-h-dvh bg-bg">
+    <div className="flex flex-1 flex-col w-full px-[20px] py-0 min-[720px]:my-auto min-[720px]:flex-none min-[720px]:max-w-[420px] min-[720px]:self-center min-[720px]:px-0 min-[720px]:py-[48px]">
       <div className="flex flex-1 flex-col pt-[calc(48px_+_env(safe-area-inset-top))] min-[720px]:flex-none min-[720px]:pt-0">
         {/* 맨 위에 앱 아이콘과 이름(사용자 요청: 아이콘은 보여야 한다), 그 아래 TDS Top의 그림 자리에 알림 예시를 둔다. */}
         <div className="flex items-center gap-[10px] mb-[28px] text-[22px] leading-[30px] font-bold text-ink"><svg className="w-[48px] h-[48px] flex-none" aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg><span>{APP_NAME}</span></div>
@@ -44,6 +43,11 @@ export function LoginScreen({ app }: { app: AppController }) {
         </div>
       </div>
       <div className="pt-[24px] pb-[calc(20px_+_env(safe-area-inset-bottom))] min-[720px]:mt-0 min-[720px]:pb-0">
+        {/* 설치 안내는 Google 단추 위에 둔다. 아래 묶음이 화면 바닥에 붙어 있어 이 칸이 생기거나 사라져도 Google 단추 자리는 움직이지 않는다. 눌리는 곳이지만 Google 단추보다 가볍게(테두리 없는 옅은 면) 그린다. */}
+        {mode === 'prompt' ? <button type="button" className="mb-[12px] flex h-[52px] w-full items-center justify-center gap-[8px] rounded-md border border-line bg-sunken text-[15px] font-semibold text-ink active:bg-line min-[720px]:hidden" onClick={() => { void app.runInstall(); }}>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14" /></svg>앱으로 설치하기</button> : null}
+        {/* iOS Safari에는 설치 창이 없어서 누르는 단추가 아니라 방법만 조용히 알려 준다(면과 테두리를 주지 않아 눌리는 곳처럼 보이지 않게). */}
+        {mode === 'ios' ? <p className="m-0 mb-[12px] text-center text-[14px] leading-[21px] text-ink-2 min-[720px]:hidden">공유 버튼에서 <b className="font-semibold text-ink">‘홈 화면에 추가’</b>를 고르면<br />앱처럼 쓸 수 있어요</p> : null}
         <button type="button" className="flex items-center justify-center gap-[10px] w-full h-[56px] border border-[light-dark(#747775,#8E918F)] rounded-md bg-[light-dark(#FFFFFF,#131314)] text-[light-dark(#1F1F1F,#E3E3E3)] text-[17px] font-semibold [&:active:not(:disabled)]:bg-[light-dark(#F2F2F2,#1E1F20)] disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2" disabled={busy} aria-busy={busy} onClick={() => { void app.signIn(); }}>
           {busy ? null : <GoogleG />}
           <span>{busy ? 'Google로 이동하고 있어요' : 'Google로 계속하기'}</span>
@@ -52,17 +56,9 @@ export function LoginScreen({ app }: { app: AppController }) {
           {app.authError ? <p className="m-0 text-[14px] leading-[20px] text-center text-danger" role="alert">{app.authError}</p> : null}
         </div>
         <p className="m-0 mt-[14px] text-[13px] leading-[20px] text-center text-ink-2 min-[720px]:text-[14px]">계속하면 <a className="inline-block px-[4px] py-[12px] -mx-[4px] -my-[12px] text-ink" href="./privacy.html">개인정보처리방침</a>에 동의하는 거예요</p>
-        {/* 설치 칸은 안드로이드에서 처음부터 자리를 잡아 둔다(설치 창 신호가 늦게 와도 Google 단추가 움직이지 않게). */}
-        <div className={`install min-[720px]:hidden ${reserve || mode !== 'none' ? 'min-h-[76px] pt-[20px]' : ''}`}>
-          {mode === 'prompt' ? <button type="button" className="flex h-[56px] w-full items-center justify-center gap-[8px] rounded-md border border-ink-3 bg-surface text-[16px] font-semibold text-ink active:bg-sunken" onClick={() => { void app.runInstall(); }}>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14" /></svg>앱으로 설치하기</button> : null}
-          {/* iOS Safari에는 설치 창이 없어서 누르는 단추가 아니라 방법만 조용히 알려 준다(면과 테두리를 주지 않아 눌리는 곳처럼 보이지 않게). */}
-          {mode === 'ios' ? <p className="m-0 text-center text-[14px] leading-[21px] text-ink-2">공유 버튼에서 <b className="font-semibold text-ink">‘홈 화면에 추가’</b>를 고르면<br />앱처럼 쓸 수 있어요</p> : null}
-        </div>
-        {/* 서비스 정보: 처리방침 말고 눈에 띄지 않게 한 줄. 문의는 공개 이슈로 받는다(개인 연락처를 적지 않는다). */}
-        <p className="m-0 mt-[20px] text-center text-[12px] leading-[18px] text-ink-3 min-[720px]:mt-[36px]"><a className="inline-block px-[6px] py-[13px] -my-[13px] text-ink-3 underline underline-offset-2" href="https://github.com/aniseongu/skku-notice-platform/issues" target="_blank" rel="noopener noreferrer">문의하기</a> · <a className="inline-block px-[6px] py-[13px] -my-[13px] text-ink-3 underline underline-offset-2" href="https://github.com/aniseongu/skku-notice-platform" target="_blank" rel="noopener noreferrer">오픈소스</a></p>
-        <p className="m-0 mt-[4px] text-center text-[12px] leading-[18px] text-ink-3">성균관대학교와 무관한 개인 프로젝트예요</p>
       </div>
     </div>
+  {/* 서비스 정보는 화면 맨 아래에 둔다. PC에서는 창 바닥에 붙어 로그인 묶음과 떨어져 있고, 휴대폰에서는 로그인 묶음 바로 아래 바닥이다. 개인 연락처는 처리방침에만 적는다. */}
+    <footer className="px-[20px] pt-[8px] pb-[calc(20px_+_env(safe-area-inset-bottom))] text-center text-[12px] leading-[18px] text-ink-3"><a className="inline-block px-[6px] py-[13px] -my-[13px] text-ink-3 underline underline-offset-2" href="https://github.com/aniseongu/skku-notice-platform/issues" target="_blank" rel="noopener noreferrer">문의하기</a> · <a className="inline-block px-[6px] py-[13px] -my-[13px] text-ink-3 underline underline-offset-2" href="https://github.com/aniseongu/skku-notice-platform" target="_blank" rel="noopener noreferrer">오픈소스</a></footer>
   </div>;
 }
