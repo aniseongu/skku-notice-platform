@@ -315,3 +315,19 @@ def test_judgments_that_ended_without_ai_are_retried_after_twelve_hours_with_the
 
     store = RetryStore([])
     assert svc.run_graduation(store, MASTER, NOW)["grad_retry"] == 2 and store.retry_args == (svc.RETRY_AFTER_HOURS, svc.RETRY_PER_RUN)
+
+
+def test_ai_read_facts_of_an_older_extractor_are_kept_for_a_rules_only_refresh():
+    """AI로 읽은 사실은 추출기 버전이 옛것이어도 다시 뽑지 않는다(키 한도를 쓰므로). 규칙만 다시 돌리고 옛 버전 표시는 그대로 둔다."""
+    stored = {"organization_type": "incorporated_company", "corporate_status_verified": True, "work_mode": "full_time",
+              "task_category": "software_dev", "start_date": "2027-02-15", "end_date": "2027-04-30", "explicitly_stated_hours": None,
+              "daily_hours": None, "days_per_week": None, "academic_credit": None, "duration_months": None, "duration_days": None}
+    models = Models(text="{}")
+    for status, expect_rerule in (("used", 1), ("no_key", 0)):
+        previous = {"input_hash": "h1", "ruleset_version": "cse-old", "extractor_version": "facts-8", "ai_status": status,
+                    "model": "m", "facts": stored}
+        store = Store([request()], key=None, previous=previous)
+        counts = svc.run_graduation(store, MASTER, NOW, client_factory=lambda key: type("C", (), {"models": models})(), sleep=lambda s: None)
+        assert counts["grad_rerule"] == expect_rerule and models.calls == 0
+        if expect_rerule:
+            assert store.saved[0]["extractor_version"] == "facts-8" and store.saved[0]["ruleset_version"] == DEPT_RULESET

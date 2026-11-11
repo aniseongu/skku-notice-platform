@@ -89,13 +89,16 @@ def run_graduation(store, master_key: str, now: datetime, client_factory=None, s
             counts["grad_cached"] += 1
             continue
         # 공고도 프로필도 그대로인데 규칙 문구만 바뀐 판정(자동 갱신)은 저장된 사실로 규칙만 다시 돌린다: AI 호출도, 다른 계산도 없다.
-        if (previous.get("input_hash") == req.get("input_hash") and previous.get("extractor_version") == EXTRACTOR_VERSION
-                and previous.get("ruleset_version") != DEPT_RULESET and isinstance(previous.get("facts"), dict)):
+        # AI로 읽은 사실은 추출기 버전이 옛것이어도 버리지 않는다(다시 뽑으면 키의 한도를 쓴다). 그 밖의 판정은 사실을 공짜로
+        # 다시 뽑을 수 있으니 추출기가 바뀌었으면 새 추출기로 만든다.
+        if (previous.get("input_hash") == req.get("input_hash") and previous.get("ruleset_version") != DEPT_RULESET
+                and (previous.get("extractor_version") == EXTRACTOR_VERSION or previous.get("ai_status") == "used")
+                and isinstance(previous.get("facts"), dict)):
             rerun = assess_from_stored(profile_from_row(req), previous["facts"])
             if rerun is not None:
                 store.save_assessment({
                     "user_id": user_id, "notice_id": notice_id, "status": "READY", "input_hash": req.get("input_hash"),
-                    "ruleset_version": DEPT_RULESET, "extractor_version": EXTRACTOR_VERSION,
+                    "ruleset_version": DEPT_RULESET, "extractor_version": previous.get("extractor_version") or EXTRACTOR_VERSION,
                     "ai_status": previous.get("ai_status"), "model": previous.get("model"),
                     "department": rerun["department"], "university_3p": rerun["university_3p"], "facts": rerun["facts"],
                     "assessed_at": now.isoformat()})
