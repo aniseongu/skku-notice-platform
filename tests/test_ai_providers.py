@@ -93,10 +93,21 @@ def test_network_error_and_bad_output_have_no_secret():
     assert info.value.kind == "network" and SECRET not in str(info.value)
 
     for body in ({"choices": []}, {"choices": [{"message": {"content": ""}}]},
-                 {"choices": [{"message": {"content": "{"}, "finish_reason": "length"}]}):
+                 {"choices": [{"message": {"content": "{"}, "finish_reason": "length"}]},
+                 {"error": {"message": f"provider down {SECRET}"}}):
         with pytest.raises(ProviderError) as bad:
             client_for("groq", lambda r, b=body: httpx.Response(200, json=b)).models.generate_content(model="m", contents="x")
-        assert bad.value.kind == "bad_output"
+        assert bad.value.kind == "bad_output" and SECRET not in bad.value.detail
+    assert "provider down" in bad.value.detail
+
+
+def test_fenced_list_and_cut_but_valid_answers_are_accepted():
+    for content in ('```json\n{"items": []}\n```', [{"type": "text", "text": '{"items": []}'}]):
+        body = {"model": "m", "choices": [{"message": {"content": content}, "finish_reason": "stop"}]}
+        reply = client_for("openrouter", lambda r, b=body: httpx.Response(200, json=b)).models.generate_content(model="openrouter/free", contents="x")
+        assert json.loads(reply.text) == {"items": []}
+    done = {"choices": [{"message": {"content": '{"items": []}'}, "finish_reason": "length"}]}
+    assert client_for("groq", lambda r: httpx.Response(200, json=done)).models.generate_content(model="m", contents="x").text
 
 
 def test_existing_school_judge_works_unchanged_through_groq_adapter():

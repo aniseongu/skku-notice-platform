@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import re
 from types import SimpleNamespace
 
 import httpx
@@ -20,7 +21,7 @@ from skku_notice.ai_models import supports_strict_schema
 
 BASE_URL = {"groq": "https://api.groq.com/openai/v1", "openrouter": "https://openrouter.ai/api/v1"}
 TIMEOUT_SECONDS = 60.0
-MAX_OUTPUT_TOKENS = 4096
+MAX_OUTPUT_TOKENS = 8192
 
 
 class ProviderError(Exception):
@@ -127,14 +128,43 @@ class _Models:
                                 _detail(response, self._api_key))
         try:
             payload = response.json()
-            choice = payload["choices"][0]
-            text = choice["message"]["content"]
-        except (ValueError, KeyError, IndexError, TypeError) as exc:
-            raise ProviderError(None, "bad_output") from exc
-        if not isinstance(text, str) or not text.strip() or choice.get("finish_reason") == "length":
-            raise ProviderError(None, "bad_output")
+        except ValueError as exc:
+            raise ProviderError(None, "bad_output", detail="not json") from exc
+        text, why = _extract_text(payload)
+        if text is None:
+            # OpenRouter는 모델 쪽 오류를 200 응답의 error 항목으로 줄 때가 있다. 사유만 짧게 남긴다.
+            error = payload.get("error") if isinstance(payload, dict) else None
+            note = (error.get("message") if isinstance(error, dict) else error) or why
+            raise ProviderError(None, "bad_output", detail=" ".join(str(note).split())[:160].replace(self._api_key, "***"))
         usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
         return SimpleNamespace(text=text, usage=usage, model=payload.get("model") or model)
+
+
+_FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.S)
+
+
+def _extract_text(payload: object) -> tuple[str | None, str]:
+    """답 글자를 꺼낸다. 코드 블록(```json)으로 감싼 답과 글자 조각 목록으로 온 답도 받는다. 못 꺼내면 (None, 이유)."""
+    try:
+        choice = payload["choices"][0]  # type: ignore[index]
+        content = choice["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        return None, "no choices"
+    if isinstance(content, list):
+        content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
+    if not isinstance(content, str) or not content.strip():
+        return None, f"empty content finish={choice.get('finish_reason')}"
+    text = content.strip()
+    fenced = _FENCE.match(text)
+    if fenced:
+        text = fenced.group(1)
+    if choice.get("finish_reason") == "length":
+        # 잘린 답이면 JSON이 끝까지 닫히지 않는다. 호출한 쪽이 형식을 검증해서 버린다.
+        try:
+            json.loads(text)
+        except ValueError:
+            return None, "truncated (finish=length)"
+    return text, ""
 
 
 class OpenAICompatClient:
