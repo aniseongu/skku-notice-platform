@@ -65,3 +65,5 @@ deno.lock
 .wrangler/
 # Supabase CLI 연결 정보(로컬)
 supabase/.temp/
+# CLI를 web/ 같은 하위 폴더에서 실행해도 생기는 연결 정보 캐시(프로젝트 ref, 조직 ID)는 올리지 않는다.
+**/supabase/.temp/
