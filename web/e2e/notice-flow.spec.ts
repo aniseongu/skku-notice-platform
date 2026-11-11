@@ -1153,8 +1153,12 @@ test('selection mode click order: enter → tick → count → action → toast 
   await trigger.click();
   await expect(bar).toBeVisible();
   await expect(bar.getByText('전체 선택')).toBeVisible();
-  // 아무것도 안 골랐을 때는 행동 단추가 없다(고르면 해당하는 단추만 나온다).
-  await expect(bar.getByRole('button', { name: /으로 표시$/ })).toHaveCount(0);
+  // 행동 단추는 처음부터 같은 자리에 있고, 아무것도 안 골랐을 때는 둘 다 비활성이다(휴대폰은 고르기 전에 아래 막대를 숨긴다).
+  if (!narrow) {
+    await expect(bar.getByRole('button', { name: /으로 표시$/ })).toHaveCount(2);
+    await expect(bar.getByRole('button', { name: /으로 표시$/ }).first()).toBeDisabled();
+    await expect(bar.getByRole('button', { name: /으로 표시$/ }).last()).toBeDisabled();
+  }
   if (narrow) await expect(tabbar).toBeHidden();                       // 휴대폰은 선택 중 아래 탭 바 대신 단추 막대
 
   // 3. 두 줄을 고르면 개수와 일부 선택 표시가 바뀐다. 하나를 풀면 1개.
@@ -1185,7 +1189,7 @@ test('selection mode click order: enter → tick → count → action → toast 
   await rowBoxes.nth(0).focus();
   await page.keyboard.press('Space');
   await expect(bar.getByText('1개')).toBeVisible();
-  const action = bar.getByRole('button', { name: /(읽음|읽지 않음)으로 표시$/ }).first();
+  const action = bar.locator('button:enabled', { hasText: '으로 표시' }).first();
   await expect(action).toBeEnabled();
   await action.focus();
   await page.keyboard.press('Enter');
