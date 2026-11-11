@@ -246,7 +246,11 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await expect(screen.getByLabel('Gemini 키', { exact: true })).toHaveCount(0);
   await withApp(page, { byokStatus: { keyHint: 'DDDD', model: 'm', disabled: true, lastError: 'Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요.', usedToday: 0 } });
   await expect(screen.locator('[data-provider], .setting', { hasText: 'Gemini 키' }).first().getByText('키를 확인해 주세요')).toBeVisible();
-  await screen.getByRole('button', { name: 'Gemini 키 연결 끊기' }).click();
+  await screen.getByRole('button', { name: 'Gemini 키 연결 끊기', exact: true }).click();
+  expect(await calls(page)).toEqual([]);  // 한 번 더 확인한다
+  await screen.getByRole('button', { name: '취소' }).click();
+  await screen.getByRole('button', { name: 'Gemini 키 연결 끊기', exact: true }).click();
+  await screen.getByRole('button', { name: 'Gemini 키 연결 끊기 확인' }).click();
   expect(await calls(page)).toEqual([['remove']]);
   // 아이캠퍼스 토큰도 같은 흐름이다. 형식이 맞지 않으면 저장할 수 없다.
   await withApp(page, {});
@@ -264,7 +268,8 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await expect(screen.getByText('연결됨 ····ZZZZ')).toBeVisible();
   expect(await screen.innerText()).not.toContain(token);
   await withApp(page, {});
-  await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결 끊기' }).click();
+  await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결 끊기', exact: true }).click();
+  await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결 끊기 확인' }).click();
   expect(await calls(page)).toEqual([['removeCanvas']]);
 });
 
