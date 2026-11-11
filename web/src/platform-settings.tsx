@@ -408,7 +408,7 @@ function BoardsSection({ model }: { model: SettingsModel }) {
   const canMove = order.boards.length >= 2;
   return <Section id="s-boards" title="받을 게시판"
     action={canMove ? <button type="button" className="head-action" onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : undefined}>
-    <p className="settings-lead">알림을 받고 목록에 모아 볼 게시판이에요. 이 순서로 보여요</p>
+    <p className="settings-lead">{editing ? '손잡이를 끌어 순서를 바꿔요. 바꾸면 바로 저장돼요' : '알림을 받고 목록에 모아 볼 게시판이에요. 이 순서로 보여요'}</p>
     {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <>
       {model.error ? <><p className="field-note error" role="alert">{model.error}</p>
         <button type="button" className="ghost-button" onClick={model.retry}>다시 불러오기</button></> : null}
@@ -475,8 +475,8 @@ function BoardOrderList({ order, editing, onToggle, busy = false }: { order: Set
         </ul>
       </SortableContext>
     </DndContext>
-    {editing ? <p className="field-note m-0 mt-[8px]">손잡이를 끌어 순서를 바꿔요. 바꾸면 바로 저장돼요</p> : null}
-    {editing && order.status ? <p className="field-note m-0" role="status">{order.status === 'saved' ? '저장했어요' : '저장하지 못했어요. 다시 옮기면 또 저장해요'}</p> : null}
+    {/* 아래에는 문제가 생겼을 때만 적는다. 저장 성공은 따로 알리지 않는다(바로 저장된다고 위에 이미 적었다). */}
+    {editing && order.status === 'failed' ? <p className="field-note error m-0 mt-[8px]" role="alert">저장하지 못했어요. 다시 옮기면 또 저장해요</p> : null}
   </div>;
 }
 
