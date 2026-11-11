@@ -1371,7 +1371,7 @@ export class AppController extends Reactive {
     const scoped = list.filter((n) => !n.deadline || !deadlinePassed(n.deadline))
       .filter((n) => this.isExternal(n) === external)
       .filter((n) => !this.unreadOnly || !this.isRead(n) || n.id === this.selectedId || n.id === this.openedId)
-      .filter((n) => !this.graduationOnly || !this.gradEnabled() || this.gradBadge(n) === 'ok' || n.id === this.selectedId || n.id === this.openedId);
+      .filter((n) => !this.graduationOnly || !this.gradEnabled() || this.gradPartsFor(n, this.judgement(n)?.ai?.verdict).some((part) => part.met) || n.id === this.selectedId || n.id === this.openedId);
     return orderNotices(scoped, this.sortFor(tab));
   }
 

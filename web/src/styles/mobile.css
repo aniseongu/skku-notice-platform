@@ -61,9 +61,9 @@
   .select-trigger .i { width: 18px; height: 18px; }
   .view-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 8px 0 0; border: 0; background: none; color: var(--text-2); font-size: 14px; font-weight: 500; }
   .view-toggle[aria-pressed="true"] { color: var(--text); font-weight: 600; }
-  .filter-check { position: relative; width: 16px; height: 16px; flex: none; border: 1px solid var(--text-3); border-radius: var(--r-sm); }
+  .filter-check { position: relative; width: 18px; height: 18px; flex: none; border: 1.5px solid var(--text-3); border-radius: var(--r-sm); }
   .view-toggle[aria-pressed="true"] .filter-check { background: var(--text); border-color: var(--text); }
-  .view-toggle[aria-pressed="true"] .filter-check::after { content: ""; position: absolute; left: 6px; top: 2px; width: 5px; height: 10px; border: solid var(--on-accent); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .view-toggle[aria-pressed="true"] .filter-check::after { content: ""; position: absolute; inset: 0; margin: auto; width: 12px; height: 12px; background: var(--surface); -webkit-mask: var(--check-mask) center / contain no-repeat; mask: var(--check-mask) center / contain no-repeat; --check-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 6.3l2.4 2.4 4.6-5'/%3E%3C/svg%3E"); }
   .list { padding: 0; }
   .group + .group { margin-top: 20px; }
   .sort-trigger { font-weight: 500; }
