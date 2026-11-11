@@ -369,7 +369,7 @@ function Canvas({ model }: { model: SettingsModel }) {
         checked={open && pushOn} disabled={!pushOn || info.busy} onChange={toggle} />
     </Section>
     {/* 토큰은 계정에 저장하는 값이라 알림을 켜기 전에도 넣을 수 있다. 입력 방식은 연결 키 쪽과 같은 줄이다. */}
-    <Section id="s-canvas-token" title="토큰"><CanvasRow model={model} alignEnd={false} /></Section>
+    <Section id="s-canvas-token" title="토큰"><CanvasRow model={model} alignEnd /></Section>
     {open && pushOn ? <>
       <Section id="s-canvas-time" title="하루 요약">
         <Setting name="요약 시간" help={hasToken ? '모든 기기에 같은 시간을 적용해요. 할 일이 없어도 알려요' : '토큰을 연결하면 바꿀 수 있어요'}>

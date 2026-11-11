@@ -754,6 +754,12 @@ export class AppController extends Reactive {
    * 프로필 저장 → 게시판 구독 반영 → 키워드 저장 순서로 끝낸다. 중간에 실패하면 같은 내용으로 다시 부를 때
    * 끝낸 단계는 건너뛰고 실패한 단계부터 이어서 저장한다. 계정이 바뀌면 단계마다 멈춘다.
    */
+  /** 저장이 끝나도 남은 단계(AI 키, 알림)를 마칠 때까지 첫 설정 화면을 둔다. 프로필에 완료 시각이 생기면 needsOnboarding이 꺼져 화면이 바로 사라지기 때문이다. */
+  applyOnboardingSaved(profile: UserProfile) {
+    this.profile = profile;
+    this.onboardingOpen = true;
+  }
+
   async finishOnboarding(draft: Draft): Promise<boolean> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch, client = authClient;
     if (!client || !userId || this.onboardingBusy) return false;
@@ -790,7 +796,7 @@ export class AppController extends Reactive {
     try {
       await current.run();
       if (epoch !== this.subscriptionsEpoch) return false;
-      this.profile = nextProfile; this.subscriptions = boards; this.setKeywords(words);
+      this.applyOnboardingSaved(nextProfile); this.subscriptions = boards; this.setKeywords(words);
       this.onboardingChain = null;
       this.showToast('설정을 저장했어요');
       return true;

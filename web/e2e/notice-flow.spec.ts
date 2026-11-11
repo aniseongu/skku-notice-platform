@@ -282,7 +282,7 @@ test('first-run setup: choices only, department list follows the college, double
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
     const w = window as unknown as { calls: unknown[][] };
     w.calls = [];
-    app.finishOnboarding = (draft: unknown) => { w.calls.push(['finish', draft]); return Promise.resolve(true); };
+    app.finishOnboarding = (draft: unknown) => { w.calls.push(['finish', draft]); (app.applyOnboardingSaved as (profile: unknown) => void)({ ...(app.profile as object), onboardedAt: 'x' }); return Promise.resolve(true); };
     app.closeOnboarding = () => { w.calls.push(['close']); app.onboardingOpen = false; app.profile = { ...(app.profile as object), onboardedAt: 'x' }; };
     app.enablePush = () => { w.calls.push(['push']); return Promise.resolve(); };
     app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null };
@@ -963,6 +963,13 @@ test('iCampus page: switch on → token → summary time, each in its own sectio
   await withApp(page, { canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null }, summaryTime: '21:00' });
   await expect(screen.getByText('연결됨 ····ZZZZ')).toBeVisible();
   expect(await screen.innerText()).not.toContain(token);
+  // 넓은 화면에서는 토큰 줄의 조작이 스위치처럼 오른쪽 끝에 붙는다.
+  if (test.info().project.name === 'desktop') {
+    const right = async (loc: import('@playwright/test').Locator) => { const box = (await loc.boundingBox())!; return box.x + box.width; };
+    const swRight = await right(sw);
+    const lastAction = await right(screen.getByRole('button', { name: '아이캠퍼스 토큰 연결 끊기', exact: true }));
+    expect(Math.abs(swRight - lastAction)).toBeLessThanOrEqual(4);
+  }
   expect((await calls(page)).filter((c) => c[0] === 'mode')).toEqual([['mode', 'reminders']]);
   await expect(time.getByRole('radio', { name: '오전' })).toBeEnabled();
   await time.getByRole('radio', { name: '오전' }).click(); clicks += 1;
@@ -1114,7 +1121,7 @@ test('software original major is asked for the admission year and the internship
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
     const w = window as unknown as { calls: unknown[][] };
     w.calls = [];
-    app.finishOnboarding = (draft: unknown) => { w.calls.push(['finish', draft]); return Promise.resolve(true); };
+    app.finishOnboarding = (draft: unknown) => { w.calls.push(['finish', draft]); (app.applyOnboardingSaved as (profile: unknown) => void)({ ...(app.profile as object), onboardedAt: 'x' }); return Promise.resolve(true); };
     app.closeOnboarding = () => { app.onboardingOpen = false; app.profile = { ...(app.profile as object), onboardedAt: 'x' }; };
     app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
     app.profileStatus = 'ready';
