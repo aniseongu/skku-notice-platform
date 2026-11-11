@@ -194,7 +194,7 @@ def _work_check(facts: InternFacts) -> Check:
         return Check("DEPT-WORK", FAIL, "공고의 담당 업무가 IT·SW 교육과 거리가 있어요")
     if facts.task_category == "mixed_it":
         names = _role_names(related or roles[:1]) or "‘디지털·IT’"
-        return Check("DEPT-WORK", PASS, f"여러 직무 중 {names} 직무가 소프트웨어 업무 분야로 보여요. 그 직무로 지원하면 인정될 수 있어요(심의는 따로 있어요)")
+        return Check("DEPT-WORK", PASS, f"여러 직무 중 {names} 직무가 소프트웨어 업무 분야로 보여요")
     return Check("DEPT-WORK", UNKNOWN, "실제 담당 업무를 공고에서 확인하지 못했어요")
 
 
