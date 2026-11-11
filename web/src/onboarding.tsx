@@ -124,9 +124,9 @@ export function Onboarding({ app }: { app: AppController }) {
       ? <ProgramPicker current={primary} onPick={setPrimary} />
       : <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]">
         <ChoiceList label="선택한 주전공" selected={programKey(primary)} items={[{ id: programKey(primary), label: programLabel(primary), note: primary.department ? primary.college : undefined }]} onSelect={() => undefined} />
-        <button type="button" className="text-button" onClick={() => setChangingPrimary(true)}>주전공 바꾸기</button>
+        <button type="button" className="text-button self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" onClick={() => setChangingPrimary(true)}>주전공 바꾸기</button>
       </div>;
-    foot = <button type="button" className="solid-button" disabled={!canContinue('primary', draft)} onClick={() => { setChangingPrimary(false); go('double'); }}>다음</button>;
+    foot = <button type="button" className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!canContinue('primary', draft)} onClick={() => { setChangingPrimary(false); go('double'); }}>다음</button>;
   } else if (step === 'double') {
     title = '복수전공이 있나요?';
     lead = addingDouble ? '' : '있으면 그 학과 공지도 함께 받아요';
@@ -137,7 +137,7 @@ export function Onboarding({ app }: { app: AppController }) {
           <dl className="info-list m-0 grid gap-[2px] [&>div]:flex [&>div]:justify-between [&>div]:gap-[12px] [&>div]:py-[6px] [&>div]:text-[14px] [&_dt]:flex-none [&_dt]:text-ink-3 [&_dd]:m-0 [&_dd]:text-right [&_dd]:font-semibold [&_dd]:text-ink">{doubles.map((program) => <div key={programKey(program)}>
             <dt>{program.department ? program.college : '복수전공'}</dt>
             <dd><span>{programLabel(program)}</span>{' '}
-              <button type="button" className="text-button" aria-label={`${programLabel(program)} 빼기`} onClick={() => removeDouble(program)}>빼기</button></dd>
+              <button type="button" className="text-button self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" aria-label={`${programLabel(program)} 빼기`} onClick={() => removeDouble(program)}>빼기</button></dd>
           </div>)}</dl>
         </Card> : null}
         {draft.programs.length < MAX_PROGRAMS
@@ -148,8 +148,8 @@ export function Onboarding({ app }: { app: AppController }) {
               onSelect={(id) => { if (id === 'no') { setDoubleAnswer('no'); go('status'); } else { setDoubleAnswer('yes'); setAddingDouble(true); } }} /> : null}
       </div>;
     foot = addingDouble
-      ? <button type="button" className="solid-button" disabled={!pendingDouble} onClick={() => { if (pendingDouble) { addDouble(pendingDouble); go('status'); } }}>다음</button>
-      : <button type="button" className="solid-button" disabled={!canContinue('double', draft, doubleAnswer)} onClick={() => go('status')}>다음</button>;
+      ? <button type="button" className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!pendingDouble} onClick={() => { if (pendingDouble) { addDouble(pendingDouble); go('status'); } }}>다음</button>
+      : <button type="button" className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!canContinue('double', draft, doubleAnswer)} onClick={() => go('status')}>다음</button>;
   } else if (step === 'status') {
     title = '학교 정보를 알려 주세요';
     body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]">
@@ -161,7 +161,7 @@ export function Onboarding({ app }: { app: AppController }) {
       <h2>병역 (선택)</h2>
       <Segmented label="병역" options={SERVICE} columns={3} value={draft.militaryService} onChange={(militaryService) => setDraft({ ...draft, militaryService })} />
     </div>;
-    foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('internship')}>다음</button>;
+    foot = <button type="button" className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!canContinue('status', draft)} onClick={() => go('internship')}>다음</button>;
   } else if (step === 'internship') {
     const software = isSoftwareOriginal({ programs: draft.programs });
     // 질문이 하나뿐이면 제목이 곧 질문이다(제목, 부제, 질문 세 겹으로 쓰지 않는다).
@@ -183,7 +183,7 @@ export function Onboarding({ app }: { app: AppController }) {
           onChange={(value) => setDraft({ ...draft, deptInternshipDone: value === 'yes' })} />
       </> : null}
     </div>;
-    foot = <button type="button" className="solid-button" disabled={!canContinue('internship', draft)} onClick={() => go('boards')}>다음</button>;
+    foot = <button type="button" className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!canContinue('internship', draft)} onClick={() => go('boards')}>다음</button>;
   } else if (step === 'boards') {
     title = '어떤 공지를 받을까요?';
     lead = '고른 전공에 맞춰 켜 뒀어요';
@@ -206,7 +206,7 @@ export function Onboarding({ app }: { app: AppController }) {
       <ChipGroup label="관심 키워드" options={keywordOptions} selected={draft.keywords} onToggle={(word) => setDraft({ ...draft, keywords: toggleValue(draft.keywords, word) })} />
       {app.onboardingError ? <p className="error-text text-[14px] text-danger" role="alert">{app.onboardingError}</p> : null}
     </div>;
-    foot = <button type="button" className="solid-button" disabled={app.onboardingBusy} onClick={() => { void save(); }}>
+    foot = <button type="button" className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={app.onboardingBusy} onClick={() => { void save(); }}>
       {app.onboardingBusy ? '저장하고 있어요' : app.onboardingError ? '다시 시도하기' : '다음'}</button>;
   } else if (step === 'ai') {
     title = 'AI를 연결해 주세요';
@@ -216,7 +216,7 @@ export function Onboarding({ app }: { app: AppController }) {
       {app.onboardingError ? <p className="error-text text-[14px] text-danger" role="alert">{app.onboardingError}</p> : null}</div>;
     foot = <>
       {connected ? null : <p className="m-0 text-center text-[14px] text-ink-2" role="status">키를 하나 연결해 주세요</p>}
-      <button type="button" className="solid-button" disabled={!connected || app.onboardingBusy || app.byokBusy || app.aiBusy} onClick={finishWithKey}>
+      <button type="button" className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!connected || app.onboardingBusy || app.byokBusy || app.aiBusy} onClick={finishWithKey}>
         {app.onboardingBusy ? '저장하고 있어요' : '끝내기'}</button>
     </>;
   } else {
@@ -228,10 +228,10 @@ export function Onboarding({ app }: { app: AppController }) {
     </div>;
     foot = <>
       {pushAsk || app.pushStatus === 'busy'
-        ? <button type="button" className="solid-button" disabled={app.pushStatus === 'busy'} onClick={() => { void app.enablePush().then(() => { if (app.pushStatus === 'on') afterNotify(); }); }}>
+        ? <button type="button" className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={app.pushStatus === 'busy'} onClick={() => { void app.enablePush().then(() => { if (app.pushStatus === 'on') afterNotify(); }); }}>
           {app.pushStatus === 'busy' ? '확인하고 있어요' : app.pushRetry ? '다시 시도하기' : '알림 받기'}</button>
-        : <button type="button" className="solid-button" onClick={afterNotify}>{needAi() ? '다음' : '끝내기'}</button>}
-      {pushAsk ? <button type="button" className="ghost-button" onClick={afterNotify}>나중에 할게요</button> : null}
+        : <button type="button" className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={afterNotify}>{needAi() ? '다음' : '끝내기'}</button>}
+      {pushAsk ? <button type="button" className="ghost-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={afterNotify}>나중에 할게요</button> : null}
     </>;
   }
 
@@ -251,7 +251,7 @@ export function Onboarding({ app }: { app: AppController }) {
       <div className="onb-top sticky top-0 z-[2] bg-bg pt-[env(safe-area-inset-top)] [&_.icon-button]:m-0 [&_.icon-button]:size-[44px]">
         <div className="onb-top-inner mx-auto grid w-[min(100%,36rem)] grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-x-[12px] pt-[8px] pr-[12px] pb-[4px] pl-[4px] min-[900px]:pt-[16px]">
           {showBack
-            ? <button type="button" className="icon-button" aria-label="이전 단계" onClick={back}><svg className="i" aria-hidden="true"><use href="icons/sprite.svg#back" /></svg></button>
+            ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft" aria-label="이전 단계" onClick={back}><svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href="icons/sprite.svg#back" /></svg></button>
             : <span className="onb-top-slot block size-[44px]" aria-hidden="true" />}
           <div className="onb-progress flex items-center gap-[6px]" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={index + 1}
             aria-valuetext={`${STEPS.length}단계 중 ${index + 1}단계`} aria-label="첫 설정 진행">
@@ -259,7 +259,7 @@ export function Onboarding({ app }: { app: AppController }) {
           </div>
           {/* 처음 설정은 건너뛸 수 없다(전공과 키는 필수). 설정에서 다시 연 경우에만 닫을 수 있다. */}
           {manual
-            ? <button type="button" className="onb-x inline-flex h-[44px] w-[44px] items-center justify-center gap-[4px] rounded-pill border border-line bg-surface p-0 text-[14px] font-semibold whitespace-nowrap text-ink [&:hover]:bg-sunken active:bg-sunken [&_.i]:size-[20px]" aria-label="닫기" onClick={() => app.dismissOnboarding()}><svg className="i" aria-hidden="true"><use href="icons/sprite.svg#close" /></svg></button>
+            ? <button type="button" className="onb-x inline-flex h-[44px] w-[44px] items-center justify-center gap-[4px] rounded-pill border border-line bg-surface p-0 text-[14px] font-semibold whitespace-nowrap text-ink [&:hover]:bg-sunken active:bg-sunken [&_.i]:size-[20px]" aria-label="닫기" onClick={() => app.dismissOnboarding()}><svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href="icons/sprite.svg#close" /></svg></button>
             : <span className="onb-top-slot block size-[44px]" aria-hidden="true" />}
         </div>
       </div>

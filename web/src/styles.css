@@ -1,14 +1,13 @@
 /* 토큰과 규칙의 정본은 docs/DESIGN.md. 값은 styles/tokens.css에 있고, 아래 @theme이 같은 값을 Tailwind 유틸리티로 노출한다.
    Tailwind의 preflight(기본 초기화)는 가져오지 않는다: 기존 화면이 그대로 보이도록 base 레이어가 초기화를 맡는다.
    레이어 우선순위는 아래 한 줄이 정하고, 유틸리티가 가장 위라서 클래스 하나로 기존 규칙을 덮어쓸 수 있다. */
-@layer theme, tokens, base, mobile, desktop, settings, platform, utilities;
+@layer theme, tokens, base, mobile, desktop, platform, utilities;
 
 @import 'tailwindcss/theme.css' layer(theme);
 @import './styles/tokens.css';
 @import './styles/base.css';
 @import './styles/mobile.css';
 @import './styles/desktop.css';
-@import './styles/settings.css';
 @import './styles/platform.css';
 @import 'tailwindcss/utilities.css' layer(utilities);
 

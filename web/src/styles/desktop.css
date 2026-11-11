@@ -2,11 +2,5 @@
 @layer desktop {
   @media (min-width: 720px) {
     body { overflow: hidden; }
-    .icon-button { width: 36px; height: 36px; border-radius: var(--r-sm); }
-    @media (hover: hover) {
-      .icon-button:hover:not(:disabled) {
-        background: color-mix(in oklch, var(--sunken) 70%, transparent);
-      }
-    }
   }
 }
