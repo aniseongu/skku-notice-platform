@@ -11,7 +11,8 @@ import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR, PROFILE_TEXT
 import { programLabel } from './skku-programs';
 import { BOARD_CATALOG, COLLEGE_BOARD, DEPARTMENT_BOARD, OTHER_BOARDS } from './skku-boards';
 // 순서 바꾸기는 dnd-kit(MIT)을 쓴다: 손잡이로 끌기(마우스·터치)와 키보드(Space로 집고 방향키로 옮기고 Space로 놓기), 낭독기 안내가 들어 있다.
-import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type Modifier } from '@dnd-kit/core';
+import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Avatar, SwitchRow } from './ui';
@@ -425,8 +426,6 @@ function chevron(d: string, className?: string) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" className={className}><path d={d} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
-const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
-
 /** 게시판 한 줄. 줄마다 테두리가 있는 따로 떨어진 칸이다. 오른쪽 끝에서 받기를 켜고 끄고(평소), 순서를 바꾸는 중에는 같은 자리의 손잡이로 끈다.
  *  손잡이를 스위치와 같은 오른쪽에 둔 이유: 마우스가 단추 근처에 있는 채로 바로 옮길 수 있게 하려는 것이다(.claude/rules/usability.md). */
 function BoardRow({ board, editing, onToggle, busy }: { board: { id: string; label: string }; editing: boolean; onToggle?: (id: string) => void; busy: boolean }) {
@@ -460,7 +459,7 @@ function BoardOrderList({ order, editing, onToggle, busy = false }: { order: Set
   };
   const position = (id: unknown) => `${ids.indexOf(String(id)) + 1}번째`;
   return <div className="order-box">
-    <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[verticalOnly]} onDragEnd={onDragEnd}
+    <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis, restrictToParentElement]} onDragEnd={onDragEnd}
       accessibility={{
         screenReaderInstructions: { draggable: '순서를 바꾸려면 Space를 눌러 집고, 위아래 방향키로 옮긴 뒤 Space로 놓으세요. 취소는 Esc예요.' },
         announcements: {
