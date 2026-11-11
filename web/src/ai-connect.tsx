@@ -47,7 +47,7 @@ export function StepGuide({ label, sub, steps, note }: { label: string; sub: str
 function SharedGuide() {
   return <StepGuide label="키는 어디서 받나요?" sub="두 곳 모두 무료로 만들 수 있어요" note="키는 암호화해서 서버에만 보관해요"
     steps={[<>{lnk(GUIDE.groq.url, 'Groq')}, {lnk(GUIDE.gemini.url, 'Gemini')} 중 한 곳에서 로그인해요</>,
-      '"키 만들기"를 눌러요', '키를 복사해요. 한 번만 보여요', '위 칸에 붙여 넣고 "연결하기"를 눌러요']} />;
+      '"키 만들기"를 눌러요', '키를 복사해요. 한 번만 보여요', '받은 키를 해당 업체 칸에 붙여 넣고 "연결하기"를 눌러요']} />;
 }
 
 /** AI 연결 줄들. 다른 설정 쪽과 같은 줄(이름, 설명, 오른쪽 조작) 모양이고, 연결한 개수에 따라 필요한 줄만 보인다. */

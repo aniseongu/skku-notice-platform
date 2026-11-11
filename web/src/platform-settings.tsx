@@ -798,7 +798,7 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
             </svg>
           </button>
         </div>
-        <button type="button" className="solid-button inline-flex items-center justify-center py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:bg-transparent disabled:opacity-60 min-h-[44px] shrink-0 px-4 disabled:border-line disabled:text-ink-2" aria-label={`${name} ${labels.save}`} disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인 중' : labels.save}</button>
+        <button type="button" className="solid-button inline-flex items-center justify-center py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:opacity-60 min-h-[44px] min-w-[96px] shrink-0 px-4 disabled:border-line disabled:bg-sunken disabled:text-ink-2 disabled:opacity-100" aria-label={`${name} ${labels.save}`} disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인 중' : labels.save}</button>
       </div>
       {extra}
       {error ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{error}</p> : null}
