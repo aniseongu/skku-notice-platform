@@ -136,11 +136,12 @@ export function Setting({ name, help, children, className = '' }: { name: string
   </div>;
 }
 
-export function Choice<T extends string | number>({ label, options, value, onPick, disabled, grid }: {
-  label: string; options: readonly (readonly [T, string])[]; value: T | null; onPick: (value: T) => void; disabled?: boolean; grid?: boolean;
+export function Choice<T extends string | number>({ label, options, value, onPick, disabled, grid, columns }: {
+  label: string; options: readonly (readonly [T, string])[]; value: T | null; onPick: (value: T) => void; disabled?: boolean; grid?: boolean; columns?: 3 | 4;
 }) {
+  const cols = columns === 3 ? 'grid-cols-3' : 'grid-cols-4';
   // 선택지가 많으면(입학 연도) 한 줄로 늘어놓지 않고 4열 격자로 칸 안에 담는다.
-  return <div className={grid ? 'segmented grid w-full grid-cols-4 gap-[2px] rounded-md bg-sunken p-[3px] [align-self:flex-start] [&_button]:px-0 [&_button]:min-h-[38px] [&_button]:rounded-[8px] [&_button]:border-0 [&_button]:bg-transparent [&_button]:py-0 [&_button]:text-[14px] [&_button]:font-medium [&_button]:text-ink-2 max-[719px]:[&_button]:min-h-[44px] [&_button[aria-checked=true]]:bg-surface [&_button[aria-checked=true]]:font-semibold [&_button[aria-checked=true]]:text-ink [&_button[aria-checked=true]]:[box-shadow:0_1px_2px_oklch(0.2_0.02_var(--h)/0.12)] [&_button[aria-pressed=true]]:bg-surface [&_button[aria-pressed=true]]:font-semibold [&_button[aria-pressed=true]]:text-ink [&_button[aria-pressed=true]]:[box-shadow:0_1px_2px_oklch(0.2_0.02_var(--h)/0.12)]' : 'segmented inline-flex rounded-md bg-sunken p-[3px] [align-self:flex-start] [&_button]:px-[14px] [&_button]:min-h-[38px] [&_button]:rounded-[8px] [&_button]:border-0 [&_button]:bg-transparent [&_button]:py-0 [&_button]:text-[14px] [&_button]:font-medium [&_button]:text-ink-2 max-[719px]:[&_button]:min-h-[44px] [&_button[aria-checked=true]]:bg-surface [&_button[aria-checked=true]]:font-semibold [&_button[aria-checked=true]]:text-ink [&_button[aria-checked=true]]:[box-shadow:0_1px_2px_oklch(0.2_0.02_var(--h)/0.12)] [&_button[aria-pressed=true]]:bg-surface [&_button[aria-pressed=true]]:font-semibold [&_button[aria-pressed=true]]:text-ink [&_button[aria-pressed=true]]:[box-shadow:0_1px_2px_oklch(0.2_0.02_var(--h)/0.12)]'} role="radiogroup" aria-label={label}>
+  return <div className={grid ? `segmented grid w-full ${cols} gap-[2px] rounded-md bg-sunken p-[3px] [align-self:flex-start] [&_button]:px-0 [&_button]:min-h-[38px] [&_button]:rounded-[8px] [&_button]:border-0 [&_button]:bg-transparent [&_button]:py-0 [&_button]:text-[14px] [&_button]:font-medium [&_button]:text-ink-2 max-[719px]:[&_button]:min-h-[44px] [&_button[aria-checked=true]]:bg-surface [&_button[aria-checked=true]]:font-semibold [&_button[aria-checked=true]]:text-ink [&_button[aria-checked=true]]:[box-shadow:0_1px_2px_oklch(0.2_0.02_var(--h)/0.12)] [&_button[aria-pressed=true]]:bg-surface [&_button[aria-pressed=true]]:font-semibold [&_button[aria-pressed=true]]:text-ink [&_button[aria-pressed=true]]:[box-shadow:0_1px_2px_oklch(0.2_0.02_var(--h)/0.12)]` : 'segmented inline-flex rounded-md bg-sunken p-[3px] [align-self:flex-start] [&_button]:px-[14px] [&_button]:min-h-[38px] [&_button]:rounded-[8px] [&_button]:border-0 [&_button]:bg-transparent [&_button]:py-0 [&_button]:text-[14px] [&_button]:font-medium [&_button]:text-ink-2 max-[719px]:[&_button]:min-h-[44px] [&_button[aria-checked=true]]:bg-surface [&_button[aria-checked=true]]:font-semibold [&_button[aria-checked=true]]:text-ink [&_button[aria-checked=true]]:[box-shadow:0_1px_2px_oklch(0.2_0.02_var(--h)/0.12)] [&_button[aria-pressed=true]]:bg-surface [&_button[aria-pressed=true]]:font-semibold [&_button[aria-pressed=true]]:text-ink [&_button[aria-pressed=true]]:[box-shadow:0_1px_2px_oklch(0.2_0.02_var(--h)/0.12)]'} role="radiogroup" aria-label={label}>
     {options.map(([option, text]) => <button type="button" role="radio" key={String(option)} aria-checked={value === option}
       disabled={disabled} onClick={() => onPick(option)}>{text}</button>)}
   </div>;
@@ -861,46 +862,59 @@ function Keys({ model }: { model: SettingsModel }) {
   </div>;
 }
 
+const FEEDBACK_HINT: Record<FeedbackKind, string> = { question: '궁금한 점을 적어 주세요', bug: '어떤 화면에서 무엇이 안 됐는지 적어 주세요', idea: '바라는 점을 적어 주세요' };
+
 function Feedback({ model }: { model: SettingsModel }) {
   const [kind, setKind] = useState<FeedbackKind>('question');
   const [body, setBody] = useState('');
   const [email, setEmail] = useState('');
+  const [mailTouched, setMailTouched] = useState(false);
   const [state, setState] = useState<'idle' | 'sending' | FeedbackResult>('idle');
-  const wrap = 'settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]';
+  const wrap = 'settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:max-w-[720px] min-[720px]:px-[24px] min-[720px]:pb-[48px]';
   if (!model.userId) return <div className={wrap}><Back model={model} /><Section id="s-feedback" title="문의하기"><LoginNote model={model} what="문의하기" /></Section></div>;
   const problem = feedbackProblem(body, email);
+  const mailProblem = email.trim() ? feedbackProblem('x', email) : null;
+  // 글을 고치면 이전 결과 문구는 지운다. 하루 한도는 고쳐도 풀리지 않으니 그대로 둔다.
+  const edited = () => { if (state === 'ok' || state === 'error') setState('idle'); };
   const submit = async () => {
-    if (problem || state === 'sending') return;
+    if (problem || state === 'sending' || state === 'limit') return;
     setState('sending');
     const result = await model.sendFeedback(kind, body, email);
-    if (result === 'ok') { setBody(''); }
+    if (result === 'ok') setBody('');
     setState(result);
   };
+  const blocked = !!problem || state === 'sending' || state === 'limit';
+  // 막힌 단추 아래에는 풀리는 조건을 한 줄로 적는다(메일 오류는 메일 칸 아래에 따로 보인다).
+  const reason = state === 'limit' ? '오늘은 5번까지 보낼 수 있어요. 내일 다시 보내 주세요' : problem && !mailProblem ? '내용을 적으면 보낼 수 있어요' : mailProblem ? '메일 주소를 고치면 보낼 수 있어요' : '';
   const over = body.length > FEEDBACK_LIMIT;
   return <div className={wrap}>
     <Back model={model} />
-    <Section id="s-feedback" title="남길 내용">
-      <Setting name="종류">
-        <Choice label="종류" options={FEEDBACK_KINDS} value={kind} onPick={(next) => { setKind(next); if (state !== 'sending') setState('idle'); }} />
-      </Setting>
-      <Setting name="내용">
-        <textarea className="input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink resize-y leading-[1.5] text-[14px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px]" rows={5} aria-label="내용" placeholder="무엇이든 편하게 적어 주세요" value={body} aria-describedby="fb-count"
-          onChange={(event) => { setBody(event.currentTarget.value); if (state !== 'sending') setState('idle'); }} />
-        <span id="fb-count" className={`counter [align-self:flex-end] text-[12px] tabular-nums ${over ? 'over text-danger' : 'text-ink-3'}`} aria-live="polite">{body.length}/{FEEDBACK_LIMIT}</span>
-      </Setting>
-      <Setting name="답장받을 메일 (선택)" help="답장이 필요하면 적어 주세요. 적지 않으면 답장은 드릴 수 없어요">
-        <input className="input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink text-[15px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px]" type="email" autoComplete="email" aria-label="답장받을 메일" placeholder="이메일 주소" value={email}
-          onChange={(event) => { setEmail(event.currentTarget.value); if (state !== 'sending') setState('idle'); }} />
-      </Setting>
-      <div className="flex flex-col gap-[8px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line">
-        <button type="button" className="solid-button inline-flex items-center justify-center py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2 min-h-[44px] w-full px-4 min-[720px]:w-auto min-[720px]:self-end" disabled={!!problem || state === 'sending'} onClick={() => { void submit(); }}>{state === 'sending' ? '보내고 있어요' : '보내기'}</button>
-        {state === 'ok' ? <p className="field-note ok text-[14px] leading-[20px] text-accent m-0" role="status">보냈어요. 남겨 주셔서 고마워요</p> : null}
-        {state === 'limit' ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">오늘은 5번까지 보낼 수 있어요. 내일 다시 보내 주세요</p> : null}
-        {state === 'error' ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">보내지 못했어요. 잠시 뒤 다시 시도해 주세요</p> : null}
-        {problem && body.trim() !== '' ? <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0" role="status">{problem}</p> : null}
+    <section aria-label="문의 내용" className="mt-[24px]">
+      <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0">
+        <Setting name="종류">
+          <Choice label="종류" options={FEEDBACK_KINDS} value={kind} onPick={(next) => { setKind(next); edited(); }} grid columns={3} />
+        </Setting>
+        <Setting name="내용">
+          <textarea className="input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px] resize-none leading-[1.5] text-[15px]" rows={5} aria-label="내용" placeholder={FEEDBACK_HINT[kind]} value={body} aria-describedby="fb-count"
+            onChange={(event) => { setBody(event.currentTarget.value); edited(); }} />
+          <span id="fb-count" className={`counter [align-self:flex-end] text-[12px] tabular-nums ${over ? 'over text-danger' : body.length >= 450 ? 'text-ink-2' : 'text-ink-3'}`} aria-live="polite">{body.length}/{FEEDBACK_LIMIT}</span>
+        </Setting>
+        <Setting name="답장받을 메일" help="답장을 받으려면 적어 주세요. 적지 않아도 보낼 수 있어요">
+          <input className={`input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px] text-[15px] ${mailTouched && mailProblem ? 'border-danger' : ''}`} type="email" autoComplete="email" aria-label="답장받을 메일" placeholder="이메일 주소" value={email} aria-invalid={mailTouched && !!mailProblem}
+            onBlur={() => setMailTouched(true)} onChange={(event) => { setEmail(event.currentTarget.value); edited(); }} />
+          {mailTouched && mailProblem ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">메일 주소 형식이 맞는지 확인해 주세요</p> : null}
+        </Setting>
       </div>
-    </Section>
-    <p className="m-0 mt-[16px] text-[14px] leading-[20px] text-ink-2">{ext('https://github.com/aniseongu/skku-notice-platform/issues', 'GitHub 이슈로도 남길 수 있어요')}</p>
+      <p className="m-0 mt-[12px] px-[4px] text-[13px] leading-[19px] text-ink-3">운영자만 읽을 수 있어요. 하루 5번까지 보낼 수 있어요</p>
+    </section>
+    {/* 보내기는 휴대폰에서 엄지 자리(아래 고정)에 둔다. 키보드가 올라와도 가려지지 않게 화면 바닥에 붙는다. */}
+    <div className="sticky bottom-0 z-[1] mt-[16px] flex flex-col gap-[8px] bg-bg pt-[12px] pb-[calc(12px+env(safe-area-inset-bottom))] max-[719px]:-mx-[var(--gutter)] max-[719px]:px-[var(--gutter)] max-[719px]:border-t max-[719px]:border-line min-[720px]:static min-[720px]:bg-transparent min-[720px]:p-0">
+      <button type="button" className="solid-button inline-flex items-center justify-center py-0 rounded-md border-0 bg-accent text-on-accent text-[16px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2 min-h-[52px] w-full px-4 min-[720px]:w-[240px]" disabled={blocked} onClick={() => { void submit(); }}>{state === 'sending' ? '보내고 있어요' : '보내기'}</button>
+      {state === 'ok' ? <p className="m-0 text-[14px] leading-[20px] font-semibold text-accent" role="status">보냈어요. 남겨 주셔서 고마워요</p> : null}
+      {state === 'error' ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">보내지 못했어요. 잠시 뒤 다시 시도해 주세요</p> : null}
+      {reason && state !== 'ok' && state !== 'error' ? <p className="m-0 text-[14px] leading-[20px] text-ink-2" role="status">{reason}</p> : null}
+    </div>
+    <p className="m-0 mt-[8px] text-[14px] leading-[20px] text-ink-2"><a className="inline-flex min-h-[44px] items-center text-accent underline" href="https://github.com/aniseongu/skku-notice-platform/issues" target="_blank" rel="noopener noreferrer">GitHub에도 남길 수 있어요<span className="visually-hidden"> (새 창으로 열려요)</span></a></p>
   </div>;
 }
 

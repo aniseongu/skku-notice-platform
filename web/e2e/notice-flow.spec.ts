@@ -1636,26 +1636,30 @@ test('contact page: in-app form sends kind, body and optional reply mail, explai
   await expect(open).toContainText('새 창으로 열려요');
   await expect(screen.getByRole('link', { name: /문의하기/ })).not.toHaveAttribute('target', '_blank');
   await screen.getByRole('link', { name: /문의하기/ }).click();
-  await expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled();            // 내용이 없으면 막혀 있다
+  await expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled();            // 내용이 없으면 막혀 있고, 이유를 적는다
+  await expect(screen.getByText('내용을 적으면 보낼 수 있어요')).toBeVisible();
   await screen.getByRole('textbox', { name: '내용' }).fill('로그인이 안 돼요');
   await expect(screen.getByRole('button', { name: '보내기' })).toBeEnabled();
   await screen.getByRole('radio', { name: '버그' }).click();
   await screen.getByRole('textbox', { name: '답장받을 메일' }).fill('not-an-email');
-  await expect(screen.getByText('메일 주소를 다시 확인해 주세요')).toBeVisible();
+  await screen.getByRole('textbox', { name: '답장받을 메일' }).blur();                 // 입력 중에는 오류를 띄우지 않고 칸을 벗어난 뒤에 보여 준다
+  await expect(screen.getByText('메일 주소 형식이 맞는지 확인해 주세요')).toBeVisible();
+  await expect(screen.getByText('메일 주소를 고치면 보낼 수 있어요')).toBeVisible();
   await expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled();
   await screen.getByRole('textbox', { name: '답장받을 메일' }).fill('me@example.com');
   await screen.getByRole('button', { name: '보내기' }).click();
   await expect(screen.getByText('보냈어요. 남겨 주셔서 고마워요')).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { sent: unknown[][] }).sent)).toEqual([['bug', '로그인이 안 돼요', 'me@example.com']]);
   await expect(screen.getByRole('textbox', { name: '내용' })).toHaveValue('');           // 보낸 뒤에는 비운다
-  await page.evaluate(() => { (window as unknown as { next: string }).next = 'limit'; });
-  await screen.getByRole('textbox', { name: '내용' }).fill('또 보내요');
-  await screen.getByRole('button', { name: '보내기' }).click();
-  await expect(screen.getByText('오늘은 5번까지 보낼 수 있어요. 내일 다시 보내 주세요')).toBeVisible();
   await page.evaluate(() => { (window as unknown as { next: string }).next = 'error'; });
+  await screen.getByRole('textbox', { name: '내용' }).fill('또 보내요');
   await screen.getByRole('button', { name: '보내기' }).click();
   await expect(screen.getByText('보내지 못했어요. 잠시 뒤 다시 시도해 주세요')).toBeVisible();
   await expect(screen.getByRole('textbox', { name: '내용' })).toHaveValue('또 보내요');   // 실패하면 쓴 글을 지우지 않는다
+  await page.evaluate(() => { (window as unknown as { next: string }).next = 'limit'; });
+  await screen.getByRole('button', { name: '보내기' }).click();
+  await expect(screen.getByText('오늘은 5번까지 보낼 수 있어요. 내일 다시 보내 주세요')).toBeVisible();
+  await expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled();            // 한도에 걸리면 단추를 막고 이유를 적는다
 });
 
 test('share button in the open detail: opens the device share sheet, stays quiet when closed, and copies the link when there is no sheet', async ({ page }, testInfo) => {
@@ -1686,6 +1690,6 @@ test('share button in the open detail: opens the device share sheet, stays quiet
   await expect(page.locator('.toast')).not.toContainText('복사');
   await (await open('none')).click();
   await expect(page.locator('.toast')).toContainText('링크를 복사했어요');
+  await expect(page.getByRole('button', { name: '공유하기' }).locator('use')).toHaveAttribute('href', /#check$/);   // 누른 자리에서도 결과가 보인다
   expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toMatch(/^https?:\/\//);
 });
-  await expect(page.getByRole('button', { name: '공유하기' }).locator('use')).toHaveAttribute('href', /#check$/);   // 누른 자리에서도 결과가 보인다

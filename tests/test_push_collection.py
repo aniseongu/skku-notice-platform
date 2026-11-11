@@ -142,3 +142,62 @@ def test_device_canvas_mode_decides_which_alerts_a_device_gets():
     for mode, kinds in matrix.items():
         for kind, wanted in kinds.items():
             assert canvas_wanted(mode, kind) is wanted, (mode, kind)
+
+
+def test_feedback_mail_has_the_text_and_reply_to():
+    from skku_notice.push_collection import feedback_mail
+
+    row = {
+        "kind": "bug", "body": "  로그인이   안 돼요\n두 번째 줄 ",
+        "reply_email": "me@example.com", "created_at": "t",
+    }
+    mail = feedback_mail(row)
+    assert mail["subject"] == "[성공 문의] 버그: 로그인이 안 돼요 두 번째 줄"
+    assert "로그인이   안 돼요\n두 번째 줄" in mail["text"]
+    assert "답장 메일: me@example.com" in mail["text"]
+    assert mail["reply_to"] == "me@example.com"
+    plain = feedback_mail({"kind": "idea", "body": "다크 모드", "reply_email": None, "created_at": "x"})
+    assert "reply_to" not in plain and "답장할 수 없어요" in plain["text"]
+
+
+def test_feedback_batch_marks_only_sent_rows_and_needs_key_and_address(monkeypatch):
+    from datetime import UTC, datetime
+
+    from skku_notice import push_collection as pc
+
+    marked, posted = [], []
+
+    class FakeStore:
+        def feedback_pending(self):
+            return [
+                {"id": "f1", "kind": "question", "body": "하나"},
+                {"id": "f2", "kind": "question", "body": "둘"},
+            ]
+
+        def mark_feedback(self, feedback_id, now):
+            marked.append(feedback_id)
+
+    class Response:
+        def __init__(self, status):
+            self.status_code = status
+
+    def fake_post(url, headers, json, timeout):
+        posted.append((url, headers["Authorization"], json["to"], json["subject"]))
+        return Response(200 if len(posted) == 1 else 500)
+
+    monkeypatch.setattr(pc.requests, "post", fake_post)
+    now = datetime.now(UTC)
+    sender = "성공 <onboarding@resend.dev>"
+    counts = pc.run_feedback_batch(FakeStore(), "re_key", "owner@example.com", sender, now)
+    assert counts == {"feedback_sent": 1, "feedback_retry": 1}
+    assert marked == ["f1"]
+    assert posted[0][:3] == ("https://api.resend.com/emails", "Bearer re_key", ["owner@example.com"])
+
+    class Untouched:
+        def feedback_pending(self):
+            raise AssertionError("읽지 않아야 한다")
+
+    nothing = {"feedback_sent": 0, "feedback_retry": 0}
+    assert pc.run_feedback_batch(Untouched(), "", "owner@example.com", "x", now) == nothing
+    assert pc.run_feedback_batch(Untouched(), "re_key", "", "x", now) == nothing
+    assert pc.run_feedback_batch(Untouched(), "re_key", "not-an-email", "x", now) == nothing

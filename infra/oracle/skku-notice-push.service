@@ -11,6 +11,8 @@ WorkingDirectory=/opt/skku-notice-platform
 Environment=PYTHONPATH=/opt/skku-notice-platform/src
 EnvironmentFile=/etc/skku-notice/worker.env
 EnvironmentFile=/etc/skku-notice/push.env
+# 새 문의 메일(선택): RESEND_API_KEY, FEEDBACK_NOTIFY_EMAIL. 파일이 없으면 메일은 보내지 않는다.
+EnvironmentFile=-/etc/skku-notice/feedback.env
 RuntimeDirectory=skku-notice-push
 RuntimeDirectoryMode=0755
 ExecStart=/usr/bin/flock -n /run/skku-notice-push/push.lock /opt/skku-notice-push/bin/python -m skku_notice.push_collection

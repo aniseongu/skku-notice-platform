@@ -5,6 +5,7 @@ import re
 from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
+import requests
 from py_vapid import Vapid
 
 from skku_notice.deadline import KST
@@ -53,6 +54,22 @@ class PushStore(NoticeStore):
             "user_push_subscriptions",
             params={"select": "id,endpoint,p256dh,auth_secret,canvas_mode", "user_id": f"eq.{user_id}"},
         ).json()
+
+    def feedback_pending(self) -> list[dict]:
+        return self._request(
+            "GET",
+            "user_feedback",
+            params={
+                "select": "id,kind,body,reply_email,created_at", "notified_at": "is.null",
+                "order": "created_at.asc", "limit": "10",
+            },
+        ).json()
+
+    def mark_feedback(self, feedback_id: str, now: datetime) -> None:
+        self._request(
+            "PATCH", "user_feedback", params={"id": f"eq.{feedback_id}", "notified_at": "is.null"},
+            json={"notified_at": now.isoformat()},
+        )
 
     def mark_canvas(self, alert_id: int, status: str, attempts: int, now: datetime) -> None:
         self._request(
@@ -208,6 +225,58 @@ def run_canvas_batch(store: PushStore, private_key: str, subject: str, now: date
     return counts
 
 
+FEEDBACK_KIND_LABEL = {"question": "문의", "bug": "버그", "idea": "바라는 점"}
+RESEND_URL = "https://api.resend.com/emails"
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def feedback_mail(row: dict) -> dict:
+    """운영자에게 보낼 메일 내용. 답장 메일을 적은 사용자라면 Reply-To로 달아 바로 답장할 수 있게 한다."""
+    label = FEEDBACK_KIND_LABEL.get(row.get("kind"), "문의")
+    text = str(row.get("body", "")).strip()
+    first = " ".join(text.split())[:40] or "내용 없음"
+    reply = str(row.get("reply_email") or "").strip()
+    lines = [f"종류: {label}", f"보낸 때: {row.get('created_at', '')}", "", text, ""]
+    lines.append(f"답장 메일: {reply}" if reply else "답장 메일: 적지 않았어요(답장할 수 없어요)")
+    mail = {"subject": f"[성공 문의] {label}: {first}", "text": "\n".join(lines)}
+    if EMAIL_RE.match(reply):
+        mail["reply_to"] = reply
+    return mail
+
+
+def send_feedback_mail(api_key: str, sender: str, to: str, mail: dict) -> bool:
+    """Resend로 한 통을 보낸다. 실패 사유(키, 응답 본문)는 남기지 않는다."""
+    try:
+        response = requests.post(
+            RESEND_URL,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"from": sender, "to": [to], **mail},
+            timeout=15,
+        )
+        return 200 <= response.status_code < 300
+    except requests.RequestException:
+        return False
+
+
+def run_feedback_batch(
+    store: PushStore, api_key: str, to: str, sender: str, now: datetime,
+) -> dict[str, int]:
+    """새 문의를 운영자 메일로 한 통씩 보낸다.
+
+    키나 받는 주소가 없으면 읽지도 보내지도 않는다(나중에 설정하면 그때 보낸다).
+    """
+    counts = {"feedback_sent": 0, "feedback_retry": 0}
+    if not api_key or not EMAIL_RE.match(to):
+        return counts
+    for row in store.feedback_pending():
+        if send_feedback_mail(api_key, sender, to, feedback_mail(row)):
+            store.mark_feedback(row["id"], now)
+            counts["feedback_sent"] += 1
+        else:
+            counts["feedback_retry"] += 1
+    return counts
+
+
 def main() -> int:
     private_key = os.environ.get("VAPID_PRIVATE_KEY", "")
     subject = os.environ.get("VAPID_SUBJECT", "")
@@ -219,6 +288,10 @@ def main() -> int:
             now = datetime.now(UTC)
             counts = run_batch(store, private_key, subject, now)
             canvas = run_canvas_batch(store, private_key, subject, now)
+            feedback = run_feedback_batch(
+                store, os.environ.get("RESEND_API_KEY", ""), os.environ.get("FEEDBACK_NOTIFY_EMAIL", ""),
+                os.environ.get("FEEDBACK_MAIL_FROM", "성공 <onboarding@resend.dev>"), now,
+            )
         finally:
             store.close()
     except Exception:
@@ -227,7 +300,8 @@ def main() -> int:
         return 1
     print(
         f"Push worker: sent={counts['sent']} expired={counts['expired']} retry={counts['retry']} "
-        f"canvas_sent={canvas['canvas_sent']} canvas_failed={canvas['canvas_failed']}",
+        f"canvas_sent={canvas['canvas_sent']} canvas_failed={canvas['canvas_failed']} "
+        f"feedback_sent={feedback['feedback_sent']} feedback_retry={feedback['feedback_retry']}",
         flush=True,
     )
     return int(counts["retry"] > 0)
