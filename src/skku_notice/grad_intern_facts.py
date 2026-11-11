@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
 
-from skku_notice.grad_intern_rules import ORG_TYPES, TASK_CATEGORIES, WORK_MODES, InternFacts
+from skku_notice.grad_intern_rules import ORG_TYPES, TASK_CATEGORIES, WORK_MODES, InternFacts, clean_role
 
 MAX_TEXT = 6000
 
@@ -35,8 +35,12 @@ def facts_from_dict(data: dict) -> InternFacts | None:
         def number(value, kind):
             return None if value is None else kind(value)
 
+        roles = tuple(dict.fromkeys(r for r in (clean_role(x) for x in (data.get("roles") or data.get("tasks") or [])) if r))
+        if not roles:  # 정규식으로 읽은 판정은 직무가 근거 문장에만 있다
+            quotes = [e.get("quote") for e in data.get("evidence") or [] if isinstance(e, dict) and e.get("field") == "tasks" and e.get("source") != "judgment"]
+            roles = tuple(dict.fromkeys(r for r in (clean_role(q) for q in quotes if isinstance(q, str)) if r))
         return InternFacts(
-            organization_type=org, corporate_status_verified=bool(data.get("corporate_status_verified")),
+            roles=roles, organization_type=org, corporate_status_verified=bool(data.get("corporate_status_verified")),
             work_mode=data.get("work_mode") or "unknown", start_date=day(data.get("start_date")), end_date=day(data.get("end_date")),
             explicitly_stated_hours=number(data.get("explicitly_stated_hours"), int), daily_hours=number(data.get("daily_hours"), int),
             days_per_week=number(data.get("days_per_week"), int), task_category=data.get("task_category") or "unknown",
@@ -152,7 +156,7 @@ class Extracted:
             "missing_fields": self.missing, "ai_used": self.ai_used,
             "organization_type": self.facts.organization_type,
             "corporate_status_verified": self.facts.corporate_status_verified,
-            "work_mode": self.facts.work_mode, "task_category": self.facts.task_category,
+            "work_mode": self.facts.work_mode, "task_category": self.facts.task_category, "roles": list(self.facts.roles),
             "start_date": self.facts.start_date.isoformat() if self.facts.start_date else None,
             "end_date": self.facts.end_date.isoformat() if self.facts.end_date else None,
             "explicitly_stated_hours": self.facts.explicitly_stated_hours,
@@ -521,6 +525,9 @@ def build_facts(title: str, body: str, ai: dict | None, judgment: tuple[str | No
     elif values.get("organization_type") == "public_agency":
         values["corporate_status_verified"] = False
 
+    # 직무 이름: AI가 읽은 것(공고 글에 실제로 있는 것만)이 먼저, 없으면 정규식이 찾은 근거 문장에서.
+    role_quotes = [e["quote"] for e in evidence if e.get("field") == "tasks" and e.get("source") != "judgment"]
+    roles = tuple(dict.fromkeys(r for r in (clean_role(x) for x in (tasks or role_quotes)) if r))[:5]
     facts = InternFacts(
         organization_type=values.get("organization_type", "unknown"),
         corporate_status_verified=bool(values.get("corporate_status_verified", False)),
@@ -532,6 +539,7 @@ def build_facts(title: str, body: str, ai: dict | None, judgment: tuple[str | No
         academic_credit=values.get("academic_credit"),
         duration_months=values.get("duration_months") if "start_date" not in values else None,
         duration_days=values.get("duration_days") if "start_date" not in values else None,
+        roles=roles,
     )
     for name, empty in (("기관 종류", facts.organization_type == "unknown"), ("근무 형태", facts.work_mode == "unknown"),
                         ("근무 기간", facts.start_date is None and facts.duration_days is None), ("담당 업무", facts.task_category == "unknown")):

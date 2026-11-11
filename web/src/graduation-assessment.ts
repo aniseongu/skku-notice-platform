@@ -40,6 +40,13 @@ export function shortReason(text: string): string {
   return text.replace(/^[^:：]{1,20}[:：]\s*/, '').split(/(?<=[요다])\.\s+/)[0].replace(/\.$/, '').trim();
 }
 
+/** 학과 요건의 직무 근거 한 문장: 여러 직무 중 어떤 직무가 소프트웨어와 관련 있어 보이는지 이름으로 말한다. 맞지 않는 경우(이유로 이미 보임)는 비운다. */
+export function jobNote(track: Track): string {
+  const work = track.checks.find((c) => c.ruleId === 'DEPT-WORK');
+  if (!work || work.result === 'fail') return '';
+  return shortReason(work.note.replace(/\([^)]*\)\s*$/, ''));
+}
+
 /** 화면에 쓰는 단계. 확인할 게 남지 않고 통과한 검사만 있으면 "조건부"(승인·증빙은 수행 뒤 확인)여도 "가능"으로 보여 준다. */
 export function displayStatus(track: Track): Status {
   const passed = track.checks.some((c) => c.result === 'pass');
@@ -53,8 +60,10 @@ export function reasonOf(track: Track): string {
   if (track.status === 'NOT_ELIGIBLE' && fail) return shortReason(fail.note);
   const unknown = track.checks.find((c) => c.result === 'unknown');
   if ((track.status === 'NEEDS_REVIEW' || track.status === 'CONDITIONAL') && unknown) return shortReason(unknown.note);
-  if (displayStatus(track) === 'LIKELY' && track.status === 'CONDITIONAL') {
-    const pass = track.checks.find((c) => c.result === 'pass');
+  // 가능이라고 말한 뒤의 이유는 같은 말을 되풀이하지 않고 근거(기간·시간 기준)를 보인다. 없으면 통과한 첫 검사.
+  if (displayStatus(track) === 'LIKELY') {
+    const passes = track.checks.filter((c) => c.result === 'pass');
+    const pass = passes.find((c) => /-(FT|PT)$|TIME|HOURS/.test(c.ruleId)) ?? passes[0];
     if (pass) return shortReason(pass.note.replace(/\([^)]*\)\s*$/, ''));
   }
   return shortReason(track.label);

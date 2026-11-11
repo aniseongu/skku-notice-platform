@@ -333,7 +333,9 @@ def test_multi_track_posting_with_a_digital_it_track_is_not_called_unknown_work(
     assert found.organization_name == "IBK기업은행"  # 안내문의 "회사명 오류"가 아니라 제목의 이름
     result = assess_department(PROFILE, found.facts)
     work = next(check for check in result.checks if check.rule_id == "DEPT-WORK")
-    assert work.result == "unknown" and "디지털·IT 분야로 지원하면" in work.note
+    # 여러 직무 중 어떤 직무가 관련 있어 보이는지 이름으로 말한다.
+    assert work.result == "unknown" and "여러 직무 중 ‘디지털·IT’ 직무만 소프트웨어와 관련 있어 보여요" in work.note
+    assert "그 직무로 지원하면 해당될 수 있어요" in work.note
     assert result.status != LIKELY and result.status != CONDITIONAL  # 업무를 단정하지 않으므로 확인 필요에 머문다
 
 
@@ -380,3 +382,33 @@ def test_the_facts_for_the_office_role_posting_name_the_task_and_stop_asking_for
     extracted = gf.build_facts("[중소기업중앙회]2027년정규직(5급)채용연계형인턴직원채용", KBIZ_OCR, None)
     assert extracted.facts.task_category == "non_software"
     assert "담당 업무" not in extracted.missing   # "공고에 없어 확인하지 못한 내용"에 더 이상 나오지 않는다
+
+
+def test_roles_are_named_and_only_the_software_looking_ones_are_called_related():
+    from skku_notice.grad_intern_rules import clean_role, related_roles
+
+    assert clean_role("디지털·IT(50명)") == "디지털·IT" and clean_role("일반사무26명") == "일반사무"
+    assert clean_role("디지털·IT 관련") == "디지털·IT"
+    assert related_roles(("영업점 창구", "디지털·IT", "AI 서비스 인프라·플랫폼 엔지니어")) == ("디지털·IT", "AI 서비스 인프라·플랫폼 엔지니어")
+
+
+def test_the_note_says_which_of_several_roles_look_related_to_software():
+    from skku_notice.grad_intern_rules import InternFacts, _work_check
+
+    some = InternFacts(task_category="application_embedded", roles=("영업 지원", "백엔드 개발", "플랫폼 엔지니어"))
+    note = _work_check(some).note
+    assert "여러 직무 중 ‘백엔드 개발’, ‘플랫폼 엔지니어’ 직무가" in note and "영업 지원" not in note
+    one = _work_check(InternFacts(task_category="cloud_platform", roles=("AI 서비스 인프라·플랫폼 엔지니어",))).note
+    assert one.startswith("‘AI 서비스 인프라·플랫폼 엔지니어’ 직무가") and "여러 직무" not in one
+    assert "공고의 담당 업무가" in _work_check(InternFacts(task_category="data_ai")).note   # 직무 이름을 모르면 예전 문장
+
+
+def test_stored_facts_give_back_the_role_names_without_asking_the_ai_again():
+    extracted = gf.build_facts("[(주)예시] 인턴", "모집 직무: 백엔드 개발, 영업 지원\n근무형태: 전일제 근무\n근무기간: 2026.12.21 ~ 2027.02.28", ai_reply(
+        tasks=["백엔드 개발", "영업 지원"], task_category="application_embedded",
+        evidence=[{"field": "tasks", "quote": "모집 직무: 백엔드 개발, 영업 지원"}]))
+    assert extracted.facts.roles == ("백엔드 개발", "영업 지원")
+    stored = extracted.as_dict()
+    assert stored["roles"] == ["백엔드 개발", "영업 지원"]
+    restored = gf.facts_from_dict({k: v for k, v in stored.items() if k != "roles"})   # 예전에 저장한 판정에는 roles가 없다
+    assert restored is not None and restored.roles == ("백엔드 개발", "영업 지원")   # tasks에서 되살린다

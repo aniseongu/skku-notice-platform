@@ -180,3 +180,22 @@ test('가능한 이유는 수치만이 아니라 기준과 결론까지 말하�
   const no = track('NOT_ELIGIBLE', [{ ruleId: '3P-HOURS', result: 'fail', note: '근무 기간으로 계산하면 약 120시간이라 기준(280시간)에 못 미쳐서 인정되기 어려워요' }]);
   assert.match(reasonOf(no), /기준\(280시간\)에 못 미쳐서 인정되기 어려워요/);
 });
+
+test('가능의 이유는 같은 말을 되풀이하지 않고 기간·시간 근거를 보인다(판정이 LIKELY여도 같다)', async () => {
+  const { reasonOf } = await import('../src/graduation-assessment.ts');
+  const dept = { status: 'LIKELY', label: '학과 졸업 인턴십 인정 가능성이 높아요', unknowns: [], afterCompletion: [], notes: [], checks: [
+    { ruleId: 'DEPT-CORPORATE', result: 'pass', note: '기업·연구소 공고라 법인으로 봤어요' },
+    { ruleId: 'DEPT-COMPANY-FT', result: 'pass', note: '전일제 90일이라 기준(4주, 28일)을 넘어서 인정될 수 있어요' },
+    { ruleId: 'DEPT-WORK', result: 'pass', note: '공고의 담당 업무가 학과가 정한 SW 업무 분야로 보여요' },
+  ] };
+  assert.equal(reasonOf(dept), '전일제 90일이라 기준(4주, 28일)을 넘어서 인정될 수 있어요');
+  assert.equal(reasonOf({ ...dept, checks: [] }), '학과 졸업 인턴십 인정 가능성이 높아요');   // 근거가 없으면 판정 문장
+});
+
+test('학과 요건에는 관련 있어 보이는 직무 이름을 한 문장으로 덧붙이고, 맞지 않는 경우는 덧붙이지 않는다', async () => {
+  const { jobNote } = await import('../src/graduation-assessment.ts');
+  const track = (result, note) => ({ status: 'LIKELY', label: 'x', unknowns: [], afterCompletion: [], notes: [], checks: [{ ruleId: 'DEPT-WORK', result, note }] });
+  assert.equal(jobNote(track('pass', '여러 직무 중 ‘백엔드 개발’ 직무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)')), '여러 직무 중 ‘백엔드 개발’ 직무가 학과가 정한 SW 업무 분야로 보여요');
+  assert.equal(jobNote(track('fail', '공고의 담당 업무가 IT·SW 교육과 거리가 있어요')), '');
+  assert.equal(jobNote({ ...track('pass', 'x'), checks: [] }), '');
+});

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import calendar
+import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -76,6 +77,8 @@ class InternFacts:
     duration_days: int | None = None
     # 교내 연구실: 월별 계획 시간. ("semester"|"vacation", 시간)
     monthly_hours: tuple[tuple[str, int], ...] = ()
+    # 공고에서 읽은 직무 이름(여러 직무를 모집하면 여러 개). 판정 근거에 어떤 직무가 관련 있어 보이는지 이름으로 말하는 데 쓴다.
+    roles: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -154,13 +157,42 @@ def _dept_applicability(profile: GradProfile) -> tuple[str, str]:
     return "unknown", "전공과 입학 연도를 알려 주면 졸업요건 해당 여부를 확인해요"
 
 
+# 직무 이름에 소프트웨어·IT를 뜻하는 말이 있으면 소프트웨어와 관련 있어 보이는 직무로 본다(판정이 아니라 근거에 이름을 적기 위한 분류).
+IT_ROLE_NAME = re.compile(
+    r"개발|엔지니어|프로그래|소프트웨어|\bSW\b|\bIT\b|디지털|데이터|\bAI\b|인공지능|시스템|인프라|클라우드|보안|네트워크|플랫폼|\bQA\b|테스트", re.I)
+_ROLE_TAIL = re.compile(r"\s*\(?\s*\d+\s*명\s*\)?|\s*(?:관련|분야|직무|부문|모집)\s*$")
+
+
+def clean_role(text: str) -> str:
+    """공고의 직무 표기("디지털·IT(50명)", "일반사무26명")에서 이름만 남긴다."""
+    value = str(text or "").strip()
+    for _ in range(3):
+        value = _ROLE_TAIL.sub("", value).strip(" ·,/:-(")
+    return value[:24]
+
+
+def related_roles(roles: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(role for role in roles if IT_ROLE_NAME.search(role))
+
+
+def _role_names(roles: tuple[str, ...]) -> str:
+    return ", ".join(f"‘{role}’" for role in roles[:3])
+
+
 def _work_check(facts: InternFacts) -> Check:
+    roles = tuple(dict.fromkeys(role for role in facts.roles if role))
+    related = related_roles(roles)
     if facts.task_category in SW_CATEGORIES:
+        if related and len(roles) > len(related):
+            return Check("DEPT-WORK", PASS, f"여러 직무 중 {_role_names(related)} 직무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)")
+        if related:
+            return Check("DEPT-WORK", PASS, f"{_role_names(related)} 직무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)")
         return Check("DEPT-WORK", PASS, "공고의 담당 업무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)")
     if facts.task_category == "non_software":
         return Check("DEPT-WORK", FAIL, "공고의 담당 업무가 IT·SW 교육과 거리가 있어요")
     if facts.task_category == "mixed_it":
-        return Check("DEPT-WORK", UNKNOWN, "여러 직무를 모집해요. 디지털·IT 분야로 지원하면 해당될 수 있어요")
+        names = _role_names(related or roles[:1]) or "‘디지털·IT’"
+        return Check("DEPT-WORK", UNKNOWN, f"여러 직무 중 {names} 직무만 소프트웨어와 관련 있어 보여요. 그 직무로 지원하면 해당될 수 있어요")
     return Check("DEPT-WORK", UNKNOWN, "실제 담당 업무를 공고에서 확인하지 못했어요")
 
 
