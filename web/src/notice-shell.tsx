@@ -339,7 +339,7 @@ function ViewFilters({ app }: { app: AppController }) {
           onClick={() => app.markSelectedRead(true)}><Icon name="mail-open" />읽음으로 표시</button> : null}
         {selectedRead > 0 ? <button type="button" className={`${SELECT_BTN} ghost-button min-[720px]:min-h-[44px] min-[720px]:min-w-[44px] min-[720px]:rounded-[var(--r-md)] min-[720px]:border-0 min-[720px]:bg-transparent min-[720px]:px-[12px] min-[720px]:text-[14px] min-[720px]:font-medium min-[720px]:text-ink max-[719px]:flex-1`} disabled={!selectedRead}
           aria-label={`선택한 읽은 공지 ${selectedRead}개 읽지 않음으로 표시`}
-          onClick={() => app.markSelectedRead(false)}><Icon name="mail" />안 읽음으로 표시</button> : null}
+          onClick={() => app.markSelectedRead(false)}><Icon name="mail" />읽지 않음으로 표시</button> : null}
       </div>
     </div>;
   }
