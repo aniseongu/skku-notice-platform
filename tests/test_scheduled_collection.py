@@ -458,3 +458,23 @@ def test_purge_expired_calls_the_database_function_and_tolerates_odd_replies():
     assert Fake({"notices": 3, "ocr_cache": 1}).purge_expired() == {"notices": 3, "ocr_cache": 1}
     assert seen[0] == ("POST", "rpc/purge_expired_data", {})   # 인자 없이 기본 기준을 쓴다
     assert Fake(None).purge_expired() == {}
+
+
+def test_dormant_boards_lose_their_last_success_time_so_they_do_not_make_the_feed_look_stale():
+    from skku_notice.scheduled_collection import NoticeStore
+
+    seen = []
+
+    class Fake(NoticeStore):
+        def __init__(self):
+            pass
+
+        def _request(self, method, path, **kwargs):
+            seen.append((method, path, kwargs.get("params"), kwargs.get("json")))
+
+    Fake().clear_dormant(["biz-notice", "bus-notice"])
+    assert seen == [("PATCH", "platform_sources", {"id": "in.(biz-notice,bus-notice)", "last_success_at": "not.is.null"},
+                     {"last_success_at": None})]   # 시각이 있는 휴면 게시판만
+    seen.clear()
+    Fake().clear_dormant([])
+    assert seen == []   # 비울 게시판이 없으면 아무것도 하지 않는다

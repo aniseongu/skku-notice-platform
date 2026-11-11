@@ -127,6 +127,19 @@ class NoticeStore:
                 headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
             )
 
+    def clear_dormant(self, source_ids: list[str]) -> None:
+        """구독자가 없어 수집하지 않는 게시판의 마지막 성공 시각을 비운다.
+        화면의 기준 시각은 가장 오래된 성공 시각을 따라서, 수집이 멈춘 게시판이 남아 있으면
+        모든 사용자에게 "새 공지를 못 가져왔어요"가 뜬다(비운 값은 계산에서 빠진다).
+        나중에 누가 구독하면 다시 수집되고 시각이 채워진다."""
+        if source_ids:
+            self._request(
+                "PATCH", "platform_sources",
+                params={"id": f"in.({','.join(source_ids)})", "last_success_at": "not.is.null"},
+                json={"last_success_at": None},
+                headers={"Prefer": "return=minimal"},
+            )
+
     def purge_expired(self) -> dict:
         """보관 기간이 지난 공지와 딸린 데이터를 지운다(마감 30일 뒤, 마감 없으면 90일 뒤, 저장한 공지 제외).
         배치라 수집 때마다 불러도 가볍다. 지운 번호는 기록해, 다시 수집돼도 새 글로 들어오지 않는다."""
@@ -532,6 +545,12 @@ def main() -> int:
             # 실패해도 학교 수집 결과와 종료 코드에는 영향을 주지 않는다.
             external_count, _external_failed = run_external_collection(settings, store, now)
             count += external_count
+            # 구독자 없는 게시판이 기준 시각을 끌어내리지 않게 한다. 실패해도 수집 결과에는 영향이 없다.
+            try:
+                dormant = [s["id"] for s in school_sources(settings) if s.get("on_demand") and s["id"] not in subscribed]
+                store.clear_dormant(dormant)
+            except StoreError as exc:
+                print(f"휴면 게시판 정리 건너뜀 ({type(exc).__name__})", flush=True)
             # 보관 기간이 지난 데이터 정리. 실패해도 수집 결과에는 영향이 없다(함수가 아직 없으면 건너뛴다).
             try:
                 purged = store.purge_expired()
