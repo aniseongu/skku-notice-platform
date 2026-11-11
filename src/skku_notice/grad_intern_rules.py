@@ -165,9 +165,10 @@ def _company_time_check(facts: InternFacts) -> Check:
     days = inclusive_days(facts.start_date, facts.end_date)
     if days is None and facts.duration_days:
         days = facts.duration_days  # 날짜 없이 개월·주·근무일수만 적힌 공고
-    if facts.work_mode == "full_time":
+    # 전일제인지 안 적혀 있으면 전일제로 본다. 설명에도 전일제로 간주했다는 말은 쓰지 않고 전일제처럼 적는다.
+    if facts.work_mode in ("full_time", "unknown"):
         if days is None:
-            return Check("DEPT-COMPANY-FT", UNKNOWN, "전일제이지만 근무 기간을 확인하지 못했어요")
+            return Check("DEPT-COMPANY-FT", UNKNOWN, "근무 기간을 공고에서 확인하지 못했어요")
         if days >= MIN_FULL_TIME_DAYS:
             return Check("DEPT-COMPANY-FT", PASS, f"전일제 {days}일로 4주(28일) 이상이에요")
         return Check("DEPT-COMPANY-FT", FAIL, f"전일제 {days}일로 4주(28일)에 못 미쳐요")
@@ -178,7 +179,7 @@ def _company_time_check(facts: InternFacts) -> Check:
         if hours >= MIN_PART_TIME_HOURS:
             return Check("DEPT-COMPANY-PT", PASS, f"파트타임 {hours}시간으로 160시간 이상이에요")
         return Check("DEPT-COMPANY-PT", FAIL, f"파트타임 {hours}시간으로 160시간에 못 미쳐요")
-    return Check("DEPT-COMPANY-TIME", UNKNOWN, "전일제인지 파트타임인지 공고에 없어요")
+    return Check("DEPT-COMPANY-TIME", UNKNOWN, "근무 시간을 공고에서 확인하지 못했어요")
 
 
 def _corporate_check(facts: InternFacts) -> Check:

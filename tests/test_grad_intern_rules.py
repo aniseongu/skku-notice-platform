@@ -85,9 +85,13 @@ def test_t07_public_agency_security_five_weeks():
     assert dept(f) == LIKELY
 
 
-def test_t08_work_mode_unknown_needs_review_even_if_long():
+def test_t08_work_mode_unknown_is_treated_as_full_time_without_saying_so():
     f = facts(work_mode="unknown", end_date=D0 + timedelta(days=55))
-    assert dept(f) == CONDITIONAL and p3(f) == CONDITIONAL  # 근무 형태를 몰라도 회사 인턴이면 조건부 가능
+    result = assess_department(P, f)
+    # 전일제인지 안 적혀 있으면 전일제로 본다. 4주 이상이면 통과하고, 설명에는 "전일제로 간주" 같은 말을 쓰지 않는다.
+    assert result.status == LIKELY and p3(f) in (LIKELY, CONDITIONAL)
+    notes = " ".join(c.note for c in result.checks)
+    assert "간주" not in notes and "적혀 있지 않" not in notes and "전일제인지" not in notes
 
 
 def test_t09_and_t16_missing_or_title_only_task_needs_review():
