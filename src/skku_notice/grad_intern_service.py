@@ -20,6 +20,7 @@ from skku_notice.grad_intern_sources import DEPT_RULESET, EXTRACTOR_VERSION, P3_
 MAX_PER_RUN = 40
 AI_CALLS_PER_RUN = 6
 ENQUEUE_PER_RUN = 10
+STALE_PER_RUN = 10  # 규칙 버전이 바뀐 옛 판정을 실행마다 이만큼씩 새 규칙으로 다시 만든다(AI 호출은 위 상한과 일일 한도 안에서만)
 SW_COLLEGE, SW_DEPARTMENT = "소프트웨어융합대학", "소프트웨어학과"
 
 
@@ -58,9 +59,10 @@ def run_graduation(store, master_key: str, now: datetime, client_factory=None, s
     provider_factory = provider_factory or make_client
 
     client_factory = client_factory or gemini_client
-    counts = {"grad_queued": 0, "grad_assessed": 0, "grad_cached": 0, "grad_ai": 0, "grad_ai_unavailable": 0}
+    counts = {"grad_queued": 0, "grad_stale": 0, "grad_assessed": 0, "grad_cached": 0, "grad_ai": 0, "grad_ai_unavailable": 0}
     # 버튼 없이 미리 판정한다: 아직 채우지 못한 요건이 있는 사용자의 최근 인턴 공고를 대기열에 넣는다.
     counts["grad_queued"] = store.enqueue_graduation(ENQUEUE_PER_RUN)
+    counts["grad_stale"] = store.requeue_stale(DEPT_RULESET, STALE_PER_RUN) if hasattr(store, "requeue_stale") else 0
     today = now.astimezone(UTC).date().isoformat()
     used_calls = 0
     for req in store.graduation_requests(MAX_PER_RUN):

@@ -123,6 +123,22 @@ class JudgeStore(NoticeStore):
             pass
         return total
 
+    def requeue_stale(self, ruleset: str, limit: int) -> int:
+        """규칙 버전이 바뀐 뒤 옛 판정을 조금씩 새 규칙으로 다시 만든다(자동 갱신).
+        사용자가 아무것도 하지 않아도 새 문장으로 바뀐다. 한 번에 조금씩만 대기로 돌려
+        화면에서 판정이 사라지는 시간을 짧게 하고, 대기로 돌린 건은 같은 실행에서 바로 처리한다.
+        각 사용자의 판정은 그 사용자의 키로만 다시 만든다."""
+        rows = self._request("GET", "user_notice_graduation_assessments", params={
+            "status": "eq.READY", "ruleset_version": f"neq.{ruleset}", "select": "user_id,notice_id",
+            "order": "assessed_at.asc", "limit": str(max(1, limit))}).json()
+        now = datetime.now(UTC).isoformat()
+        for row in rows:
+            where = {"user_id": f"eq.{row['user_id']}", "notice_id": f"eq.{row['notice_id']}",
+                     "status": "eq.READY"}
+            self._request("PATCH", "user_notice_graduation_assessments", params=where,
+                          json={"status": "PENDING", "requested_at": now})
+        return len(rows)
+
     def graduation_requests(self, limit: int) -> list[dict]:
         return self._request("POST", "rpc/list_graduation_requests", json={"p_limit": limit}).json()
 

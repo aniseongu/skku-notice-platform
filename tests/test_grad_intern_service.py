@@ -213,3 +213,45 @@ def test_a_not_software_llm_judgment_makes_the_department_result_not_eligible():
     run(store, models)
     assert store.saved[0]["department"]["status"] == "NOT_ELIGIBLE"
     assert models.calls == 0  # 이미 있는 판정을 읽을 뿐 AI를 더 부르지 않는다
+
+
+def test_stale_assessments_are_requeued_each_run_for_the_current_ruleset():
+    class StaleStore(Store):
+        def requeue_stale(self, ruleset, limit):
+            self.stale_args = (ruleset, limit)
+            return 3
+
+    store = StaleStore([])
+    counts = svc.run_graduation(store, MASTER, NOW)
+    assert store.stale_args == (DEPT_RULESET, svc.STALE_PER_RUN)   # 규칙 버전이 바뀌면 옛 판정을 조금씩 새 규칙으로 다시 만든다
+    assert counts["grad_stale"] == 3
+    # 이 기능이 없는 저장소(옛 시험용)에서도 그냥 지나간다.
+    assert svc.run_graduation(Store([]), MASTER, NOW)["grad_stale"] == 0
+
+
+def test_requeue_stale_only_flips_ready_rows_of_an_old_ruleset_one_by_one():
+    from skku_notice.byok_judge import JudgeStore as RealStore
+
+    calls = []
+
+    class Resp:
+        def __init__(self, data):
+            self._data = data
+
+        def json(self):
+            return self._data
+
+    class Fake(RealStore):
+        def __init__(self):
+            pass
+
+        def _request(self, method, path, **kwargs):
+            calls.append((method, path, kwargs.get("params"), kwargs.get("json")))
+            return Resp([{"user_id": "u1", "notice_id": "n1"}, {"user_id": "u2", "notice_id": "n2"}] if method == "GET" else [])
+
+    assert Fake().requeue_stale("r3", 5) == 2
+    get = calls[0]
+    assert get[0] == "GET" and get[2]["status"] == "eq.READY" and get[2]["ruleset_version"] == "neq.r3" and get[2]["limit"] == "5"
+    patches = [c for c in calls if c[0] == "PATCH"]
+    assert len(patches) == 2 and all(c[2]["status"] == "eq.READY" and c[3]["status"] == "PENDING" for c in patches)
+    assert {c[2]["user_id"] for c in patches} == {"eq.u1", "eq.u2"}   # 사용자마다 따로, 그 사용자의 판정만
