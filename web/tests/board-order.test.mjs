@@ -27,3 +27,14 @@ test('parseBoardOrder keeps only unique strings', () => {
   assert.deepEqual(parseBoardOrder(['a', 1, 'a', '', 'b']), ['a', 'b']);
   assert.deepEqual(parseBoardOrder(null), []);
 });
+
+test('저장된 순서가 없으면 성균관대 > 대학 > 학과 > 기타 순서로 놓고, 같은 구분 안에서는 원래 순서를 지킨다', async () => {
+  const { applyBoardOrder } = await import('../src/board-order.ts');
+  const boards = [
+    { id: 'futurecar-notice', name: '미래차 부트캠프 공지' }, { id: 'sw-dept', name: '소프트웨어학과' }, { id: 'ai-notice', name: '인공지능학과' },
+    { id: 'swcol', name: '소프트웨어융합대학' }, { id: 'skku-notice01', name: '성균관대' }, { id: 'biz-notice', name: '경영대학 공지' },
+  ];
+  assert.deepEqual(applyBoardOrder(boards, []).map((x) => x.id), ['skku-notice01', 'swcol', 'biz-notice', 'sw-dept', 'ai-notice', 'futurecar-notice']);
+  // 저장된 순서가 있으면 그 순서가 먼저다.
+  assert.deepEqual(applyBoardOrder(boards, ['ai-notice']).map((x) => x.id)[0], 'ai-notice');
+});

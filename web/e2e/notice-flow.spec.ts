@@ -759,7 +759,7 @@ test('left board list shows only chosen boards, falls back to boards with notice
     app.authUserId = 'account-a'; app.subscriptions = ['korean-notice', 'biz-notice']; app.subscriptionsLoading = false;
   });
   list = await labels();
-  expect(list).toEqual(['모든 게시판', '국어국문학과', '경영대학', '게시판 더 고르기']);
+  expect(list).toEqual(['모든 게시판', '경영대학', '국어국문학과', '게시판 더 고르기']);
   // 지금 보고 있는 게시판은 구독이 아니어도 사라지지 않는다.
   await page.evaluate(() => { (document.querySelector('notice-app') as unknown as { board: string }).board = 'enc-notice'; });
   expect(await labels()).toContain('공과대학');
