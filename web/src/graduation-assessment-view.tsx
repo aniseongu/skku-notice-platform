@@ -51,10 +51,17 @@ export function GraduationNotes({ model }: { model: GraduationModel }) {
   if (!ready) return null;
   const hasP3 = model.tracks.p3 && !!ready.university3p;
   const hasDept = model.tracks.dept && !!ready.department;
-  return <ul className="m-0 mt-[16px] list-none p-0 text-[12px] leading-[18px] text-ink-3 [word-break:keep-all]" aria-label="인턴십 요건 안내">
-    <li>· 인턴십 요건은 공고에 적힌 내용만 보고 대략 판단해요. 실제 인정 여부는 학교와 학과에 확인해 주세요</li>
-    {hasP3 ? <li>· 3품 인턴십은 근무 시간이 280시간 이상인지 봐요</li> : null}
-    {hasDept ? <li>· 솦 인턴십은 담당 업무가 소프트웨어 분야인지, 근무가 전일제 4주 또는 파트타임 160시간 이상인지, 법인 기관인지 봐요</li> : null}
-    {ready.aiStatus && ready.aiStatus !== 'used' ? <li role="status">· {AI_NOTE[ready.aiStatus]}</li> : null}
-  </ul>;
+  const hasCriteria = hasP3 || hasDept;
+  // 점 대신 위 구분선과 "판정 기준" 라벨, 이름 칸(왼쪽)과 설명 칸(오른쪽)으로 나눈다.
+  return <div className="mt-[20px] border-t border-line pt-[12px] text-[12px] leading-[18px] text-ink-2 [word-break:keep-all]" aria-label="인턴십 요건 안내">
+    <p className="m-0">공고에 적힌 내용만 보고 대략 판단해요. 실제 인정 여부는 학교와 학과에 확인해 주세요</p>
+    {hasCriteria ? <>
+      <p className="m-0 mt-[12px] font-semibold text-ink-3">판정 기준</p>
+      <dl className="m-0 mt-[4px] grid grid-cols-[auto_1fr] gap-x-[12px] gap-y-[2px]">
+        {hasP3 ? <><dt className="font-medium text-ink-3">3품</dt><dd className="m-0">근무 시간이 280시간 이상인지 확인해요</dd></> : null}
+        {hasDept ? <><dt className="font-medium text-ink-3">솦</dt><dd className="m-0">소프트웨어 업무인지와 근무 기간·시간을 확인해요</dd></> : null}
+      </dl>
+    </> : null}
+    {ready.aiStatus && ready.aiStatus !== 'used' ? <p className="m-0 mt-[12px] text-ink-3" role="status">{AI_NOTE[ready.aiStatus]}</p> : null}
+  </div>;
 }
