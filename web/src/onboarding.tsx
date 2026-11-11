@@ -8,13 +8,13 @@ import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } fro
 import { COLLEGES, MAX_PROGRAMS, findCollege, programKey, programLabel, type Program } from './skku-programs';
 import { BOARD_CATALOG, boardsForPrograms, OTHER_BOARDS } from './skku-boards';
 import {
-  KEYWORD_SUGGESTIONS, SEARCH_THRESHOLD, STEPS, canContinue, filterDepartments, initialDraft, nextStep, previousStep,
+  KEYWORD_SUGGESTIONS, SEARCH_THRESHOLD, STEPS, canContinue, filterDepartments, initialDraft, missingHint, nextStep, previousStep,
   stepIndex, toggleValue, withPrograms, type Draft, type DoubleAnswer, type Step,
 } from './onboarding-flow';
 import { APP_NAME } from './brand';
 import { Card, ChipGroup, ChoiceList, Segmented, SwitchRow } from './ui';
 
-const STEP_LABELS = ['주전공', '복수전공', '학교 정보', '받을 공지', '알림', 'AI 키'] as const;
+const STEP_LABELS = ['주전공', '복수전공', '학교 정보', '인턴십', '받을 공지', '알림', 'AI 키'] as const;
 
 const YEARS = [1, 2, 3, 4, 5].map((year) => ({ value: year, label: year === 5 ? '5학년 이상' : `${year}학년` }));
 const STATUS = ENROLLMENT.map((value) => ({ value, label: value }));
@@ -86,7 +86,7 @@ export function Onboarding({ app }: { app: AppController }) {
   // 이전 화면의 스크롤 위치가 남아 제목이 가려지지 않게 맨 위로 되돌린 뒤 제목으로 포커스를 옮긴다.
   useEffect(() => { bodyRef.current?.scrollTo({ top: 0 }); heading.current?.focus({ preventScroll: true }); }, [step, addingDouble, changingPrimary, saved]);
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') app.dismissOnboarding(); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && app.onboardingManual) app.dismissOnboarding(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [app]);
@@ -123,7 +123,8 @@ export function Onboarding({ app }: { app: AppController }) {
   // 알림 → AI 키 순서. 알림을 이미 켰거나 지원하지 않으면 알림 단계를 건너뛰고, 키가 이미 있으면 AI 단계를 건너뛴다.
   const needAi = () => app.byokOn && !app.byokStatus && app.aiKeys.length === 0;
   const afterNotify = () => { if (needAi()) go('ai'); else app.closeOnboarding(); };
-  const save = async () => { if (await app.finishOnboarding(draft)) { setSaved(true); if (app.pushStatus === 'off') go('notify'); else afterNotify(); } };
+  const finishWithKey = () => { void app.completeOnboarding(); };
+  const save = async () => { if (await app.finishOnboarding(draft, !needAi())) { setSaved(true); if (app.pushStatus === 'off') go('notify'); else afterNotify(); } };
 
   let title = '', lead = '', body: React.ReactNode = null, foot: React.ReactNode = null;
   if (step === 'primary') {
@@ -160,8 +161,6 @@ export function Onboarding({ app }: { app: AppController }) {
       : <button type="button" className="solid-button" disabled={!canContinue('double', draft, doubleAnswer)} onClick={() => go('status')}>다음</button>;
   } else if (step === 'status') {
     title = '학교 정보를 알려 주세요';
-    lead = '지원 자격에 맞는 공지를 고르고, 이미 채운 인턴십 요건은 인턴 공고에서 빼 드려요';
-    const software = isSoftwareOriginal({ programs: draft.programs });
     body = <div className="onb-group">
       <h2>학년</h2>
       <Segmented label="학년" options={YEARS} columns={3} value={draft.year} onChange={(year) => setDraft({ ...draft, year })} />
@@ -170,6 +169,13 @@ export function Onboarding({ app }: { app: AppController }) {
       <p className="card-note">졸업예정은 이번 학기에 졸업하는 경우, 졸업은 학위를 이미 받은 경우예요</p>
       <h2>병역</h2>
       <Segmented label="병역" options={SERVICE} columns={3} value={draft.militaryService} onChange={(militaryService) => setDraft({ ...draft, militaryService })} />
+    </div>;
+    foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('internship')}>다음</button>;
+  } else if (step === 'internship') {
+    title = '인턴십 진행 상황을 알려 주세요';
+    lead = '이미 채운 요건은 인턴 공고에서 빼 드려요';
+    const software = isSoftwareOriginal({ programs: draft.programs });
+    body = <div className="onb-group">
       {software ? <>
         <h2>입학 연도가 언제예요?</h2>
         <p className="card-note">입학 연도마다 졸업요건이 달라요. 학번 전체는 받지 않아요</p>
@@ -185,10 +191,10 @@ export function Onboarding({ app }: { app: AppController }) {
           onChange={(value) => setDraft({ ...draft, deptInternshipDone: value === 'yes' })} />
       </> : null}
     </div>;
-    foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('boards')}>다음</button>;
+    foot = <button type="button" className="solid-button" disabled={!canContinue('internship', draft)} onClick={() => go('boards')}>다음</button>;
   } else if (step === 'boards') {
     title = '어떤 공지를 받을까요?';
-    lead = '고른 전공을 기준으로 켜 뒀어요';
+    lead = '고른 전공에 맞춰 켜 뒀어요. 바꿀 수 있어요';
     // 서버 이름을 받기 전에도 내부 id가 보이지 않게 목록의 한글 이름으로 채운다.
     const nameOf = (id: string) => sources.find((source) => source.id === id)?.name ?? BOARD_CATALOG.find((board) => board.id === id)?.name ?? OTHER_BOARDS.find((board) => board.id === id)?.name ?? id;
     body = <div className="onb-group">
@@ -203,20 +209,23 @@ export function Onboarding({ app }: { app: AppController }) {
           checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
       </div>
       <h2>관심 키워드</h2>
-      <p className="card-note">안 골라도 모든 공지를 받아요</p>
+      <p className="card-note">고르지 않으면 모든 공지를 받아요</p>
       <ChipGroup label="관심 키워드" options={keywordOptions} selected={draft.keywords} onToggle={(word) => setDraft({ ...draft, keywords: toggleValue(draft.keywords, word) })} />
       {app.onboardingError ? <p className="error-text" role="alert">{app.onboardingError}</p> : null}
     </div>;
     foot = <button type="button" className="solid-button" disabled={app.onboardingBusy} onClick={() => { void save(); }}>
       {app.onboardingBusy ? '저장하고 있어요' : app.onboardingError ? '다시 시도하기' : '다음'}</button>;
   } else if (step === 'ai') {
-    title = 'AI를 연결할까요?';
-    lead = '세 곳 중 한 곳만 연결하면 돼요. 안 해도 공지와 알림은 똑같이 써요';
+    title = 'AI를 연결해 주세요';
+    lead = '세 곳 중 한 곳만 연결하면 돼요';
     const connected = !!app.byokStatus || app.aiKeys.length > 0;
-    body = <div className="onb-group"><div className="box"><AiRows byok={aiConnectModel(app)} /></div></div>;
-    foot = connected
-      ? <button type="button" className="solid-button" onClick={() => app.closeOnboarding()}>끝내기</button>
-      : <button type="button" className="ghost-button" disabled={app.byokBusy || app.aiBusy} onClick={() => app.closeOnboarding()}>나중에 할게요</button>;
+    body = <div className="onb-group"><div className="box"><AiRows byok={aiConnectModel(app)} /></div>
+      {app.onboardingError ? <p className="error-text" role="alert">{app.onboardingError}</p> : null}</div>;
+    foot = <>
+      {connected ? null : <p className="m-0 text-center text-[13px] text-ink-3" role="status">키를 하나 연결해 주세요</p>}
+      <button type="button" className="solid-button" disabled={!connected || app.onboardingBusy || app.byokBusy || app.aiBusy} onClick={finishWithKey}>
+        {app.onboardingBusy ? '저장하고 있어요' : '끝내기'}</button>
+    </>;
   } else {
     title = '알림을 켜 둘까요?';
     lead = '새 공지가 올라오면 이 기기로 알려드려요. 키워드와 맞지 않는 공지는 조용히 보여드려요.';
@@ -255,9 +264,10 @@ export function Onboarding({ app }: { app: AppController }) {
             aria-valuetext={`${STEPS.length}단계 중 ${index + 1}단계`} aria-label="첫 설정 진행">
             {STEPS.map((name, i) => <span key={name} data-done={i <= index} />)}
           </div>
+          {/* 처음 설정은 건너뛸 수 없다(전공과 키는 필수). 설정에서 다시 연 경우에만 닫을 수 있다. */}
           {manual
             ? <button type="button" className="onb-x" aria-label="닫기" onClick={() => app.dismissOnboarding()}><svg className="i" aria-hidden="true"><use href="icons/sprite.svg#close" /></svg></button>
-            : <button type="button" className="onb-skip" onClick={() => app.dismissOnboarding()}>나중에 하기</button>}
+            : <span className="onb-top-slot" aria-hidden="true" />}
         </div>
       </div>
       <div className="onb-body min-[900px]:flex-none">
@@ -265,7 +275,9 @@ export function Onboarding({ app }: { app: AppController }) {
         {lead ? <p className="onb-lead">{lead}</p> : null}
         {body}
       </div>
-      {foot ? <div className="onb-foot"><div className="onb-foot-inner">{foot}</div></div> : null}
+      {foot ? <div className="onb-foot"><div className="onb-foot-inner">
+        {missingHint(step, draft, doubleAnswer) && !addingDouble ? <p className="m-0 text-center text-[13px] text-ink-3" role="status">{missingHint(step, draft, doubleAnswer)}</p> : null}
+        {foot}</div></div> : null}
     </div>
   </div>;
 }

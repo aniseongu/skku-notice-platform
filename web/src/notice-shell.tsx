@@ -269,7 +269,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
     return <Empty title="목록을 불러오지 못했어요" body="공지 데이터를 연결하는 중이에요. 잠시 뒤 다시 확인해 주세요" action="다시 불러오기" onAction={() => { void app.refresh(); }} />;
   }
   if (!list.length) {
-    const picker = <div className="group-head empty-head"><span></span><BoardSelect app={app} /></div>;
+    const picker = app.tab() === 'all' && app.noBoards() ? null : <div className="group-head empty-head"><span></span><BoardSelect app={app} /></div>;
     const note = (() => {
       // 받을 게시판을 아직 안 골랐으면 첫 설정으로, 이미 마친 사람은 게시판 고르기로 이어 준다.
       if (app.tab() === 'all' && app.noBoards()) {

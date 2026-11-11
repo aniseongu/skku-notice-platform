@@ -760,20 +760,40 @@ export class AppController extends Reactive {
     this.onboardingOpen = true;
   }
 
-  async finishOnboarding(draft: Draft): Promise<boolean> {
+  /** AI 키를 연결해야 설정이 끝난다. 키가 없으면 완료 시각을 남기지 않아서, 중간에 나갔다 다시 들어와도 첫 설정이 이어진다. */
+  async completeOnboarding(): Promise<boolean> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch, client = authClient;
+    if (!client || !userId || this.onboardingBusy) return false;
+    const next: UserProfile = { ...this.profile, onboardedAt: this.profile.onboardedAt ?? new Date().toISOString() };
+    this.onboardingBusy = true; this.onboardingError = '';
+    try {
+      if (epoch !== this.subscriptionsEpoch || !(await sessionIs(client, userId))) throw new Error('계정이 바뀌었어요');
+      await storeProfile(client, userId, next);
+      if (epoch !== this.subscriptionsEpoch) return false;
+      this.profile = next; this.closeOnboarding();
+      return true;
+    } catch {
+      if (epoch === this.subscriptionsEpoch) this.onboardingError = '저장하지 못했어요. 다시 시도해 주세요.';
+      return false;
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.onboardingBusy = false;
+    }
+  }
+
+  async finishOnboarding(draft: Draft, final = true): Promise<boolean> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch, client = authClient;
     if (!client || !userId || this.onboardingBusy) return false;
     let words: string[];
     try { words = parseKeywords(draft.keywords.join('\n')); }
     catch (error) { this.onboardingError = error instanceof Error ? error.message : '키워드를 확인해 주세요.'; return false; }
-    const key = JSON.stringify([userId, epoch, draft]);
+    const key = JSON.stringify([userId, epoch, draft, final]);
     const nextProfile: UserProfile = {
       ...this.profile, programs: draft.programs, year: draft.year, enrollmentStatus: draft.enrollmentStatus, militaryService: draft.militaryService,
       admissionYear: isSoftwareOriginal({ programs: draft.programs }) ? draft.admissionYear : this.profile.admissionYear,
       university3pInternshipSelected: draft.university3pInternshipSelected,
       university3pInternshipDone: draft.university3pInternshipDone,
       deptInternshipDone: isSoftwareOriginal({ programs: draft.programs }) ? draft.deptInternshipDone : this.profile.deptInternshipDone,
-      onboardedAt: this.profile.onboardedAt ?? new Date().toISOString(),
+      onboardedAt: this.profile.onboardedAt ?? (final ? new Date().toISOString() : null),
     };
     const boards = draft.boards.filter((id) => this.sources.some((source) => source.id === id && !source.external));
     if (!this.onboardingChain || this.onboardingChain.key !== key) {
@@ -1375,6 +1395,12 @@ export class AppController extends Reactive {
   // 고른 게시판이 지금 탭에 없으면 모든 게시판으로 본다(탭을 오가도 빈 목록이 되지 않게).
   activeBoard(): string { return this.tabSources().some((s) => s.id === this.board) ? this.board : 'all'; }
 
+  /** 로그인해 받을 게시판을 고른 사람은 고른 게시판의 학교 공지만 목록에 나온다(전체 보기에서도 고르지 않은 게시판 공지가 섞이지 않게). */
+  inChosenBoards(notice: Notice): boolean {
+    if (!this.authUserId || this.subscriptionsLoading || this.subscriptionsError || this.subscriptions.length === 0) return true;
+    return this.subscriptions.includes(notice.source_id);
+  }
+
   isExternal(notice: Notice): boolean { return Boolean(this.sources.find((s) => s.id === notice.source_id)?.external); }
 
   byTab(list: Notice[], tab: Tab): Notice[] {
@@ -1385,6 +1411,7 @@ export class AppController extends Reactive {
     const scoped = list.filter((n) => !n.deadline || !deadlinePassed(n.deadline))
       .filter((n) => this.isExternal(n) === external)
       .filter(() => external || !this.noBoards())
+      .filter((n) => external || this.inChosenBoards(n) || n.id === this.selectedId || n.id === this.openedId)
       .filter((n) => !this.unreadOnly || !this.isRead(n) || n.id === this.selectedId || n.id === this.openedId)
       .filter((n) => !this.graduationOnly || !this.gradEnabled() || this.gradPartsFor(n, this.judgement(n)?.ai?.verdict).some((part) => part.met) || n.id === this.selectedId || n.id === this.openedId);
     return orderNotices(scoped, this.sortFor(tab));

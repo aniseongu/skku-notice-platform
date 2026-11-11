@@ -104,7 +104,7 @@
   .onb-group { display: grid; gap: 8px; }
   .onb .settings-head { margin: 0 0 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
   /* 라벨은 자기 칩·목록과 한 덩어리다. 위 24px(앞에 다른 묶음이 있으면 32px), 아래 8px. 묶음의 gap이 8px이라 위 여백은 그만큼 뺀다. */
-  .onb-group > h2 { margin: 16px 0 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
+  .onb-group > h2 { margin: 16px 0 0; font-size: 15px; line-height: 22px; font-weight: 600; color: var(--text); }
   .onb-group > h2:first-child { margin-top: 0; }
   .onb-group > * + h2 { margin-top: 24px; }
   .onb-foot { position: sticky; bottom: 0; z-index: 2; background: linear-gradient(to bottom, transparent, var(--bg) 14px); padding: 18px 0 0; }
