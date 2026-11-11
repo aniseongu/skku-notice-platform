@@ -731,13 +731,13 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
       {status ? <button type="button" className="text-button self-start" disabled={busy} onClick={() => { setEditing(false); setValue(''); setShown(false); }}>{labels.close}</button> : null}
       {guide}
     </> : confirming ? <>
-      <p className="m-0 text-[14px] text-ink">{name} 연결을 끊을까요?</p>
-      <div className="flex gap-2">
+      <p className="m-0 text-[14px] text-ink min-[720px]:text-right">{name} 연결을 끊을까요?</p>
+      <div className="flex gap-2 min-[720px]:justify-end">
         <button type="button" className="ghost-button key-action min-h-[44px] px-4 py-0 text-danger" aria-label={`${name} 연결 끊기 확인`} disabled={busy} onClick={onRemove}>끊기</button>
         <button type="button" className="ghost-button key-action min-h-[44px] px-4 py-0" disabled={busy} onClick={() => setConfirming(false)}>취소</button>
       </div>
     </> : <>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-[720px]:justify-end">
         <span className={`inline-flex min-h-[32px] min-w-[128px] items-center justify-center rounded-pill bg-sunken px-3 text-[14px] font-medium ${status?.disabled ? 'text-danger' : 'text-accent'}`}>{state}</span>
         <span className="flex shrink-0 gap-2"><button type="button" className="ghost-button key-action min-h-[44px] px-3 py-0" aria-label={`${name} ${retry}`} disabled={loading} onClick={() => setEditing(true)}>{retry}</button>
         {status ? <button type="button" className="ghost-button key-action min-h-[44px] px-3 py-0 text-danger" aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={() => setConfirming(true)}>{labels.remove}</button> : null}</span>
