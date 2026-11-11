@@ -1559,7 +1559,11 @@ export class AppController extends Reactive {
     }
     remember('notice-sort', this.sort);
     remember('intern-sort', this.internSort);
-    if (view !== this.view) { this.view = view; this.selectedId = null; this.selecting = false; this.selectedReads = []; }
+    if (view !== this.view) {
+      this.view = view; this.selectedId = null; this.selecting = false; this.selectedReads = [];
+      // 설정에서 나오거나 탭이 바뀌어 돌아올 때도 상세 칸은 닫힌 채로 연다(setView와 같다). 열어 둔 설정은 그대로 두고 이번만 닫는다.
+      if (view !== 'settings') this.detailOpen = false;
+    }
   };
 
   setBoard(board: string) {

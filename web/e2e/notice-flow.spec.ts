@@ -488,6 +488,24 @@ test('a new notice that is not judged yet says so while an AI key exists, and sa
   await expect(reason(ids[2])).not.toContainText('확인하고 있어요');
 });
 
+test('leaving settings returns to the list with the detail pane closed, whichever way you leave', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 800 });
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.waitForLoadState('networkidle');
+  const state = () => page.evaluate(() => { const a = document.querySelector('notice-app') as unknown as Record<string, unknown>; return { view: a.view, detailOpen: a.detailOpen, selectedId: a.selectedId }; });
+  // 상세 칸을 열어 둔 사용자(저장된 설정)가 설정에 들어갔다 나온다.
+  await page.evaluate(() => { const a = document.querySelector('notice-app') as unknown as Record<string, unknown> & { setDetail: (open: boolean) => void }; a.setDetail(true); });
+  for (const how of ['X 버튼', '뒤로 가기']) {
+    await page.getByRole('button', { name: '설정', exact: true }).click();
+    await expect(page.locator('platform-settings-screen')).toBeVisible();
+    if (how === 'X 버튼') await page.getByRole('button', { name: '설정 닫기' }).click(); else await page.goBack();
+    await expect(page.locator('platform-settings-screen')).toHaveCount(0);
+    expect(await state(), how).toMatchObject({ view: 'all', detailOpen: false, selectedId: null });
+    await page.evaluate(() => { const a = document.querySelector('notice-app') as unknown as { setDetail: (open: boolean) => void }; a.setDetail(true); });
+  }
+});
+
 test('refresh button and R refetch the notice list, lock while loading, and keep the list with a message on failure', async ({ page }) => {
   let hits = 0;
   let mode: 'ok' | 'slow' | 'fail' = 'ok';
