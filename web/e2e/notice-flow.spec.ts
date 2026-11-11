@@ -930,11 +930,13 @@ test('iCampus page: switch on → token → summary time, each in its own sectio
   await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false, pushStatus: 'on', devices, thisDeviceId: 'd1',
     summaryTime: null, canvasStatus: null, refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', registerCanvas: 'fn:registerCanvas', removeCanvas: 'fn:removeCanvas', setSummaryTime: 'fn:time' });
   const sw = screen.getByRole('switch', { name: /아이캠퍼스 알림/ });
-  // 꺼져 있으면 아무것도 펼쳐지지 않는다(키 입력칸도 없다).
+  // 꺼져 있어도 토큰 입력칸은 있다(연결 키 쪽과 같은 입력 줄). 요약 시간은 켜야 나온다.
   await expect(sw).toHaveAttribute('aria-checked', 'false');
-  await expect(screen.getByLabel('아이캠퍼스 토큰', { exact: true })).toHaveCount(0);
+  await expect(screen.getByLabel('아이캠퍼스 토큰', { exact: true })).toBeVisible();
+  await expect(screen.getByRole('group', { name: '하루 요약 시간' })).toHaveCount(0);
+  expect(await screen.locator('h2.settings-head').allInnerTexts()).toEqual(['알림', '토큰']);
   let clicks = 0;
-  // 1) 스위치 켜기: 키 입력칸이 같은 자리 바로 아래에 열리고, 요약 시간은 키를 연결할 때까지 잠겨 있다.
+  // 1) 스위치 켜기: 요약 시간이 아래에 열리고, 토큰을 연결할 때까지 잠겨 있다.
   await sw.click(); clicks += 1;
   await expect(sw).toHaveAttribute('aria-checked', 'true');
   const input = screen.getByLabel('아이캠퍼스 토큰', { exact: true });
@@ -974,9 +976,10 @@ test('iCampus page: switch on → token → summary time, each in its own sectio
   await withApp(page, { canvasStatus: null, summaryTime: null });
   await expect(sw).toHaveAttribute('aria-checked', 'true');
   await expect(screen.getByLabel('아이캠퍼스 토큰', { exact: true })).toBeVisible();
-  // 기기 알림이 꺼져 있으면 스위치를 켤 수 없고 이유를 알려 준다.
+  // 기기 알림이 꺼져 있으면 스위치를 켤 수 없고 이유를 알려 주지만, 토큰은 여전히 넣을 수 있다.
   await withApp(page, { pushStatus: 'off' });
   await expect(sw).toBeDisabled();
+  await expect(screen.getByLabel('아이캠퍼스 토큰', { exact: true })).toBeVisible();
   await expect(screen.getByText('먼저 알림 설정에서 이 기기 알림을 켜 주세요')).toBeVisible();
 });
 

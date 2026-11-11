@@ -340,7 +340,7 @@ function DeviceRow({ device, info }: { device: Device; info: NonNullable<Setting
   </li>;
 }
 
-/** 아이캠퍼스 쪽: 알림 켜기 → 토큰 → 하루 요약 시간 순으로, 켜면 같은 쪽 아래에 구역별로 펼쳐진다. 토큰과 요약 시간은 제목이 있는 따로 구역이다.
+/** 아이캠퍼스 쪽: 알림 켜기 → 토큰 → 하루 요약 시간 순이고, 토큰은 켜기 전에도 넣을 수 있다. 요약 시간은 켜면 펼쳐진다. 구역마다 제목이 있다.
  * 스위치는 이 기기의 알림 모드(끔/켬)이고, 토큰이 저장돼 있어야 알림이 실제로 간다. 토큰을 지워도 입력칸이 닫히지 않게 펼침 상태는 따로 둔다. */
 function Canvas({ model }: { model: SettingsModel }) {
   const info = model.devicesInfo;
@@ -368,8 +368,9 @@ function Canvas({ model }: { model: SettingsModel }) {
       <SwitchRow label="아이캠퍼스 알림" description={pushOn ? '과제 마감과 하루 요약을 이 기기로 받아요' : '먼저 알림 설정에서 이 기기 알림을 켜 주세요'}
         checked={open && pushOn} disabled={!pushOn || info.busy} onChange={toggle} />
     </Section>
+    {/* 토큰은 계정에 저장하는 값이라 알림을 켜기 전에도 넣을 수 있다. 입력 방식은 연결 키 쪽과 같은 줄이다. */}
+    <Section id="s-canvas-token" title="토큰"><CanvasRow model={model} alignEnd={false} /></Section>
     {open && pushOn ? <>
-      <Section id="s-canvas-token" title="토큰"><CanvasRow model={model} alignEnd={false} /></Section>
       <Section id="s-canvas-time" title="하루 요약">
         <Setting name="요약 시간" help={hasToken ? '모든 기기에 같은 시간을 적용해요. 할 일이 없어도 알려요' : '토큰을 연결하면 바꿀 수 있어요'}>
           <p className="setting-name visually-hidden" id="summary-time-label">하루 요약 시간</p>
