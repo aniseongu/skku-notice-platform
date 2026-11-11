@@ -105,6 +105,7 @@ class Extracted:
             "start_date": self.facts.start_date.isoformat() if self.facts.start_date else None,
             "end_date": self.facts.end_date.isoformat() if self.facts.end_date else None,
             "explicitly_stated_hours": self.facts.explicitly_stated_hours,
+            "daily_hours": self.facts.daily_hours, "days_per_week": self.facts.days_per_week,
             "academic_credit": self.facts.academic_credit,
             "duration_months": self.facts.duration_months, "duration_days": self.facts.duration_days,
         }
@@ -132,7 +133,8 @@ WEEK5 = re.compile(r"주\s*5\s*일")
 WEEK_HOURS = re.compile(r"주\s*(\d{1,2})\s*시간")
 WEEK_DAYS_LOW = re.compile(r"주\s*([1-4])\s*일")
 FULL_DAY = re.compile(r"(?:1일|일|하루)\s*8\s*시간|풀\s*타임|종일\s*근무")
-DAY_HOURS = re.compile(r"하루\s*(\d{1,2})\s*(?:[Hh]|시간)")
+DAY_HOURS = re.compile(r"(?:하루|1\s*일)\s*(\d{1,2})\s*(?:[Hh]|시간)")
+DAYS_PER_WEEK = re.compile(r"주\s*([1-7])\s*일")
 CLOCK = re.compile(r"(\d{1,2})\s*:\s*(\d{2})\s*[~\-–∼]\s*(\d{1,2})\s*:\s*(\d{2})")
 
 # 담당 업무 분야: 공고의 "담당업무"(없으면 제목과 앞부분) 칸에서 말을 찾는다. 소프트웨어 말만 있으면 그 분야, 소프트웨어가 아닌 말만 있으면
@@ -209,6 +211,12 @@ def static_facts(title: str, body: str) -> dict:
         if len(day_hits) == 1 and 5 <= (workdays := day_hits.pop()) <= 365:
             found["duration_days"] = workdays * 7 // 5  # 근무일수는 평일 기준이라 달력 일수로 바꾼다
             found["evidence"].append({"field": "period", "quote": WORK_DAYS.search(text).group(0)})
+    # 하루 근무시간과 주당 일수는 각각 한 값으로 모일 때만 읽는다(여러 값이면 어느 것인지 몰라서 비운다).
+    per_day = {int(m.group(1)) for m in DAY_HOURS.finditer(text) if 1 <= int(m.group(1)) <= 12}
+    per_week = {int(m.group(1)) for m in DAYS_PER_WEEK.finditer(text)}
+    if len(per_day) == 1 and len(per_week) == 1:
+        found["daily_hours"], found["days_per_week"] = per_day.pop(), per_week.pop()
+        found["evidence"].append({"field": "hours", "quote": f"1일 {found['daily_hours']}시간, 주 {found['days_per_week']}일"})
     hours = {int(m.group(1)) for m in TOTAL_HOURS.finditer(text)}
     if len(hours) == 1:
         found["explicitly_stated_hours"] = hours.pop()
@@ -440,6 +448,7 @@ def build_facts(title: str, body: str, ai: dict | None, judgment: tuple[str | No
         work_mode=values.get("work_mode", "unknown"),
         start_date=values.get("start_date"), end_date=values.get("end_date"),
         explicitly_stated_hours=values.get("explicitly_stated_hours"),
+        daily_hours=values.get("daily_hours"), days_per_week=values.get("days_per_week"),
         task_category=values.get("task_category", "unknown"),
         academic_credit=values.get("academic_credit"),
         duration_months=values.get("duration_months") if "start_date" not in values else None,

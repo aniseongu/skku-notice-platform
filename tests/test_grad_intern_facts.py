@@ -288,3 +288,8 @@ def test_duration_months_are_read_from_label_on_the_previous_line_and_from_inter
     # 개월 수가 둘이거나 근무와 관계없는 개월 수는 읽지 않는다.
     for body in ("매장 현장 (2개월)과 본사 프로젝트 실무 (3개월)", "모집 인원 3개월 후 발표"):
         assert "duration_months" not in gf.static_facts("[㈜가나] 인턴", body), body
+
+
+def test_daily_hours_and_days_per_week_are_read_when_both_are_written():
+    found = gf.build_facts("중소기업중앙회 인턴", "근무시간: 09:00 ~ 18:00 (1일 8시간, 주 5일)", None)
+    assert found.facts.daily_hours == 8 and found.facts.days_per_week == 5

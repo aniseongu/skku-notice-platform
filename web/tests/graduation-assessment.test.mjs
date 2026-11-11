@@ -146,3 +146,14 @@ test('솦 인턴십은 소프트웨어학과 원전공이 아니면(복수전공
   const parts = gp({ dept: 'LIKELY', p3: 'LIKELY' }, tracks, 'relevant');
   assert.deepEqual(parts.map((p) => p.key), ['p3']);                  // 목록·상세 라벨에도 3품만 나온다
 });
+
+test('확인할 것이 없고 통과한 검사만 있으면 조건부여도 가능으로 보이고 이유는 통과한 근거다', async () => {
+  const { displayStatus, reasonOf } = await import('../src/graduation-assessment.ts');
+  const track = (status, checks) => ({ status, label: '학교 신3품 인턴십: 가능성이 있지만 승인과 증빙이 남아 있어요', checks, unknowns: [], afterCompletion: [], notes: [] });
+  const pass = { ruleId: '3P-HOURS', result: 'pass', note: '근무시간이 없어서 전일 근무(1일 8시간, 주 5일)로 보고 계산하면 약 428시간이에요(실제 인정은 출근 기록 기준이에요)' };
+  const done = track('CONDITIONAL', [pass]);
+  assert.equal(displayStatus(done), 'LIKELY');
+  assert.equal(reasonOf(done), '근무시간이 없어서 전일 근무(1일 8시간, 주 5일)로 보고 계산하면 약 428시간이에요');
+  assert.equal(displayStatus(track('CONDITIONAL', [pass, { ruleId: 'X', result: 'unknown', note: '확인 못 했어요' }])), 'CONDITIONAL');
+  assert.equal(displayStatus(track('NOT_ELIGIBLE', [{ ruleId: 'X', result: 'fail', note: '안 돼요' }])), 'NOT_ELIGIBLE');
+});

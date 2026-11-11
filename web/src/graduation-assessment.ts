@@ -40,12 +40,23 @@ export function shortReason(text: string): string {
   return text.replace(/^[^:：]{1,20}[:：]\s*/, '').split(/(?<=[요다])\.\s+/)[0].replace(/\.$/, '').trim();
 }
 
-/** 이유: 안 맞는 항목이 있으면 그것, 확인 못 한 항목이 있으면 그것, 아니면 판정 문장. */
+/** 화면에 쓰는 단계. 확인할 게 남지 않고 통과한 검사만 있으면 "조건부"(승인·증빙은 수행 뒤 확인)여도 "가능"으로 보여 준다. */
+export function displayStatus(track: Track): Status {
+  const passed = track.checks.some((c) => c.result === 'pass');
+  const open = track.checks.some((c) => c.result !== 'pass');
+  return track.status === 'CONDITIONAL' && passed && !open ? 'LIKELY' : track.status;
+}
+
+/** 이유: 안 맞는 항목이 있으면 그것, 확인 못 한 항목이 있으면 그것, 통과했으면 통과한 근거, 아니면 판정 문장. */
 export function reasonOf(track: Track): string {
   const fail = track.checks.find((c) => c.result === 'fail');
   if (track.status === 'NOT_ELIGIBLE' && fail) return shortReason(fail.note);
   const unknown = track.checks.find((c) => c.result === 'unknown');
   if ((track.status === 'NEEDS_REVIEW' || track.status === 'CONDITIONAL') && unknown) return shortReason(unknown.note);
+  if (displayStatus(track) === 'LIKELY' && track.status === 'CONDITIONAL') {
+    const pass = track.checks.find((c) => c.result === 'pass');
+    if (pass) return shortReason(pass.note.replace(/\([^)]*\)\s*$/, ''));
+  }
   return shortReason(track.label);
 }
 

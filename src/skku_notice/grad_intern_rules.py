@@ -64,6 +64,9 @@ class InternFacts:
     start_date: date | None = None
     end_date: date | None = None
     explicitly_stated_hours: int | None = None
+    # 공고에 "1일 8시간", "주 5일"처럼 적힌 하루 근무시간과 주당 근무일수(둘 다 있을 때만 총 시간을 계산한다)
+    daily_hours: int | None = None
+    days_per_week: int | None = None
     task_category: str = "unknown"
     academic_credit: float | None = None
     # 공고에 "5개월"처럼 기간만 적힌 경우의 개월 수(시작·종료일이 없을 때만 쓴다)
@@ -284,21 +287,20 @@ def _p3_hours_check(facts: InternFacts) -> Check:
         if hours >= P3_MIN_HOURS:
             return Check("3P-HOURS", PASS, f"공고에 {hours}시간으로 적혀 있어요(실제 인정은 출근 기록 기준이에요)")
         return Check("3P-HOURS", FAIL, f"공고의 {hours}시간은 비교과 현장실습 기준 280시간에 못 미쳐요")
-    if facts.work_mode in ("full_time", "unknown") and facts.start_date and facts.end_date and facts.end_date >= facts.start_date:
-        cap = weekdays_between(facts.start_date, facts.end_date) * P3_MAX_DAILY_HOURS
-        if cap < P3_MIN_HOURS:
-            return Check("3P-HOURS", FAIL, f"평일 하루 8시간으로 계산해도 최대 {cap}시간이라 280시간에 못 미쳐요")
-        if facts.work_mode == "unknown":
-            return Check("3P-HOURS", UNKNOWN, "기간은 충분할 수 있어요. 전일제인지와 근무 시간은 공고에 없어서 확인이 필요해요")
-        return Check("3P-HOURS", UNKNOWN, "기간은 충분할 수 있지만 실제 인정 시간은 공휴일과 출근 기록으로 정해져요")
-    if facts.work_mode in ("full_time", "unknown") and facts.duration_days:
-        # 근무 형태가 안 적혀 있어도 기간으로 상한은 계산한다: 평일 하루 8시간으로도 280시간에 못 미치면 어느 형태로든 안 된다.
-        cap = facts.duration_days * 5 // 7 * P3_MAX_DAILY_HOURS
-        if cap < P3_MIN_HOURS:
-            return Check("3P-HOURS", FAIL, f"공고의 기간 {facts.duration_days}일은 평일 하루 8시간으로 계산해도 최대 {cap}시간이라 280시간에 못 미쳐요")
-        if facts.work_mode == "unknown":
-            return Check("3P-HOURS", UNKNOWN, f"기간은 {facts.duration_days}일 정도로 충분할 수 있어요. 전일제인지와 근무 시간은 공고에 없어서 확인이 필요해요")
-        return Check("3P-HOURS", UNKNOWN, f"공고에 {facts.duration_days}일 정도로 적혀 있어요. 실제 인정 시간은 출근 기록으로 정해져요")
+    if facts.work_mode in ("full_time", "unknown"):
+        # 근무시간이 공고에 없으면 전일 근무(1일 8시간, 주 5일)로 보고 계산한다. 파트타임이라고 적힌 공고는 여기에 오지 않는다.
+        stated = bool(facts.daily_hours and facts.days_per_week)
+        daily, weekly = (facts.daily_hours, facts.days_per_week) if stated else (P3_MAX_DAILY_HOURS, 5)
+        basis = f"1일 {daily}시간, 주 {weekly}일로" if stated else "근무시간이 없어서 전일 근무(1일 8시간, 주 5일)로 보고"
+        estimate = None
+        if facts.start_date and facts.end_date and facts.end_date >= facts.start_date:
+            estimate = ((facts.end_date - facts.start_date).days + 1) * weekly * daily // 7  # 공휴일은 빼지 않아 실제와 조금 다를 수 있다
+        elif facts.duration_days:
+            estimate = facts.duration_days * weekly // 7 * daily
+        if estimate is not None:
+            if estimate < P3_MIN_HOURS:
+                return Check("3P-HOURS", FAIL, f"{basis} 계산하면 약 {estimate}시간이라 280시간에 못 미쳐요")
+            return Check("3P-HOURS", PASS, f"{basis} 계산하면 약 {estimate}시간이에요(실제 인정은 출근 기록 기준이에요)")
     return Check("3P-HOURS", UNKNOWN, "근무 시간을 공고에서 확인하지 못했어요")
 
 

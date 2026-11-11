@@ -16,6 +16,7 @@ from skku_notice.grad_intern_rules import (
     spans_months,
     weekdays_between,
 )
+from skku_notice.grad_intern_sources import DEPT_RULESET
 
 P = GradProfile(admission_year=2022, degree_track="original_major", sw_major=True, university_3p_selected=True)
 D0 = date(2026, 12, 7)  # 월요일
@@ -197,13 +198,35 @@ def test_3p_note_says_it_does_not_imply_department_credit():
 def test_assessment_serializes_without_extra_fields():
     data = assess_department(P, facts()).as_dict()
     assert set(data) == {"status", "rule_version", "label", "checks", "unknowns", "after_completion", "notes", "sources"}
-    assert data["rule_version"] == "cse-2025-06-01"
+    assert data["rule_version"] == DEPT_RULESET
 
 
 def test_3p_hours_use_the_period_even_when_the_work_mode_is_not_written():
     from skku_notice.grad_intern_rules import _p3_hours_check
     long = _p3_hours_check(facts(work_mode="unknown", start_date=None, end_date=None, duration_days=90))
-    assert long.result == "unknown" and "전일제인지" in long.note  # 기간은 충분하지만 근무 형태·시간이 없다고 정확히 알린다
+    assert long.result == "pass" and "전일 근무" in long.note  # 근무시간이 없으면 전일 근무로 보고 계산한다
     short = _p3_hours_check(facts(work_mode="unknown", start_date=None, end_date=None, duration_days=28))
     assert short.result == "fail"  # 평일 8시간으로도 280시간에 못 미치면 형태와 상관없이 미달
     assert _p3_hours_check(facts(work_mode="part_time", start_date=None, end_date=None, duration_days=90)).result == "unknown"
+
+
+def test_3p_hours_default_to_full_time_when_hours_are_not_written():
+    from skku_notice.grad_intern_rules import _p3_hours_check
+    # 중소기업중앙회 공고: 2027-02-15 ~ 04-30, 근무시간 없음 -> 전일 근무로 계산해 280시간을 넘는다
+    check = _p3_hours_check(facts(work_mode="full_time", start_date=date(2027, 2, 15), end_date=date(2027, 4, 30)))
+    assert check.result == "pass" and "전일 근무" in check.note and "약 428시간" in check.note
+
+
+def test_3p_hours_use_written_daily_hours_and_days_per_week():
+    from skku_notice.grad_intern_rules import _p3_hours_check
+    start, end = date(2027, 2, 15), date(2027, 4, 30)
+    ok = _p3_hours_check(facts(work_mode="full_time", start_date=start, end_date=end, daily_hours=8, days_per_week=5))
+    assert ok.result == "pass" and "1일 8시간, 주 5일" in ok.note
+    short = _p3_hours_check(facts(work_mode="full_time", start_date=start, end_date=end, daily_hours=4, days_per_week=3))
+    assert short.result == "fail" and "280시간에 못 미쳐요" in short.note
+
+
+def test_3p_part_time_without_hours_stays_unknown():
+    from skku_notice.grad_intern_rules import _p3_hours_check
+    check = _p3_hours_check(facts(work_mode="part_time", start_date=date(2027, 2, 15), end_date=date(2027, 4, 30)))
+    assert check.result == "unknown"

@@ -1,7 +1,7 @@
 // 공지 상세의 "졸업요건 확인". 서버가 수집할 때 미리 판정해 두고, 이 화면은 결과를 글로만 보여 준다(버튼 없음).
 // 영역 이름, 판정 키워드(되면 초록·안 되면 빨강), 이유가 한 문단에 이어진다. 색만으로 구분하지 않도록 판정도 글로 쓴다.
 import { useState } from 'react';
-import { STATUS_TEXT, reasonOf, type GraduationAssessment, type Track, type VisibleTracks } from './graduation-assessment';
+import { STATUS_TEXT, displayStatus, reasonOf, type GraduationAssessment, type Track, type VisibleTracks } from './graduation-assessment';
 
 export interface GraduationModel {
   tracks: VisibleTracks;
@@ -27,8 +27,9 @@ const MUTED = new Set(['NOT_ELIGIBLE', 'NOT_APPLICABLE']);
 
 /** "3품 인턴십 가능" 키워드 바로 옆에 이유가 이어지는 한 문단. */
 function Result({ name, track }: { name: string; track: Track }) {
-  return <p className={`m-0 mb-[8px] text-[14px] leading-[21px] [word-break:keep-all] ${MUTED.has(track.status) ? 'text-ink-3' : 'text-ink-2'}`} data-status={track.status}>
-    <b className={`mr-[6px] ${KEYWORD[track.status] ?? 'font-semibold text-ink-2'}`}>{name} {STATUS_TEXT[track.status]}</b><span aria-hidden className="mr-[6px] text-ink-3">·</span>{reasonOf(track)}
+  const display = displayStatus(track);
+  return <p className={`m-0 mb-[8px] text-[14px] leading-[21px] [word-break:keep-all] ${MUTED.has(display) ? 'text-ink-3' : 'text-ink-2'}`} data-status={display}>
+    <b className={`mr-[6px] ${KEYWORD[display] ?? 'font-semibold text-ink-2'}`}>{name} {STATUS_TEXT[display]}</b><span aria-hidden className="mr-[6px] text-ink-3">·</span>{reasonOf(track)}
   </p>;
 }
 
