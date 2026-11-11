@@ -130,12 +130,22 @@ class _Models:
             payload = response.json()
         except ValueError as exc:
             raise ProviderError(None, "bad_output", detail="not json") from exc
+        # 출처: https://openrouter.ai/docs/api/reference/errors-and-debugging
+        # 요청이 받아들여진 뒤 실패하면 HTTP는 200이고 본문에 error만 오거나, choices 안에 finish_reason "error"와 error가 같이 온다.
+        error = payload.get("error") if isinstance(payload, dict) else None
+        if error is None and isinstance(payload, dict):
+            choices = payload.get("choices")
+            first = choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
+            error = first.get("error")
+        if error:
+            code = error.get("code") if isinstance(error, dict) else None
+            code = code if isinstance(code, int) else None
+            note = (error.get("message") if isinstance(error, dict) else error) or "error"
+            raise ProviderError(code, classify(code) if code else "bad_output",
+                                detail=" ".join(str(note).split())[:160].replace(self._api_key, "***"))
         text, why = _extract_text(payload)
         if text is None:
-            # OpenRouter는 모델 쪽 오류를 200 응답의 error 항목으로 줄 때가 있다. 사유만 짧게 남긴다.
-            error = payload.get("error") if isinstance(payload, dict) else None
-            note = (error.get("message") if isinstance(error, dict) else error) or why
-            raise ProviderError(None, "bad_output", detail=" ".join(str(note).split())[:160].replace(self._api_key, "***"))
+            raise ProviderError(None, "bad_output", detail=why)
         usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
         return SimpleNamespace(text=text, usage=usage, model=payload.get("model") or model)
 

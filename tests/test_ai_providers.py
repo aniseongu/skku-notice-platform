@@ -128,3 +128,14 @@ def test_legacy_provider_default_and_model_id_check():
     assert provider_or_default(None) == "gemini" and provider_or_default("") == "gemini" and provider_or_default("x") == "gemini"
     assert provider_or_default("groq") == "groq"
     assert valid_model_id("openai/gpt-oss-20b") and valid_model_id("vendor/model:free") and not valid_model_id("bad model!")
+
+
+@pytest.mark.parametrize("body,code,kind", [
+    ({"error": {"code": 429, "message": "Rate limit exceeded"}}, 429, "rate_limit"),
+    ({"error": {"code": 502, "message": "provider down"}}, 502, "unavailable"),
+    ({"choices": [{"message": {"content": "partial"}, "finish_reason": "error", "error": {"code": 402, "message": "no credits"}}]}, 402, "payment"),
+])
+def test_openrouter_errors_inside_a_200_response_keep_their_code(body, code, kind):
+    with pytest.raises(ProviderError) as info:
+        client_for("openrouter", lambda r: httpx.Response(200, json=body)).models.generate_content(model="openrouter/free", contents="x")
+    assert info.value.code == code and info.value.kind == kind
