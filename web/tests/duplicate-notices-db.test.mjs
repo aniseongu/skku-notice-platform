@@ -23,6 +23,7 @@ test('duplicate notices: first seen wins, school needs the same body, external n
     await db.exec(await readFile(new URL('../../supabase/migrations/20261112120000_duplicate_notices_image_only.sql', import.meta.url), 'utf8'));
     await db.exec(await readFile(new URL('../../supabase/migrations/20261112130000_duplicate_notices_ocr_text.sql', import.meta.url), 'utf8'));
     await db.exec(await readFile(new URL('../../supabase/migrations/20261112140000_duplicate_notices_title_only_for_image.sql', import.meta.url), 'utf8'));
+    await db.exec(await readFile(new URL('../../supabase/migrations/20261112170000_duplicate_external_company_title.sql', import.meta.url), 'utf8'));
     const long = '장학금 신청 안내입니다. 신청 기간과 제출 서류를 확인하세요. '.repeat(4);
     await db.exec(`insert into platform_notices (id, source_id, title, posted_on, first_seen, body) values
       ('skku/1','skku','[장학] 2026학년도 동계 장학금 신청 안내','2026-11-10','2026-11-10 01:00+00','${long}'),
@@ -35,7 +36,7 @@ test('duplicate notices: first seen wins, school needs the same body, external n
       ('skku/2','skku','공지','2026-11-10','2026-11-10 01:00+00','${long}');`);
     const keys = Object.fromEntries((await db.query('select id, dup_key from platform_notices')).rows.map((r) => [r.id, r.dup_key]));
     assert.equal(keys['skku/1'], null);                         // 본문이 있는 글은 제목 열쇠가 없다(제목만으로 합치지 않는다)
-    assert.match(keys['ja/1'], /^x:img:/); assert.equal(keys['ja/1'], keys['lk/2']);   // 외부 공고도 본문이 사진뿐일 때만 제목으로 본다
+    assert.equal(keys['ja/1'], keys['lk/2']);                    // 회사명이 든 외부 공고는 제목으로 본다
     const loser = async (id, user = null) => (await db.query('select dup_loser($1, $2) l', [id, user])).rows[0].l;
     assert.equal(await loser('skku/1'), false);                // 가장 먼저 본 글이 대표
     assert.equal(await loser('biz/9'), true);
@@ -83,5 +84,15 @@ test('duplicate notices: first seen wins, school needs the same body, external n
     assert.equal(await textKey('skku/30'), await textKey('biz/30'));
     assert.notEqual(await textKey('cse/30'), await textKey('skku/30'));
     assert.equal(await loser('biz/30'), true); assert.equal(await loser('skku/30'), false); assert.equal(await loser('cse/30'), false);
+    // 회사명이 든 외부 공고는 본문이 서로 달라도 같은 공고다. 회사 표기가 없는 외부 제목은 본문이 다르면 합치지 않는다.
+    await db.exec(`insert into platform_notices (id, source_id, title, posted_on, first_seen, body) values
+      ('ja/40','ja','[카카오뱅크] DevOps 엔지니어링팀 정규직 전환형 인턴 채용','2026-11-10','2026-11-10 01:00+00','${long}'),
+      ('lk/40','lk','[카카오뱅크] DevOps 엔지니어링팀 정규직 전환형 인턴 채용','2026-11-11','2026-11-11 01:00+00','${long.replace('신청', '지원')}'),
+      ('ja/41','ja','개발자 신입 공개 채용 안내 전체 공고','2026-11-10','2026-11-10 01:00+00','${long}'),
+      ('lk/41','lk','개발자 신입 공개 채용 안내 전체 공고','2026-11-11','2026-11-11 01:00+00','${long.replace('신청', '지원')}'),
+      ('skku/42','skku','[카카오뱅크] DevOps 엔지니어링팀 정규직 전환형 인턴 채용','2026-11-10','2026-11-10 02:00+00','${long.replace('신청', '문의')}');`);
+    assert.equal(await loser('lk/40'), true);
+    assert.equal(await loser('lk/41'), false);                   // 회사 표기가 없으면 본문이 달라서 합치지 않는다
+    assert.equal(await loser('skku/42'), false);                 // 학교 글은 외부 공고와 합치지 않는다
   } finally { await db.close(); }
 });
