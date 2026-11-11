@@ -38,3 +38,9 @@ test('같은 공지로 묶인 글끼리 서로 찾을 수 있고, 묶이지 않�
   assert.deepEqual(mates.get('lk/1').map((n) => n.id), ['ja/1']);
   assert.equal(mates.has('cse/1'), false);
 });
+
+test('같은 게시판 안의 글은 제목이나 내용 열쇠가 같아도 합치지 않는다', () => {
+  const list = [notice('lk/1', 'x:a', '2026-11-10T01:00Z', '2026-11-10', 'x:b1'), notice('lk/2', 'x:b', '2026-11-10T02:00Z', '2026-11-10', 'x:b1')];
+  assert.equal(dropDuplicates(list).length, 2);
+  assert.equal(groupMates(list).size, 0);
+});

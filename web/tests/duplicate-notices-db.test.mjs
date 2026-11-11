@@ -41,7 +41,7 @@ test('duplicate notices: first seen wins, school needs the same body, external n
     assert.equal(await loser('skku/1'), false);                // 가장 먼저 본 글이 대표
     assert.equal(await loser('biz/9'), true);
     assert.equal(await loser('cse/5'), false);                 // 제목이 같아도 본문이 다르면 다른 글
-    assert.equal(await loser('skku/2'), true);                 // 제목은 짧아도 본문이 같으면 같은 글이다
+    assert.equal(await loser('skku/2'), false);                // 같은 게시판의 글은 본문이 같아도 합치지 않는다
     assert.equal(await loser('lk/2'), true);                   // 외부 공고는 사이트가 달라도 합친다
     assert.equal(await loser('lk/3'), false);                  // 같은 제목이라도 게시일이 3일 넘게 멀면 별개 글
     // 사용자가 볼 수 없는 게시판의 글이 먼저 감지됐어도 그 사용자에게는 대표가 아니다(구독한 게시판의 글을 대표로 삼는다).
@@ -91,6 +91,11 @@ test('duplicate notices: first seen wins, school needs the same body, external n
       ('ja/41','ja','개발자 신입 공개 채용 안내 전체 공고','2026-11-10','2026-11-10 01:00+00','${long}'),
       ('lk/41','lk','개발자 신입 공개 채용 안내 전체 공고','2026-11-11','2026-11-11 01:00+00','${long.replace('신청', '지원')}'),
       ('skku/42','skku','[카카오뱅크] DevOps 엔지니어링팀 정규직 전환형 인턴 채용','2026-11-10','2026-11-10 02:00+00','${long.replace('신청', '문의')}');`);
+    // 같은 게시판의 글끼리는 본문 앞부분이 같아도 합치지 않는다(한 회사의 여러 직무 공고).
+    await db.exec(`insert into platform_notices (id, source_id, title, posted_on, first_seen, body) values
+      ('lk/50','lk','[오오비] 마케팅 AE 오프라인 인턴','2026-11-10','2026-11-10 01:00+00','${long}'),
+      ('lk/51','lk','[오오비] 디자이너 인턴 체험형','2026-11-10','2026-11-10 02:00+00','${long}');`);
+    assert.equal(await loser('lk/51'), false);
     assert.equal(await loser('lk/40'), true);
     assert.equal(await loser('lk/41'), false);                   // 회사 표기가 없으면 본문이 달라서 합치지 않는다
     assert.equal(await loser('skku/42'), false);                 // 학교 글은 외부 공고와 합치지 않는다

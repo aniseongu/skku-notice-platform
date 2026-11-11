@@ -30,3 +30,20 @@ begin
 end $$;
 
 update public.platform_notices set title = title;
+
+-- 같은 게시판 안의 글끼리는 합치지 않는다. 한 회사의 여러 직무 공고는 회사 소개로 시작하는 본문 앞부분이 같아서 잘못 합쳐졌다(오오비컴퍼니 마케팅과 디자이너).
+-- 같은 공지가 두 번 올라오는 일은 서로 다른 게시판 사이에서만 생긴다.
+create or replace function public.dup_loser(p_id text, p_user uuid default null) returns boolean
+language sql stable set search_path to '' as $$
+  select exists (
+    select 1 from public.platform_notices n
+    join public.platform_notices o on o.id <> n.id and o.source_id <> n.source_id
+      and (o.dup_key = n.dup_key or o.dup_text_key = n.dup_text_key)
+      and abs(o.posted_on - n.posted_on) <= 3 and (o.first_seen, o.id) < (n.first_seen, n.id)
+    where n.id = p_id and (n.dup_key is not null or n.dup_text_key is not null)
+      and (p_user is null
+        or exists (select 1 from public.platform_sources os where os.id = o.source_id and os.external)
+        or exists (select 1 from public.user_source_subscriptions us where us.user_id = p_user and us.source_id = o.source_id)));
+$$;
+revoke all on function public.dup_loser(text, uuid) from public, anon, authenticated;
+grant execute on function public.dup_loser(text, uuid) to service_role;

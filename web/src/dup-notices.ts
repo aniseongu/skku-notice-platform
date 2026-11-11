@@ -2,7 +2,7 @@ import type { Notice } from './data.ts';
 
 // 같은 공지가 여러 게시판에 올라오면 가장 먼저 감지된 글 하나만 보여 준다(그 글의 게시판 이름이 줄에 적힌다).
 // 게시일이 3일 안이고, 정리한 제목이 같거나(dup_key) 제목이 달라도 본문이나 사진 글자가 같으면(dup_text_key) 같은 글이다.
-// DB 함수 dup_loser와 같은 규칙이다. 사용자가 볼 수 있는 목록 안에서만 묶으므로, 구독하지 않은 게시판의 글이 대표가 되어
+// 같은 게시판 안의 글끼리는 합치지 않는다(한 회사의 여러 직무 공고가 잘못 합쳐지지 않게). DB 함수 dup_loser와 같은 규칙이다. 사용자가 볼 수 있는 목록 안에서만 묶으므로, 구독하지 않은 게시판의 글이 대표가 되어
 // 구독한 게시판의 글이 사라지는 일은 없다.
 const WINDOW_DAYS = 3;
 const DAY = 86_400_000;
@@ -29,7 +29,7 @@ export function dropDuplicates(list: readonly Notice[]): Notice[] {
   for (const group of groups.values()) {
     if (group.length < 2) continue;
     for (const notice of group) {
-      if (group.some((other) => other !== notice && earlier(other, notice) && Math.abs(day(other) - day(notice)) <= WINDOW_DAYS)) hidden.add(notice.id);
+      if (group.some((other) => other !== notice && other.source_id !== notice.source_id && earlier(other, notice) && Math.abs(day(other) - day(notice)) <= WINDOW_DAYS)) hidden.add(notice.id);
     }
   }
   return hidden.size ? list.filter((notice) => !hidden.has(notice.id)) : [...list];
@@ -48,7 +48,7 @@ export function groupMates(list: readonly Notice[]): Map<string, Notice[]> {
     if (group.length < 2) continue;
     for (const notice of group) {
       for (const other of group) {
-        if (other === notice || Math.abs(day(other) - day(notice)) > WINDOW_DAYS) continue;
+        if (other === notice || other.source_id === notice.source_id || Math.abs(day(other) - day(notice)) > WINDOW_DAYS) continue;
         const found = mates.get(notice.id) ?? new Map<string, Notice>();
         found.set(other.id, other); mates.set(notice.id, found);
       }
