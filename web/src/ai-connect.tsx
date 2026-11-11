@@ -26,11 +26,11 @@ const GUIDE: Record<Id, { url: string; placeholder: string; steps: string[] }> =
   },
 };
 
-const LABELS = { empty: '연결 안 됨', saved: '연결됨', disabled: '', broken: '키가 거절됐어요', retry: '다시 연결하기', close: '취소', add: '연결하기', edit: '다시 연결하기', remove: '연결 끊기', save: '연결하기' };
+const LABELS = { empty: '연결 안 됨', saved: '연결됨', disabled: '', broken: '키가 거절됐어요', retry: '바꾸기', close: '취소', add: '연결하기', edit: '바꾸기', remove: '연결 끊기', save: '연결하기' };
 
 function guideOf(id: Id) {
   const g = GUIDE[id];
-  return <Guide label="키는 어디서 받나요?" steps={[ext(g.url, g.steps[0]), ...g.steps.slice(1), '키는 암호화해서 서버에만 보관하고, 연결하기 전에 한 번 확인해요']} />;
+  return <Guide compact label="키는 어디서 받나요?" steps={[ext(g.url, g.steps[0]), ...g.steps.slice(1), '키는 암호화해서 서버에만 보관하고, 연결하기 전에 한 번 확인해요']} />;
 }
 
 /** AI 연결 줄들. 다른 설정 쪽과 같은 줄(이름, 설명, 오른쪽 조작) 모양이고, 연결한 개수에 따라 필요한 줄만 보인다. */
@@ -40,18 +40,13 @@ export function AiRows({ byok }: { byok?: Byok }) {
   if (!byok?.available || !ai) {
     return <Setting name="AI 연결" help="지금은 키를 연결할 수 없어요. 잠시 뒤 다시 열어 주세요" />;
   }
-  const { prefs } = ai;
   const usable = ORDER.filter((id) => (id === 'gemini' ? !!byok.status && !byok.status.disabled : ai.keys.some((key) => key.provider === id && !key.disabled)));
   const count = usable.length;
   const lead = count === 0 ? '안 넣어도 괜찮아요. 한 곳만 연결해도 공지 요약과 분석이 더 자세해져요'
-    : !prefs.aiEnabled ? '키는 그대로 두고 기본 방식으로만 분석해요'
-      : count === 1 ? '연결한 키로 요약과 판정을 만들어요. 한도가 차면 기본 방식으로 이어서 분석해요'
+    : count === 1 ? '연결한 키로 요약과 판정을 만들어요. 한도가 차면 기본 방식으로 이어서 분석해요'
         : '연결한 곳 중 쓸 수 있는 곳을 알아서 골라 써요. 공지 글은 연결한 곳으로 보내져요';
   return <>
-    <Setting name="AI 분석" help={lead}>
-      {count > 0 ? <Choice label="AI 분석" value={prefs.aiEnabled ? 'on' : 'off'} disabled={ai.busy}
-        options={[['on', '켜기'], ['off', '끄기']] as const} onPick={(value) => ai.savePrefs({ ...prefs, aiEnabled: value === 'on' })} /> : null}
-    </Setting>
+    <Setting name="AI 분석" help={lead} />
     {ORDER.map((id) => {
       const name = `${NAME[id]} 키`;
       if (id === 'gemini') {

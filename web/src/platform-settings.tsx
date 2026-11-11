@@ -653,7 +653,10 @@ function Profile({ model }: { model: SettingsModel }) {
 }
 
 // bare: 이미 위에 구분선이 있는 묶음 안에서는 자기 윗선과 여백을 없애 선이 두 줄로 겹치지 않게 한다.
-export function Guide({ label, steps, bare = false, open = false }: { label: string; steps: ReactNode[]; bare?: boolean; open?: boolean }) {
+export function Guide({ label, steps, bare = false, open = false, compact = false }: { label: string; steps: ReactNode[]; bare?: boolean; open?: boolean; compact?: boolean }) {
+  if (compact) {
+    return <details open={open} className="group"><summary className="flex min-h-[36px] cursor-pointer list-none items-center gap-1 text-[13px] text-ink-3 [&::-webkit-details-marker]:hidden">{label}{chevron('M6 9l6 6 6-6', 'h-4 w-4 text-ink-3 transition-transform group-open:rotate-180')}</summary><ol className="m-0 mb-1 mt-1 flex list-decimal flex-col gap-1 pl-5 text-[13px] text-ink-2">{steps.map((step, index) => <li key={index}>{step}</li>)}</ol></details>;
+  }
   return <details open={open} className={`connection-manual group ${bare ? 'mt-0 border-t-0' : ''}`}><summary className={SUMMARY}>{label}{chevron('M6 9l6 6 6-6', CHEVRON)}</summary><ol className="steps">{steps.map((step, index) => <li key={index}>{step}</li>)}</ol></details>;
 }
 
@@ -688,23 +691,27 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
   // 연결 전에는 입력칸이 처음부터 보이고, 받는 방법은 아래에 접어 둔다. 연결하면 키 끝자리를 칩 안에 보여 준다.
   return <Setting name={name} help={help}>
     {form ? <>
-      <div className="inline-row">
-        <input className="input" type={shown ? 'text' : 'password'} autoComplete="off" spellCheck={false} aria-label={name}
-          placeholder={placeholder} value={value} disabled={busy} onChange={(event) => setValue(event.currentTarget.value.trim())} />
-        <button type="button" className="ghost-button min-h-[44px]" aria-pressed={shown} disabled={busy} onClick={() => setShown(!shown)}>{shown ? '숨기기' : '보기'}</button>
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <input className="input w-full pr-11" type={shown ? 'text' : 'password'} autoComplete="off" spellCheck={false} aria-label={name}
+            placeholder={placeholder} value={value} disabled={busy} onChange={(event) => setValue(event.currentTarget.value.trim())} />
+          <button type="button" className="absolute right-0 top-0 grid h-full w-11 place-items-center border-0 bg-transparent p-0 text-ink-3" aria-label={shown ? '숨기기' : '보기'} aria-pressed={shown} disabled={busy} onClick={() => setShown(!shown)}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              {shown ? <><path d="M17.94 17.94A10.4 10.4 0 0 1 12 20C5 20 1 12 1 12a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></> : <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>}
+            </svg>
+          </button>
+        </div>
+        <button type="button" className="solid-button min-h-[44px] shrink-0 px-4" aria-label={`${name} ${labels.save}`} disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인 중' : labels.save}</button>
       </div>
       {extra}
-      <div className="inline-row">
-        <button type="button" className="solid-button min-h-[44px]" aria-label={`${name} ${labels.save}`} disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인하고 있어요' : labels.save}</button>
-        {status ? <button type="button" className="ghost-button min-h-[44px]" disabled={busy} onClick={() => { setEditing(false); setValue(''); setShown(false); }}>{labels.close}</button> : null}
-      </div>
       {error ? <p className="field-note error" role="alert">{error}</p> : null}
+      {status ? <button type="button" className="text-button self-start" disabled={busy} onClick={() => { setEditing(false); setValue(''); setShown(false); }}>{labels.close}</button> : null}
       {guide}
     </> : <>
-      <div className="connection-summary">
+      <div className="flex flex-wrap items-center gap-2">
         <span className={`inline-flex min-h-[32px] items-center rounded-pill bg-sunken px-3 text-[14px] font-medium ${status?.disabled ? 'text-danger' : 'text-accent'}`}>{state}</span>
-        <button type="button" className="ghost-button key-action min-h-[44px] px-[14px] py-0" aria-label={`${name} ${retry}`} disabled={loading} onClick={() => setEditing(true)}>{retry}</button>
-        {status ? <button type="button" className={`ghost-button key-action min-h-[44px] px-[14px] py-0 ${labels.broken ? '' : 'text-danger'}`} aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={onRemove}>{labels.remove}</button> : null}
+        <button type="button" className="ghost-button key-action min-h-[44px] px-3 py-0" aria-label={`${name} ${retry}`} disabled={loading} onClick={() => setEditing(true)}>{retry}</button>
+        {status ? <button type="button" className="ghost-button key-action min-h-[44px] px-3 py-0 text-danger" aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={onRemove}>{labels.remove}</button> : null}
       </div>
       {status?.lastError && !labels.broken ? <p className="field-note error" role="alert">{status.lastError}</p> : null}
       {note ? <p className="field-note" role="status">{note}</p> : null}
@@ -721,7 +728,7 @@ function CanvasRow({ model }: { model: SettingsModel }) {
       <span className="field-note">지금은 토큰을 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
     </KeyRow>;
   }
-  const guide = <Guide label="토큰은 어디서 받나요?" steps={[
+  const guide = <Guide compact label="토큰은 어디서 받나요?" steps={[
     <>{ext('https://canvas.skku.edu/profile/settings', '아이캠퍼스 계정 설정')}을 열고 로그인해요</>,
     '"승인된 통합" 아래의 "새 액세스 토큰"을 눌러요',
     '목적에 "성공 알림" 같은 이름을 쓰고 만료일은 비워 두거나 학기 끝으로 정해요',
@@ -729,7 +736,7 @@ function CanvasRow({ model }: { model: SettingsModel }) {
     '저장하면 아이캠퍼스에 확인한 뒤 암호화해 서버에만 보관해요. 읽기만 하고 아이캠퍼스 내용을 바꾸지 않아요',
   ]} />;
   return <SecretRow name="아이캠퍼스 토큰" help={help} placeholder="숫자~로 시작하는 토큰" status={byok.canvas} loading={byok.loading} busy={byok.canvasBusy}
-    labels={{ empty: '연결 안 됨', saved: '연결됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '연결하기', edit: '다시 연결하기', remove: '연결 끊기', save: '연결하기' }}
+    labels={{ empty: '연결 안 됨', saved: '연결됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '연결하기', edit: '바꾸기', remove: '연결 끊기', save: '연결하기' }}
     error={byok.canvasError} onRegister={byok.registerCanvas} onRemove={byok.removeCanvas} guide={guide}
     valid={(value) => /^[0-9A-Za-z~_-]{16,200}$/.test(value)} />;
 }
