@@ -3,7 +3,7 @@ import json
 from datetime import date
 
 from skku_notice import grad_intern_facts as gf
-from skku_notice.grad_intern_rules import CONDITIONAL, LIKELY, GradProfile, assess_department
+from skku_notice.grad_intern_rules import CONDITIONAL, LIKELY, NOT_ELIGIBLE, GradProfile, assess_department
 
 PROFILE = GradProfile(2022, "original_major", True, True)
 TITLE = "[(주)예시모빌리티] 차량 진단 및 OTA 소프트웨어 검증 인턴 모집"
@@ -334,9 +334,9 @@ def test_multi_track_posting_with_a_digital_it_track_is_not_called_unknown_work(
     result = assess_department(PROFILE, found.facts)
     work = next(check for check in result.checks if check.rule_id == "DEPT-WORK")
     # 여러 직무 중 어떤 직무가 관련 있어 보이는지 이름으로 말한다.
-    assert work.result == "unknown" and "여러 직무 중 ‘디지털·IT’ 직무만 소프트웨어와 관련 있어 보여요" in work.note
-    assert "그 직무로 지원하면 해당될 수 있어요" in work.note
-    assert result.status != LIKELY and result.status != CONDITIONAL  # 업무를 단정하지 않으므로 확인 필요에 머문다
+    assert work.result == "pass" and "여러 직무 중 ‘디지털·IT’ 직무가 소프트웨어 업무 분야로 보여요" in work.note
+    assert "그 직무로 지원하면 인정될 수 있어요" in work.note
+    assert result.status != NOT_ELIGIBLE  # 업무는 해당하고, 기간이 안 적혀 있으면 그 부분만 확인 필요로 남는다
 
 
 def test_english_job_list_is_non_software():

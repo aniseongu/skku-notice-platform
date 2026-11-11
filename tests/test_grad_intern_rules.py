@@ -255,3 +255,28 @@ def test_it_role_name_recognises_english_and_korean_developer_titles():
         assert IT_ROLE_NAME.search(title), title
     for title in ("영업 관리", "마케팅 담당자", "일반사무", "경영지원"):
         assert not IT_ROLE_NAME.search(title), title
+
+
+def _company_note(department):
+    return next(c.note for c in department.checks if c.rule_id.startswith("DEPT-COMPANY"))
+
+
+def test_company_time_note_states_hours_for_full_and_part_time():
+    full = assess_department(P, facts(end_date=D0 + timedelta(days=89)))
+    assert _company_note(full) == "전일제 90일(약 514시간)이에요. 기준(전일제 4주, 28일)을 넘어서 인정될 수 있어요"
+    short = assess_department(P, facts(end_date=D0 + timedelta(days=13)))
+    assert "약 80시간" in _company_note(short) and "못 미쳐서" in _company_note(short)
+    part_enough = assess_department(P, facts(work_mode="part_time", end_date=D0 + timedelta(days=55),
+                                             daily_hours=4, days_per_week=5))
+    assert _company_note(part_enough) == "파트타임 기간과 하루 근무로 계산하면 약 160시간이라 기준(160시간)을 넘어서 인정될 수 있어요"
+    part_short = assess_department(P, facts(work_mode="part_time", explicitly_stated_hours=100))
+    assert _company_note(part_short) == "파트타임 100시간이라 기준(160시간)에 못 미쳐서 인정되기 어려워요"
+    part_unknown = assess_department(P, facts(work_mode="part_time"))
+    assert "확인하지 못했어요" in _company_note(part_unknown)
+
+
+def test_mixed_it_roles_are_likely_not_needs_review():
+    result = assess_department(P, facts(task_category="mixed_it", roles=("일반사무", "디지털·IT")))
+    work = next(c for c in result.checks if c.rule_id == "DEPT-WORK")
+    assert work.result == "pass" and "‘디지털·IT’ 직무가 소프트웨어 업무 분야" in work.note
+    assert result.status == LIKELY

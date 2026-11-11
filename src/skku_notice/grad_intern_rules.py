@@ -34,7 +34,7 @@ WORK_MODES = ("full_time", "part_time", "unknown")
 SW_CATEGORIES = (
     "application_embedded", "cloud_platform", "data_ai", "system_network", "security", "software_qa",
 )
-# mixed_it: 여러 직무를 모집하고 그중 디지털·IT 구분이 있는 공고(소프트웨어 업무로 단정하지 않고 확인 필요로 둔다)
+# mixed_it: 여러 직무를 모집하고 그중 디지털·IT 구분이 있는 공고(몇 개만 해당해도 그 직무로 지원하면 되므로 가능으로 본다)
 TASK_CATEGORIES = SW_CATEGORIES + ("non_software", "other", "mixed_it", "unknown")
 
 MIN_FULL_TIME_DAYS = 28  # 제28조 1호: 전일제 4주 이상
@@ -194,8 +194,17 @@ def _work_check(facts: InternFacts) -> Check:
         return Check("DEPT-WORK", FAIL, "공고의 담당 업무가 IT·SW 교육과 거리가 있어요")
     if facts.task_category == "mixed_it":
         names = _role_names(related or roles[:1]) or "‘디지털·IT’"
-        return Check("DEPT-WORK", UNKNOWN, f"여러 직무 중 {names} 직무만 소프트웨어와 관련 있어 보여요. 그 직무로 지원하면 해당될 수 있어요")
+        return Check("DEPT-WORK", PASS, f"여러 직무 중 {names} 직무가 소프트웨어 업무 분야로 보여요. 그 직무로 지원하면 인정될 수 있어요(심의는 따로 있어요)")
     return Check("DEPT-WORK", UNKNOWN, "실제 담당 업무를 공고에서 확인하지 못했어요")
+
+
+def _estimated_hours(facts: InternFacts, days: int | None) -> int | None:
+    """기간과 하루·주 근무로 센 총 시간(공휴일은 빼지 않아 실제와 조금 다를 수 있다). 전일 근무는 1일 8시간, 주 5일로 본다."""
+    if days is None:
+        return None
+    daily = facts.daily_hours or P3_MAX_DAILY_HOURS
+    weekly = facts.days_per_week or 5
+    return days * weekly * daily // 7
 
 
 def _company_time_check(facts: InternFacts) -> Check:
@@ -206,16 +215,20 @@ def _company_time_check(facts: InternFacts) -> Check:
     if facts.work_mode in ("full_time", "unknown"):
         if days is None:
             return Check("DEPT-COMPANY-FT", UNKNOWN, "근무 기간을 공고에서 확인하지 못했어요")
+        hours = facts.explicitly_stated_hours or _estimated_hours(facts, days)
+        measure = f"전일제 {days}일(약 {hours}시간)이에요. " if hours else f"전일제 {days}일이에요. "
         if days >= MIN_FULL_TIME_DAYS:
-            return Check("DEPT-COMPANY-FT", PASS, f"전일제 {days}일이라 기준(4주, 28일)을 넘어서 인정될 수 있어요")
-        return Check("DEPT-COMPANY-FT", FAIL, f"전일제 {days}일이라 기준(4주, 28일)에 못 미쳐서 인정되기 어려워요")
+            return Check("DEPT-COMPANY-FT", PASS, measure + "기준(전일제 4주, 28일)을 넘어서 인정될 수 있어요")
+        return Check("DEPT-COMPANY-FT", FAIL, measure + "기준(전일제 4주, 28일)에 못 미쳐서 인정되기 어려워요")
     if facts.work_mode == "part_time":
-        hours = facts.explicitly_stated_hours
+        stated = facts.explicitly_stated_hours
+        hours = stated if stated is not None else (_estimated_hours(facts, days) if facts.daily_hours and facts.days_per_week else None)
         if hours is None:
             return Check("DEPT-COMPANY-PT", UNKNOWN, "파트타임이지만 총 근무 시간을 확인하지 못했어요")
+        label = f"파트타임 {hours}시간" if stated is not None else f"파트타임 기간과 하루 근무로 계산하면 약 {hours}시간"
         if hours >= MIN_PART_TIME_HOURS:
-            return Check("DEPT-COMPANY-PT", PASS, f"파트타임 {hours}시간이라 기준(160시간)을 넘어서 인정될 수 있어요")
-        return Check("DEPT-COMPANY-PT", FAIL, f"파트타임 {hours}시간이라 기준(160시간)에 못 미쳐서 인정되기 어려워요")
+            return Check("DEPT-COMPANY-PT", PASS, f"{label}이라 기준(160시간)을 넘어서 인정될 수 있어요")
+        return Check("DEPT-COMPANY-PT", FAIL, f"{label}이라 기준(160시간)에 못 미쳐서 인정되기 어려워요")
     return Check("DEPT-COMPANY-TIME", UNKNOWN, "근무 시간을 공고에서 확인하지 못했어요")
 
 
