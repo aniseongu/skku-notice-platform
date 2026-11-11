@@ -332,7 +332,7 @@ function ViewFilters({ app }: { app: AppController }) {
         onChange={(event) => { app.selectedReads = event.currentTarget.checked ? list.map((notice) => notice.id) : []; }} />
         <span aria-live="polite">{count ? `${count}개 선택됨` : '전체 선택'}</span>
 </label>
-      <button type="button" className={`${SELECT_BTN} order-2 ml-auto border-0 bg-transparent px-[16px] font-medium text-ink-2 min-[720px]:order-3 min-[720px]:ml-[4px] min-[720px]:px-[4px]`} onClick={() => app.closeSelection()}><Icon name="close" />선택 끝내기</button>
+      <button type="button" className={`${SELECT_BTN} order-2 ml-auto -mr-[4px] border-0 bg-transparent px-[16px] font-medium text-ink-2 min-[720px]:order-3 min-[720px]:ml-[4px] min-[720px]:px-[4px]`} onClick={() => app.closeSelection()}><Icon name="close" />선택 끝내기</button>
       <div className={`order-3 flex gap-[8px] min-[720px]:gap-[12px] ${count ? '' : 'max-[719px]:hidden'} max-[719px]:fixed max-[719px]:inset-x-0 max-[719px]:bottom-0 max-[719px]:pb-[calc(16px+env(safe-area-inset-bottom))] max-[719px]:z-[3] max-[719px]:bg-[var(--glass)] max-[719px]:backdrop-blur-[20px] max-[719px]:backdrop-saturate-[1.6] max-[719px]:border-t max-[719px]:border-line max-[719px]:px-[var(--gutter)] max-[719px]:pt-[8px] min-[720px]:order-2 min-[720px]:ml-auto`}>
         <button type="button" className={`${SELECT_BTN} solid-button min-[720px]:min-h-[44px] min-[720px]:min-w-[44px] min-[720px]:rounded-[var(--r-md)] min-[720px]:border-0 min-[720px]:bg-transparent min-[720px]:px-[12px] min-[720px]:text-[14px] min-[720px]:font-medium min-[720px]:text-ink-2 min-[720px]:disabled:text-ink-3 min-[720px]:disabled:opacity-60 max-[719px]:flex-1`} disabled={!selectedUnread}
           aria-label={`선택한 읽지 않은 공지 ${selectedUnread}개 읽음으로 표시`}
@@ -341,6 +341,7 @@ function ViewFilters({ app }: { app: AppController }) {
           aria-label={`선택한 읽은 공지 ${selectedRead}개 읽지 않음으로 표시`}
           onClick={() => app.markSelectedRead(false)}><Icon name="mail" />읽지 않음으로 표시</button>
       </div>
+      <div className="order-4"><SortSelect app={app} /></div>
     </div>;
   }
   const select = <button type="button" className="read-all select-trigger" disabled={!list.length}
