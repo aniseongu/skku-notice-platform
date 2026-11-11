@@ -29,7 +29,12 @@ const SHORTCUTS: { group: string; items: [string, string[]][] }[] = [
 ];
 
 // 단축키 표시(Primer KeybindingHint 방식: 키 하나에 kbd 하나, 사방 1px 테두리). 화면 낭독기에는 aria-keyshortcuts로 알린다.
-const Kbd = ({ keys }: { keys: string[] }) => <span className="kbd-group" aria-hidden="true">{keys.map((key) => <kbd className="kbd" key={key}>{key}</kbd>)}</span>;
+// 마우스와 키보드가 있는 기기에서만 보인다(휴대폰에는 단축키가 없다). 그 조건은 base.css의 .kbd-group 한 줄이 맡는다.
+const KBD = 'kbd inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-[4px] border bg-transparent px-[5px] [font:500_11px/1_var(--font)] tracking-[0]';
+const KBD_IDLE = 'border-line text-ink-3';
+const KBD_ON_SOLID = 'border-[color-mix(in_oklch,var(--on-accent)_40%,transparent)] text-on-accent';
+const Kbd = ({ keys, className = '', onSolid = false }: { keys: string[]; className?: string; onSolid?: boolean }) =>
+  <span className={`kbd-group inline-flex gap-[4px] ${className}`} aria-hidden="true">{keys.map((key) => <kbd className={`${KBD} ${onSolid ? KBD_ON_SOLID : KBD_IDLE}`} key={key}>{key}</kbd>)}</span>;
 
 const Icon = ({ name }: { name: IconName }) => <svg className="i" aria-hidden="true"><use href={`icons/sprite.svg#${name}`} /></svg>;
 const GearIcon = () => <svg className="i" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" />
@@ -117,7 +122,7 @@ export function NoticeShell({ app }: { app: AppController }) {
                 <label className="search wide-only min-[720px]:h-[36px] min-[720px]:min-w-[120px] min-[720px]:w-[260px] min-[720px]:flex-[0_1_260px] min-[720px]:px-[12px] min-[720px]:py-0"><Icon name="search" />
                   <input type="search" placeholder="공지 찾기" autoComplete="off" aria-label="공지 검색" aria-keyshortcuts="/" value={app.query}
                     onChange={(event) => { app.query = event.currentTarget.value; app.selectedId = null; app.selectedReads = []; }} />
-                  {app.query ? null : <Kbd keys={['/']} />}</label>
+                  {app.query ? null : <Kbd keys={['/']} className="ml-auto" />}</label>
                 {app.detailOpen || !selected ? null : <button type="button" className="icon-button wide-only" aria-label="상세 칸 열기" title="상세 칸 열기"
                   onClick={() => app.setDetail(true)}><Icon name="panel" /></button>}
                 <button type="button" className="icon-button" aria-label="공지 다시 가져오기" title="공지 다시 가져오기 (R)" aria-keyshortcuts="r"
@@ -155,24 +160,25 @@ export function NoticeShell({ app }: { app: AppController }) {
           {selected ? <div className="detail-actions">
             <SaveButton app={app} notice={selected} />
             <button type="button" className="ghost-button" onClick={() => { void app.copyLink(selected); }}>링크 복사하기</button>
-            <a className="solid-button" href={safeUrl(selected.url)} target="_blank" rel="noopener" aria-keyshortcuts="Enter">원문 열기<Kbd keys={['Enter']} /></a></div> : null}
+            <a className="solid-button" href={safeUrl(selected.url)} target="_blank" rel="noopener" aria-keyshortcuts="Enter">원문 열기<Kbd keys={['Enter']} className="ml-[8px]" onSolid /></a></div> : null}
         </div>
         {selected ? <Detail app={app} notice={selected} /> : <p className="detail-note detail-empty">공지를 고르면 여기에 보여요</p>}
       </aside>
     </div>
 
-    <nav className="tabbar glass" aria-label="보기" hidden={settings || Boolean(reading) || app.selecting} inert={onboarding}>
-      {TABS.map((t) => <button type="button" key={t.id} aria-current={app.view === t.id ? 'page' : 'false'}
+    <nav className="tabbar glass fixed inset-x-0 bottom-0 z-[3] flex h-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] select-none border-t border-line pb-[env(safe-area-inset-bottom)] [-webkit-user-select:none] min-[720px]:hidden!" aria-label="보기" hidden={settings || Boolean(reading) || app.selecting} inert={onboarding}>
+      {TABS.map((t) => <button type="button" key={t.id} className="flex min-h-[44px] min-w-[44px] flex-1 flex-col items-center justify-center gap-[2px] border-0 bg-transparent text-[13px] leading-[18px] font-medium text-ink-2 aria-[current=page]:font-bold aria-[current=page]:text-accent" aria-current={app.view === t.id ? 'page' : 'false'}
         onClick={() => app.setView(t.id)}><Icon name={t.icon} /><span>{t.label}</span></button>)}
     </nav>
-    <div className="toast" role="status" hidden={!app.toast}>{app.toast}{app.toastLink ? <div className="toast-actions">
-      <a href={app.toastLink} target={app.toastLink.startsWith('?') ? '_self' : '_blank'} rel="noopener noreferrer">{app.toastLinkLabel}</a>
-      <button type="button" onClick={() => { app.toast = ''; app.toastLink = null; }}>닫기</button></div> : null}</div>
+    <div className="toast fixed bottom-[calc(var(--tabbar-h)+16px+env(safe-area-inset-bottom))] left-1/2 z-[4] w-max max-w-[calc(100%-32px)] [transform:translateX(-50%)] rounded-md bg-ink px-[16px] py-[12px] text-[14px] text-bg [box-shadow:var(--shadow-pop)]" role="status" hidden={!app.toast}>{app.toast}{app.toastLink ? <div className="toast-actions flex items-center justify-between gap-[12px]">
+      <a className={`${TOAST_ACTION} underline`} href={app.toastLink} target={app.toastLink.startsWith('?') ? '_self' : '_blank'} rel="noopener noreferrer">{app.toastLinkLabel}</a>
+      <button type="button" className={`${TOAST_ACTION} min-w-[44px] justify-center border-0 bg-transparent px-[4px] py-0`} onClick={() => { app.toast = ''; app.toastLink = null; }}>닫기</button></div> : null}</div>
     {app.shortcutsOpen ? <ShortcutsDialog app={app} /> : null}
     {onboarding ? <Onboarding app={app} /> : null}
   </>;
 }
 
+const TOAST_ACTION = 'inline-flex min-h-[44px] items-center text-inherit [font:inherit]';
 const boardChoices = (app: AppController) => [{ id: 'all', label: app.tab() === 'intern' ? '모든 사이트' : '모든 게시판' },
   ...app.tabSources().map((s) => ({ id: s.id, label: boardName(s, s.id) }))];
 
@@ -257,7 +263,7 @@ function UpdatedLine({ app, count, pending = 0 }: { app: AppController; count?: 
 }
 
 const Empty = ({ title, body, action, onAction }: { title: string; body: string; action?: string; onAction?: () => void }) =>
-  <div className="empty"><Icon name="ginkgo" /><strong>{title}</strong><p>{body}</p>
+  <div className="empty flex flex-col items-center gap-[4px] px-[24px] py-[64px] text-center text-ink-3 [&_.i]:mb-[8px] [&_.i]:size-[36px] [&_.i]:[stroke-width:1.5]"><Icon name="ginkgo" /><strong className="text-[16px] leading-[23px] text-ink-2">{title}</strong><p className="m-0 mb-[12px] text-[14px]">{body}</p>
     {action ? <button type="button" className="ghost-button" onClick={onAction}>{action}</button> : null}</div>;
 
 function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
@@ -484,16 +490,16 @@ function ReadingView({ app, notice }: { app: AppController; notice: Notice }) {
 function ShortcutsDialog({ app }: { app: AppController }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => { const dialog = ref.current; if (dialog && !dialog.open) dialog.showModal(); }, []);
-  return <dialog ref={ref} className="shortcuts" aria-labelledby="shortcuts-title" onClose={() => { app.shortcutsOpen = false; }}
+  return <dialog ref={ref} className="shortcuts w-[min(440px,calc(100vw-32px))] rounded-lg border border-line bg-surface px-[24px] pt-0 pb-[20px] text-ink shadow-pop backdrop:bg-[oklch(0.15_0.01_var(--h)/0.4)]" aria-labelledby="shortcuts-title" onClose={() => { app.shortcutsOpen = false; }}
     onClick={(event) => { if (event.target === event.currentTarget) event.currentTarget.close(); }}>
-    <div className="dialog-head">
-      <h2 id="shortcuts-title">단축키</h2>
+    <div className="dialog-head -mr-[8px] flex h-[56px] items-center justify-between">
+      <h2 id="shortcuts-title" className="text-[17px] font-bold">단축키</h2>
       <button type="button" className="icon-button" aria-label="닫기" onClick={(event) => event.currentTarget.closest('dialog')?.close()}><Icon name="close" /></button>
     </div>
     {SHORTCUTS.map((section) => <section className="shortcut-group" key={section.group}>
-      <h3>{section.group}</h3>
-      <dl>{section.items.map(([label, keys]) => <div key={label}><dt>{label}</dt><dd><Kbd keys={keys} /></dd></div>)}</dl>
+      <h3 className="mx-0 mt-[12px] mb-[4px] text-[12px] leading-[16px] font-semibold text-ink-3">{section.group}</h3>
+      <dl className="m-0">{section.items.map(([label, keys]) => <div className="flex min-h-[36px] items-center justify-between border-t border-line text-[14px]" key={label}><dt>{label}</dt><dd className="m-0"><Kbd keys={keys} /></dd></div>)}</dl>
     </section>)}
-    <p className="dialog-foot">위아래 화살표로도 공지를 옮길 수 있어요</p>
+    <p className="dialog-foot mt-[12px] text-[12px] text-ink-3">위아래 화살표로도 공지를 옮길 수 있어요</p>
   </dialog>;
 }

@@ -88,19 +88,6 @@
   .select-all { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; font-weight: 500; color: var(--text-2); cursor: pointer; }
   @media (max-width: 359px) { .view-actions { gap: 0; } }
 
-  /* 출처: https://seed-design.io/components/bottom-navigation */
-  .tabbar {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 3;
-    display: flex; height: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
-    border-top: 1px solid var(--line); user-select: none; -webkit-user-select: none;
-  }
-  .tabbar button {
-    display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-    min-width: 44px; min-height: 44px; border: 0; background: none; color: var(--text-2);
-    font-size: 13px; line-height: 18px; font-weight: 500;
-  }
-  .tabbar button[aria-current="page"] { color: var(--accent); font-weight: 700; }
-
   /* 휴대폰 앱 안 상세 화면 */
   .reading { padding: 16px var(--gutter) calc(96px + env(safe-area-inset-bottom)); }
   .read-actions {

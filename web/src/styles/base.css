@@ -68,52 +68,12 @@
   .skeleton span:nth-child(2) { grid-area: title; }
   .skeleton span:nth-child(3) { grid-area: reason; width: 70%; }
 
-  .empty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 64px 24px; text-align: center; color: var(--text-3); }
-  .empty .i { width: 36px; height: 36px; margin-bottom: 8px; stroke-width: 1.5; }
-  .empty strong { font-size: 16px; line-height: 23px; color: var(--text-2); }
-  .empty p { margin: 0 0 12px; font-size: 14px; }
-
-  .toast {
-    position: fixed; left: 50%; bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom)); z-index: 4;
-    transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px);
-    padding: 12px 16px; border-radius: var(--r-md); background: var(--text); color: var(--bg); font-size: 14px; box-shadow: var(--shadow-pop);
-  }
-  .toast-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .toast-actions a, .toast-actions button { display: inline-flex; align-items: center; min-height: 44px; color: inherit; font: inherit; }
-  .toast-actions a { text-decoration: underline; }
-  .toast-actions button { min-width: 44px; justify-content: center; padding: 0 4px; border: 0; background: none; }
   .wco-bar { display: none; }
 
   /* 상세 본문은 Tailwind 클래스로 옮겼다(notice-detail.tsx, cls.ts). 상세 칸이 비었을 때의 안내 글만 남긴다. */
   .detail-note { margin-top: 20px; font-size: 13px; line-height: 19px; color: var(--text-3); }
   .detail-empty { margin: 0; padding: 24px 32px; }
 
-  /* 단축키 표시(Primer KeybindingHint 참고): 키 하나에 kbd 하나, 사방 같은 1px 테두리, 작은 흐린 글자 */
-  .kbd-group { display: inline-flex; gap: 4px; }
-  .kbd {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: 20px; height: 20px; padding: 0 5px;
-    border: 1px solid var(--line); border-radius: 4px; background: none;
-    font: 500 11px/1 var(--font); letter-spacing: 0; color: var(--text-3);
-  }
-  .solid-button .kbd-group { margin-left: 8px; }
-  .solid-button .kbd { border-color: color-mix(in oklch, var(--on-accent) 40%, transparent); color: var(--on-accent); }
-  .search .kbd-group { margin-left: auto; }
   /* 마우스와 키보드가 있는 기기에서만 보인다(휴대폰에는 단축키가 없다) */
   @media not ((hover: hover) and (pointer: fine)) { .kbd-group, .kbd-only { display: none !important; } }
-
-  dialog.shortcuts {
-    width: min(440px, calc(100vw - 32px)); padding: 0 24px 20px;
-    border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); color: var(--text);
-    box-shadow: var(--shadow-pop);
-  }
-  dialog.shortcuts::backdrop { background: oklch(0.15 0.01 var(--h) / 0.4); }
-  .dialog-head { display: flex; align-items: center; justify-content: space-between; height: 56px; margin-right: -8px; }
-  .dialog-head h2 { font-size: 17px; font-weight: 700; }
-  .shortcut-group h3 { margin: 12px 0 4px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--text-3); }
-  .shortcut-group dl { margin: 0; }
-  .shortcut-group div { display: flex; align-items: center; justify-content: space-between; min-height: 36px; border-top: 1px solid var(--line); font-size: 14px; }
-  .shortcut-group dd { margin: 0; }
-  .dialog-foot { margin-top: 12px; font-size: 12px; color: var(--text-3); }
 }
-

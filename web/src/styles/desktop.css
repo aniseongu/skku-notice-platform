@@ -2,7 +2,7 @@
 @layer desktop {
   @media (min-width: 720px) {
     body { overflow: hidden; }
-    .narrow-only, .tabbar { display: none !important; }
+    .narrow-only { display: none !important; }
     .wide-only { display: flex; }
     .app {
       display: grid; grid-template-columns: 248px minmax(0, 1fr);
