@@ -33,7 +33,8 @@ WORK_MODES = ("full_time", "part_time", "unknown")
 SW_CATEGORIES = (
     "application_embedded", "cloud_platform", "data_ai", "system_network", "security", "software_qa",
 )
-TASK_CATEGORIES = SW_CATEGORIES + ("non_software", "other", "unknown")
+# mixed_it: 여러 직무를 모집하고 그중 디지털·IT 구분이 있는 공고(소프트웨어 업무로 단정하지 않고 확인 필요로 둔다)
+TASK_CATEGORIES = SW_CATEGORIES + ("non_software", "other", "mixed_it", "unknown")
 
 MIN_FULL_TIME_DAYS = 28  # 제28조 1호: 전일제 4주 이상
 MIN_PART_TIME_HOURS = 160  # 제28조 1호: 파트타임 160시간 이상
@@ -158,6 +159,8 @@ def _work_check(facts: InternFacts) -> Check:
         return Check("DEPT-WORK", PASS, "공고의 담당 업무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)")
     if facts.task_category == "non_software":
         return Check("DEPT-WORK", FAIL, "공고의 담당 업무가 IT·SW 교육과 거리가 있어요")
+    if facts.task_category == "mixed_it":
+        return Check("DEPT-WORK", UNKNOWN, "여러 직무를 모집해요. 디지털·IT 분야로 지원하면 해당될 수 있어요")
     return Check("DEPT-WORK", UNKNOWN, "실제 담당 업무를 공고에서 확인하지 못했어요")
 
 

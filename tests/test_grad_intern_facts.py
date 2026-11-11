@@ -324,3 +324,14 @@ def test_period_end_inherits_year_or_rolls_over_and_rejects_nonsense():
     assert dates("인턴십 기간 2027년 3월 2일 ~ 2027년 6월 30일") == (date(2027, 3, 2), date(2027, 6, 30))
     assert dates("근무기간: 2027.03.02 ~ 2029.06.30") is None  # 1년을 넘는 범위는 근무 기간으로 보지 않는다
     assert dates("근무기간: 2027.02.30 ~ 04.30") is None  # 없는 날짜
+
+
+def test_multi_track_posting_with_a_digital_it_track_is_not_called_unknown_work():
+    text = "디지털·IT(50명)  본부부서  디지털·IT 관련 업무지원\n영업점(통장신규 등 창구업무)\n* 회사명 오류, 표절, 반복된 답변은 불합격"
+    found = gf.build_facts("[IBK기업은행] 2027년 체험형 청년인턴 채용", text, None)
+    assert found.facts.task_category == "mixed_it"
+    assert found.organization_name == "IBK기업은행"  # 안내문의 "회사명 오류"가 아니라 제목의 이름
+    result = assess_department(PROFILE, found.facts)
+    work = next(check for check in result.checks if check.rule_id == "DEPT-WORK")
+    assert work.result == "unknown" and "디지털·IT 분야로 지원하면" in work.note
+    assert result.status != LIKELY and result.status != CONDITIONAL  # 업무를 단정하지 않으므로 확인 필요에 머문다

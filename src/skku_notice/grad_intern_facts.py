@@ -63,7 +63,7 @@ MONTHS = re.compile(
 WEEKS = re.compile(r"(?:근무|인턴(?:십)?|실습|활동|기간|진행)[^\n]{0,12}?(\d{1,2})\s*주(?!\s*(?:\d|일|\d일))|(\d{1,2})\s*주\s*(?:간|동안)\s*(?:진행|근무|인턴|실습)?")
 WORK_DAYS = re.compile(r"(?:총\s*)?(?:근무\s*일수|근무일)\s*[:：]?\s*(?:총\s*)?(\d{2,3})\s*일|총\s*(\d{2,3})\s*일\s*(?:간\s*)?근무")
 # 회사 이름: "회사명: ○○", "기업명 ○○", 그리고 법인 표기가 붙은 이름. 그림 글자(OCR)는 띄어쓰기가 흔들려 공백을 허용한다.
-ORG_LABEL = re.compile(r"(?:회사|기업|기관|업체|법인)\s*(?:명|이름)\s*[:：]?\s*([^\n,;/|]{2,30})")
+ORG_LABEL = re.compile(r"(?:회사|기업|기관|업체|법인)\s*(?:명|이름)\s*[:：]?\s*(?!오류|표절|누락|기재|변경|확인)([^\n,;/|]{2,30})")
 ORG_LEGAL = re.compile(r"(?:\(주\)|㈜|주식회사)[ \t]*([가-힣A-Za-z0-9&·.\-]{1,20})|([가-힣A-Za-z0-9&·.\-]{2,20})[ \t]*(?:\(주\)|㈜|주식회사)")
 # "넷마블네오에서 ... 인턴십을 모집합니다" 같은 문장의 주어
 ORG_SENTENCE = re.compile(r"(?:^|[\n.:：]\s*)([가-힣A-Za-z][가-힣A-Za-z0-9&·]{1,14})\s*(?:에서|은|는)\s[^.\n]{0,40}?(?:모집|채용)")
@@ -186,6 +186,10 @@ def squeeze(text: str) -> str:
     return _BLANK_LINES.sub("\n\n\n", _WIDE_SPACE.sub("   ", text or ""))
 
 
+# "디지털·IT(50명)", "디지털·IT 관련 업무지원"처럼 여러 직무 중 IT 분야 모집 구분이 따로 있는 공고
+IT_TRACK = re.compile(r"디지털\s*[·ㆍ・,/]?\s*IT\s*(?:\(\s*\d+\s*명|관련|분야|직무|부문)|IT\s*(?:분야|직무)\s*(?:모집|지원|배치)")
+
+
 def static_task_category(title: str, body: str) -> tuple[str, str] | None:
     """(분야, 근거 문장) 또는 None. 코드만으로 뚜렷하게 정할 수 있을 때만 답한다."""
     body = squeeze(body)[:MAX_TEXT]
@@ -202,6 +206,9 @@ def static_task_category(title: str, body: str) -> tuple[str, str] | None:
         # 그때는 제목에 비SW 말이 있을 때만 단정한다(본문 앞부분의 회사 소개 문구로 단정하지 않는다).
         if match or NON_SW_WORDS.search(title):
             return "non_software", non.group(0)
+    track = IT_TRACK.search(squeeze(body)[:MAX_TEXT])
+    if track:
+        return "mixed_it", track.group(0)  # 여러 직무 중 디지털·IT 구분이 있다: 그 분야로 지원하면 해당될 수 있다
     return None
 
 
@@ -286,7 +293,10 @@ def static_facts(title: str, body: str) -> dict:
     if category:
         found["task_category"], quote = category
         found["evidence"].append({"field": "tasks", "quote": quote})
-    for pattern in (ORG_LABEL, ORG_LEGAL, ORG_SENTENCE, ORG_POSTER, ORG_YEAR_LINE):
+    bracket = TITLE_ORG.match(title or "")
+    if bracket and not TITLE_GENERIC.search(bracket.group(1)) and len(bracket.group(1).strip()) >= 2:
+        found["organization_name"] = bracket.group(1).strip()[:40]  # "[IBK기업은행] ..."처럼 제목에 적힌 이름이 가장 확실하다
+    for pattern in () if "organization_name" in found else (ORG_LABEL, ORG_LEGAL, ORG_SENTENCE, ORG_POSTER, ORG_YEAR_LINE):
         match = pattern.search(text)
         name = next((g for g in (match.groups() if match else ()) if g), "").strip(" .-:：")
         if name and len(name) >= 2:
