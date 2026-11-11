@@ -19,6 +19,7 @@ import { composeSummaryTime, deleteDevice, loadDevices, loadSummaryTime, saveCan
 import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from './my-notices';
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
 import { AI_PROVIDERS, DEFAULT_AI_PREFERENCES, loadAiKeyStatuses, loadAiPreferences, registerAiKey, removeAiKey, saveAiPreferences, type AiKeyStatus, type AiPreferences, type AiProvider } from './ai-providers';
+import { markInstalled, noteStandalone } from './install-hint';
 import { byokAvailable, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
 import { keywordMatchesNotice } from './keyword-match';
@@ -428,7 +429,8 @@ export class AppController extends Reactive {
     document.addEventListener('pointerdown', this.closeBoardMenuOutside);
     window.addEventListener('popstate', this.onPopState);
     window.addEventListener('beforeinstallprompt', (event) => { event.preventDefault(); this.install = event as InstallPrompt; });
-    window.addEventListener('appinstalled', () => { this.install = null; });
+    window.addEventListener('appinstalled', () => { this.install = null; markInstalled(); });
+    noteStandalone();
   }
 
   stop() {
