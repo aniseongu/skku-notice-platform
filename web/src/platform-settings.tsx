@@ -683,24 +683,27 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
   // 저장이 끝나 상태가 바뀌면 입력칸을 닫고 비운다. 값은 이 입력칸 밖에 남기지 않는다.
   useEffect(() => { if (status) { setValue(''); setEditing(false); setShown(false); } }, [status?.keyHint]);
   const state = loading ? '확인 중' : status ? (status.disabled && labels.broken ? labels.broken : `${labels.saved} ····${status.keyHint}${status.disabled ? labels.disabled : ''}`) : labels.empty;
+  const retry = status?.disabled && labels.retry ? labels.retry : labels.edit;
+  const form = !status && !loading || editing;
+  // 연결 전에는 입력칸이 처음부터 보이고, 받는 방법은 아래에 접어 둔다. 연결하면 키 끝자리를 칩 안에 보여 준다.
   return <Setting name={name} help={help}>
-    {editing ? <>
-      {guideFirst ? guide : null}
+    {form ? <>
       <div className="inline-row">
         <input className="input" type={shown ? 'text' : 'password'} autoComplete="off" spellCheck={false} aria-label={name}
           placeholder={placeholder} value={value} disabled={busy} onChange={(event) => setValue(event.currentTarget.value.trim())} />
-        <button type="button" className="ghost-button" aria-pressed={shown} disabled={busy} onClick={() => setShown(!shown)}>{shown ? '숨기기' : '보기'}</button>
+        <button type="button" className="ghost-button min-h-[44px]" aria-pressed={shown} disabled={busy} onClick={() => setShown(!shown)}>{shown ? '숨기기' : '보기'}</button>
       </div>
       {extra}
       <div className="inline-row">
-        <button type="button" className="solid-button" disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인하고 있어요' : labels.save}</button>
-        <button type="button" className="ghost-button" disabled={busy} onClick={() => { setEditing(false); setValue(''); setShown(false); }}>{labels.close}</button>
+        <button type="button" className="solid-button min-h-[44px]" aria-label={`${name} ${labels.save}`} disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인하고 있어요' : labels.save}</button>
+        {status ? <button type="button" className="ghost-button min-h-[44px]" disabled={busy} onClick={() => { setEditing(false); setValue(''); setShown(false); }}>{labels.close}</button> : null}
       </div>
       {error ? <p className="field-note error" role="alert">{error}</p> : null}
-      {guideFirst ? null : guide}
+      {guide}
     </> : <>
-      <div className="connection-summary">{status || loading ? <span className={`setting-state ${status?.disabled ? 'text-danger' : ''}`}>{state}</span> : null}
-        <button type="button" className="ghost-button key-action min-h-[44px] px-[14px] py-0" aria-label={`${name} ${status ? (status.disabled && labels.retry ? labels.retry : labels.edit) : labels.add}`} disabled={loading} onClick={() => setEditing(true)}>{status ? (status.disabled && labels.retry ? labels.retry : labels.edit) : labels.add}</button>
+      <div className="connection-summary">
+        <span className={`inline-flex min-h-[32px] items-center rounded-pill bg-sunken px-3 text-[14px] font-medium ${status?.disabled ? 'text-danger' : 'text-accent'}`}>{state}</span>
+        <button type="button" className="ghost-button key-action min-h-[44px] px-[14px] py-0" aria-label={`${name} ${retry}`} disabled={loading} onClick={() => setEditing(true)}>{retry}</button>
         {status ? <button type="button" className={`ghost-button key-action min-h-[44px] px-[14px] py-0 ${labels.broken ? '' : 'text-danger'}`} aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={onRemove}>{labels.remove}</button> : null}
       </div>
       {status?.lastError && !labels.broken ? <p className="field-note error" role="alert">{status.lastError}</p> : null}
@@ -718,7 +721,7 @@ function CanvasRow({ model }: { model: SettingsModel }) {
       <span className="field-note">지금은 토큰을 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
     </KeyRow>;
   }
-  const guide = <Guide label="받는 방법" steps={[
+  const guide = <Guide label="토큰은 어디서 받나요?" steps={[
     <>{ext('https://canvas.skku.edu/profile/settings', '아이캠퍼스 계정 설정')}을 열고 로그인해요</>,
     '"승인된 통합" 아래의 "새 액세스 토큰"을 눌러요',
     '목적에 "성공 알림" 같은 이름을 쓰고 만료일은 비워 두거나 학기 끝으로 정해요',

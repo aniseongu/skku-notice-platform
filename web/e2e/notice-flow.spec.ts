@@ -238,16 +238,19 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await expect(screen.getByRole('radiogroup', { name: 'AI 분석' })).toHaveCount(0);
   await expect(screen.getByText('요금')).toHaveCount(0);
   await expect(screen.locator('.setting', { hasText: '아이캠퍼스 토큰' }).getByRole('button', { name: '아이캠퍼스 토큰 연결하기' })).toBeVisible();
-  await screen.getByRole('button', { name: 'Gemini 키 연결하기' }).click();
-  const save = screen.getByRole('button', { name: '연결하기', exact: true });
+  // 연결 전에는 입력칸이 처음부터 보이고, 받는 방법은 접혀 있다.
+  const save = screen.getByRole('button', { name: 'Gemini 키 연결하기' });
   await expect(save).toBeDisabled();
   const key = `AIza${'D'.repeat(35)}`;
   const input = screen.getByLabel('Gemini 키', { exact: true });
   await expect(input).toHaveAttribute('type', 'password');
   await input.fill(key);
-  await screen.getByRole('button', { name: '보기' }).click();
+  const row = screen.locator('.setting', { hasText: 'Gemini 키' });
+  await row.getByRole('button', { name: '보기' }).click();
   await expect(input).toHaveAttribute('type', 'text');
-  await screen.getByRole('button', { name: '숨기기' }).click();
+  await row.getByRole('button', { name: '숨기기' }).click();
+  await expect(screen.getByRole('link', { name: /Google AI Studio/ })).toBeHidden();
+  await screen.locator('.setting', { hasText: 'Gemini 키' }).getByText('키는 어디서 받나요?').click();
   await expect(screen.getByRole('link', { name: /Google AI Studio/ })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
   await save.click();
   expect(await calls(page)).toEqual([['register', key]]);
@@ -261,16 +264,15 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   expect(await calls(page)).toEqual([['remove']]);
   // 아이캠퍼스 토큰도 같은 흐름이다. 형식이 맞지 않으면 저장할 수 없다.
   await withApp(page, {});
-  await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' }).click();
   const canvasInput = screen.getByLabel('아이캠퍼스 토큰', { exact: true });
   await expect(canvasInput).toHaveAttribute('type', 'password');
   await canvasInput.fill('짧음');
-  await expect(screen.getByRole('button', { name: '연결하기', exact: true })).toBeDisabled();
+  await expect(screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' })).toBeDisabled();
   const token = `1234~${'Z'.repeat(40)}`;
   await canvasInput.fill(token);
-  await screen.getByText('받는 방법').click();
+  await screen.getByText('토큰은 어디서 받나요?').click();
   await expect(screen.getByRole('link', { name: /아이캠퍼스 계정 설정/ })).toHaveAttribute('href', 'https://canvas.skku.edu/profile/settings');
-  await screen.getByRole('button', { name: '연결하기', exact: true }).click();
+  await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' }).click();
   expect(await calls(page)).toEqual([['registerCanvas', token]]);
   await withApp(page, { canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null } });
   await expect(screen.getByText('연결됨 ····ZZZZ')).toBeVisible();
@@ -719,18 +721,16 @@ test('core settings tasks finish within their click budget and in the expected o
 
   // 1) Gemini 키: 연결 키 → 입력하기 → 저장하기 = 3클릭
   await click('연결 키', screen.getByRole('link', { name: /연결 키/ }));
-  await click('Gemini 연결하기', screen.getByRole('button', { name: 'Gemini 키 연결하기' }));
   await screen.getByLabel('Gemini 키', { exact: true }).fill(`AQ.${'a'.repeat(50)}`);
-  await click('Gemini 연결 확정', screen.getByRole('button', { name: '연결하기', exact: true }));
-  expect(log.length).toBe(3);
+  await click('Gemini 연결하기', screen.getByRole('button', { name: 'Gemini 키 연결하기' }));
+  expect(log.length).toBe(2);
   expect((await calls(page))[0][0]).toBe('registerKey');
   // 2) 같은 쪽에서 아이캠퍼스 토큰: 입력하기 → 저장하기 = 추가 2클릭(쪽 이동 없음)
   await withApp(page, { byokStatus: { keyHint: 'aaaa', model: 'm', disabled: false, lastError: null, usedToday: 0 }, registerCanvas: 'fn:registerCanvas' });
   log.length = 0;
-  await click('아이캠퍼스 입력하기', screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' }));
   await screen.getByLabel('아이캠퍼스 토큰', { exact: true }).fill(`1234~${'b'.repeat(40)}`);
-  await click('아이캠퍼스 연결 확정', screen.getByRole('button', { name: '연결하기', exact: true }));
-  expect(log.length).toBe(2);
+  await click('아이캠퍼스 연결하기', screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' }));
+  expect(log.length).toBe(1);
   expect((await calls(page))[0][0]).toBe('registerCanvas');
   // 3) 쪽 이동은 X(데스크톱) 또는 뒤로 가기(모바일) 한 번에 첫 쪽으로 돌아온다.
   await page.goBack();
