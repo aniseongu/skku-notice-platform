@@ -45,12 +45,16 @@ export function GraduationSection({ model }: { title: string; model: GraduationM
   </section>;
 }
 
-/** 안내문은 결과 옆이 아니라 공지 맨 아래에 작고 옅게 둔다(Toss: 읽는 흐름을 끊지 않는 보조 안내). 판정이 나온 뒤에만 보인다. */
+/** 안내문은 결과 옆이 아니라 공지 맨 아래(글 정보 다음)에 작고 옅게 둔다(Toss: 읽는 흐름을 끊지 않는 보조 안내). 판정이 나온 뒤에만 보인다. */
 export function GraduationNotes({ model }: { model: GraduationModel }) {
   const ready = model.assessment?.state === 'ready' ? model.assessment : null;
   if (!ready) return null;
-  return <div className="mt-[20px] text-[12px] leading-[18px] text-ink-3 [word-break:keep-all]">
-    <p className="m-0">인턴십 요건은 공고에 적힌 내용만 보고 대략 판단해요. 실제 인정 여부는 학교와 학과에 확인해 주세요</p>
-    {ready.aiStatus && ready.aiStatus !== 'used' ? <p className="m-0 mt-[4px]" role="status">{AI_NOTE[ready.aiStatus]}</p> : null}
-  </div>;
+  const hasP3 = model.tracks.p3 && !!ready.university3p;
+  const hasDept = model.tracks.dept && !!ready.department;
+  return <ul className="m-0 mt-[16px] list-none p-0 text-[12px] leading-[18px] text-ink-3 [word-break:keep-all]" aria-label="인턴십 요건 안내">
+    <li>· 인턴십 요건은 공고에 적힌 내용만 보고 대략 판단해요. 실제 인정 여부는 학교와 학과에 확인해 주세요</li>
+    {hasP3 ? <li>· 3품 인턴십은 근무 시간이 280시간 이상인지 봐요</li> : null}
+    {hasDept ? <li>· 솦 인턴십은 담당 업무가 소프트웨어 분야인지, 근무가 전일제 4주 또는 파트타임 160시간 이상인지, 법인 기관인지 봐요</li> : null}
+    {ready.aiStatus && ready.aiStatus !== 'used' ? <li role="status">· {AI_NOTE[ready.aiStatus]}</li> : null}
+  </ul>;
 }
