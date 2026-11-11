@@ -3,7 +3,7 @@
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
-import { AiRows } from './ai-connect';
+import { AiRows, StepGuide } from './ai-connect';
 import type { AiKeyStatus, AiPreferences, AiProvider } from './ai-providers';
 import { type ByokStatus, type CanvasStatus } from './byok';
 import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, validDeviceName, type CanvasMode, type Device } from './devices';
@@ -215,8 +215,6 @@ function Overview({ model }: { model: SettingsModel }) {
         <button type="button" className="ghost-button" aria-keyshortcuts="?" onClick={model.showShortcuts}>단축키 보기</button>
       </Setting>
     </Section>
-    {model.userId ? <DeleteAccount model={model} /> : null}
-    {/* 맨 아래: 개인정보 처리방침은 설정의 마지막에 둔다. */}
     <div className="box mt-[24px]">
         <a className="settings-link" href="privacy.html">
         <span><span className="setting-name">개인정보 처리방침</span>
@@ -224,6 +222,8 @@ function Overview({ model }: { model: SettingsModel }) {
         <span className="settings-chevron" aria-hidden="true" />
       </a>
     </div>
+    {/* 계정 삭제는 되돌릴 수 없어서 설정의 가장 아래에 따로 둔다. */}
+    {model.userId ? <DeleteAccount model={model} /> : null}
   </div>;
 }
 
@@ -755,17 +755,13 @@ function CanvasRow({ model }: { model: SettingsModel }) {
       <span className="field-note">지금은 토큰을 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
     </KeyRow>;
   }
-  const guide = <Guide label="토큰은 어디서 받나요?" steps={[
-    <>{ext('https://canvas.skku.edu/profile/settings', '아이캠퍼스 계정 설정')}을 열고 로그인해요</>,
-    '"승인된 통합" 아래의 "새 액세스 토큰"을 눌러요',
-    '목적에 "성공 알림" 같은 이름을 쓰고 만료일은 비워 두거나 학기 끝으로 정해요',
-    '"토큰 생성"을 누르면 한 번만 보이는 긴 글자가 나와요. 복사해서 붙여 넣고 "연결하기"를 눌러요',
-    '저장하면 아이캠퍼스에 확인한 뒤 암호화해 서버에만 보관해요. 읽기만 하고 아이캠퍼스 내용을 바꾸지 않아요',
-  ]} />;
-  return <SecretRow name="아이캠퍼스 토큰" help={help} placeholder="숫자~로 시작하는 토큰" status={byok.canvas} loading={byok.loading} busy={byok.canvasBusy}
+  return <><SecretRow name="아이캠퍼스 토큰" help={help} placeholder="숫자~로 시작하는 토큰" status={byok.canvas} loading={byok.loading} busy={byok.canvasBusy}
     labels={{ empty: '연결 안 됨', saved: '연결됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '연결하기', edit: '바꾸기', remove: '연결 끊기', save: '연결하기' }}
-    error={byok.canvasError} onRegister={byok.registerCanvas} onRemove={byok.removeCanvas} guide={guide}
-    valid={(value) => /^[0-9A-Za-z~_-]{16,200}$/.test(value)} />;
+    error={byok.canvasError} onRegister={byok.registerCanvas} onRemove={byok.removeCanvas} guide={null}
+    valid={(value) => /^[0-9A-Za-z~_-]{16,200}$/.test(value)} />
+    <StepGuide label="토큰은 어디서 받나요?" links={[{ href: 'https://canvas.skku.edu/profile/settings', text: '아이캠퍼스 설정 열기' }]}
+      steps={['위 버튼으로 아이캠퍼스를 열고 로그인해요', '"승인된 통합" 아래의 "새 액세스 토큰"을 눌러요', '목적에 "성공 알림" 같은 이름을 쓰고 만료일은 비워 두거나 학기 끝으로 정해요', '"토큰 생성"을 누르고 나오는 긴 글자를 복사해요. 한 번만 보여요', '위 입력칸에 붙여 넣고 "연결하기"를 눌러요']}
+      note="아이캠퍼스에 확인한 뒤 암호화해 서버에만 보관해요. 읽기만 하고 내용을 바꾸지 않아요" /></>;
 }
 
 function Keys({ model }: { model: SettingsModel }) {
