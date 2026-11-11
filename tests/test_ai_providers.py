@@ -139,3 +139,33 @@ def test_openrouter_errors_inside_a_200_response_keep_their_code(body, code, kin
     with pytest.raises(ProviderError) as info:
         client_for("openrouter", lambda r: httpx.Response(200, json=body)).models.generate_content(model="openrouter/free", contents="x")
     assert info.value.code == code and info.value.kind == kind
+
+
+def test_reasoning_is_kept_low_and_each_provider_uses_its_own_length_parameter():
+    seen = {}
+
+    def handler(request):
+        seen[request.url.host] = json.loads(request.content)
+        return httpx.Response(200, json=ok_body("{}"))
+
+    for provider, model in (("groq", "openai/gpt-oss-20b"), ("openrouter", "openrouter/free")):
+        client_for(provider, handler).models.generate_content(model=model, contents="x", config=types.GenerateContentConfig(response_schema=SCHEMA))
+    groq, router = seen["api.groq.com"], seen["openrouter.ai"]
+    assert groq["reasoning_effort"] == "low" and groq["include_reasoning"] is False and groq["max_completion_tokens"] >= 4096
+    assert "max_tokens" not in groq
+    assert router["reasoning"] == {"effort": "low"} and router["max_tokens"] >= 4096
+
+
+def test_a_400_about_json_schema_is_retried_once_in_json_mode():
+    calls = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        calls.append(body["response_format"]["type"])
+        if body["response_format"]["type"] == "json_schema":
+            return httpx.Response(400, json={"error": {"message": "this model does not support response_format json_schema"}})
+        return httpx.Response(200, json=ok_body('{"items": []}'))
+
+    reply = client_for("groq", handler).models.generate_content(
+        model="openai/gpt-oss-20b", contents="x", config=types.GenerateContentConfig(response_schema=SCHEMA))
+    assert calls == ["json_schema", "json_object"] and json.loads(reply.text) == {"items": []}

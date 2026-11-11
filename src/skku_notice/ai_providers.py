@@ -92,26 +92,40 @@ class _Models:
     def __init__(self, provider: str, api_key: str, http: httpx.Client | None):
         self._provider, self._api_key, self._http = provider, api_key, http
 
-    def generate_content(self, *, model: str, contents: object, config: object | None = None):
+    def _body(self, model: str, contents: object, config: object | None, json_mode_only: bool = False) -> dict:
         system = getattr(config, "system_instruction", None)
         schema = getattr(config, "response_schema", None)
         messages = []
         if isinstance(system, str) and system:
             messages.append({"role": "system", "content": system})
         user = _text_of(contents)
-        if schema is not None and not supports_strict_schema(self._provider, model):
+        strict = supports_strict_schema(self._provider, model) and not json_mode_only
+        if schema is not None and not strict:
             # 스키마를 지원하지 않는 모델은 JSON 모드로 받고 호출한 쪽이 형식을 검증한다.
             user += "\n\n반드시 아래 JSON 스키마를 따르는 JSON 객체 하나만 답하세요.\n" + json.dumps(
                 json_schema(schema), ensure_ascii=False)
         messages.append({"role": "user", "content": user})
-        body: dict = {"model": model, "messages": messages, "temperature": getattr(config, "temperature", 0) or 0,
-                      "max_tokens": MAX_OUTPUT_TOKENS}
+        body: dict = {"model": model, "messages": messages, "temperature": getattr(config, "temperature", 0) or 0}
+        # 출처: https://console.groq.com/docs/reasoning, https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
+        # 추론 토큰도 답 길이 한도에 들어가서, 추론이 길면 내용이 빈 채로 finish_reason이 length로 끝난다. 추론을 낮춘다.
+        if self._provider == "groq":
+            body["max_completion_tokens"] = MAX_OUTPUT_TOKENS
+            if model.startswith("openai/gpt-oss"):
+                body["reasoning_effort"] = "low"
+                body["include_reasoning"] = False
+        else:
+            body["max_tokens"] = MAX_OUTPUT_TOKENS
+            body["reasoning"] = {"effort": "low"}
         if schema is not None:
-            if supports_strict_schema(self._provider, model):
+            if strict:
                 body["response_format"] = {"type": "json_schema", "json_schema": {
                     "name": "result", "strict": False, "schema": json_schema(schema)}}
             else:
                 body["response_format"] = {"type": "json_object"}
+        return body
+
+    def generate_content(self, *, model: str, contents: object, config: object | None = None):
+        body = self._body(model, contents, config)
         headers = {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"}
         if self._provider == "openrouter":
             headers["X-Title"] = "SKKU Notice Platform"
@@ -121,6 +135,14 @@ class _Models:
         except httpx.HTTPError as exc:
             # 예외 문구에는 요청 주소와 헤더가 들어갈 수 있어 종류만 남긴다.
             raise ProviderError(None, "network") from exc
+        if (response.status_code == 400 and body.get("response_format", {}).get("type") == "json_schema"
+                and re.search(r"response_format|json_schema|structured", _detail(response, self._api_key), re.I)):
+            # 이 모델이 스키마 모드를 받지 않는다. JSON 모드로 한 번만 다시 보낸다(호출한 쪽이 형식을 검증한다).
+            body = self._body(model, contents, config, json_mode_only=True)
+            try:
+                response = http.post(f"{BASE_URL[self._provider]}/chat/completions", json=body, headers=headers)
+            except httpx.HTTPError as exc:
+                raise ProviderError(None, "network") from exc
         if response.status_code >= 400:
             retry = response.headers.get("retry-after", "")
             raise ProviderError(response.status_code, classify(response.status_code),
