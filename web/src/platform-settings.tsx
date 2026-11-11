@@ -653,8 +653,8 @@ function Profile({ model }: { model: SettingsModel }) {
 }
 
 // bare: 이미 위에 구분선이 있는 묶음 안에서는 자기 윗선과 여백을 없애 선이 두 줄로 겹치지 않게 한다.
-export function Guide({ label, steps, bare = false }: { label: string; steps: ReactNode[]; bare?: boolean }) {
-  return <details className={`connection-manual group ${bare ? 'mt-0 border-t-0' : ''}`}><summary className={SUMMARY}>{label}{chevron('M6 9l6 6 6-6', CHEVRON)}</summary><ol className="steps">{steps.map((step, index) => <li key={index}>{step}</li>)}</ol></details>;
+export function Guide({ label, steps, bare = false, open = false }: { label: string; steps: ReactNode[]; bare?: boolean; open?: boolean }) {
+  return <details open={open} className={`connection-manual group ${bare ? 'mt-0 border-t-0' : ''}`}><summary className={SUMMARY}>{label}{chevron('M6 9l6 6 6-6', CHEVRON)}</summary><ol className="steps">{steps.map((step, index) => <li key={index}>{step}</li>)}</ol></details>;
 }
 
 export const ext = (href: string, text: string) => <a href={href} target="_blank" rel="noopener noreferrer">{text}</a>;
@@ -726,7 +726,7 @@ function CanvasRow({ model }: { model: SettingsModel }) {
     '저장하면 아이캠퍼스에 확인한 뒤 암호화해 서버에만 보관해요. 읽기만 하고 아이캠퍼스 내용을 바꾸지 않아요',
   ]} />;
   return <SecretRow name="아이캠퍼스 토큰" help={help} placeholder="숫자~로 시작하는 토큰" status={byok.canvas} loading={byok.loading} busy={byok.canvasBusy}
-    labels={{ empty: '연결 안 됨', saved: '연결됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '연결하기', edit: '바꾸기', remove: '연결 끊기', save: '연결하기' }}
+    labels={{ empty: '연결 안 됨', saved: '연결됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '연결하기', edit: '다시 연결하기', remove: '연결 끊기', save: '연결하기' }}
     error={byok.canvasError} onRegister={byok.registerCanvas} onRemove={byok.removeCanvas} guide={guide}
     valid={(value) => /^[0-9A-Za-z~_-]{16,200}$/.test(value)} />;
 }

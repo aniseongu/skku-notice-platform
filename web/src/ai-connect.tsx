@@ -20,17 +20,18 @@ const GUIDE: Record<Id, { url: string; placeholder: string; steps: string[] }> =
   openrouter: { url: PROVIDER_GUIDE.openrouter.url, placeholder: '키를 붙여 넣어 주세요', steps: PROVIDER_GUIDE.openrouter.steps },
   gemini: {
     url: 'https://aistudio.google.com/apikey', placeholder: '키를 붙여 넣어 주세요',
-    steps: ['Google AI Studio의 API 키 화면을 열고 Google 계정으로 로그인해요', '"API 키 만들기"를 누르고, 프로젝트를 고르라고 하면 새 프로젝트를 만들어요',
-      '만들어진 키를 붙여 넣고 "연결하기"를 눌러요. Gemini에 확인한 뒤 암호화해 서버에만 보관해요',
-      '무료 등급은 보낸 내용이 Google 제품 개선에 쓰일 수 있어요'],
+    steps: ['Google AI Studio 키 만들기 화면을 열고 Google 계정으로 로그인해요',
+      '"API 키 만들기"를 누르고, 프로젝트를 고르라고 하면 새 프로젝트를 만들어요',
+      '만들어진 키를 복사해요',
+      '여기로 돌아와 키를 붙여 넣고 "연결하기"를 눌러요'],
   },
 };
 
-const LABELS = { empty: '연결 안 됨', saved: '연결됨', disabled: '', broken: '키가 거절됐어요', retry: '다시 연결', close: '취소', add: '연결하기', edit: '바꾸기', remove: '연결 끊기', save: '연결하기' };
+const LABELS = { empty: '연결 안 됨', saved: '연결됨', disabled: '', broken: '키가 거절됐어요', retry: '다시 연결하기', close: '취소', add: '연결하기', edit: '다시 연결하기', remove: '연결 끊기', save: '연결하기' };
 
 function guideOf(id: Id) {
   const g = GUIDE[id];
-  return <Guide label="키는 어디서 받나요?" steps={[ext(g.url, g.steps[0]), ...g.steps.slice(1)]} />;
+  return <Guide label="키는 어디서 받나요?" open steps={[ext(g.url, g.steps[0]), ...g.steps.slice(1), '키는 암호화해서 서버에만 보관하고, 연결하기 전에 한 번 확인해요']} />;
 }
 
 /** AI 연결 줄들. 다른 설정 쪽과 같은 줄(이름, 설명, 오른쪽 조작) 모양이고, 연결한 개수에 따라 필요한 줄만 보인다. */

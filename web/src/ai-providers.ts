@@ -12,18 +12,20 @@ export const DEFAULT_AI_PREFERENCES: AiPreferences = { aiEnabled: true };
 /** 발급 안내. 화면 이름과 한도는 바뀔 수 있어 숫자를 약속하지 않는다. */
 export const PROVIDER_GUIDE: Record<AiProvider, { name: string; url: string; blurb: string; steps: string[]; placeholder: string }> = {
   groq: {
-    name: 'Groq', url: 'https://console.groq.com/keys', placeholder: 'GroqCloud에서 만든 키',
-    blurb: '빠르게 답해요. 무료로 시작할 수 있지만 한도는 계정마다 달라요',
-    steps: ['GroqCloud의 API 키 화면을 열고 로그인해요', '"Create API Key"를 눌러 내 키를 만들어요',
-      '만들어진 키를 붙여 넣고 "저장하기"를 눌러요. 저장하면 Groq에 확인한 뒤 암호화해 서버에만 보관해요',
-      '무료 한도와 요금은 Groq 콘솔에서 확인해요. 성공은 무료 모델만 써요'],
+    name: 'Groq', url: 'https://console.groq.com/keys', placeholder: '키를 붙여 넣어 주세요',
+    blurb: '빠르게 답해요. 무료로 시작할 수 있어요',
+    steps: ['Groq 키 만들기 화면을 열고 로그인해요. 처음이면 가입부터 해요',
+      '"Create API Key"를 누르고 이름을 아무거나 적어요 (예: 성공)',
+      '만들어진 키를 복사해요. 키는 이때 한 번만 보여요',
+      '여기로 돌아와 키를 붙여 넣고 "연결하기"를 눌러요'],
   },
   openrouter: {
-    name: 'OpenRouter', url: 'https://openrouter.ai/settings/keys', placeholder: 'OpenRouter에서 만든 키',
-    blurb: '한 키로 여러 모델을 써요. 처음에는 무료 모델(openrouter/free)로 시작해요',
-    steps: ['OpenRouter의 키 화면을 열고 로그인해요', '"Create Key"를 눌러 내 키를 만들어요. 무료·유료 키가 따로 있지 않아요',
-      '만들어진 키를 붙여 넣고 "저장하기"를 눌러요. 저장하면 OpenRouter에 확인한 뒤 암호화해 서버에만 보관해요',
-      '유료 모델은 성공에서 따로 허용하기 전에는 쓰지 않아요'],
+    name: 'OpenRouter', url: 'https://openrouter.ai/settings/keys', placeholder: '키를 붙여 넣어 주세요',
+    blurb: '여러 모델을 한 키로 써요. 무료 모델로 시작해요',
+    steps: ['OpenRouter 키 만들기 화면을 열고 로그인해요. 처음이면 가입부터 해요',
+      '"Create Key"를 누르고 이름을 아무거나 적어요 (예: 성공)',
+      '만들어진 키를 복사해요. 키는 이때 한 번만 보여요',
+      '여기로 돌아와 키를 붙여 넣고 "연결하기"를 눌러요'],
   },
 };
 
