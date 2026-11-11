@@ -38,7 +38,7 @@ const META = '[grid-area:meta] flex min-w-0 flex-wrap gap-[6px] text-[13px] lead
 const META_SPAN = 'min-w-0 max-w-full [overflow-wrap:anywhere] min-[720px]:overflow-hidden min-[720px]:text-ellipsis min-[720px]:whitespace-nowrap';
 
 function NoticeRows({ model }: { model: NoticeRowsModel }) {
-  return <ol className="rows">{model.rows.map((row, index) => {
+  return <ol className="rows m-0 list-none overflow-hidden bg-surface p-0 min-[720px]:rounded-none min-[720px]:bg-transparent">{model.rows.map((row, index) => {
     const n = row.notice;
     const title = cleanTitle(n.title_ko || n.title);
     const tags = [n.category, n.pinned ? '고정' : '', n.changed_at ? '수정됨' : '', !model.savedView && row.saved ? '저장함' : ''].filter(Boolean).join(', ');

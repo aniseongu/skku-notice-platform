@@ -135,7 +135,7 @@ export function NoticeShell({ app }: { app: AppController }) {
           </div>
 
           {settings ? <platform-settings-screen model={settingsModel(app)} /> : <>
-            <div className="tools narrow-only">
+            <div className="tools narrow-only px-[var(--gutter)] pt-[4px] pb-0 min-[720px]:hidden!">
               <label className="search"><Icon name="search" />
                 <input type="search" placeholder="공지 찾기" autoComplete="off" aria-label="공지 검색" value={app.query}
                   onChange={(event) => { app.query = event.currentTarget.value; app.selectedId = null; app.selectedReads = []; }} /></label>
@@ -268,14 +268,14 @@ const Empty = ({ title, body, action, onAction }: { title: string; body: string;
 
 function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
   if (app.loading && !app.notices.length) {
-    return <ol className="rows">{Array.from({ length: 6 }, (_, i) =>
+    return <ol className="rows m-0 list-none overflow-hidden bg-surface p-0 min-[720px]:rounded-none min-[720px]:bg-transparent">{Array.from({ length: 6 }, (_, i) =>
       <li className={`row skeleton ${ROW_LAYOUT} min-[720px]:[grid-template-areas:"meta_title_dday"_"meta_reason_dday"]`} aria-hidden="true" key={i}><span></span><span></span><span></span></li>)}</ol>;
   }
   if (app.failed && !app.notices.length) {
     return <Empty title="목록을 불러오지 못했어요" body="공지 데이터를 연결하는 중이에요. 잠시 뒤 다시 확인해 주세요" action="다시 불러오기" onAction={() => { void app.refresh(); }} />;
   }
   if (!list.length) {
-    const picker = app.tab() === 'all' && app.noBoards() ? null : <div className="group-head empty-head"><span></span><BoardSelect app={app} /></div>;
+    const picker = app.tab() === 'all' && app.noBoards() ? null : <div className="group-head empty-head mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-end min-[720px]:m-0 min-[720px]:min-h-0 min-[720px]:px-[24px] min-[720px]:py-[6px]"><span></span><BoardSelect app={app} /></div>;
     const note = (() => {
       // 받을 게시판을 아직 안 골랐으면 첫 설정으로, 이미 마친 사람은 게시판 고르기로 이어 준다.
       if (app.tab() === 'all' && app.noBoards()) {
@@ -305,8 +305,8 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
       : app.view === 'saved' ? '저장한 공지' : postedGroup(notice.posted_on, today);
     groups.set(key, [...(groups.get(key) ?? []), notice]);
   }
-  return <>{[...groups].map(([heading, items], index) => <section className="group" aria-label={heading} key={heading}>
-    <div className="group-head"><h2>{heading}</h2>{index === 0 && !app.selecting ? <BoardSelect app={app} /> : null}</div>
+  return <>{[...groups].map(([heading, items], index) => <section className={`group ${index > 0 ? 'mt-[20px] min-[720px]:mt-[8px]' : ''}`} aria-label={heading} key={heading}>
+    <div className="group-head mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-between min-[720px]:m-0 min-[720px]:min-h-0 min-[720px]:px-[24px] min-[720px]:py-[6px]"><h2 className="text-[13px] leading-[18px] font-semibold text-ink-3 min-[720px]:text-[12px] min-[720px]:leading-[16px]">{heading}</h2>{index === 0 && !app.selecting ? <BoardSelect app={app} /> : null}</div>
     <notice-rows-screen model={{
       rows: items.map((notice) => {
         const ai = app.judgement(notice)?.ai ?? null;
@@ -339,7 +339,7 @@ function ViewFilters({ app }: { app: AppController }) {
     const selectedUnread = selectedVisible.filter((notice) => !app.isRead(notice)).length;
     const selectedRead = selectedVisible.length - selectedUnread;
     const count = selectedVisible.length;
-    return <div className="view-options select-options min-[720px]:bg-[var(--glass)] min-[720px]:backdrop-blur-[20px] min-[720px]:backdrop-saturate-[1.6] min-[720px]:sticky min-[720px]:top-[var(--head-h)] min-[720px]:z-[2] flex-wrap gap-y-[8px] border-b border-line min-h-[48px] py-[4px] max-[719px]:min-h-[44px] max-[719px]:py-0 min-[720px]:pt-[4px] min-[720px]:pb-0" role="group" aria-label="공지 선택">
+    return <div className="view-options select-options flex items-center justify-between gap-x-[8px] px-[var(--gutter)] min-[720px]:px-[24px] min-[720px]:bg-[var(--glass)] min-[720px]:backdrop-blur-[20px] min-[720px]:backdrop-saturate-[1.6] min-[720px]:sticky min-[720px]:top-[var(--head-h)] min-[720px]:z-[2] flex-wrap gap-y-[8px] border-b border-line min-h-[48px] py-[4px] max-[719px]:min-h-[44px] max-[719px]:py-0 min-[720px]:pt-[4px] min-[720px]:pb-0" role="group" aria-label="공지 선택">
       <label className={`select-all order-1 ${app.gradEnabled() ? 'max-[719px]:w-full' : ''} ${count ? 'font-medium text-ink' : ''}`}><input type="checkbox" ref={allBox} checked={everyone} disabled={!list.length}
         onChange={(event) => { app.selectedReads = event.currentTarget.checked ? list.map((notice) => notice.id) : []; }} />
         <span aria-live="polite">{count ? `${count}개 선택됨` : '전체 선택'}</span>
@@ -356,28 +356,39 @@ function ViewFilters({ app }: { app: AppController }) {
       <div className="order-4"><SortSelect app={app} /></div>
     </div>;
   }
-  const select = <button type="button" className="read-all select-trigger" disabled={!list.length}
+  const select = <button type="button" className="read-all select-trigger inline-flex min-h-[44px] min-w-[44px] items-center gap-[6px] border-0 bg-transparent px-[4px] py-0 text-[14px] font-medium whitespace-nowrap text-ink-2 disabled:text-ink-3 [&_.i]:size-[18px]" disabled={!list.length}
     onClick={(event) => {
       app.selecting = true; app.selectedReads = [];
       if (event.detail === 0) void app.updateComplete.then(() => document.querySelector<HTMLInputElement>('.select-all input')?.focus({ preventScroll: true }));
     }}><Icon name="select-list" />선택</button>;
-  if (app.view === 'saved') return <div className="view-options saved-options"><div className="view-actions">{select}<SortSelect app={app} /></div></div>;
-  return <div className="view-options" role="group" aria-label="공지 보기 조건">
-    <div className="view-filters">
-      <button type="button" className="view-toggle" aria-pressed={app.unreadOnly} onClick={() => {
+  if (app.view === 'saved') return <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>{select}<SortSelect app={app} /></div></div>;
+  return <div className={`view-options ${VIEW_ROW} justify-between`} role="group" aria-label="공지 보기 조건">
+    <div className="view-filters flex min-w-0 flex-wrap items-center gap-x-[12px] gap-y-0">
+      <button type="button" className={VIEW_TOGGLE} aria-pressed={app.unreadOnly} onClick={() => {
         app.unreadOnly = !app.unreadOnly;
         app.listChanged();
         remember('view-unread', app.unreadOnly ? '1' : '0');
-      }}><span className="filter-check" aria-hidden="true"></span>읽지 않은 공지만</button>
-      {app.gradEnabled() ? <button type="button" className="view-toggle" aria-pressed={app.graduationOnly} onClick={() => {
+      }}><span className={FILTER_CHECK} aria-hidden="true"></span>읽지 않은 공지만</button>
+      {app.gradEnabled() ? <button type="button" className={VIEW_TOGGLE} aria-pressed={app.graduationOnly} onClick={() => {
         app.graduationOnly = !app.graduationOnly;
         app.listChanged();
         remember('view-grad', app.graduationOnly ? '1' : '0');
-      }}><span className="filter-check" aria-hidden="true"></span>인턴십 충족만</button> : null}
+      }}><span className={FILTER_CHECK} aria-hidden="true"></span>인턴십 충족만</button> : null}
     </div>
-    <div className="view-actions">{select}<SortSelect app={app} /></div>
+    <div className={VIEW_ACTIONS}>{select}<SortSelect app={app} /></div>
   </div>;
 }
+
+const VIEW_ROW = 'flex flex-wrap items-center gap-[8px] px-[var(--gutter)] min-[720px]:px-[24px] min-[720px]:pt-[4px] min-[720px]:pb-0';
+const VIEW_ACTIONS = 'view-actions ml-auto flex items-center gap-[4px] max-[359px]:gap-0';
+const VIEW_TOGGLE = 'view-toggle group inline-flex min-h-[44px] items-center gap-[8px] border-0 bg-transparent py-0 pr-[8px] pl-0 text-[14px] font-medium text-ink-2 aria-pressed:font-semibold aria-pressed:text-ink';
+// 체크 표시(::after의 마스크)는 base.css의 .check-mark가 맡는다.
+const FILTER_CHECK = 'filter-check check-mark relative size-[18px] flex-none rounded-sm border-[1.5px] border-ink-3 group-aria-pressed:border-ink group-aria-pressed:bg-ink';
+const MENU_TRIGGER = 'board-trigger group inline-flex min-h-[44px] items-center justify-end gap-[7px] border-0 bg-transparent py-0 pr-0 pl-[12px] text-[14px] whitespace-nowrap text-ink-2';
+const MENU_CHEVRON = 'board-chevron size-[7px] border-r-[1.5px] border-b-[1.5px] border-current [transform:translateY(-2px)_rotate(45deg)] group-aria-expanded:[transform:translateY(2px)_rotate(225deg)]';
+const MENU_OPTIONS = 'board-options absolute top-[calc(100%+4px)] right-0 z-[4] rounded-md border border-line bg-surface p-[4px] [box-shadow:var(--shadow-pop)]';
+const MENU_OPTION = 'board-option flex min-h-[44px] w-full items-center justify-between gap-[12px] rounded-sm border-0 bg-transparent px-[12px] py-0 text-left text-[14px] font-medium whitespace-nowrap text-ink-2 [&:hover]:bg-sunken focus-visible:bg-sunken aria-pressed:bg-sunken aria-pressed:font-semibold aria-pressed:text-ink';
+const MENU_CHECK = 'board-check mr-[3px] h-[12px] w-[7px] border-r-[1.5px] border-b-[1.5px] border-current [transform:rotate(45deg)]';
 
 // 위아래·Home·End로 메뉴 항목 사이를 옮긴다.
 function moveFocus(event: React.KeyboardEvent, selector: string) {
@@ -393,16 +404,16 @@ function SortSelect({ app }: { app: AppController }) {
   const sort = app.sortFor(app.tab());
   const options = [{ id: 'latest', label: app.view === 'saved' ? '저장한 순' : '최신순' }, { id: 'deadline', label: '마감순' }] as const;
   const label = options.find((option) => option.id === sort)!.label;
-  return <div className="sort-picker">
-    <button type="button" className="board-trigger sort-trigger" aria-label={`정렬: ${label}`}
+  return <div className="sort-picker relative flex-none">
+    <button type="button" className={`sort-trigger ${MENU_TRIGGER} font-medium`} aria-label={`정렬: ${label}`}
       aria-expanded={app.sortMenuOpen} aria-controls="sort-options" onClick={() => {
         app.sortMenuOpen = !app.sortMenuOpen;
         if (app.sortMenuOpen) void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.sort-option[aria-pressed="true"]')?.focus());
-      }}>{label}<span className="board-chevron" aria-hidden="true" /></button>
-    {app.sortMenuOpen ? <div id="sort-options" className="board-options sort-options" role="group" aria-label="정렬 선택"
+      }}>{label}<span className={MENU_CHEVRON} aria-hidden="true" /></button>
+    {app.sortMenuOpen ? <div id="sort-options" className={`sort-options ${MENU_OPTIONS} min-w-[140px]`} role="group" aria-label="정렬 선택"
       onKeyDown={(event) => moveFocus(event, '.sort-option')}
       onBlur={(event) => { if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) app.sortMenuOpen = false; }}>
-      {options.map((option) => <button type="button" className="board-option sort-option" key={option.id} aria-pressed={sort === option.id}
+      {options.map((option) => <button type="button" className={`sort-option ${MENU_OPTION}`} key={option.id} aria-pressed={sort === option.id}
         onClick={() => {
           if (app.view === 'saved') app.savedSort = option.id;
           else if (app.view === 'intern') app.internSort = option.id;
@@ -412,7 +423,7 @@ function SortSelect({ app }: { app: AppController }) {
           app.sortMenuOpen = false;
           history.replaceState(null, '', `${location.pathname}?tab=${app.tab()}&sort=${option.id}`);
           void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.sort-trigger')?.focus());
-        }}><span>{option.label}</span>{sort === option.id ? <span className="board-check" aria-hidden="true" /> : null}</button>)}
+        }}><span>{option.label}</span>{sort === option.id ? <span className={MENU_CHECK} aria-hidden="true" /> : null}</button>)}
     </div> : null}
   </div>;
 }
@@ -420,22 +431,22 @@ function SortSelect({ app }: { app: AppController }) {
 function BoardSelect({ app }: { app: AppController }) {
   const boards = boardChoices(app);
   const current = boards.find((b) => b.id === app.activeBoard())?.label ?? boards[0].label;
-  return <div className="board-picker narrow-only" onBlur={(event) => {
+  return <div className="board-picker narrow-only relative flex-none min-[720px]:hidden!" onBlur={(event) => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) app.boardMenuOpen = false;
   }}>
-    <button type="button" className="board-trigger" aria-label={`게시판: ${current}`} aria-expanded={app.boardMenuOpen}
+    <button type="button" className={`${MENU_TRIGGER} font-semibold`} aria-label={`게시판: ${current}`} aria-expanded={app.boardMenuOpen}
       aria-controls="board-options" onClick={() => {
         app.boardMenuOpen = !app.boardMenuOpen;
         if (app.boardMenuOpen) void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.board-option[aria-pressed="true"]')?.focus());
       }}>
-      {current}<span className="board-chevron" aria-hidden="true" />
+      {current}<span className={MENU_CHEVRON} aria-hidden="true" />
     </button>
-    {app.boardMenuOpen ? <div id="board-options" className="board-options" role="group" aria-label="게시판 선택"
+    {app.boardMenuOpen ? <div id="board-options" className={`${MENU_OPTIONS} min-w-[max(100%,180px)]`} role="group" aria-label="게시판 선택"
       onKeyDown={(event) => moveFocus(event, '.board-option')}>
-      {boards.map((b) => <button type="button" className="board-option" key={b.id} aria-pressed={app.activeBoard() === b.id}
+      {boards.map((b) => <button type="button" className={`board-option ${MENU_OPTION}`} key={b.id} aria-pressed={app.activeBoard() === b.id}
         onClick={() => { app.setBoard(b.id); void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.board-picker .board-trigger')?.focus()); }}>
-        <span>{b.label}</span>{app.activeBoard() === b.id ? <span className="board-check" aria-hidden="true" /> : null}</button>)}
-      {app.tab() === 'intern' ? null : <button type="button" className="board-option board-more" onClick={() => app.openSettings('notifications')}><span>게시판 더 고르기</span></button>}
+        <span>{b.label}</span>{app.activeBoard() === b.id ? <span className={MENU_CHECK} aria-hidden="true" /> : null}</button>)}
+      {app.tab() === 'intern' ? null : <button type="button" className={`board-more ${MENU_OPTION}`} onClick={() => app.openSettings('notifications')}><span>게시판 더 고르기</span></button>}
     </div> : null}
   </div>;
 }
