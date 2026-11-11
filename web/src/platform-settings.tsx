@@ -41,8 +41,6 @@ export interface SettingsModel {
   boardOrder: { boards: { id: string; label: string }[]; status: '' | 'saved' | 'failed'; move: (ids: string[]) => void };
   sources: { id: string; label: string }[];
   subscriptions: string[];
-  subscriptionsOnly: boolean;
-  setSubscriptionsOnly: (enabled: boolean) => void;
   loading: boolean;
   error: string;
   toggle: (id: string, enabled: boolean) => void;
@@ -204,10 +202,6 @@ function Overview({ model }: { model: SettingsModel }) {
       <Setting name="화면 모드" help="자동은 휴대폰과 PC 설정을 따라요">
         <Choice label="화면 모드" options={THEMES} value={model.theme} onPick={model.setTheme} />
       </Setting>
-      {model.userId ? <Setting name="목록 보기" help="성대 공지 탭에 보일 공지를 정해요">
-        <Choice label="목록 보기" value={model.subscriptionsOnly ? 'mine' : 'all'} disabled={model.loading || !!model.error}
-          options={[['all', '모든 게시판'], ['mine', '받는 게시판만']]} onPick={(value) => model.setSubscriptionsOnly(value === 'mine')} />
-      </Setting> : null}
       {model.canInstall ? <Setting name="앱 설치" help="바탕화면이나 홈 화면에서 바로 열어요">
         <button type="button" className="ghost-button" onClick={model.install}>앱으로 설치하기</button>
       </Setting> : null}

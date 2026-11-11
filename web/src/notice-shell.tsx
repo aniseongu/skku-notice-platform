@@ -188,8 +188,6 @@ function settingsModel(app: AppController) {
     boardOrder: { boards: applyBoardOrder(app.schoolSources(), app.boardOrder).map((source) => ({ id: source.id, label: boardName(source, source.id) })),
       status: app.authUserId && app.boardOrderAccount ? app.boardOrderStatus : '' as const, move: (ids: string[]) => app.setBoardOrder(ids) },
     subscriptions: app.subscriptions, loading: app.subscriptionsLoading, error: app.subscriptionsError,
-    subscriptionsOnly: app.subscriptionsOnly,
-    setSubscriptionsOnly: (enabled: boolean) => { app.subscriptionsOnly = enabled; app.selectedId = null; app.selectedReads = []; remember('subscriptions-only', enabled ? '1' : '0'); },
     toggle: (id: string, enabled: boolean) => { void app.toggleSubscription(id, enabled); },
     retry: () => {
       if (app.authUserId) { app.subscriptionsLoading = true; app.subscriptionsError = ''; void app.refreshSubscriptions(app.authUserId, app.subscriptionsEpoch); }
@@ -271,10 +269,6 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
     return <Empty title="목록을 불러오지 못했어요" body="공지 데이터를 연결하는 중이에요. 잠시 뒤 다시 확인해 주세요" action="다시 불러오기" onAction={() => { void app.refresh(); }} />;
   }
   if (!list.length) {
-    const subscribed = app.tab() === 'all' && app.authUserId && app.subscriptionsOnly;
-    if (subscribed && app.subscriptionsLoading) return <p className="detail-note" role="status">구독한 게시판을 불러오고 있어요.</p>;
-    if (subscribed && app.subscriptionsError) return <Empty title="구독을 불러오지 못했어요" body="설정에서 다시 불러와 주세요" action="설정 열기" onAction={() => app.openSettings('notifications')} />;
-    if (subscribed && !app.subscriptions.length) return <Empty title="구독한 게시판이 없어요" body="설정에서 게시판을 선택해 주세요" action="설정 열기" onAction={() => app.openSettings('notifications')} />;
     const picker = <div className="group-head empty-head"><span></span><BoardSelect app={app} /></div>;
     const note = (() => {
       if (app.query) return <Empty title={`'${app.query}'에 맞는 공지가 없어요`} body="다른 단어로 찾아보세요" action="검색어 지우기" onAction={() => { app.query = ''; }} />;

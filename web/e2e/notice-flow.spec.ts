@@ -60,28 +60,6 @@ test('detail shows my Gemini summary first in the plain original style and descr
   expect(alt).toContain('졸업 요건 안내');
 });
 
-test('subscription filter keeps only the selected school board', async ({ page }) => {
-  await page.goto('/?api=sample/api/v1');
-  const rows = page.locator('notice-rows-screen a.row');
-  await expect(rows.first()).toBeVisible();
-  // 목록이 점진적으로 그려지므로 행 수가 두 번 연속 같을 때까지 기다린 뒤 기준 목록을 잡는다.
-  let previous = -1;
-  await expect.poll(async () => { const count = await rows.count(); const same = count === previous; previous = count; return same; }, { intervals: [300] }).toBe(true);
-  const ids = await rows.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-id') ?? ''));
-  const source = ids[0].split('/')[0];
-  expect(ids.some((id) => !id.startsWith(`${source}/`))).toBeTruthy();
-  await page.evaluate((id) => {
-    const app = document.querySelector('notice-app') as HTMLElement & Record<string, unknown>;
-    app.authUserId = 'account-a';
-    app.subscriptions = [id];
-    app.subscriptionsError = '';
-    app.subscriptionsLoading = false;
-    app.subscriptionsOnly = true;
-  }, source);
-  await expect.poll(async () => rows.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-id') ?? '')))
-    .toEqual(ids.filter((id) => id.startsWith(`${source}/`)));
-});
-
 // 앱 상태를 직접 바꿔 컨트롤러와 화면의 실제 연결을 확인한다. 서버 호출이 필요한 동작은 컨트롤러 메서드를 기록용으로 바꾼다.
 type AppHandle = Record<string, unknown>;
 const withApp = (page: import('@playwright/test').Page, patch: Record<string, unknown>) => page.evaluate((values) => {
@@ -294,12 +272,9 @@ test('settings items live in the right place: list scope under display, profile 
   await settingsAt(page);
   const screen = page.locator('platform-settings-screen');
   await expect(screen.getByRole('radiogroup', { name: '목록 보기' })).toHaveCount(0);
-  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, subscriptionsOnly: false });
-  // 목록 보기는 알림이 아니라 화면 설정이다.
-  const view = screen.locator('section', { has: page.getByRole('heading', { name: '화면' }) });
-  await expect(view.getByRole('radiogroup', { name: '목록 보기' })).toBeVisible();
-  await view.getByRole('radio', { name: '받는 게시판만' }).click();
-  expect(await page.evaluate(() => (document.querySelector('notice-app') as unknown as { subscriptionsOnly: boolean }).subscriptionsOnly)).toBe(true);
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true });
+  // 목록에 보일 게시판은 따로 설정하지 않는다(목록의 게시판 고르기가 이미 같은 일을 한다).
+  await expect(screen.getByRole('radiogroup', { name: '목록 보기' })).toHaveCount(0);
   await screen.getByRole('link', { name: /알림/ }).first().click();
   await expect(screen.getByRole('radiogroup', { name: '목록 보기' })).toHaveCount(0);
   // 학년·학기·재학 상태·병역은 프로필 설정 한 곳에 있다.

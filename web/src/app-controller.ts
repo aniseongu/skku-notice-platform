@@ -106,7 +106,7 @@ function rememberSelected(id?: string | null): string | null {
 
 export function remember(key: string, value?: string): string | null {
   try {
-    const storageKey = ['keywords', 'board', 'board-order', 'view-unread', 'subscriptions-only', 'onboarding-dismissed'].includes(key) ? localKey(key) : key;
+    const storageKey = ['keywords', 'board', 'board-order', 'view-unread', 'onboarding-dismissed'].includes(key) ? localKey(key) : key;
     if (value === undefined) return localStorage.getItem(storageKey);
     localStorage.setItem(storageKey, value);
   } catch { /* 사생활 보호 모드에서는 기억하지 않는다 */ }
@@ -182,7 +182,7 @@ export class AppController extends Reactive {
     profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, profileError: { state: true }, settingsSection: { state: true },
     onboardingOpen: { state: true }, onboardingManual: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
     keywordNote: { state: true },
-    subscriptions: { state: true }, subscriptionsLoading: { state: true }, subscriptionsError: { state: true }, subscriptionsOnly: { state: true },
+    subscriptions: { state: true }, subscriptionsLoading: { state: true }, subscriptionsError: { state: true },
     boardOrder: { state: true }, boardOrderStatus: { state: true },
     preferencesLoading: { state: true }, preferencesError: { state: true }, preferencesUnavailable: { state: true },
     unreadOnly: { state: true }, selecting: { state: true }, selectedReads: { state: true },
@@ -196,7 +196,6 @@ export class AppController extends Reactive {
   boardOrderChain: Promise<void> = Promise.resolve();
   preferencesError = '';
   preferencesUnavailable = false;
-  subscriptionsOnly = remember('subscriptions-only') === '1';
   subscriptions: string[] = [];
   subscriptionsLoading = false;
   subscriptionsError = '';
@@ -380,7 +379,6 @@ export class AppController extends Reactive {
           this.keyword = null;
           this.query = '';
           this.board = remember('board') ?? 'all';
-          this.subscriptionsOnly = remember('subscriptions-only') === '1';
           this.unreadOnly = remember('view-unread') === '1';
           this.selecting = false; this.selectedReads = [];
         }
@@ -1372,8 +1370,6 @@ export class AppController extends Reactive {
     // 읽고 있는 글은 상세를 닫거나 다른 글로 옮길 때까지 남긴다.
     const scoped = list.filter((n) => !n.deadline || !deadlinePassed(n.deadline))
       .filter((n) => this.isExternal(n) === external)
-      .filter((n) => tab !== 'all' || !this.authUserId || !this.subscriptionsOnly
-        || (!this.subscriptionsLoading && !this.subscriptionsError && this.subscriptions.includes(n.source_id)))
       .filter((n) => !this.unreadOnly || !this.isRead(n) || n.id === this.selectedId || n.id === this.openedId)
       .filter((n) => !this.graduationOnly || !this.gradEnabled() || this.gradBadge(n) === 'ok' || n.id === this.selectedId || n.id === this.openedId);
     return orderNotices(scoped, this.sortFor(tab));
