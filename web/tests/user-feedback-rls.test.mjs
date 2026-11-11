@@ -13,6 +13,7 @@ test('feedback is insert-only, bound to the signed-in account, validated and rat
         select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
       grant usage on schema auth to authenticated, anon; insert into auth.users values ('${a}'), ('${b}');`);
     await db.exec(await readFile(new URL('../../supabase/migrations/20261112190000_user_feedback.sql', import.meta.url), 'utf8'));
+    await db.exec(await readFile(new URL('../../supabase/migrations/20261112200000_user_feedback_limit_lock.sql', import.meta.url), 'utf8'));
     await db.exec(`set role authenticated; set request.jwt.claim.sub = '${a}';`);
     await db.exec(`insert into user_feedback(kind, body) values ('question', '로그인이 안 돼요')`);
     await db.exec(`insert into user_feedback(kind, body, reply_email) values ('idea', '다크 모드 좋아요', 'me@example.com')`);
@@ -30,6 +31,13 @@ test('feedback is insert-only, bound to the signed-in account, validated and rat
     // 24시간에 5건까지(이미 2건 보냈다).
     for (let i = 0; i < 3; i++) await db.exec(`insert into user_feedback(kind, body) values ('question', '${i}번째')`);
     await assert.rejects(db.exec(`insert into user_feedback(kind, body) values ('question', '여섯 번째')`), /feedback_limit/);
+    // 계정당 총 50건 상한: 하루 한도가 지나도 쌓이지 않는다(오래된 글로 채워 넣고 확인한다).
+    await db.exec(`reset role; alter table user_feedback disable trigger user_feedback_limit;
+      insert into user_feedback(user_id, kind, body, created_at) select '${a}', 'question', 'old ' || g, now() - interval '3 days' from generate_series(1, 45) g;
+      alter table user_feedback enable trigger user_feedback_limit; set role authenticated; set request.jwt.claim.sub = '${a}'`);
+    // 오늘 보낸 5건은 이미 한도라 총량 상한과 따로 확인하려고 오늘 글을 3일 전으로 옮긴다.
+    await db.exec(`reset role; update user_feedback set created_at = now() - interval '3 days' where user_id = '${a}'; set role authenticated; set request.jwt.claim.sub = '${a}'`);
+    await assert.rejects(db.exec(`insert into user_feedback(kind, body) values ('question', '오십한 번째')`), /feedback_limit/);
     // 다른 계정은 따로 센다.
     await db.exec(`set request.jwt.claim.sub = '${b}'`);
     await db.exec(`insert into user_feedback(kind, body) values ('idea', '다른 계정')`);
@@ -37,7 +45,7 @@ test('feedback is insert-only, bound to the signed-in account, validated and rat
     await assert.rejects(db.exec(`insert into user_feedback(kind, body) values ('bug', 'x')`), /permission denied/);
     // 운영자(서비스 역할)는 읽는다. 계정을 지우면 글도 같이 지워진다.
     await db.exec('reset role; set role service_role');
-    assert.equal((await db.query('select count(*)::int as n from user_feedback')).rows[0].n, 6);
+    assert.equal((await db.query('select count(*)::int as n from user_feedback')).rows[0].n, 51);
     await db.exec(`reset role; delete from auth.users where id = '${a}'`);
     await db.exec('set role service_role');
     assert.equal((await db.query('select count(*)::int as n from user_feedback')).rows[0].n, 1);
