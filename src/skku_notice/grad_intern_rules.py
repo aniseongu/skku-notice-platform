@@ -159,7 +159,7 @@ def _dept_applicability(profile: GradProfile) -> tuple[str, str]:
 
 # 직무 이름에 소프트웨어·IT를 뜻하는 말이 있으면 소프트웨어와 관련 있어 보이는 직무로 본다(판정이 아니라 근거에 이름을 적기 위한 분류).
 IT_ROLE_NAME = re.compile(
-    r"개발|엔지니어|프로그래|소프트웨어|\bSW\b|\bIT\b|디지털|데이터|\bAI\b|인공지능|시스템|인프라|클라우드|보안|네트워크|플랫폼|\bQA\b|테스트"
+    r"UI\s*/?\s*UX|UX|웹\s*디자인|개발|엔지니어|프로그래|소프트웨어|\bSW\b|\bIT\b|디지털|데이터|\bAI\b|인공지능|시스템|인프라|클라우드|보안|네트워크|플랫폼|\bQA\b|테스트"
     r"|engineer|developer|software|back-?end|front-?end|full-?stack|devops|\bdba\b|architect|scientist|programmer|백엔드|프론트|풀스택|웹\s*개발|서버|앱\s*개발",
     re.I)
 _ROLE_TAIL = re.compile(r"\s*\(?\s*\d+\s*명\s*\)?|\s*(?:관련|분야|직무|부문|모집)\s*$")
@@ -191,7 +191,7 @@ def _work_check(facts: InternFacts) -> Check:
             return Check("DEPT-WORK", PASS, f"{_role_names(related)} 직무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)")
         return Check("DEPT-WORK", PASS, "공고의 담당 업무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)")
     if facts.task_category == "non_software":
-        return Check("DEPT-WORK", FAIL, "공고의 담당 업무가 IT·SW 교육과 거리가 있어요")
+        return Check("DEPT-WORK", FAIL, "공고의 담당 업무가 IT·SW와 거리가 있어요")
     if facts.task_category == "mixed_it":
         names = _role_names(related or roles[:1]) or "‘디지털·IT’"
         return Check("DEPT-WORK", PASS, f"여러 직무 중 {names} 직무가 소프트웨어 업무 분야로 보여요")

@@ -419,3 +419,10 @@ def test_stored_facts_give_back_the_role_names_without_asking_the_ai_again():
     assert stored["roles"] == ["백엔드 개발", "영업 지원"]
     restored = gf.facts_from_dict({k: v for k, v in stored.items() if k != "roles"})   # 예전에 저장한 판정에는 roles가 없다
     assert restored is not None and restored.roles == ("백엔드 개발", "영업 지원")   # tasks에서 되살린다
+
+
+def test_ui_ux_and_web_design_roles_count_as_software():
+    found = gf.static_task_category("[MCL 주식회사]UI/UX 리서치 및 웹 디자인 인턴모집 공고", "모집 직무: UI/UX 리서치 및 웹 디자인\n이력서와 포트폴리오를 이메일로 제출")
+    assert found is not None and found[0] == "application_embedded"
+    plain = gf.static_task_category("브랜드 디자인 인턴", "담당업무: 포스터 디자인과 패키지 디자인 보조 업무입니다. 디자인 경험자 우대")
+    assert plain is None or plain[0] == "non_software"

@@ -26,7 +26,7 @@ export interface GraduationAssessment {
 /** 수행 후에 확인하는 요건. 공고만으로는 통과로 표시하지 않는다. */
 export const AFTER_COMPLETION: Record<string, string> = {
   'DEPT-EVALUATION': '수행 기관 평가 60점 이상(60점 미만이면 미수행으로 봐요)',
-  'DEPT-WORK-COMMITTEE': '수행 내용이 IT·SW 교육에 맞는지 졸업평가위원회 심의',
+  'DEPT-WORK-COMMITTEE': '수행 내용이 IT·SW 분야에 맞는지 졸업평가위원회 심의',
   'DEPT-COMPANY-DOCS': '출근부, 수행 평가표, 주간·종합 보고서, 수행 확인서 제출',
   'DEPT-LAB-DOCS': '출근부, 수행 평가표, 월간·종합 보고서, 수행 확인서(학과장 도장과 책임교수 서명)',
   'DEPT-DEADLINE': '졸업 학기 종강 뒤 14일 안에 수행 증명서 제출',

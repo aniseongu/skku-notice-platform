@@ -196,6 +196,6 @@ test('학과 요건에는 관련 있어 보이는 직무 이름을 한 문장으
   const { jobNote } = await import('../src/graduation-assessment.ts');
   const track = (result, note) => ({ status: 'LIKELY', label: 'x', unknowns: [], afterCompletion: [], notes: [], checks: [{ ruleId: 'DEPT-WORK', result, note }] });
   assert.equal(jobNote(track('pass', '여러 직무 중 ‘백엔드 개발’ 직무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)')), '여러 직무 중 ‘백엔드 개발’ 직무가 학과가 정한 SW 업무 분야로 보여요');
-  assert.equal(jobNote(track('fail', '공고의 담당 업무가 IT·SW 교육과 거리가 있어요')), '');
+  assert.equal(jobNote(track('fail', '공고의 담당 업무가 IT·SW와 거리가 있어요')), '');
   assert.equal(jobNote({ ...track('pass', 'x'), checks: [] }), '');
 });
