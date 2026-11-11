@@ -8,7 +8,7 @@ import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } fro
 import { COLLEGES, MAX_PROGRAMS, findCollege, programKey, programLabel, type Program } from './skku-programs';
 import { BOARD_CATALOG, boardsForPrograms, OTHER_BOARDS } from './skku-boards';
 import {
-  KEYWORD_SUGGESTIONS, SEARCH_THRESHOLD, STEPS, canContinue, filterDepartments, initialDraft, missingHint, nextStep, previousStep,
+  KEYWORD_SUGGESTIONS, STEPS, canContinue, filterDepartments, initialDraft, missingHint, nextStep, previousStep,
   stepIndex, toggleValue, withPrograms, type Draft, type DoubleAnswer, type Step,
 } from './onboarding-flow';
 import { APP_NAME } from './brand';
@@ -32,10 +32,33 @@ export function ProgramPicker({ onPick, current, listClass = '', lead = true }: 
   const [query, setQuery] = useState('');
   const found = findCollege(college);
   const listRef = useRef<HTMLDivElement>(null);
+  const searching = query.trim().length > 0;
   // 대학 목록에서 아래쪽 항목을 눌러 스크롤된 채로 학과 목록이 열려 제목이 가려지지 않게, 목록이 바뀌면 맨 위로 되돌린다.
   useEffect(() => { document.querySelector('.onb-main')?.scrollTo({ top: 0 }); listRef.current?.scrollTo({ top: 0 }); }, [college]);
+  const GROUP = 'onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]';
+  // 검색 칸은 처음부터 보이고, 모든 대학의 학과를 한 번에 찾는다. 대학을 먼저 고르지 않아도 된다.
+  const search = <input type="search" className="onb-search min-h-[44px] rounded-md border border-line bg-surface px-[12px] py-0" aria-label="학과 검색" placeholder="학과 이름으로 찾기" autoComplete="off"
+    value={query} onChange={(event) => setQuery(event.currentTarget.value)} />;
+  if (searching) {
+    const results = COLLEGES.flatMap((item) => {
+      if (item.departments.length === 0) return filterDepartments([item.name], query).map(() => ({ college: item.name, department: null as string | null }));
+      return filterDepartments(item.departments, query).map((department) => ({ college: item.name, department }));
+    });
+    const selectedId = current ? `${current.college}/${current.department ?? ''}` : null;
+    return <div className={GROUP}>
+      {search}
+      <div ref={listRef} className={listClass}>
+        {results.length
+          ? <ChoiceList label="학과 검색 결과" selected={selectedId}
+            items={results.map((item) => ({ id: `${item.college}/${item.department ?? ''}`, label: item.department ?? item.college, note: item.department ? item.college : undefined }))}
+            onSelect={(id) => { const hit = results.find((item) => `${item.college}/${item.department ?? ''}` === id); if (hit) onPick(hit); }} />
+          : <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2" role="status">'{query}'에 맞는 학과가 없어요. 다른 단어로 찾아보세요.</p>}
+      </div>
+    </div>;
+  }
   if (!found) {
-    return <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]">
+    return <div className={GROUP}>
+      {search}
       <div ref={listRef} className={listClass}>
         <GroupGrid label="대학 선택" names={COLLEGES.map((item) => item.name)} onPick={(name) => { setCollege(name); setQuery(''); }} />
       </div>
@@ -43,20 +66,15 @@ export function ProgramPicker({ onPick, current, listClass = '', lead = true }: 
   }
   // 학과가 없는 대학(학부대학)은 그 대학 하나만 고르는 목록이다.
   const noDepartments = found.departments.length === 0;
-  const departments = filterDepartments(found.departments, query);
-  return <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]">
+  return <div className={GROUP}>
+    {search}
     <BackToGroups current={found.name} onBack={() => setCollege(null)} />
-    {found.departments.length > SEARCH_THRESHOLD
-      ? <input type="search" className="onb-search min-h-[44px] rounded-md border border-line bg-surface px-[12px] py-0" aria-label="학과 검색" placeholder="학과 이름으로 찾기" autoComplete="off"
-        value={query} onChange={(event) => setQuery(event.currentTarget.value)} /> : null}
     <div ref={listRef} className={listClass}>
       {noDepartments
         ? <ChoiceList label={`${found.name} 선택`} selected={current?.college === found.name ? found.name : null}
           items={[{ id: found.name, label: found.name }]} onSelect={() => onPick({ college: found.name, department: null })} />
-        : departments.length
-          ? <ChoiceList label={`${found.name} 학과 선택`} selected={current?.college === found.name ? current.department : null}
-            items={departments.map((name) => ({ id: name, label: name }))} onSelect={(name) => onPick({ college: found.name, department: name })} />
-          : <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2" role="status">'{query}'에 맞는 학과가 없어요. 다른 단어로 찾아보세요.</p>}
+        : <ChoiceList label={`${found.name} 학과 선택`} selected={current?.college === found.name ? current.department : null}
+          items={found.departments.map((name) => ({ id: name, label: name }))} onSelect={(name) => onPick({ college: found.name, department: name })} />}
     </div>
   </div>;
 }
