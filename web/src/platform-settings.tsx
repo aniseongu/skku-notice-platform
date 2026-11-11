@@ -8,7 +8,8 @@ import type { AiKeyStatus, AiPreferences, AiProvider } from './ai-providers';
 import { type ByokStatus, type CanvasStatus } from './byok';
 import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, validDeviceName, type CanvasMode, type Device } from './devices';
 import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
-import { programLabel } from './skku-programs';
+import { MAX_PROGRAMS, programKey, programLabel, type Program } from './skku-programs';
+import { ProgramPicker } from './onboarding';
 import { BOARD_CATALOG, COLLEGE_BOARD, DEPARTMENT_BOARD, OTHER_BOARDS } from './skku-boards';
 // 순서 바꾸기는 dnd-kit(MIT)을 쓴다: 손잡이로 끌기(마우스·터치)와 키보드(Space로 집고 방향키로 옮기고 Space로 놓기), 낭독기 안내가 들어 있다.
 import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
@@ -593,6 +594,35 @@ function CalendarPage({ model }: { model: SettingsModel }) {
   </div>;
 }
 
+/** 전공 바꾸기: 첫 설정으로 돌아가지 않고 이 자리에서 바로 고른다. 학과를 누르면 바로 저장하고, 게시판은 건드리지 않는다(게시판은 알림 설정에서 고른다). */
+function ProgramEditor({ programs, ready, onChange }: { programs: Program[]; ready: boolean; onChange: (next: Program[]) => void }) {
+  const [editing, setEditing] = useState<'main' | 'double' | null>(null);
+  const [main, ...doubles] = programs;
+  const name = (program: Program) => `${programLabel(program)}${program.department ? ` (${program.college})` : ''}`;
+  const pick = (picked: Program) => {
+    const others = doubles.filter((p) => programKey(p) !== programKey(picked));
+    onChange(editing === 'main' ? [picked, ...others] : [main, ...others, picked].slice(0, MAX_PROGRAMS));
+    setEditing(null);
+  };
+  return <>
+    <Setting name="주전공" help={main ? name(main) : '아직 없어요'}>
+      <button type="button" className="ghost-button" disabled={!ready} onClick={() => setEditing(editing === 'main' ? null : 'main')}>{main ? '바꾸기' : '고르기'}</button>
+    </Setting>
+    <Setting name="복수전공" help={doubles.length ? doubles.map(name).join(', ') : '없어요'}>
+      <div className="inline-row">
+        {doubles.map((program) => <button key={programKey(program)} type="button" className="ghost-button" disabled={!ready} aria-label={`${programLabel(program)} 빼기`}
+          onClick={() => onChange(programs.filter((p) => programKey(p) !== programKey(program)))}>{programLabel(program)} 빼기</button>)}
+        {main && programs.length < MAX_PROGRAMS ? <button type="button" className="ghost-button" disabled={!ready} onClick={() => setEditing(editing === 'double' ? null : 'double')}>추가하기</button> : null}
+      </div>
+    </Setting>
+    {editing ? <div className="setting stacked">
+      <p className="setting-name m-0">{editing === 'main' ? '주전공을 골라 주세요' : '복수전공을 골라 주세요'}</p>
+      <ProgramPicker current={editing === 'main' ? main : null} onPick={pick} />
+      <button type="button" className="text-button self-start" onClick={() => setEditing(null)}>닫기</button>
+    </div> : null}
+  </>;
+}
+
 function Profile({ model }: { model: SettingsModel }) {
   const { profile } = model;
   const save = (patch: Partial<UserProfile>) => model.saveProfile({ ...profile, ...patch });
@@ -606,13 +636,7 @@ function Profile({ model }: { model: SettingsModel }) {
       <div><p className="setting-name">{model.name ?? model.email ?? '로그인됨'}</p>{model.name && model.email ? <p className="setting-help">{model.email}</p> : null}</div>
     </div>
     <Section id="s-major" title="전공">
-      <Setting name="전공" help="공지를 받을 게시판을 고를 때 참고해요">
-        <dl className="info-list">
-          <div><dt>주전공</dt><dd>{main ? `${programLabel(main)}${main.department ? ` (${main.college})` : ''}` : '아직 없어요'}</dd></div>
-          <div><dt>복수전공</dt><dd>{doubles.length ? doubles.map(programLabel).join(', ') : '없어요'}</dd></div>
-        </dl>
-        <button type="button" className="ghost-button" disabled={!ready} onClick={model.openOnboarding}>전공과 게시판 다시 고르기</button>
-      </Setting>
+      <ProgramEditor programs={profile.programs} ready={ready} onChange={(programs) => save({ programs })} />
     </Section>
     <Section id="s-school" title="학교 정보">
       <Setting name="학년 및 학기" help="인턴 공고의 지원 자격을 가릴 때만 써요">
@@ -728,7 +752,7 @@ function CanvasRow({ model }: { model: SettingsModel }) {
       <span className="field-note">지금은 토큰을 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
     </KeyRow>;
   }
-  const guide = <Guide compact label="토큰은 어디서 받나요?" steps={[
+  const guide = <Guide label="토큰은 어디서 받나요?" steps={[
     <>{ext('https://canvas.skku.edu/profile/settings', '아이캠퍼스 계정 설정')}을 열고 로그인해요</>,
     '"승인된 통합" 아래의 "새 액세스 토큰"을 눌러요',
     '목적에 "성공 알림" 같은 이름을 쓰고 만료일은 비워 두거나 학기 끝으로 정해요',

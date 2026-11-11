@@ -14,7 +14,7 @@ import {
 import { APP_NAME } from './brand';
 import { Card, ChipGroup, ChoiceList, Segmented, SwitchRow } from './ui';
 
-const STEP_LABELS = ['주전공', '복수전공', '학년·재학 상태', '인턴십 졸업요건', '받을 공지', '기타 게시판', 'AI 키', '알림'] as const;
+const STEP_LABELS = ['주전공', '복수전공', '학년·재학 상태', '인턴십', '받을 공지', '기타 게시판', 'AI 키', '알림'] as const;
 
 const YEARS = [1, 2, 3, 4, 5].map((year) => ({ value: year, label: year === 5 ? '5학년 이상' : `${year}학년` }));
 const STATUS = ENROLLMENT.map((value) => ({ value, label: value }));
@@ -24,7 +24,7 @@ const DEPT_DONE = [{ value: 'yes', label: '마쳤어요' }, { value: 'no', label
 const SERVICE = MILITARY.map((value) => ({ value, label: value }));
 
 /** 대학을 고른 뒤 그 대학의 학과만 보여 준다. 대학 줄은 학과 목록으로 들어가는 이동 줄이고, 학과는 고르기만 한다(확정은 아래 "다음"). */
-function ProgramPicker({ onPick, onCancel, current }: {
+export function ProgramPicker({ onPick, onCancel, current }: {
   onPick: (program: Program) => void; onCancel?: () => void; current?: Program | null;
 }) {
   const [college, setCollege] = useState<string | null>(null);
@@ -64,7 +64,7 @@ export function Onboarding({ app }: { app: AppController }) {
   const [draft, setDraft] = useState<Draft>(() => initialDraft(app.profile, app.subscriptions, app.keywords));
   const [addingDouble, setAddingDouble] = useState(false);
   const [pendingDouble, setPendingDouble] = useState<Program | null>(null);
-  const [doubleAnswer, setDoubleAnswer] = useState<DoubleAnswer>(() => (draft.programs.length > 1 ? 'yes' : null));
+  const [doubleAnswer, setDoubleAnswer] = useState<DoubleAnswer>(() => (draft.programs.length > 1 ? 'yes' : app.profile.onboardedAt ? 'no' : null));
   const [changingPrimary, setChangingPrimary] = useState(() => app.profile.programs.length === 0);
   const [saved, setSaved] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -158,21 +158,20 @@ export function Onboarding({ app }: { app: AppController }) {
     </div>;
     foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('internship')}>다음</button>;
   } else if (step === 'internship') {
-    title = '인턴십 졸업요건을 알려 주세요';
+    title = '인턴십 진행 상황을 알려 주세요';
     lead = '이미 채운 요건은 인턴 공고에서 빼 드려요';
+    // 질문마다 제목이 곧 질문이다(제목 아래에 같은 말을 설명으로 되풀이하지 않는다). 입학 연도만 이유를 한 줄로 덧붙인다.
     body = <div className="onb-group">
       {isSoftwareOriginal({ programs: draft.programs }) ? <>
-        <h2>입학 연도</h2>
-        <p className="card-note">입학 연도마다 졸업요건이 달라서 물어봐요. 학번 전체는 받지 않아요</p>
+        <h2>입학 연도가 언제예요?</h2>
+        <p className="card-note">입학 연도마다 졸업요건이 달라요. 학번 전체는 받지 않아요</p>
         <Segmented label="입학 연도" options={ADMISSION} columns={4} value={draft.admissionYear} onChange={(admissionYear) => setDraft({ ...draft, admissionYear })} />
       </> : null}
-      <h2>3품 인턴십</h2>
-      <p className="card-note">글로벌·창의·AI·인턴십 중 인턴십 영역을 채웠나요? 채웠다면 인턴 공고에서 이 요건을 빼 드려요</p>
+      <h2>3품 인턴십 영역을 채웠나요?</h2>
       <Segmented label="3품 인턴십" options={THREE_P} columns={3} value={threePAnswer(draft)}
         onChange={(value) => setDraft({ ...draft, ...threePFields(value as ThreePAnswer) })} />
       {isSoftwareOriginal({ programs: draft.programs }) ? <>
-        <h2>솦 인턴십</h2>
-        <p className="card-note">솦 인턴십을 마쳤나요? 마쳤다면 인턴 공고에서 이 요건을 빼 드려요</p>
+        <h2>솦 인턴십을 마쳤나요?</h2>
         <Segmented label="솦 인턴십" options={DEPT_DONE} columns={2}
           value={draft.deptInternshipDone === null ? null : draft.deptInternshipDone ? 'yes' : 'no'}
           onChange={(value) => setDraft({ ...draft, deptInternshipDone: value === 'yes' })} />
@@ -258,7 +257,7 @@ export function Onboarding({ app }: { app: AppController }) {
             : <button type="button" className="onb-skip" onClick={() => app.dismissOnboarding()}>나중에 하기</button>}
         </div>
       </div>
-      <div className="onb-body">
+      <div className="onb-body min-[900px]:flex-none">
         <h1 id="onb-title" ref={heading} tabIndex={-1}>{title}</h1>
         {lead ? <p className="onb-lead">{lead}</p> : null}
         {body}
