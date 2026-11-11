@@ -1,5 +1,4 @@
 // 로그인 전용 화면. 로그인하기 전에는 앱의 어떤 부분도 보이지 않고 이 화면만 뜬다.
-import { useState } from 'react';
 import { APP_NAME } from './brand';
 import { installMode, isStandalone, wasInstalled } from './install-hint';
 import type { AppController } from './app-controller';
@@ -18,8 +17,8 @@ export function LoginStatus({ text }: { text: string }) {
 
 export function LoginScreen({ app }: { app: AppController }) {
   const busy = app.authBusy;
-  const [guide, setGuide] = useState(false);
   // 휴대폰에서만 "앱으로 설치하기"를 보인다. 주 행동은 Google 단추 하나이고 설치는 그 아래 조용한 보조 행동이다.
+  const reserve = /Android/.test(navigator.userAgent) && installMode(navigator.userAgent, isStandalone(), true, wasInstalled()) !== 'none';
   const mode = installMode(navigator.userAgent, isStandalone(), !!app.install, wasInstalled());
   // 토스 첫 화면 구성(TDS Top: 위 그림, 28px 제목, 17px 설명, 아래 고정 단추 하나)을 따른다. 가운데에는 이 앱이 하는 일을 알림 예시 하나로 보여 준다.
   return <div className="flex flex-col min-h-dvh bg-bg min-[720px]:items-center min-[720px]:justify-center">
@@ -53,12 +52,13 @@ export function LoginScreen({ app }: { app: AppController }) {
           {app.authError ? <p className="m-0 text-[14px] leading-[20px] text-center text-danger" role="alert">{app.authError}</p> : null}
         </div>
         <p className="m-0 mt-[14px] text-[13px] leading-[20px] text-center text-ink-2 min-[720px]:text-[14px]">계속하면 <a className="inline-block px-[4px] py-[12px] -mx-[4px] -my-[12px] text-ink" href="./privacy.html">개인정보처리방침</a>에 동의하는 거예요</p>
-        {mode === 'none' ? null : <div className="install mt-[20px] min-[720px]:hidden">
-          <button type="button" className="flex h-[52px] w-full items-center justify-center gap-[8px] rounded-md border border-line bg-surface text-[16px] font-semibold text-ink active:bg-sunken" aria-expanded={mode === 'ios' ? guide : undefined}
-            onClick={() => { if (mode === 'prompt') void app.runInstall(); else setGuide(!guide); }}>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14" /></svg>앱으로 설치하기</button>
-          {mode === 'ios' && guide ? <p className="m-0 mt-[12px] rounded-md bg-sunken px-[16px] py-[12px] text-center text-[14px] leading-[20px] text-ink-2" role="status">Safari 아래쪽 공유 버튼을 누르고<br />‘홈 화면에 추가’를 골라요</p> : null}
-        </div>}
+        {/* 설치 칸은 안드로이드에서 처음부터 자리를 잡아 둔다(설치 창 신호가 늦게 와도 Google 단추가 움직이지 않게). */}
+        <div className={`install min-[720px]:hidden ${reserve ? 'min-h-[76px]' : ''}`}>
+          {mode === 'prompt' ? <button type="button" className="mt-[20px] flex h-[56px] w-full items-center justify-center gap-[8px] rounded-md border border-ink-3/50 bg-surface text-[16px] font-semibold text-ink active:bg-sunken" onClick={() => { void app.runInstall(); }}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14" /></svg>앱으로 설치하기</button> : null}
+          {/* iOS Safari에는 설치 창이 없어서 누르는 단추가 아니라 방법만 조용히 알려 준다(면과 테두리를 주지 않아 눌리는 곳처럼 보이지 않게). */}
+          {mode === 'ios' ? <p className="m-0 mt-[16px] text-center text-[14px] leading-[21px] text-ink-2">공유 버튼에서 <b className="font-semibold text-ink">‘홈 화면에 추가’</b>를 고르면<br />앱처럼 쓸 수 있어요</p> : null}
+        </div>
       </div>
     </div>
   </div>;
