@@ -244,3 +244,14 @@ def test_labels_do_not_carry_after_the_fact_reminders():
 
     for label in [*DEPT_LABELS.values(), *P3_LABELS.values()]:
         assert "수행 후" not in label and "—" not in label and "증빙 필요" not in label
+
+
+def test_it_role_name_recognises_english_and_korean_developer_titles():
+    """공개 한국어 IT 채용 제목(young-cc/korean-it-recruit-dataset, CC-BY-4.0)에서 가장 많이 빠졌던 말."""
+    from skku_notice.grad_intern_rules import IT_ROLE_NAME
+
+    for title in ("Backend Engineer", "Frontend Developer", "DevOps", "Data Scientist", "Software Architect",
+                  "백엔드 개발자", "프론트엔지니어", "풀스택 개발자", "서버 개발"):
+        assert IT_ROLE_NAME.search(title), title
+    for title in ("영업 관리", "마케팅 담당자", "일반사무", "경영지원"):
+        assert not IT_ROLE_NAME.search(title), title

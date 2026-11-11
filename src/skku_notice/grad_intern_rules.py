@@ -159,7 +159,9 @@ def _dept_applicability(profile: GradProfile) -> tuple[str, str]:
 
 # 직무 이름에 소프트웨어·IT를 뜻하는 말이 있으면 소프트웨어와 관련 있어 보이는 직무로 본다(판정이 아니라 근거에 이름을 적기 위한 분류).
 IT_ROLE_NAME = re.compile(
-    r"개발|엔지니어|프로그래|소프트웨어|\bSW\b|\bIT\b|디지털|데이터|\bAI\b|인공지능|시스템|인프라|클라우드|보안|네트워크|플랫폼|\bQA\b|테스트", re.I)
+    r"개발|엔지니어|프로그래|소프트웨어|\bSW\b|\bIT\b|디지털|데이터|\bAI\b|인공지능|시스템|인프라|클라우드|보안|네트워크|플랫폼|\bQA\b|테스트"
+    r"|engineer|developer|software|back-?end|front-?end|full-?stack|devops|\bdba\b|architect|scientist|programmer|백엔드|프론트|풀스택|웹\s*개발|서버|앱\s*개발",
+    re.I)
 _ROLE_TAIL = re.compile(r"\s*\(?\s*\d+\s*명\s*\)?|\s*(?:관련|분야|직무|부문|모집)\s*$")
 
 
