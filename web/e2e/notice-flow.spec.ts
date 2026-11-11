@@ -151,12 +151,12 @@ test('board subscriptions are switches grouped by college with search', async ({
   await settingsAt(page, '&section=notifications');
   const screen = page.locator('platform-settings-screen');
   await withApp(page, { authUserId: 'account-a', subscriptions: ['skku-notice01'], toggleSubscription: 'fn:toggle' });
-  const mine = screen.getByRole('switch', { checked: true });
+  const mine = screen.getByRole('switch', { checked: true }).filter({ hasNotText: '아이캠퍼스' });
   await expect(mine).toHaveCount(1);
   await expect(mine.first()).toHaveAttribute('aria-checked', 'true');
   await mine.first().click();
   await screen.locator('details.connection-manual > summary').click();
-  const more = screen.getByRole('switch', { checked: false });
+  const more = screen.getByRole('switch', { checked: false }).filter({ hasNotText: '아이캠퍼스' });
   await expect(more.first()).toBeVisible();
   const search = screen.getByRole('searchbox', { name: '게시판 검색' });
   await search.fill('없는게시판이름');
@@ -189,10 +189,9 @@ test('profile page edits year and status in place and can reopen the first-run s
   await expect(screen.getByRole('radio', { name: '3학년' })).toHaveAttribute('aria-checked', 'true');
   await screen.getByRole('radio', { name: '4학년' }).click();
   await screen.getByRole('radio', { name: '휴학' }).click();
-  // 전공은 첫 설정으로 돌아가지 않고 이 자리에서 바꾼다: 바꾸기 → 대학 → 학과를 누르면 바로 저장하고, 복수전공은 그대로 둔다.
+  // 전공은 첫 설정으로 돌아가지 않고 이 자리에서 바꾼다: 바꾸기 → 학과를 누르면 바로 저장하고, 복수전공은 그대로 둔다.
   await expect(screen.getByRole('button', { name: '전공과 게시판 다시 고르기' })).toHaveCount(0);
   await screen.getByRole('button', { name: '바꾸기' }).click();
-  await screen.getByRole('button', { name: '문과대학', exact: true }).click();
   await screen.getByRole('radio', { name: '철학과', exact: true }).click();
   const recorded = await calls(page);
   expect(recorded[0]).toEqual(['save', { ...profile, year: 4 }]);
@@ -207,7 +206,7 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   // 서버 기능이 아직 없을 때도 줄은 보이고 이유를 알려 준다.
   await expect(screen.getByRole('heading', { name: 'AI 연결' })).toBeVisible();
   await expect(screen.getByText('지금은 키를 연결할 수 없어요')).toBeVisible();
-  await expect(screen.locator('.setting', { hasText: '아이캠퍼스 토큰' }).getByText('준비 중')).toBeVisible();
+  await expect(screen.getByText('아이캠퍼스')).toHaveCount(0);   // 아이캠퍼스는 알림 쪽에서 켠다
   await expect(screen.getByLabel('Gemini 키', { exact: true })).toHaveCount(0);
   // 학기·병역 같은 프로필은 프로필 설정에서 바꾼다. 연결 키 쪽에는 두지 않는다.
   await expect(screen.getByRole('radio', { name: '2학기' })).toHaveCount(0);
@@ -219,7 +218,6 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   // 업체나 요금을 고르라는 질문은 없다. 연결이 하나도 없으면 켜기·끄기도 보이지 않는다.
   await expect(screen.getByRole('radiogroup', { name: 'AI 분석' })).toHaveCount(0);
   await expect(screen.getByText('요금')).toHaveCount(0);
-  await expect(screen.locator('.setting', { hasText: '아이캠퍼스 토큰' }).getByRole('button', { name: '아이캠퍼스 토큰 연결하기' })).toBeVisible();
   // 연결 전에는 입력칸이 처음부터 보이고, 받는 방법은 접혀 있다.
   const save = screen.getByRole('button', { name: 'Gemini 키 연결하기' });
   await expect(save).toBeDisabled();
@@ -252,25 +250,6 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await screen.getByRole('button', { name: 'Gemini 키 연결 끊기', exact: true }).click();
   await screen.getByRole('button', { name: 'Gemini 키 연결 끊기 확인' }).click();
   expect(await calls(page)).toEqual([['remove']]);
-  // 아이캠퍼스 토큰도 같은 흐름이다. 형식이 맞지 않으면 저장할 수 없다.
-  await withApp(page, {});
-  const canvasInput = screen.getByLabel('아이캠퍼스 토큰', { exact: true });
-  await expect(canvasInput).toHaveAttribute('type', 'password');
-  await canvasInput.fill('짧음');
-  await expect(screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' })).toBeDisabled();
-  const token = `1234~${'Z'.repeat(40)}`;
-  await canvasInput.fill(token);
-  await screen.getByText('토큰은 어디서 받나요?').click();
-  await expect(screen.getByRole('link', { name: '아이캠퍼스 설정' })).toHaveAttribute('href', 'https://canvas.skku.edu/profile/settings');
-  await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' }).click();
-  expect(await calls(page)).toEqual([['registerCanvas', token]]);
-  await withApp(page, { canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null } });
-  await expect(screen.getByText('연결됨 ····ZZZZ')).toBeVisible();
-  expect(await screen.innerText()).not.toContain(token);
-  await withApp(page, {});
-  await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결 끊기', exact: true }).click();
-  await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결 끊기 확인' }).click();
-  expect(await calls(page)).toEqual([['removeCanvas']]);
 });
 
 test('settings items live in the right place: list scope under display, profile fields together, shortcuts jump to the page', async ({ page }) => {
@@ -317,21 +296,22 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('heading', { name: '주전공이 어디예요?' })).toBeVisible();
   await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
   const barWidth1 = (await dialog.getByRole('progressbar').boundingBox())!.width;
-  // 대학 → 학과: 고른 대학의 학과만 보인다.
-  await dialog.getByRole('button', { name: '소프트웨어융합대학', exact: true }).click();
-  // 질문 제목이 접히지 않고 보여야 한다(전역 h1 규칙이 제목 높이를 0으로 만들던 결함의 재발 방지).
+  // 한 화면: 검색 칸과 대학별로 묶인 학과 목록이 함께 있고, 학과를 바로 누른다(대학을 먼저 거치지 않는다).
   const title = dialog.getByRole('heading', { name: '주전공이 어디예요?' });
   expect((await title.boundingBox())!.height).toBeGreaterThan(20);
-  await expect(dialog.getByRole('radio', { name: '소프트웨어학과', exact: true })).toBeVisible();
-  await expect(dialog.getByRole('radio', { name: '국어국문학과', exact: true })).toHaveCount(0);
-  await dialog.getByRole('button', { name: '다른 대학 고르기' }).click();
-  await dialog.getByRole('button', { name: '문과대학', exact: true }).click();
   await expect(dialog.getByRole('searchbox', { name: '학과 검색' })).toBeVisible();
+  await expect(dialog.getByRole('radiogroup', { name: '소프트웨어융합대학 학과 선택' }).getByRole('radio', { name: '소프트웨어학과', exact: true })).toBeAttached();
+  await expect(dialog.getByRole('radio', { name: '국어국문학과', exact: true })).toBeAttached();
   await dialog.getByRole('searchbox', { name: '학과 검색' }).fill('철학');
   await expect(dialog.getByRole('radio', { name: '철학과', exact: true })).toBeVisible();
   await expect(dialog.getByRole('radio', { name: '사학과', exact: true })).toHaveCount(0);
-  await dialog.getByRole('button', { name: '다른 대학 고르기' }).click();
-  await dialog.getByRole('button', { name: '소프트웨어융합대학', exact: true }).click();
+  // 대학 이름으로 찾아도 그 대학의 학과가 나온다.
+  await dialog.getByRole('searchbox', { name: '학과 검색' }).fill('소프트웨어융합');
+  await expect(dialog.getByRole('radio', { name: '소프트웨어학과', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('radio', { name: '철학과', exact: true })).toHaveCount(0);
+  await dialog.getByRole('searchbox', { name: '학과 검색' }).fill('없는학과');
+  await expect(dialog.getByRole('status')).toContainText('맞는 학과가 없어요');
+  await dialog.getByRole('searchbox', { name: '학과 검색' }).fill('');
   // 학과는 고르기만 하고 아래 다음이 확정한다(자동으로 넘어가지 않는다).
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('radio', { name: '소프트웨어학과', exact: true }).click();
@@ -345,7 +325,6 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '8단계 중 2단계');
   expect(Math.abs((await dialog.getByRole('progressbar').boundingBox())!.width - barWidth1)).toBeLessThanOrEqual(0.5);
   await dialog.getByRole('radio', { name: '있어요', exact: true }).click();
-  await dialog.getByRole('button', { name: '경영대학', exact: true }).click();
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('radio', { name: '경영학과', exact: true }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
@@ -541,7 +520,7 @@ test('first-run setup layout: header and body share one column, the close contro
     await open(manual);
     const dialog = page.getByRole('dialog');
     await dialog.waitFor();
-    await dialog.getByRole('button', { name: '문과대학', exact: true }).scrollIntoViewIfNeeded();   // 아래로 스크롤된 상태에서도 어긋나지 않아야 한다
+    await dialog.getByRole('radio', { name: '철학과', exact: true }).scrollIntoViewIfNeeded();   // 아래로 스크롤된 상태에서도 어긋나지 않아야 한다
     const top = await box('.onb-top-inner'), body = await box('.onb-body');
     expect(Math.abs(top.x - body.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(top.width - body.width)).toBeLessThanOrEqual(1);
@@ -714,13 +693,6 @@ test('core settings tasks finish within their click budget and in the expected o
   await click('Gemini 연결하기', screen.getByRole('button', { name: 'Gemini 키 연결하기' }));
   expect(log.length).toBe(2);
   expect((await calls(page))[0][0]).toBe('registerKey');
-  // 2) 같은 쪽에서 아이캠퍼스 토큰: 입력하기 → 저장하기 = 추가 2클릭(쪽 이동 없음)
-  await withApp(page, { byokStatus: { keyHint: 'aaaa', model: 'm', disabled: false, lastError: null, usedToday: 0 }, registerCanvas: 'fn:registerCanvas' });
-  log.length = 0;
-  await screen.getByLabel('아이캠퍼스 토큰', { exact: true }).fill(`1234~${'b'.repeat(40)}`);
-  await click('아이캠퍼스 연결하기', screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' }));
-  expect(log.length).toBe(1);
-  expect((await calls(page))[0][0]).toBe('registerCanvas');
   // 3) 쪽 이동은 X(데스크톱) 또는 뒤로 가기(모바일) 한 번에 첫 쪽으로 돌아온다.
   await page.goBack();
   await hub();
@@ -738,7 +710,7 @@ test('core settings tasks finish within their click budget and in the expected o
   log.length = 0;
   await click('알림', screen.getByRole('link', { name: /알림/ }).first());
   await click('게시판 더 보기', screen.locator('details.connection-manual > summary'));
-  await click('게시판 켜기', screen.getByRole('switch', { checked: false }).first());
+  await click('게시판 켜기', screen.getByRole('switch', { checked: false }).filter({ hasNotText: '아이캠퍼스' }).first());
   expect(log.length).toBe(3);
   expect((await calls(page)).some((call) => call[0] === 'toggle' && call[2] === true)).toBe(true);
 });
@@ -925,7 +897,7 @@ test('list rows show "관심 …" or my judgment label with its reason, like the
   await expect(reason(ids[2])).toContainText('관심 장학');          // 본문에서 서버가 찾은 키워드
 });
 
-test('notifications page: this device iCampus mode, daily summary time and the device list, like the original settings', async ({ page }) => {
+test('notifications page: this device and the device list, like the original settings', async ({ page }) => {
   await settingsAt(page, '&section=notifications');
   const screen = page.locator('platform-settings-screen');
   const devices = [
@@ -935,21 +907,8 @@ test('notifications page: this device iCampus mode, daily summary time and the d
   await withApp(page, { authUserId: 'account-a', pushStatus: 'on', devices, thisDeviceId: 'd1', summaryTime: '21:05',
     canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null },
     refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', removeDevice: 'fn:remove', renameDevice: 'fn:rename', setSummaryTime: 'fn:time' });
-  // 이 기기 아이캠퍼스 알림: 원본과 같은 세 가지, 지금 값이 골라져 있다.
-  const mode = screen.getByRole('radiogroup', { name: '이 기기 아이캠퍼스 알림' });
-  await expect(mode.getByRole('radio')).toHaveText(['끄기', '하루 요약', '요약과 마감']);
-  await expect(mode.getByRole('radio', { name: '요약과 마감' })).toHaveAttribute('aria-checked', 'true');
-  await mode.getByRole('radio', { name: '하루 요약' }).click();
-  expect((await calls(page)).filter((c) => c[0] === 'mode')).toEqual([['mode', 'summary']]);
-  // 하루 요약 시간: 오전·오후, 시, 분. 21:05는 오후 9시 05분.
-  const time = screen.getByRole('group', { name: '하루 요약 시간' });
-  await expect(time.getByRole('radio', { name: '오후' })).toHaveAttribute('aria-checked', 'true');
-  await expect(time.getByLabel('시')).toHaveValue('9');
-  await expect(time.getByLabel('분')).toHaveValue('05');
-  await time.getByRole('radio', { name: '오전' }).click();
-  await time.getByLabel('시').fill('7'); await time.getByLabel('분').fill('30'); await time.getByLabel('분').blur();
-  const timeCalls = (await calls(page)).filter((c) => c[0] === 'time');
-  expect(timeCalls.at(-1)).toEqual(['time', 'am', 7, 30]);
+  // 아이캠퍼스 알림은 이 쪽에 없다(설정 홈의 아이캠퍼스에서 켠다).
+  await expect(screen.getByRole('switch', { name: /아이캠퍼스/ })).toHaveCount(0);
   // 알림 기기 목록: 이 기기에는 지우기가 없고 다른 기기는 지울 수 있다.
   const list = screen.getByRole('region', { name: '알림 기기' });
   await expect(list).toContainText('Windows · Whale');
@@ -962,10 +921,92 @@ test('notifications page: this device iCampus mode, daily summary time and the d
   expect((await calls(page)).filter((c) => c[0] === 'rename')).toEqual([['rename', 'd1', '내 노트북']]);
   await list.getByRole('button', { name: 'Android · Chrome 지우기' }).click();
   expect((await calls(page)).filter((c) => c[0] === 'remove')).toEqual([['remove', 'd2']]);
-  // 아이캠퍼스 토큰이 없으면 모드와 요약 시간을 바꿀 수 없고 이유를 알려 준다.
+});
+
+test('iCampus page: switch on → token → summary time, each in its own section, with the fewest clicks', async ({ page }) => {
+  await settingsAt(page, '&section=canvas');
+  const screen = page.locator('platform-settings-screen');
+  const devices = [{ id: 'd1', endpoint: 'https://fcm.googleapis.com/a', name: 'Windows · Whale', canvasMode: 'off', createdAt: '2026-11-07T10:00:00Z' }];
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false, pushStatus: 'on', devices, thisDeviceId: 'd1',
+    summaryTime: null, canvasStatus: null, refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', registerCanvas: 'fn:registerCanvas', removeCanvas: 'fn:removeCanvas', setSummaryTime: 'fn:time' });
+  const sw = screen.getByRole('switch', { name: /아이캠퍼스 알림/ });
+  // 꺼져 있으면 아무것도 펼쳐지지 않는다(키 입력칸도 없다).
+  await expect(sw).toHaveAttribute('aria-checked', 'false');
+  await expect(screen.getByLabel('아이캠퍼스 토큰', { exact: true })).toHaveCount(0);
+  let clicks = 0;
+  // 1) 스위치 켜기: 키 입력칸이 같은 자리 바로 아래에 열리고, 요약 시간은 키를 연결할 때까지 잠겨 있다.
+  await sw.click(); clicks += 1;
+  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  const input = screen.getByLabel('아이캠퍼스 토큰', { exact: true });
+  await expect(input).toHaveAttribute('type', 'password');
+  // 구역은 알림 → 토큰 → 하루 요약 순으로 따로 제목이 있다.
+  const heads = await screen.locator('h2.settings-head').allInnerTexts();
+  expect(heads).toEqual(['알림', '토큰', '하루 요약']);
+  const order = await screen.evaluate((root) => ['아이캠퍼스 토큰', '하루 요약 시간'].map((text) => (root.textContent ?? '').indexOf(text)));
+  expect(order[0]).toBeGreaterThan(-1);
+  expect(order[0]).toBeLessThan(order[1]);                     // 키가 요약 시간보다 위
+  const time = screen.getByRole('group', { name: '하루 요약 시간' });
+  await expect(time.getByRole('radio', { name: '오전' })).toBeDisabled();
+  await expect(screen.getByText('토큰을 연결하면 바꿀 수 있어요')).toBeVisible();
+  // 2) 키 입력: 형식이 맞지 않으면 저장할 수 없다. 맞으면 저장 한 번.
+  await input.fill('짧음');
+  await expect(screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' })).toBeDisabled();
+  const token = `1234~${'Z'.repeat(40)}`;
+  await input.fill(token);
+  await screen.getByText('토큰은 어디서 받나요?').click();
+  await expect(screen.getByRole('link', { name: '아이캠퍼스 설정' })).toHaveAttribute('href', 'https://canvas.skku.edu/profile/settings');
+  await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' }).click(); clicks += 1;
+  expect((await calls(page)).filter((c) => c[0] === 'registerCanvas')).toEqual([['registerCanvas', token]]);
+  // 3) 연결되면 모드가 꺼짐이던 이 기기를 켜고, 요약 시간이 풀린다. 입력한 키는 화면에 남지 않는다.
+  await withApp(page, { canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null }, summaryTime: '21:00' });
+  await expect(screen.getByText('연결됨 ····ZZZZ')).toBeVisible();
+  expect(await screen.innerText()).not.toContain(token);
+  expect((await calls(page)).filter((c) => c[0] === 'mode')).toEqual([['mode', 'reminders']]);
+  await expect(time.getByRole('radio', { name: '오전' })).toBeEnabled();
+  await time.getByRole('radio', { name: '오전' }).click(); clicks += 1;
+  expect((await calls(page)).filter((c) => c[0] === 'time').at(-1)).toEqual(['time', 'am', 9, 0]);
+  expect(clicks).toBe(3);   // 켜기, 키 저장, 시간 고르기
+  await expect(screen.getByRole('radiogroup', { name: '받을 아이캠퍼스 알림' }).getByRole('radio')).toHaveText(['하루 요약', '요약과 마감']);
+  // 4) 키를 끊어도 입력칸은 그대로 열려 있어 바로 다시 넣을 수 있다.
+  await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결 끊기', exact: true }).click();
+  await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결 끊기 확인' }).click();
+  expect((await calls(page)).filter((c) => c[0] === 'removeCanvas')).toEqual([['removeCanvas']]);
   await withApp(page, { canvasStatus: null, summaryTime: null });
-  await expect(mode.getByRole('radio', { name: '하루 요약' })).toBeDisabled();
-  await expect(screen.getByText('연결 키에서 아이캠퍼스 토큰을 저장해 주세요').first()).toBeVisible();
+  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  await expect(screen.getByLabel('아이캠퍼스 토큰', { exact: true })).toBeVisible();
+  // 기기 알림이 꺼져 있으면 스위치를 켤 수 없고 이유를 알려 준다.
+  await withApp(page, { pushStatus: 'off' });
+  await expect(sw).toBeDisabled();
+  await expect(screen.getByText('먼저 알림 설정에서 이 기기 알림을 켜 주세요')).toBeVisible();
+});
+
+test('iCampus page: a device that already has alerts on shows them open, and the switch turns them off', async ({ page }) => {
+  await settingsAt(page, '&section=canvas');
+  const screen = page.locator('platform-settings-screen');
+  const devices = [{ id: 'd1', endpoint: 'https://fcm.googleapis.com/a', name: 'Windows · Whale', canvasMode: 'reminders', createdAt: '2026-11-07T10:00:00Z' }];
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, pushStatus: 'on', devices, thisDeviceId: 'd1', summaryTime: '21:05',
+    canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null }, refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', setSummaryTime: 'fn:time' });
+  // 아이캠퍼스 알림: 스위치가 켜져 있고(이 기기 모드가 끔이 아님) 키·요약 시간·받을 알림이 펼쳐져 있다.
+  const sw = screen.getByRole('switch', { name: /아이캠퍼스 알림/ });
+  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  const mode = screen.getByRole('radiogroup', { name: '받을 아이캠퍼스 알림' });
+  await expect(mode.getByRole('radio')).toHaveText(['하루 요약', '요약과 마감']);
+  await expect(mode.getByRole('radio', { name: '요약과 마감' })).toHaveAttribute('aria-checked', 'true');
+  await mode.getByRole('radio', { name: '하루 요약' }).click();
+  expect((await calls(page)).filter((c) => c[0] === 'mode')).toEqual([['mode', 'summary']]);
+  // 하루 요약 시간: 오전·오후, 시, 분. 21:05는 오후 9시 05분.
+  const time = screen.getByRole('group', { name: '하루 요약 시간' });
+  await expect(time.getByRole('radio', { name: '오후' })).toHaveAttribute('aria-checked', 'true');
+  await expect(time.getByLabel('시')).toHaveValue('9');
+  await expect(time.getByLabel('분')).toHaveValue('05');
+  await time.getByRole('radio', { name: '오전' }).click();
+  await time.getByLabel('시').fill('7'); await time.getByLabel('분').fill('30'); await time.getByLabel('분').blur();
+  const timeCalls = (await calls(page)).filter((c) => c[0] === 'time');
+  expect(timeCalls.at(-1)).toEqual(['time', 'am', 7, 30]);
+  // 스위치를 끄면 이 기기 모드가 꺼지고 펼친 것이 접힌다.
+  await sw.click();
+  expect((await calls(page)).filter((c) => c[0] === 'mode').at(-1)).toEqual(['mode', 'off']);
+  await expect(screen.getByRole('group', { name: '하루 요약 시간' })).toHaveCount(0);
 });
 
 test('a deadline that is close stays red even when the notice is already read, in both themes', async ({ page }) => {
@@ -1078,7 +1119,6 @@ test('software original major is asked for the admission year and the internship
     app.authUserId = 'account-a';
   });
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: '소프트웨어융합대학', exact: true }).click();
   await dialog.getByRole('radio', { name: '소프트웨어학과', exact: true }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   await dialog.getByRole('radio', { name: '없어요', exact: true }).click();
@@ -1214,7 +1254,7 @@ test('board order: edit mode shows drag handles only, the keyboard can lift, mov
   expect(before.length).toBeGreaterThanOrEqual(2);
   await screen.getByRole('button', { name: '순서 바꾸기' }).click();
   await expect(screen.locator('.order-handle')).toHaveCount(before.length);
-  await expect(screen.getByRole('switch')).toHaveCount(0);                        // 순서를 바꾸는 중에는 받기 스위치를 숨긴다
+  await expect(screen.getByRole('switch').filter({ hasNotText: '아이캠퍼스' })).toHaveCount(0);   // 순서를 바꾸는 중에는 받기 스위치를 숨긴다
   const first = screen.locator('.order-handle').first();
   await first.focus();
   await page.keyboard.press('Space');
@@ -1238,7 +1278,6 @@ test('first-run setup keeps answers when going back and forward, and a stored "n
   const dialog = page.getByRole('dialog');
   const next = () => dialog.getByRole('button', { name: '다음' }).click();
   const back = () => dialog.getByRole('button', { name: '이전 단계' }).click();
-  await dialog.getByRole('button', { name: '소프트웨어융합대학', exact: true }).click();
   await dialog.getByRole('radio', { name: '소프트웨어학과', exact: true }).click();
   await next();
   await dialog.getByRole('radio', { name: '없어요', exact: true }).click();

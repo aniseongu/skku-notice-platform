@@ -176,6 +176,7 @@ function Overview({ model }: { model: SettingsModel }) {
   return <div className="settings settings-overview">
     <Section id="s-preferences" title="내 설정">
       <SettingsLink model={model} label="알림" help="받을 게시판과 이 기기 알림" section="notifications" />
+      <SettingsLink model={model} label="아이캠퍼스" help="과제 마감과 하루 요약 알림" section="canvas" />
       <SettingsLink model={model} label="구글 캘린더" help={model.calendar?.id ? '저장한 공지의 마감을 캘린더에 넣고 있어요' : '저장한 공지의 마감을 구글 캘린더에 넣어요'} section="calendar" />
       <SettingsLink model={model} label="관심 키워드" help={model.keywords.length ? `${model.keywords.length}개 키워드를 쓰고 있어요` : '관심 있는 공지를 골라 봐요'} section="keywords" />
     </Section>
@@ -339,39 +340,50 @@ function DeviceRow({ device, info }: { device: Device; info: NonNullable<Setting
   </li>;
 }
 
-/** 아이캠퍼스 알림: 스위치를 켜면 키 입력 → 하루 요약 시간 → 받을 알림 순으로 같은 자리에 펼쳐진다.
- * 스위치는 이 기기의 알림 모드(끔/켬)이고, 키가 저장돼 있어야 알림이 실제로 간다. 키를 지워도 입력칸이 닫히지 않게 펼침 상태는 따로 둔다. */
-function CanvasAlerts({ model, info, pushOn, thisDevice }: { model: SettingsModel; info: NonNullable<SettingsModel['devicesInfo']>; pushOn: boolean; thisDevice: Device | null }) {
-  const hasToken = info.hasCanvasToken;
+/** 아이캠퍼스 쪽: 알림 켜기 → 토큰 → 하루 요약 시간 순으로, 켜면 같은 쪽 아래에 구역별로 펼쳐진다. 토큰과 요약 시간은 제목이 있는 따로 구역이다.
+ * 스위치는 이 기기의 알림 모드(끔/켬)이고, 토큰이 저장돼 있어야 알림이 실제로 간다. 토큰을 지워도 입력칸이 닫히지 않게 펼침 상태는 따로 둔다. */
+function Canvas({ model }: { model: SettingsModel }) {
+  const info = model.devicesInfo;
+  const refresh = info?.refresh;
+  useEffect(() => { if (model.userId) refresh?.(); }, [model.userId, model.pushStatus]);
+  const pushOn = model.pushStatus === 'on';
+  const thisDevice = info?.devices.find((device) => device.id === info.thisId) ?? null;
+  const hasToken = !!info?.hasCanvasToken;
   const mode = thisDevice?.canvasMode ?? null;
   const active = pushOn && hasToken && mode !== null && mode !== 'off';
   const [open, setOpen] = useState(active);
   // 서버에서 늦게 불러온 켜짐 상태도 펼침에 반영한다(한 방향만: 끄는 것은 사용자가 스위치로만 한다).
   useEffect(() => { if (active) setOpen(true); }, [active]);
-  // 펼친 채로 키를 저장했는데 이 기기 모드가 꺼짐이면 켜 준다. 스위치만 켜지고 알림은 안 가는 상태를 만들지 않는다.
-  useEffect(() => { if (open && pushOn && hasToken && mode === 'off') info.setMode('reminders'); }, [open, pushOn, hasToken, mode]);
+  // 펼친 채로 토큰을 저장했는데 이 기기 모드가 꺼짐이면 켜 준다. 스위치만 켜지고 알림은 안 가는 상태를 만들지 않는다.
+  useEffect(() => { if (open && pushOn && hasToken && mode === 'off') info?.setMode('reminders'); }, [open, pushOn, hasToken, mode]);
+  if (!model.userId) return <div className="settings"><Section id="s-canvas" title="아이캠퍼스"><LoginNote model={model} what="아이캠퍼스 알림" /></Section></div>;
+  if (!info) return <div className="settings"><Section id="s-canvas" title="아이캠퍼스"><Setting name="아이캠퍼스 알림" help="지금은 설정할 수 없어요. 잠시 뒤 다시 열어 주세요" /></Section></div>;
   const toggle = (next: boolean) => {
     setOpen(next);
     if (next && hasToken && mode === 'off') info.setMode('reminders');
     if (!next && mode !== null && mode !== 'off') info.setMode('off');
   };
-  return <Section id="s-canvas" title="아이캠퍼스 알림">
-    <SwitchRow label="아이캠퍼스 알림" description={pushOn ? '과제 마감과 하루 요약을 이 기기로 받아요' : '먼저 이 기기 알림을 켜 주세요'}
-      checked={open && pushOn} disabled={!pushOn || info.busy} onChange={toggle} />
+  return <div className="settings">
+    <Section id="s-canvas" title="알림">
+      <SwitchRow label="아이캠퍼스 알림" description={pushOn ? '과제 마감과 하루 요약을 이 기기로 받아요' : '먼저 알림 설정에서 이 기기 알림을 켜 주세요'}
+        checked={open && pushOn} disabled={!pushOn || info.busy} onChange={toggle} />
+    </Section>
     {open && pushOn ? <>
-      <CanvasRow model={model} alignEnd={false} />
-      <Setting name="하루 요약 시간" help={hasToken ? '모든 기기에 같은 시간을 적용해요. 할 일이 없어도 알려요' : '키를 연결하면 바꿀 수 있어요'}>
-        <p className="setting-name visually-hidden" id="summary-time-label">하루 요약 시간</p>
-        <SummaryTime info={info} />
-        {hasToken ? <p className="field-note">확인이 늦어지면 알림도 늦어져요</p> : null}
-        {info.error ? <p className="field-note error" role="alert">{info.error}</p> : null}
-      </Setting>
-      {hasToken ? <Setting name="받을 알림" help="요약과 마감을 고르면 하루 전과 3시간 전에도 알려요">
-        <Choice label="받을 아이캠퍼스 알림" value={mode === 'summary' ? 'summary' : 'reminders'} disabled={!thisDevice || info.busy}
-          options={CANVAS_MODES.filter(([value]) => value !== 'off')} onPick={(next: CanvasMode) => info.setMode(next)} />
-      </Setting> : null}
+      <Section id="s-canvas-token" title="토큰"><CanvasRow model={model} alignEnd={false} /></Section>
+      <Section id="s-canvas-time" title="하루 요약">
+        <Setting name="요약 시간" help={hasToken ? '모든 기기에 같은 시간을 적용해요. 할 일이 없어도 알려요' : '토큰을 연결하면 바꿀 수 있어요'}>
+          <p className="setting-name visually-hidden" id="summary-time-label">하루 요약 시간</p>
+          <div className={hasToken ? '' : 'opacity-50'}><SummaryTime info={info} /></div>
+          {hasToken ? <p className="field-note">확인이 늦어지면 알림도 늦어져요</p> : null}
+          {info.error ? <p className="field-note error" role="alert">{info.error}</p> : null}
+        </Setting>
+        {hasToken ? <Setting name="받을 알림" help="요약과 마감을 고르면 하루 전과 3시간 전에도 알려요">
+          <Choice label="받을 아이캠퍼스 알림" value={mode === 'summary' ? 'summary' : 'reminders'} disabled={!thisDevice || info.busy}
+            options={CANVAS_MODES.filter(([value]) => value !== 'off')} onPick={(next: CanvasMode) => info.setMode(next)} />
+        </Setting> : null}
+      </Section>
     </> : null}
-  </Section>;
+  </div>;
 }
 
 function Notifications({ model }: { model: SettingsModel }) {
@@ -380,7 +392,6 @@ function Notifications({ model }: { model: SettingsModel }) {
   const refresh = info?.refresh;
   // 설정 쪽을 열 때와 이 기기 알림을 켜고 끌 때 기기 목록을 다시 읽는다.
   useEffect(() => { if (model.userId) refresh?.(); }, [model.userId, model.pushStatus]);
-  const thisDevice = info?.devices.find((device) => device.id === info.thisId) ?? null;
   return <div className="settings">
     <Back model={model} />
     <Section id="s-notify" title="이 기기">
@@ -411,7 +422,6 @@ function Notifications({ model }: { model: SettingsModel }) {
         </ul>
       </Setting>
     </Section>
-    {model.userId && info ? <CanvasAlerts model={model} info={info} pushOn={on} thisDevice={thisDevice} /> : null}
     {model.userId && info && info.devices.length > 0 ? <Section id="s-devices" title="알림 기기">
       <Setting name="등록된 기기" help="알림을 받도록 켜 둔 기기예요. 이 기기는 위에서 끄고, 다른 기기는 여기서 지워요">
         <ul className="device-list">
@@ -625,10 +635,21 @@ function ProgramEditor({ programs, ready, onChange }: { programs: Program[]; rea
     onChange(editing === 'main' ? [picked, ...others] : [main, ...others, picked].slice(0, MAX_PROGRAMS));
     setEditing(null);
   };
+  // 고르는 칸은 누른 줄 바로 아래에 열고, 열리면 화면 안으로 옮긴다. 닫기는 제목 줄에 있어 긴 목록 끝까지 내려가지 않는다.
+  const pickerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (editing) pickerRef.current?.scrollIntoView({ block: 'nearest' }); }, [editing]);
+  const picker = <div ref={pickerRef} className="setting stacked">
+    <div className="flex items-center justify-between gap-2">
+      <p className="setting-name m-0">{editing === 'main' ? '주전공을 골라 주세요' : '복수전공을 골라 주세요'}</p>
+      <button type="button" className="text-button min-h-[44px] px-2" onClick={() => setEditing(null)}>닫기</button>
+    </div>
+    <ProgramPicker current={editing === 'main' ? main : null} onPick={pick} listClass="max-h-[min(55vh,420px)] overflow-y-auto" />
+  </div>;
   return <>
     <Setting name="주전공" help={main ? name(main) : '아직 없어요'}>
       <button type="button" className="ghost-button" disabled={!ready} onClick={() => setEditing(editing === 'main' ? null : 'main')}>{main ? '바꾸기' : '고르기'}</button>
     </Setting>
+    {editing === 'main' ? picker : null}
     <Setting name="복수전공" help={doubles.length ? doubles.map(name).join(', ') : '없어요'}>
       <div className="inline-row">
         {doubles.map((program) => <button key={programKey(program)} type="button" className="ghost-button" disabled={!ready} aria-label={`${programLabel(program)} 빼기`}
@@ -636,11 +657,7 @@ function ProgramEditor({ programs, ready, onChange }: { programs: Program[]; rea
         {main && programs.length < MAX_PROGRAMS ? <button type="button" className="ghost-button" disabled={!ready} onClick={() => setEditing(editing === 'double' ? null : 'double')}>추가하기</button> : null}
       </div>
     </Setting>
-    {editing ? <div className="setting stacked">
-      <p className="setting-name m-0">{editing === 'main' ? '주전공을 골라 주세요' : '복수전공을 골라 주세요'}</p>
-      <ProgramPicker current={editing === 'main' ? main : null} onPick={pick} />
-      <button type="button" className="text-button self-start" onClick={() => setEditing(null)}>닫기</button>
-    </div> : null}
+    {editing === 'double' ? picker : null}
   </>;
 }
 
@@ -774,7 +791,7 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
 
 function CanvasRow({ model, alignEnd }: { model: SettingsModel; alignEnd: boolean }) {
   const { byok } = model;
-  const help = '아이캠퍼스의 강의와 과제 마감을 알려드리는 데 써요';
+  const help = '과제 마감을 확인하는 데 써요';
   if (!byok?.available) {
     return <KeyRow name="아이캠퍼스 토큰" help={help} state="준비 중" guide={null}>
       <span className="field-note">지금은 토큰을 저장할 수 없어요. 잠시 뒤 다시 열어 주세요</span>
@@ -804,6 +821,7 @@ function Keys({ model }: { model: SettingsModel }) {
 export function PlatformSettings({ model }: { model: SettingsModel }) {
   switch (model.section) {
     case 'notifications': return <Notifications model={model} />;
+    case 'canvas': return <Canvas model={model} />;
     case 'keywords': return <Keywords model={model} />;
     case 'calendar': return <CalendarPage model={model} />;
     case 'profile': return <Profile model={model} />;

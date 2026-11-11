@@ -71,17 +71,18 @@ export function settingsSectionFromUrl(): string | null {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'keys';
   const section = params.get('section');
-  return section && ['notifications', 'keywords', 'calendar', 'profile'].includes(section) ? section : null;
+  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile'].includes(section) ? section : null;
 }
 
 /** 설정 머리의 부제. 쪽마다 그 쪽에서 하는 일을 말한다. */
 export function settingsSubtitle(): string {
   switch (settingsSectionFromUrl()) {
     case 'notifications': return '받을 게시판과 이 기기 알림을 정해요';
+    case 'canvas': return '과제 마감과 하루 요약을 알려 드려요';
     case 'keywords': return '관심 있는 공지를 골라 봐요';
     case 'calendar': return '저장한 공지의 마감을 구글 캘린더에 넣어요';
     case 'profile': return '내 정보와 Gemini에 알려줄 내용을 적어요';
-    case 'keys': return 'AI 키와 아이캠퍼스 토큰을 관리해요';
+    case 'keys': return 'AI 키를 관리해요';
     default: return '알림과 연결을 정해요';
   }
 }
@@ -89,7 +90,7 @@ export function settingsSubtitle(): string {
 export function settingsTitle(): string {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return '연결 키';
-  return ({ notifications: '알림', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
+  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
 }
 
 export interface InstallPrompt extends Event { prompt(): Promise<void> }

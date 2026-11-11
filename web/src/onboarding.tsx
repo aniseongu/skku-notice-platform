@@ -5,10 +5,10 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { AppController } from './app-controller';
 import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR } from './profile';
 import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
-import { COLLEGES, MAX_PROGRAMS, findCollege, programKey, programLabel, type Program } from './skku-programs';
+import { COLLEGES, MAX_PROGRAMS, programKey, programLabel, type Program } from './skku-programs';
 import { BOARD_CATALOG, boardsForPrograms, OTHER_BOARDS } from './skku-boards';
 import {
-  KEYWORD_SUGGESTIONS, SEARCH_THRESHOLD, STEPS, canContinue, filterDepartments, initialDraft, nextStep, previousStep,
+  KEYWORD_SUGGESTIONS, STEPS, canContinue, filterDepartments, initialDraft, nextStep, previousStep,
   stepIndex, toggleValue, withPrograms, type Draft, type DoubleAnswer, type Step,
 } from './onboarding-flow';
 import { APP_NAME } from './brand';
@@ -23,38 +23,32 @@ const THREE_P = [{ value: 'done', label: '채웠어요' }, { value: 'todo', labe
 const DEPT_DONE = [{ value: 'yes', label: '마쳤어요' }, { value: 'no', label: '아직이에요' }];
 const SERVICE = MILITARY.map((value) => ({ value, label: value }));
 
-/** 대학을 고른 뒤 그 대학의 학과만 보여 준다. 대학 줄은 학과 목록으로 들어가는 이동 줄이고, 학과는 고르기만 한다(확정은 아래 "다음"). */
-export function ProgramPicker({ onPick, onCancel, current }: {
-  onPick: (program: Program) => void; onCancel?: () => void; current?: Program | null;
+/** 전공 고르기: 검색 칸 하나와 대학별로 묶인 학과 목록이 한 화면에 있다. 대학을 먼저 거치지 않고 학과를 바로 누르면 고른 것이다(확정은 호출한 쪽이 한다).
+ * 검색은 학과 이름이나 대학 이름 어느 쪽으로 해도 된다. 목록이 길어도 검색으로 두 글자면 한 줄만 남는다. */
+export function ProgramPicker({ onPick, current, listClass = '' }: {
+  onPick: (program: Program) => void; current?: Program | null; listClass?: string;
 }) {
-  const [college, setCollege] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const found = findCollege(college);
-  // 대학 목록에서 아래쪽 항목을 눌러 스크롤된 채로 학과 목록이 열려 제목이 가려지지 않게, 목록이 바뀌면 맨 위로 되돌린다.
-  useEffect(() => { document.querySelector('.onb-main')?.scrollTo({ top: 0 }); }, [college]);
-  if (!found) {
-    return <div className="onb-group">
-      <p className="onb-lead">대학을 먼저 고르면 학과가 나와요</p>
-      <ChoiceList nav label="대학 선택" items={COLLEGES.map((item) => ({ id: item.name, label: item.name }))}
-        onSelect={(name) => { setCollege(name); setQuery(''); }} />
-      {onCancel ? <button type="button" className="text-button" onClick={onCancel}>복수전공 고르기를 취소할게요</button> : null}
-    </div>;
-  }
-  // 학과가 없는 대학(학부대학)은 그 대학 하나만 고르는 목록이다.
-  const noDepartments = found.departments.length === 0;
-  const departments = filterDepartments(found.departments, query);
+  const groups = COLLEGES.map((college) => {
+    // 대학 이름이 맞으면 그 대학 학과를 모두 보여 준다.
+    const all = !query.trim() || filterDepartments([college.name], query).length > 0;
+    return { college, departments: all ? college.departments : filterDepartments(college.departments, query), alone: college.departments.length === 0 && all };
+  }).filter((group) => group.alone || group.departments.length > 0);
   return <div className="onb-group">
-    {found.departments.length > SEARCH_THRESHOLD
-      ? <input type="search" className="onb-search" aria-label="학과 검색" placeholder="학과 이름으로 찾기" autoComplete="off"
-        value={query} onChange={(event) => setQuery(event.currentTarget.value)} /> : null}
-    {noDepartments
-      ? <ChoiceList label={`${found.name} 선택`} selected={current?.college === found.name ? found.name : null}
-        items={[{ id: found.name, label: found.name }]} onSelect={() => onPick({ college: found.name, department: null })} />
-      : departments.length
-        ? <ChoiceList label={`${found.name} 학과 선택`} selected={current?.college === found.name ? current.department : null}
-          items={departments.map((name) => ({ id: name, label: name }))} onSelect={(name) => onPick({ college: found.name, department: name })} />
-        : <p className="hint" role="status">'{query}'에 맞는 학과가 없어요. 다른 단어로 찾아보세요.</p>}
-    <button type="button" className="text-button" onClick={() => setCollege(null)}>다른 대학 고르기</button>
+    <input type="search" className="onb-search" aria-label="학과 검색" placeholder="학과나 대학 이름으로 찾기" autoComplete="off"
+      value={query} onChange={(event) => setQuery(event.currentTarget.value)} />
+    <div className={`flex flex-col gap-3 ${listClass}`}>
+      {groups.map(({ college, departments, alone }) => alone
+        // 학과가 없는 대학(학부대학)은 그 대학 하나가 선택지다.
+        ? <ChoiceList key={college.name} label={`${college.name} 선택`} selected={current?.college === college.name && !current.department ? college.name : null}
+          items={[{ id: college.name, label: college.name }]} onSelect={() => onPick({ college: college.name, department: null })} />
+        : <div key={college.name} className="flex flex-col gap-1">
+          <p className="m-0 px-1 text-[13px] font-semibold text-ink-3">{college.name}</p>
+          <ChoiceList label={`${college.name} 학과 선택`} selected={current?.college === college.name ? current.department : null}
+            items={departments.map((name) => ({ id: name, label: name }))} onSelect={(name) => onPick({ college: college.name, department: name })} />
+        </div>)}
+      {groups.length === 0 ? <p className="hint" role="status">'{query}'에 맞는 학과가 없어요. 다른 단어로 찾아보세요.</p> : null}
+    </div>
   </div>;
 }
 
@@ -125,7 +119,7 @@ export function Onboarding({ app }: { app: AppController }) {
     title = '복수전공이 있나요?';
     lead = addingDouble ? '' : '있으면 그 학과 공지도 함께 받아요';
     body = addingDouble
-      ? <ProgramPicker current={pendingDouble} onPick={setPendingDouble} onCancel={cancelDouble} />
+      ? <ProgramPicker current={pendingDouble} onPick={setPendingDouble} />
       : <div className="onb-group">
         {doubles.length ? <Card id="doubles" title="복수전공">
           <dl className="info-list">{doubles.map((program) => <div key={programKey(program)}>
@@ -207,10 +201,10 @@ export function Onboarding({ app }: { app: AppController }) {
     foot = <button type="button" className="solid-button" disabled={app.onboardingBusy} onClick={() => { void save(); }}>
       {app.onboardingBusy ? '저장하고 있어요' : app.onboardingError ? '다시 시도하기' : '다음'}</button>;
   } else if (step === 'ai') {
-    title = 'AI를 연결할까요?';
-    lead = '연결하지 않아도 공지와 알림은 똑같이 써요. 나중에 설정에서 연결해도 돼요';
+    title = 'Gemini를 연결할까요?';
+    lead = '연결하지 않아도 공지와 알림은 똑같이 써요';
     const connected = !!app.byokStatus || app.aiKeys.length > 0;
-    body = <div className="onb-group"><div className="box"><AiRows byok={aiConnectModel(app)} /></div></div>;
+    body = <div className="onb-group"><div className="box"><AiRows byok={aiConnectModel(app)} only="gemini" /></div></div>;
     foot = connected
       ? <button type="button" className="solid-button" onClick={afterAi}>다음</button>
       : <button type="button" className="ghost-button" disabled={app.byokBusy || app.aiBusy} onClick={afterAi}>나중에 할게요</button>;
