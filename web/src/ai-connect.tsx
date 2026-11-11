@@ -53,15 +53,14 @@ function SharedGuide() {
 }
 
 /** AI 연결 줄들. 다른 설정 쪽과 같은 줄(이름, 설명, 오른쪽 조작) 모양이고, 연결한 개수에 따라 필요한 줄만 보인다. */
-/** only를 주면 그 업체 줄만 보인다(첫 설정은 Gemini 하나만 묻고, 나머지는 설정에서 연결한다). */
-export function AiRows({ byok, alignEnd = false, only }: { byok?: Byok; alignEnd?: boolean; only?: Id }) {
+export function AiRows({ byok, alignEnd = false }: { byok?: Byok; alignEnd?: boolean }) {
   const [last, setLast] = useState<Id | null>(null);
   const ai = byok?.ai;
   if (!byok?.available || !ai) {
     return <Setting name="AI 연결" help="지금은 키를 연결할 수 없어요. 잠시 뒤 다시 열어 주세요" />;
   }
   return <>
-    {ORDER.filter((id) => !only || id === only).map((id) => {
+    {ORDER.map((id) => {
       const name = `${NAME[id]} 키`;
       if (id === 'gemini') {
         return <SecretRow key={id} name={name} help={BLURB[id]} placeholder={GUIDE[id].placeholder} status={byok.status} loading={byok.loading} busy={byok.busy}
@@ -73,8 +72,7 @@ export function AiRows({ byok, alignEnd = false, only }: { byok?: Byok; alignEnd
         error={last === id ? ai.error : ''} alignEnd={alignEnd} labels={LABELS} guide={null} valid={looksLikeAiKey}
         onRegister={(key) => { setLast(id); ai.register(id as AiProvider, key); }} onRemove={() => { setLast(id); ai.remove(id as AiProvider); }} />;
     })}
-    {only ? <StepGuide label="키는 어디서 받나요?" sub="무료로 만들 수 있어요" note="키는 암호화해서 서버에만 보관해요"
-      steps={[<>{lnk(GUIDE[only].url, `${NAME[only]} 키 만들기 화면`)}을 열고 로그인해요</>, ...GUIDE[only].steps.slice(1)]} /> : <SharedGuide />}
+    <SharedGuide />
   </>;
 }
 

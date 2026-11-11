@@ -201,10 +201,10 @@ export function Onboarding({ app }: { app: AppController }) {
     foot = <button type="button" className="solid-button" disabled={app.onboardingBusy} onClick={() => { void save(); }}>
       {app.onboardingBusy ? '저장하고 있어요' : app.onboardingError ? '다시 시도하기' : '다음'}</button>;
   } else if (step === 'ai') {
-    title = 'Gemini를 연결할까요?';
-    lead = '연결하지 않아도 공지와 알림은 똑같이 써요';
+    title = 'AI를 연결할까요?';
+    lead = '세 곳 중 한 곳만 연결하면 돼요. 안 해도 공지와 알림은 똑같이 써요';
     const connected = !!app.byokStatus || app.aiKeys.length > 0;
-    body = <div className="onb-group"><div className="box"><AiRows byok={aiConnectModel(app)} only="gemini" /></div></div>;
+    body = <div className="onb-group"><div className="box"><AiRows byok={aiConnectModel(app)} /></div></div>;
     foot = connected
       ? <button type="button" className="solid-button" onClick={afterAi}>다음</button>
       : <button type="button" className="ghost-button" disabled={app.byokBusy || app.aiBusy} onClick={afterAi}>나중에 할게요</button>;
