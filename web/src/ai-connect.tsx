@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { looksLikeAiKey, PROVIDER_GUIDE, type AiPreferences } from './ai-providers';
-import { backfillNote } from './byok';
 import type { AppController } from './app-controller';
 import type { AiProvider } from './ai-providers';
 import { Choice, ext, Guide, Setting, SecretRow, type SettingsModel } from './platform-settings';
@@ -57,7 +56,7 @@ export function AiRows({ byok }: { byok?: Byok }) {
       const name = `${NAME[id]} 키`;
       if (id === 'gemini') {
         return <SecretRow key={id} name={name} help={BLURB[id]} placeholder={GUIDE[id].placeholder} status={byok.status} loading={byok.loading} busy={byok.busy}
-          error={byok.error} labels={LABELS} guide={guideOf(id)} guideFirst valid={looksLikeAiKey} note={backfillNote(byok.backfill, !!byok.status?.disabled)}
+          error={byok.error} labels={LABELS} guide={guideOf(id)} guideFirst valid={looksLikeAiKey}
           onRegister={byok.register} onRemove={byok.remove} />;
       }
       const status = ai.keys.find((key) => key.provider === id) ?? null;
