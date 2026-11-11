@@ -132,7 +132,7 @@ Deno.serve((req) => handle(req, {
   },
   async verifyProviderKey(provider, apiKey) {
     // 모델 목록 조회는 토큰을 쓰지 않는다. 키 형식 오류와 권한 오류는 401·403, 한도는 429로 온다.
-    const endpoint = provider === 'groq' ? 'https://api.groq.com/openai/v1/models' : 'https://openrouter.ai/api/v1/auth/key';
+    const endpoint = 'https://api.groq.com/openai/v1/models';
     try {
       const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(8000), redirect: 'error' });
       if (response.ok) return 'valid';

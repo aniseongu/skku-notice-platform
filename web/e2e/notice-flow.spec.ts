@@ -247,7 +247,7 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await screen.getByText('키는 어디서 받나요?').click();
   await expect(screen.getByRole('link', { name: 'Gemini', exact: true })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
   await expect(screen.getByRole('link', { name: 'Groq', exact: true })).toHaveAttribute('href', 'https://console.groq.com/keys');
-  await expect(screen.getByRole('link', { name: 'OpenRouter', exact: true })).toHaveAttribute('href', 'https://openrouter.ai/settings/keys');
+  await expect(screen.getByRole('link', { name: 'OpenRouter' })).toHaveCount(0);
   await save.click();
   expect(await calls(page)).toEqual([['register', key]]);
   await withApp(page, { byokStatus: { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 } });
@@ -264,7 +264,7 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   expect(await calls(page)).toEqual([['remove']]);
 });
 
-test('connection keys page says how the AI works for 0, 1, 2 and 3 connected keys', async ({ page }) => {
+test('connection keys page says how the AI works for 0, 1 and 2 connected keys', async ({ page }) => {
   await settingsAt(page, '&keys=1');
   const screen = page.locator('platform-settings-screen');
   const key = (provider: string) => ({ provider, keyHint: 'abcd', model: 'm', disabled: false, lastError: null, usedToday: 0 });
@@ -274,8 +274,7 @@ test('connection keys page says how the AI works for 0, 1, 2 and 3 connected key
     ['아무것도 연결 안 함', null, [], /하나 이상 연결하면/],
     ['Groq 하나', null, [key('groq')], /그 한도까지만 확인해요/],
     ['Gemini 하나', gemini, [], /그 한도까지만 확인해요/],
-    ['Gemini + OpenRouter', gemini, [key('openrouter')], /번갈아 쓰고, 한 곳이 막히면/],
-    ['세 개', gemini, [key('groq'), key('openrouter')], /번갈아 쓰고, 한 곳이 막히면/],
+    ['Gemini + Groq', gemini, [key('groq')], /번갈아 쓰고, 한 곳이 막히면/],
   ];
   for (const [label, byokStatus, aiKeys, text] of states) {
     await withApp(page, { byokStatus, aiKeys });

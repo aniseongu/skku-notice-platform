@@ -2,12 +2,12 @@ import { encryptApiKey, looksLikeGeminiKey } from './crypto.ts';
 
 export const ALLOWED_ORIGINS = ['https://skku-notice-platform.pages.dev', 'http://localhost:5173', 'http://127.0.0.1:5173'];
 const MODEL_PATTERN = /^[a-z0-9.-]{3,60}$/;
-// Groq·OpenRouter 모델 ID는 슬래시와 콜론을 쓴다(예: openai/gpt-oss-20b, vendor/model:free).
+// Groq 모델 ID는 슬래시를 쓴다(예: openai/gpt-oss-20b).
 const AI_MODEL_PATTERN = /^[A-Za-z0-9._:/-]{3,100}$/;
-export type AiProvider = 'groq' | 'openrouter';
-const AI_PROVIDERS: AiProvider[] = ['groq', 'openrouter'];
-export const AI_DEFAULT_MODEL: Record<AiProvider, string> = { groq: 'openai/gpt-oss-20b', openrouter: 'openrouter/free' };
-const AI_LABEL: Record<AiProvider, string> = { groq: 'Groq', openrouter: 'OpenRouter' };
+export type AiProvider = 'groq';
+const AI_PROVIDERS: AiProvider[] = ['groq'];
+export const AI_DEFAULT_MODEL: Record<AiProvider, string> = { groq: 'openai/gpt-oss-20b' };
+const AI_LABEL: Record<AiProvider, string> = { groq: 'Groq' };
 export const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
 const MAX_BODY_BYTES = 2048;
 
@@ -41,7 +41,7 @@ export interface ByokDeps {
   verifyGeminiKey: (apiKey: string) => Promise<'valid' | 'invalid' | 'unavailable'>;
   saveKey: (row: { user_id: string; ciphertext: string; key_hint: string; model: string }) => Promise<void>;
   deleteKey: (userId: string) => Promise<void>;
-  /** Groq·OpenRouter 키 확인: 저장 없이 업체에 가벼운 요청만 보낸다. 키는 로그에 남기지 않는다. */
+  /** Groq 키 확인: 저장 없이 업체에 가벼운 요청만 보낸다. 키는 로그에 남기지 않는다. */
   verifyProviderKey?: (provider: AiProvider, apiKey: string) => Promise<'valid' | 'invalid' | 'unavailable'>;
   saveAiKey?: (row: { user_id: string; provider: AiProvider; ciphertext: string; key_hint: string; model: string }) => Promise<void>;
   deleteAiKey?: (userId: string, provider: AiProvider) => Promise<void>;
@@ -81,10 +81,11 @@ export async function handle(req: Request, deps: ByokDeps): Promise<Response> {
     if (req.method === 'DELETE') {
       const target = new URL(req.url).searchParams.get('provider');
       if (target === 'canvas') await deps.deleteCanvasToken(userId);
-      else if (target === 'groq' || target === 'openrouter') {
+      else if (target === 'groq') {
         if (!deps.deleteAiKey) return reply(400, origin, { error: '요청 형식을 확인해 주세요.' });
         await deps.deleteAiKey(userId, target);
-      } else await deps.deleteKey(userId);
+      } else if (target === null || target === 'gemini') await deps.deleteKey(userId);
+      else return reply(400, origin, { error: '요청 형식을 확인해 주세요.' }); // 모르는 업체 이름으로 Gemini 키를 지우지 않는다
       return reply(200, origin, { ok: true });
     }
     const text = await req.text();

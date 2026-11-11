@@ -52,7 +52,6 @@ def router(providers, fails=None, used=None, prefs=None):
 
 def test_caps_follow_each_providers_free_tier_not_one_number():
     assert cap_for("gemini", DAILY) == 60 and cap_for("groq", DAILY) == 60
-    assert cap_for("openrouter", DAILY) == 36 < 50   # OpenRouter 무료 모델은 크레딧이 없으면 50회/일이라 더 낮게 잡는다
     assert set(CAP_RATIO) == set(PROVIDERS)
 
 
@@ -89,13 +88,13 @@ def test_two_keys_share_the_load_in_proportion_to_their_caps(pair):
         client.generate_content(model="x", contents="hi")
 
 
-def test_three_keys_use_the_sum_of_their_caps_and_never_exceed_any_cap():
+def test_all_keys_use_the_sum_of_their_caps_and_never_exceed_any_cap():
     client, fakes = router(list(PROVIDERS))
     total = sum(cap_for(p, DAILY) for p in PROVIDERS)
     for _ in range(total):
         client.generate_content(model="x", contents="hi")
     assert {p: fakes[p].calls for p in PROVIDERS} == {p: cap_for(p, DAILY) for p in PROVIDERS}
-    assert sum(f.calls for f in fakes.values()) == total == 156
+    assert sum(f.calls for f in fakes.values()) == total == 120
 
 
 def test_with_two_keys_a_rate_limited_one_hands_over_to_the_other_within_the_same_call():
@@ -111,23 +110,24 @@ def test_a_rejected_key_is_dropped_but_the_others_keep_working():
     for _ in range(5):
         client.generate_content(model="x", contents="hi")
     assert fakes["groq"].calls == 1 and client.rejected == {"groq"}   # 거부된 키는 한 번만 시도하고 뺀다
-    assert fakes["gemini"].calls + fakes["openrouter"].calls == 5
+    assert fakes["gemini"].calls == 5
 
 
 def test_all_keys_failing_ends_without_looping_so_no_tokens_are_wasted():
     client, fakes = router(list(PROVIDERS), fails={p: HttpError(429) for p in PROVIDERS})
     with pytest.raises(HttpError):
         client.generate_content(model="x", contents="hi")
-    assert [f.calls for f in fakes.values()] == [1, 1, 1]
+    assert [f.calls for f in fakes.values()] == [1, 1]
     with pytest.raises(NoProvider):
         client.generate_content(model="x", contents="hi")   # 모두 쉬는 중이면 더 두드리지 않는다
-    assert [f.calls for f in fakes.values()] == [1, 1, 1]
+    assert [f.calls for f in fakes.values()] == [1, 1]
 
 
 def test_a_lower_cap_key_is_not_drained_first_when_usage_is_compared_as_a_ratio():
-    # 둘 다 18회 썼다: 절대 횟수는 같지만 OpenRouter(상한 36)는 절반, Gemini(상한 60)는 30%이므로 Gemini를 먼저 쓴다.
-    ranked, _ = select_candidates(candidates(["openrouter", "gemini"], {"openrouter": 18, "gemini": 18}), Preferences())
-    assert [c.provider for c in ranked] == ["gemini", "openrouter"]
+    # 둘 다 18회 썼다: 절대 횟수는 같지만 상한이 36인 키는 절반, 상한이 60인 키는 30%이므로 상한이 큰 키를 먼저 쓴다.
+    pool = [Candidate("groq", "groq-model", "key-groq", 18, 36), Candidate("gemini", "gemini-model", "key-gemini", 18, 60)]
+    ranked, _ = select_candidates(pool, Preferences())
+    assert [c.provider for c in ranked] == ["gemini", "groq"]
 
 
 def test_manual_choice_uses_only_that_provider_and_is_not_a_fallback():
@@ -135,7 +135,7 @@ def test_manual_choice_uses_only_that_provider_and_is_not_a_fallback():
     client, fakes = router(list(PROVIDERS), prefs=prefs)
     for _ in range(3):
         client.generate_content(model="x", contents="hi")
-    assert fakes["groq"].calls == 3 and fakes["gemini"].calls == 0 and fakes["openrouter"].calls == 0
+    assert fakes["groq"].calls == 3 and fakes["gemini"].calls == 0
 
 
 def test_calls_alternate_between_keys_inside_one_run_instead_of_draining_the_first_key():
@@ -143,7 +143,10 @@ def test_calls_alternate_between_keys_inside_one_run_instead_of_draining_the_fir
     for _ in range(10):
         client.generate_content(model="x", contents="hi")
     assert fakes["gemini"].calls == 5 and fakes["groq"].calls == 5   # 한 키로 몰리지 않는다(한 키의 한도가 먼저 닳지 않는다)
-    client, fakes = router(["gemini", "openrouter"])   # 상한이 다르면 상한에 비례해서 나눈다(60:36)
+    # 상한이 다르면 상한에 비례해서 나눈다(60:36)
+    fakes = {p: Provider(p) for p in ("gemini", "groq")}
+    pool = [Candidate("gemini", "g", "key-gemini", 0, 60), Candidate("groq", "q", "key-groq", 0, 36)]
+    client = RoutedClient(pool, Preferences(), factory=lambda provider, key: fakes[provider].make())
     for _ in range(48):
         client.generate_content(model="x", contents="hi")
-    assert abs(fakes["gemini"].calls - 30) <= 1 and abs(fakes["openrouter"].calls - 18) <= 1
+    assert abs(fakes["gemini"].calls - 30) <= 1 and abs(fakes["groq"].calls - 18) <= 1

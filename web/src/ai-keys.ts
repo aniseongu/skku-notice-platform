@@ -8,7 +8,7 @@ export function connectedAiKeys(model: { byok?: ByokInfo | null }): number {
   return (byok?.status && !byok.status.disabled ? 1 : 0) + (byok?.ai?.keys.filter((key) => !key.disabled).length ?? 0);
 }
 
-/** 0·1·2·3개일 때 AI가 어떻게 일하는지. 한도는 업체마다 달라서, 여러 개를 연결하면 번갈아 쓰고 한 곳이 막히면 다른 곳으로 넘어간다. */
+/** 0·1·2개일 때 AI가 어떻게 일하는지. 한도는 업체마다 달라서, 여러 개를 연결하면 번갈아 쓰고 한 곳이 막히면 다른 곳으로 넘어간다. */
 export function aiKeysLead(count: number): string {
   if (count <= 0) return '하나 이상 연결하면 AI가 공지를 확인해 드려요';
   if (count === 1) return '하나만 연결하면 그 한도까지만 확인해요. 다른 곳도 연결하면 번갈아 써서 더 많이 확인해요';

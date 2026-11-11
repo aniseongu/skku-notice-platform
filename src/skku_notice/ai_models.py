@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import re
 
-PROVIDERS = ("gemini", "groq", "openrouter")
-Provider = str  # "gemini" | "groq" | "openrouter"
+PROVIDERS = ("gemini", "groq")
+Provider = str  # "gemini" | "groq"
 
 # 업체마다 무료 한도가 달라서 모든 키를 같은 숫자로 자르지 않는다. 하루 상한(daily_calls)에 업체별 비율을 곱한다.
 # 2026-11 웹 조사(공식 문서가 표를 내리거나 출처마다 달라 모두 바뀔 수 있다): Gemini Flash-Lite 무료 약 500회/일(분당 15회),
-# Groq 무료는 모델별 약 1,000회/일(분당 30회), OpenRouter 무료 모델은 크레딧이 없으면 50회/일이고 분당 20회는 계정 전체에 걸린다.
-# 그래서 앱 상한은 실제 한도보다 훨씬 낮게 두고, OpenRouter만 더 낮춘다.
-CAP_RATIO = {"gemini": 1.0, "groq": 1.0, "openrouter": 0.6}
+# Groq 무료는 모델별 약 1,000회/일(분당 30회)이다. 그래서 앱 상한은 실제 한도보다 훨씬 낮게 둔다.
+# OpenRouter는 2026-11-12에 뺐다: 무료 자동 선택이 요청마다 1~3B급 모델을 무작위로 골라 판정과 이유 문장이 엉터리로 저장됐다(사용자 결정).
+CAP_RATIO = {"gemini": 1.0, "groq": 1.0}
 
 
 def cap_for(provider: str, daily_calls: int) -> int:
@@ -26,7 +26,6 @@ def cap_for(provider: str, daily_calls: int) -> int:
 DEFAULT_MODEL = {
     "gemini": "gemini-3.1-flash-lite",
     "groq": "openai/gpt-oss-20b",
-    "openrouter": "openrouter/free",
 }
 # 구조화(JSON 스키마) 출력을 쓸 수 있다고 확인한 모델. 그 밖의 모델은 JSON 모드 후 검증한다.
 STRICT_SCHEMA_MODELS = {

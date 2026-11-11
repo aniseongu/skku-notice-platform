@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Groq와 OpenRouter 어댑터. Gemini 클라이언트와 같은 `client.models.generate_content(...)` 인터페이스를 흉내 낸다.
+"""Groq 어댑터. Gemini 클라이언트와 같은 `client.models.generate_content(...)` 인터페이스를 흉내 낸다.
 
 판정 모듈(intern_ai, school_ai, judge 등)은 contents에 google.genai Part를, config에 GenerateContentConfig를 넘기고
 `response.text`를 읽는다. 어댑터가 이를 OpenAI 호환 Chat Completions 요청으로 바꾸므로 판정 모듈은 고치지 않는다.
@@ -19,7 +19,7 @@ import httpx
 
 from skku_notice.ai_models import supports_strict_schema
 
-BASE_URL = {"groq": "https://api.groq.com/openai/v1", "openrouter": "https://openrouter.ai/api/v1"}
+BASE_URL = {"groq": "https://api.groq.com/openai/v1"}
 TIMEOUT_SECONDS = 60.0
 MAX_OUTPUT_TOKENS = 8192
 
@@ -106,16 +106,12 @@ class _Models:
                 json_schema(schema), ensure_ascii=False)
         messages.append({"role": "user", "content": user})
         body: dict = {"model": model, "messages": messages, "temperature": getattr(config, "temperature", 0) or 0}
-        # 출처: https://console.groq.com/docs/reasoning, https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
+        # 출처: https://console.groq.com/docs/reasoning
         # 추론 토큰도 답 길이 한도에 들어가서, 추론이 길면 내용이 빈 채로 finish_reason이 length로 끝난다. 추론을 낮춘다.
-        if self._provider == "groq":
-            body["max_completion_tokens"] = MAX_OUTPUT_TOKENS
-            if model.startswith("openai/gpt-oss"):
-                body["reasoning_effort"] = "low"
-                body["include_reasoning"] = False
-        else:
-            body["max_tokens"] = MAX_OUTPUT_TOKENS
-            body["reasoning"] = {"effort": "low"}
+        body["max_completion_tokens"] = MAX_OUTPUT_TOKENS
+        if model.startswith("openai/gpt-oss"):
+            body["reasoning_effort"] = "low"
+            body["include_reasoning"] = False
         if schema is not None:
             if strict:
                 body["response_format"] = {"type": "json_schema", "json_schema": {
@@ -127,8 +123,6 @@ class _Models:
     def generate_content(self, *, model: str, contents: object, config: object | None = None):
         body = self._body(model, contents, config)
         headers = {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"}
-        if self._provider == "openrouter":
-            headers["X-Title"] = "SKKU Notice Platform"
         try:
             http = self._http or httpx.Client(timeout=TIMEOUT_SECONDS)
             response = http.post(f"{BASE_URL[self._provider]}/chat/completions", json=body, headers=headers)
@@ -152,8 +146,7 @@ class _Models:
             payload = response.json()
         except ValueError as exc:
             raise ProviderError(None, "bad_output", detail="not json") from exc
-        # 출처: https://openrouter.ai/docs/api/reference/errors-and-debugging
-        # 요청이 받아들여진 뒤 실패하면 HTTP는 200이고 본문에 error만 오거나, choices 안에 finish_reason "error"와 error가 같이 온다.
+        # 요청이 받아들여진 뒤 실패하면 HTTP는 200이고 본문에 error만 오거나, choices 안에 finish_reason "error"와 error가 같이 올 수 있다.
         error = payload.get("error") if isinstance(payload, dict) else None
         if error is None and isinstance(payload, dict):
             choices = payload.get("choices")

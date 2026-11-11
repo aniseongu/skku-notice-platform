@@ -210,7 +210,7 @@ export function Onboarding({ app }: { app: AppController }) {
       {app.onboardingBusy ? '저장하고 있어요' : app.onboardingError ? '다시 시도하기' : '다음'}</button>;
   } else if (step === 'ai') {
     title = 'AI를 연결해 주세요';
-    lead = '세 곳 중 한 곳만 연결하면 돼요';
+    lead = '두 곳 중 한 곳만 연결하면 돼요';
     const connected = !!app.byokStatus || app.aiKeys.length > 0;
     body = <div className="onb-group"><div className="box"><AiRows byok={aiConnectModel(app)} /></div>
       {app.onboardingError ? <p className="error-text" role="alert">{app.onboardingError}</p> : null}</div>;

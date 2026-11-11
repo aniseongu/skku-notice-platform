@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 """한 사용자의 AI 설정을 읽어 라우터를 만들고, 호출 결과를 키 행에 기록한다. 판정 워커와 졸업요건 처리가 함께 쓴다.
 
-- Gemini 키는 기존 `user_byok_keys`, Groq·OpenRouter 키는 `user_ai_keys`에 있다. provider가 없는 옛 행은 Gemini다.
+- Gemini 키는 기존 `user_byok_keys`, Groq 키는 `user_ai_keys`에 있다. provider가 없는 옛 행은 Gemini다.
 - 새 표나 설정 행이 아직 없는 환경이어도 기존처럼 Gemini 키 하나로 동작한다(저장소가 StoreError를 내면 건너뛴다).
 - 키 원문은 이 모듈 밖으로 내보내지 않고 로그와 예외에 넣지 않는다.
 """
@@ -17,7 +17,7 @@ from skku_notice.ai_providers import make_client
 from skku_notice.ai_router import Candidate, Preferences, RoutedClient
 from skku_notice.byok_crypto import ByokCryptoError, decrypt_api_key
 
-LABEL = {"gemini": "Gemini", "groq": "Groq", "openrouter": "OpenRouter"}
+LABEL = {"gemini": "Gemini", "groq": "Groq"}
 REJECTED_CODES = {400, 401, 403}
 # 최근에 실패한 키는 잠시 쉰다. 안 그러면 같은 실패를 10분마다 되풀이해서 한도만 쓴다.
 FAILURE_COOLDOWN = timedelta(minutes=20)
@@ -28,7 +28,7 @@ def preferences_from_row(row: dict | None) -> Preferences:
     return Preferences(
         ai_enabled=row.get("ai_enabled") is not False,
         routing_mode="manual" if row.get("routing_mode") == "manual" else "auto",
-        manual_provider=row.get("manual_provider") if row.get("manual_provider") in ("gemini", "groq", "openrouter") else None,
+        manual_provider=row.get("manual_provider") if row.get("manual_provider") in ("gemini", "groq") else None,
     )
 
 

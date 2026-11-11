@@ -16,13 +16,13 @@ test('AI provider keys are unreadable by browsers and preferences stay per user'
     await db.exec(await readFile(new URL('../../supabase/migrations/20261111140000_ai_providers.sql', import.meta.url), 'utf8'));
     const cipher = 'c'.repeat(60);
     await db.exec(`insert into user_ai_keys(user_id,provider,ciphertext,key_hint,model) values
-        ('${a}','groq','${cipher}','AbCd','openai/gpt-oss-20b'), ('${a}','openrouter','${cipher}','EfGh','openrouter/free'),
+        ('${a}','groq','${cipher}','AbCd','openai/gpt-oss-20b'),
         ('${b}','groq','${cipher}','WxYz','openai/gpt-oss-20b');
       insert into user_ai_preferences(user_id) values ('${b}');
       set role authenticated; set request.jwt.claim.sub = '${a}';`);
     // 본인 키 상태만 보이고 암호문은 읽히지 않는다.
     const own = (await db.query('select provider, key_hint from user_ai_keys order by provider')).rows;
-    assert.deepEqual(own.map((r) => r.key_hint), ['AbCd', 'EfGh']);
+    assert.deepEqual(own.map((r) => r.key_hint), ['AbCd']);
     await assert.rejects(db.exec('select ciphertext from user_ai_keys'), /permission denied/);
     await assert.rejects(db.exec('select * from user_ai_keys'), /permission denied/);
     await assert.rejects(db.exec(`insert into user_ai_keys(user_id,provider,ciphertext,key_hint,model) values ('${a}','groq','${cipher}','ZZZZ','m')`), /permission denied/);
@@ -43,6 +43,6 @@ test('AI provider keys are unreadable by browsers and preferences stay per user'
     await assert.rejects(db.exec('select key_hint from user_ai_keys'), /permission denied/);
     await assert.rejects(db.exec('select * from user_ai_preferences'), /permission denied/);
     await db.exec('reset role; set role service_role');
-    assert.equal((await db.query('select ciphertext from user_ai_keys')).rows.length, 3);
+    assert.equal((await db.query('select ciphertext from user_ai_keys')).rows.length, 2);
   } finally { await db.close(); }
 });

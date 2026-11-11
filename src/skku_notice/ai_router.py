@@ -153,7 +153,7 @@ class RoutedClient:
                 continue
             self.attempts.append({"provider": candidate.provider, "model": candidate.model, "ok": True})
             self.failed, self.error_code, self.fallback_reason = False, None, None
-            # openrouter/free처럼 요청한 이름과 실제로 답한 모델이 다를 수 있다. 답한 모델을 기록한다.
+            # 요청한 이름과 실제로 답한 모델이 다를 수 있다. 답한 모델을 기록한다.
             resolved = getattr(response, "model", None)
             resolved = resolved if isinstance(resolved, str) and 3 <= len(resolved) <= 100 else candidate.model
             self.execution_mode, self.provider, self.model = "ai", candidate.provider, resolved

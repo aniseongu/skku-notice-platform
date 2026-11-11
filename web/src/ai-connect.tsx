@@ -5,18 +5,16 @@ import type { AiProvider } from './ai-providers';
 import { Choice, ext, Guide, Setting, SecretRow, type SettingsModel } from './platform-settings';
 
 type Byok = NonNullable<SettingsModel['byok']>;
-type Id = 'groq' | 'gemini' | 'openrouter';
+type Id = 'groq' | 'gemini';
 /** 처음 보는 사람에게 권하는 순서. 연결 상태가 바뀌어도 자리는 그대로 둔다. */
-const ORDER: readonly Id[] = ['groq', 'gemini', 'openrouter'];
-const NAME: Record<Id, string> = { groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter' };
+const ORDER: readonly Id[] = ['groq', 'gemini'];
+const NAME: Record<Id, string> = { groq: 'Groq', gemini: 'Gemini' };
 const BLURB: Record<Id, string> = {
   groq: '빠르게 답해요',
   gemini: '공지 요약과 번역에 써요',
-  openrouter: '여러 모델을 한 키로 써요',
 };
 const GUIDE: Record<Id, { url: string; placeholder: string; steps: string[] }> = {
   groq: { url: PROVIDER_GUIDE.groq.url, placeholder: '키를 붙여 넣어 주세요', steps: PROVIDER_GUIDE.groq.steps },
-  openrouter: { url: PROVIDER_GUIDE.openrouter.url, placeholder: '키를 붙여 넣어 주세요', steps: PROVIDER_GUIDE.openrouter.steps },
   gemini: {
     url: 'https://aistudio.google.com/apikey', placeholder: '키를 붙여 넣어 주세요',
     steps: ['Google AI Studio 키 만들기 화면을 열고 Google 계정으로 로그인해요',
@@ -47,8 +45,8 @@ export function StepGuide({ label, sub, steps, note }: { label: string; sub: str
 }
 
 function SharedGuide() {
-  return <StepGuide label="키는 어디서 받나요?" sub="세 곳 모두 무료로 만들 수 있어요" note="키는 암호화해서 서버에만 보관해요"
-    steps={[<>{lnk(GUIDE.groq.url, 'Groq')}, {lnk(GUIDE.gemini.url, 'Gemini')}, {lnk(GUIDE.openrouter.url, 'OpenRouter')} 중 한 곳에서 로그인해요</>,
+  return <StepGuide label="키는 어디서 받나요?" sub="두 곳 모두 무료로 만들 수 있어요" note="키는 암호화해서 서버에만 보관해요"
+    steps={[<>{lnk(GUIDE.groq.url, 'Groq')}, {lnk(GUIDE.gemini.url, 'Gemini')} 중 한 곳에서 로그인해요</>,
       '"키 만들기"를 눌러요', '키를 복사해요. 한 번만 보여요', '위 칸에 붙여 넣고 "연결하기"를 눌러요']} />;
 }
 

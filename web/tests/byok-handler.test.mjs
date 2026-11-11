@@ -202,7 +202,7 @@ async function setupProviders({ verdict = 'valid' } = {}) {
   return { call, aiSaved, aiDeleted, aiVerified, masterKey: t.masterKey };
 }
 
-for (const [provider, model, secret] of [['groq', 'openai/gpt-oss-20b', `gsk_${'Q'.repeat(30)}`], ['openrouter', 'openrouter/free', `sk-or-v1-${'R'.repeat(30)}`]]) {
+for (const [provider, model, secret] of [['groq', 'openai/gpt-oss-20b', `gsk_${'Q'.repeat(30)}`]]) {
   test(`${provider} key is verified, encrypted for "<user>:${provider}" and only the last four characters come back`, async () => {
     const t = await setupProviders();
     const response = await t.call('POST', { provider, apiKey: secret });
@@ -217,7 +217,7 @@ for (const [provider, model, secret] of [['groq', 'openai/gpt-oss-20b', `gsk_${'
     assert.equal(await decryptApiKey(t.masterKey, `user-a:${provider}`, row.ciphertext), secret);
     // 사용자 ID만으로나 다른 업체 이름으로는 열리지 않는다.
     await assert.rejects(decryptApiKey(t.masterKey, 'user-a', row.ciphertext));
-    await assert.rejects(decryptApiKey(t.masterKey, `user-a:${provider === 'groq' ? 'openrouter' : 'groq'}`, row.ciphertext));
+    await assert.rejects(decryptApiKey(t.masterKey, 'user-a:gemini', row.ciphertext));
   });
 }
 
@@ -226,11 +226,12 @@ test('provider keys: refused or unreachable keys, bad format and bad models neve
   assert.equal((await refused.call('POST', { provider: 'groq', apiKey: `gsk_${'Q'.repeat(30)}` })).status, 400);
   assert.equal(refused.aiSaved.length, 0);
   const outage = await setupProviders({ verdict: 'unavailable' });
-  assert.equal((await outage.call('POST', { provider: 'openrouter', apiKey: `sk-or-${'R'.repeat(30)}` })).status, 502);
+  assert.equal((await outage.call('POST', { provider: 'groq', apiKey: `gsk_${'Q'.repeat(30)}` })).status, 502);
   const t = await setupProviders();
   assert.equal((await t.call('POST', { provider: 'groq', apiKey: 'bad key' })).status, 400);
   assert.equal((await t.call('POST', { provider: 'groq', apiKey: `gsk_${'Q'.repeat(30)}`, model: 'x; drop' })).status, 400);
   assert.equal((await t.call('POST', { provider: 'bing', apiKey: `gsk_${'Q'.repeat(30)}` })).status, 400);
+  assert.equal((await t.call('POST', { provider: 'openrouter', apiKey: `sk-or-v1-${'R'.repeat(30)}` })).status, 400); // OpenRouter는 지원하지 않는다
   assert.equal(t.aiSaved.length, 0);
   assert.equal(t.aiVerified.length, 0);
 });
@@ -238,9 +239,9 @@ test('provider keys: refused or unreachable keys, bad format and bad models neve
 test('deleting one provider key leaves the others and the response never contains secrets', async () => {
   const t = await setupProviders();
   assert.equal((await t.call('DELETE', undefined, 'https://x/byok?provider=groq')).status, 200);
-  assert.equal((await t.call('DELETE', undefined, 'https://x/byok?provider=openrouter')).status, 200);
+  assert.equal((await t.call('DELETE', undefined, 'https://x/byok?provider=openrouter')).status, 400); // 지원을 뺀 업체
   assert.equal((await t.call('DELETE')).status, 200); // provider 없음 = 기존 Gemini 삭제
-  assert.deepEqual(t.aiDeleted, ['groq:user-a', 'openrouter:user-a', 'gemini:user-a']);
+  assert.deepEqual(t.aiDeleted, ['groq:user-a', 'gemini:user-a']);
 });
 
 test('without provider support in deps the old function still answers Gemini and refuses providers', async () => {

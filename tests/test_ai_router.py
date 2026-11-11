@@ -9,8 +9,8 @@ from skku_notice.ai_providers import ProviderError
 from skku_notice.ai_router import Candidate, NoProvider, Preferences, RoutedClient, select_candidates
 from skku_notice.school_ai import judge_school_notices
 
-KEYS = {"gemini": "AIza" + "G" * 35, "groq": "gsk_" + "Q" * 30, "openrouter": "sk-or-" + "R" * 30}
-MODELS = {"gemini": "gemini-3.1-flash-lite", "groq": "openai/gpt-oss-20b", "openrouter": "openrouter/free"}
+KEYS = {"gemini": "AIza" + "G" * 35, "groq": "gsk_" + "Q" * 30}
+MODELS = {"gemini": "gemini-3.1-flash-lite", "groq": "openai/gpt-oss-20b"}
 GOOD = json.dumps({"items": [{"id": "a/1", "verdict": "relevant", "reason": "전체 학생이 신청할 수 있어요", "summary": "신청해요",
                               "deadline_kind": "없음", "deadline_at": ""}]}, ensure_ascii=False)
 ITEMS = [{"id": "a/1", "title": "장학 안내", "body": "신청"}]
@@ -60,7 +60,7 @@ def test_zero_keys_means_no_external_call_and_code_fallback():
     assert client.result().provider is None and client.result().model is None
 
 
-@pytest.mark.parametrize("provider", ["gemini", "groq", "openrouter"])
+@pytest.mark.parametrize("provider", ["gemini", "groq"])
 def test_single_key_uses_only_that_provider_with_its_own_model(provider):
     found, client, fake = run([provider])
     assert found["a/1"].verdict == "relevant"
@@ -76,7 +76,7 @@ def test_ai_disabled_with_keys_makes_zero_calls():
 
 
 # ---- 자동·직접 ----
-@pytest.mark.parametrize("pair", [("gemini", "groq"), ("gemini", "openrouter"), ("groq", "openrouter")])
+@pytest.mark.parametrize("pair", [("gemini", "groq"), ("groq", "gemini")])
 def test_two_keys_auto_falls_back_to_other_own_key(pair):
     first, second = pair
     found, client, fake = run(list(pair), {first: ProviderError(429, "rate_limit"), second: GOOD}, AUTO, used={second: 5})
@@ -85,11 +85,11 @@ def test_two_keys_auto_falls_back_to_other_own_key(pair):
     assert found and client.provider == second and first in client.limited
 
 
-def test_three_keys_are_all_candidates_but_called_one_at_a_time():
-    found, client, fake = run(["gemini", "groq", "openrouter"], {"gemini": ProviderError(503, "unavailable"), "groq": ProviderError(429, "rate_limit")}, AUTO)
-    assert [c[0] for c in fake.calls] == ["gemini", "groq", "openrouter"] and found
-    ok_found, ok_client, ok_fake = run(["gemini", "groq", "openrouter"], None, AUTO)
-    assert ok_fake.count() == 1  # 성공하면 한 번만 부른다(3중 호출 없음)
+def test_both_keys_are_candidates_but_called_one_at_a_time():
+    found, client, fake = run(["gemini", "groq"], {"gemini": ProviderError(503, "unavailable")}, AUTO)
+    assert [c[0] for c in fake.calls] == ["gemini", "groq"] and found
+    ok_found, ok_client, ok_fake = run(["gemini", "groq"], None, AUTO)
+    assert ok_fake.count() == 1  # 성공하면 한 번만 부른다(동시 호출 없음)
 
 
 def test_manual_mode_never_falls_back_to_another_provider():
@@ -109,18 +109,18 @@ def test_manual_provider_not_registered_means_no_call():
 
 # ---- 무료만 쓴다: 요금 설정이 없고 어떤 키도 막지 않는다 ----
 def test_no_price_gate_and_less_used_key_goes_first():
-    pool = cands("gemini", "groq", "openrouter", used={"gemini": 4})
+    pool = cands("gemini", "groq", used={"gemini": 4})
     ranked, reason = select_candidates(pool, Preferences())
-    assert reason is None and [c.provider for c in ranked] == ["groq", "openrouter", "gemini"]
+    assert reason is None and [c.provider for c in ranked] == ["groq", "gemini"]
 
 
 # ---- 오류별 ----
 @pytest.mark.parametrize("code,kind", [(401, "authentication"), (403, "authentication"), (402, "payment"), (429, "rate_limit"), (503, "unavailable")])
 def test_all_keys_failing_returns_code_fallback_without_raising_to_callers(code, kind):
-    err = {p: ProviderError(code, kind) for p in ("gemini", "groq", "openrouter")}
-    found, client, fake = run(["gemini", "groq", "openrouter"], err, AUTO)
+    err = {p: ProviderError(code, kind) for p in ("gemini", "groq")}
+    found, client, fake = run(["gemini", "groq"], err, AUTO)
     assert found == {} and client.execution_mode == "code" and client.failed
-    assert fake.count() == 3 and client.error_code == code  # 각 키를 한 번씩만 시도한다(폭주 없음)
+    assert fake.count() == 2 and client.error_code == code  # 각 키를 한 번씩만 시도한다(폭주 없음)
 
 
 def test_timeout_like_network_error_is_a_fallback_too():

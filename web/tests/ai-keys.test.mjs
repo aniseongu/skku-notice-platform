@@ -14,6 +14,7 @@ test('연결한 키 개수는 Gemini와 다른 업체를 합치고 끊긴 키는
   assert.equal(connectedAiKeys({ byok: undefined }), 0);
   assert.equal(connectedAiKeys({ byok: { status: null, ai: { keys: [] } } }), 0);
   assert.equal(connectedAiKeys({ byok: { status: { disabled: false }, ai: { keys: [] } } }), 1);
-  assert.equal(connectedAiKeys({ byok: { status: { disabled: false }, ai: { keys: [key('groq'), key('openrouter')] } } }), 3);
-  assert.equal(connectedAiKeys({ byok: { status: { disabled: true }, ai: { keys: [key('groq'), key('openrouter', true)] } } }), 1);
+  assert.equal(connectedAiKeys({ byok: { status: { disabled: false }, ai: { keys: [key('groq')] } } }), 2);
+  assert.equal(connectedAiKeys({ byok: { status: { disabled: true }, ai: { keys: [key('groq')] } } }), 1);
+  assert.equal(connectedAiKeys({ byok: { status: { disabled: false }, ai: { keys: [key('groq', true)] } } }), 1);
 });

@@ -16,7 +16,7 @@ from tests.test_grad_intern_service import request as grad_request
 
 MASTER = b64encode(b"k" * 32)
 NOW = datetime(2026, 11, 7, 12, 0, tzinfo=UTC)
-GROQ_KEY, OR_KEY, GEM_KEY = "gsk_" + "G" * 30, "sk-or-" + "O" * 30, "AIza" + "M" * 35
+GROQ_KEY, GEM_KEY = "gsk_" + "G" * 30, "AIza" + "M" * 35
 SCHOOL = [{"notice_id": "s/1", "title": "장학 안내", "body": "신청"}]
 REPLY = json.dumps({"items": [{"id": "s/1", "verdict": "relevant", "reason": "전체 학생이 신청할 수 있어요", "summary": "신청해요",
                                "deadline_kind": "없음", "deadline_at": ""}]}, ensure_ascii=False)
@@ -74,7 +74,7 @@ class Net:
         return [h for h, _, _ in self.requests]
 
 
-GROQ, OPENROUTER = "api.groq.com", "openrouter.ai"
+GROQ = "api.groq.com"
 
 
 def run(store, net, gemini=None):
@@ -133,12 +133,12 @@ def test_two_keys_fall_back_automatically_and_the_failed_key_gets_its_own_error(
 
 def test_all_providers_fail_keeps_pending_work_and_raises_nothing():
     prefs = None
-    extra = {"u1": [ai_row("u1", "groq", GROQ_KEY, "openai/gpt-oss-20b"), ai_row("u1", "openrouter", OR_KEY, "openrouter/free")]}
+    extra = {"u1": [ai_row("u1", "groq", GROQ_KEY, "openai/gpt-oss-20b")]}
     store = AiStore(gem_rows=[gem_row("u1")], extra=extra, prefs=prefs)
-    net, gem = Net({GROQ: 429, OPENROUTER: 503}), SimpleNamespace(calls=0, outcome=ApiError(401))
+    net, gem = Net({GROQ: 429}), SimpleNamespace(calls=0, outcome=ApiError(401))
     counts, _ = run(store, net, gem)
     assert counts["judged"] == 0 and store.saved == []
-    assert net.hosts().count(GROQ) == 1 and net.hosts().count(OPENROUTER) == 1 and gem.calls == 1  # 키마다 한 번
+    assert net.hosts().count(GROQ) == 1 and gem.calls == 1  # 키마다 한 번
     assert "disabled_at" in store.updates[-1][1]  # 거부된 Gemini 키만 비활성
     assert all("disabled_at" not in f for _, _, f in store.ai_updates)
 
@@ -217,9 +217,8 @@ def test_graduation_with_failing_groq_key_still_returns_a_rule_result():
     assert saved["department"]["status"] in ("LIKELY", "CONDITIONAL", "NEEDS_REVIEW")  # 불합격으로 바꾸지 않는다
 
 
-def test_a_groq_ciphertext_moved_into_the_openrouter_row_does_not_open():
-    moved = ai_row("u1", "groq", GROQ_KEY, "openai/gpt-oss-20b")
-    moved["provider"] = "openrouter"  # 같은 사용자라도 업체가 다르면 AAD가 달라 열리지 않는다
+def test_another_users_groq_ciphertext_moved_into_this_users_row_does_not_open():
+    moved = ai_row("u2", "groq", GROQ_KEY, "openai/gpt-oss-20b")  # 다른 사용자에 묶인 암호문이라 AAD가 달라 열리지 않는다
     store = AiStore(extra={"u1": [moved]})
     net = Net({})
     counts, _ = run(store, net)
@@ -230,10 +229,10 @@ def test_a_key_that_just_failed_rests_for_a_while_and_a_healthy_key_is_used_inst
     recent = (NOW - timedelta(minutes=5)).isoformat()
     sick = ai_row("u1", "groq", GROQ_KEY, "openai/gpt-oss-20b")
     sick.update(last_error="Groq 판정을 잠시 못 했어요. 다시 시도해요.", error_at=recent)
-    store = AiStore(extra={"u1": [sick, ai_row("u1", "openrouter", OR_KEY, "openrouter/free")]})
+    store = AiStore(gem_rows=[gem_row("u1")], extra={"u1": [sick]})
     net = Net({})
-    counts, _ = run(store, net)
-    assert counts["judged"] == 1 and net.hosts() == [OPENROUTER]  # 쉬는 Groq에는 요청하지 않는다
+    counts, gem = run(store, net)
+    assert counts["judged"] == 1 and net.hosts() == [] and gem.calls == 1  # 쉬는 Groq에는 요청하지 않고 Gemini가 받는다
     old = dict(sick, error_at=(NOW - timedelta(minutes=30)).isoformat())
     net2 = Net({})
     run(AiStore(extra={"u1": [old]}), net2)

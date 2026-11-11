@@ -53,8 +53,8 @@ def test_unknown_model_uses_json_mode_and_embeds_schema_in_prompt():
         return httpx.Response(200, json=ok_body("{}"))
 
     config = types.GenerateContentConfig(system_instruction="규칙", response_schema=SCHEMA)
-    client_for("openrouter", handler).models.generate_content(
-        model="openrouter/free", contents=[types.Part.from_text(text="질문")], config=config)
+    client_for("groq", handler).models.generate_content(
+        model="meta-llama/some-model", contents=[types.Part.from_text(text="질문")], config=config)
     assert seen["body"]["response_format"] == {"type": "json_object"}
     assert "JSON 스키마" in seen["body"]["messages"][-1]["content"]
 
@@ -104,7 +104,7 @@ def test_network_error_and_bad_output_have_no_secret():
 def test_fenced_list_and_cut_but_valid_answers_are_accepted():
     for content in ('```json\n{"items": []}\n```', [{"type": "text", "text": '{"items": []}'}]):
         body = {"model": "m", "choices": [{"message": {"content": content}, "finish_reason": "stop"}]}
-        reply = client_for("openrouter", lambda r, b=body: httpx.Response(200, json=b)).models.generate_content(model="openrouter/free", contents="x")
+        reply = client_for("groq", lambda r, b=body: httpx.Response(200, json=b)).models.generate_content(model="m", contents="x")
         assert json.loads(reply.text) == {"items": []}
     done = {"choices": [{"message": {"content": '{"items": []}'}, "finish_reason": "length"}]}
     assert client_for("groq", lambda r: httpx.Response(200, json=done)).models.generate_content(model="m", contents="x").text
@@ -135,25 +135,23 @@ def test_legacy_provider_default_and_model_id_check():
     ({"error": {"code": 502, "message": "provider down"}}, 502, "unavailable"),
     ({"choices": [{"message": {"content": "partial"}, "finish_reason": "error", "error": {"code": 402, "message": "no credits"}}]}, 402, "payment"),
 ])
-def test_openrouter_errors_inside_a_200_response_keep_their_code(body, code, kind):
+def test_errors_inside_a_200_response_keep_their_code(body, code, kind):
     with pytest.raises(ProviderError) as info:
-        client_for("openrouter", lambda r: httpx.Response(200, json=body)).models.generate_content(model="openrouter/free", contents="x")
+        client_for("groq", lambda r: httpx.Response(200, json=body)).models.generate_content(model="m", contents="x")
     assert info.value.code == code and info.value.kind == kind
 
 
-def test_reasoning_is_kept_low_and_each_provider_uses_its_own_length_parameter():
+def test_reasoning_is_kept_low_and_uses_the_groq_length_parameter():
     seen = {}
 
     def handler(request):
         seen[request.url.host] = json.loads(request.content)
         return httpx.Response(200, json=ok_body("{}"))
 
-    for provider, model in (("groq", "openai/gpt-oss-20b"), ("openrouter", "openrouter/free")):
-        client_for(provider, handler).models.generate_content(model=model, contents="x", config=types.GenerateContentConfig(response_schema=SCHEMA))
-    groq, router = seen["api.groq.com"], seen["openrouter.ai"]
+    client_for("groq", handler).models.generate_content(model="openai/gpt-oss-20b", contents="x", config=types.GenerateContentConfig(response_schema=SCHEMA))
+    groq = seen["api.groq.com"]
     assert groq["reasoning_effort"] == "low" and groq["include_reasoning"] is False and groq["max_completion_tokens"] >= 4096
     assert "max_tokens" not in groq
-    assert router["reasoning"] == {"effort": "low"} and router["max_tokens"] >= 4096
 
 
 def test_a_400_about_json_schema_is_retried_once_in_json_mode():

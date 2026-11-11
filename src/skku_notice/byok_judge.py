@@ -78,7 +78,7 @@ class JudgeStore(NoticeStore):
             },
         ).json()
 
-    # Groq·OpenRouter 키와 AI 설정. 표가 없는 환경이면 비어 있는 것으로 읽어 Gemini 동작을 그대로 둔다.
+    # Groq 키와 AI 설정. 표가 없는 환경이면 비어 있는 것으로 읽어 Gemini 동작을 그대로 둔다.
     def ai_key_users(self) -> list[str]:
         try:
             rows = self._request("GET", "user_ai_keys", params={
@@ -358,7 +358,7 @@ def run_judging(
 
 
 def _users(store) -> list[tuple[str, dict | None]]:
-    """AI 키가 있는 사용자: Gemini 키 행과 Groq·OpenRouter만 가진 사용자. Gemini 행이 없으면 None."""
+    """AI 키가 있는 사용자: Gemini 키 행과 Groq만 가진 사용자. Gemini 행이 없으면 None."""
     users: dict[str, dict | None] = {row["user_id"]: row for row in store.keys()}
     extra = getattr(store, "ai_key_users", None)
     for user_id in (extra() if extra else []):

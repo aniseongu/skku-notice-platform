@@ -192,7 +192,7 @@ function Overview({ model }: { model: SettingsModel }) {
             {model.name && model.email ? <span className="setting-help">{model.email}</span> : null}</div>
         </div>
         <SettingsLink model={model} label="프로필 설정" help={profileSummary(model.profile)} section="profile" />
-        <SettingsLink model={model} label="연결 키" help="Gemini·Groq·OpenRouter 키" section="keys" />
+        <SettingsLink model={model} label="연결 키" help="Gemini·Groq 키" section="keys" />
         <Setting name="로그아웃" help="이 기기에서만 나가요. 구독과 저장은 계정에 남아요">
           <button type="button" className="ghost-button" disabled={model.authBusy} onClick={model.signOut}>이 기기에서 로그아웃</button>
           {model.authError ? <p className="field-note error" role="alert">{model.authError}</p> : null}
@@ -838,9 +838,9 @@ function CanvasRow({ model, alignEnd }: { model: SettingsModel; alignEnd: boolea
 
 function Keys({ model }: { model: SettingsModel }) {
   if (!model.userId) return <div className="settings"><Back model={model} /><Section id="s-keys" title="연결 키"><LoginNote model={model} what="연결 키" /></Section></div>;
-  // Gemini, Groq, OpenRouter를 모두 연결했을 때만 칩과 버튼을 오른쪽 끝에 붙인다. 하나라도 비어 있으면 그대로 둔다.
+  // Gemini와 Groq를 모두 연결했을 때만 칩과 버튼을 오른쪽 끝에 붙인다. 하나라도 비어 있으면 그대로 둔다.
   const ai = model.byok?.ai;
-  const allConnected = !!model.byok?.status && !!ai && (['groq', 'openrouter'] as const).every((id) => ai.keys.some((key) => key.provider === id));
+  const allConnected = !!model.byok?.status && !!ai && ai.keys.some((key) => key.provider === 'groq');
   return <div className="settings">
     <Back model={model} />
     <Section id="s-ai" title="AI 연결">

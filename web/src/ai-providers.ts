@@ -1,8 +1,8 @@
 import { FunctionsHttpError, type SupabaseClient } from '@supabase/supabase-js';
 
-/** Groq·OpenRouter 본인 키(Gemini 키는 byok.ts가 맡는다)와 AI 사용 설정. 키 원문은 요청 한 번에만 쓰고 저장하지 않는다. */
-export type AiProvider = 'groq' | 'openrouter';
-export const AI_PROVIDERS: readonly AiProvider[] = ['groq', 'openrouter'];
+/** Groq 본인 키(Gemini 키는 byok.ts가 맡는다)와 AI 사용 설정. 키 원문은 요청 한 번에만 쓰고 저장하지 않는다. */
+export type AiProvider = 'groq';
+export const AI_PROVIDERS: readonly AiProvider[] = ['groq'];
 
 export interface AiKeyStatus { provider: AiProvider; keyHint: string; model: string; disabled: boolean; lastError: string | null; usedToday: number }
 /** 업체와 요금은 사용자가 고르지 않는다. 켜기·끄기만 사용자가 정한다. 무료가 기본이고 유료 모델을 직접 고른 키는 막지 않는다. */
@@ -16,14 +16,6 @@ export const PROVIDER_GUIDE: Record<AiProvider, { name: string; url: string; blu
     blurb: '빠르게 답해요. 무료로 시작할 수 있어요',
     steps: ['Groq 키 만들기 화면을 열고 로그인해요. 처음이면 가입부터 해요',
       '"Create API Key"를 누르고 이름을 아무거나 적어요 (예: 성공)',
-      '만들어진 키를 복사해요. 키는 이때 한 번만 보여요',
-      '여기로 돌아와 키를 붙여 넣고 "연결하기"를 눌러요'],
-  },
-  openrouter: {
-    name: 'OpenRouter', url: 'https://openrouter.ai/settings/keys', placeholder: '키를 붙여 넣어 주세요',
-    blurb: '여러 모델을 한 키로 써요. 무료 모델로 시작해요',
-    steps: ['OpenRouter 키 만들기 화면을 열고 로그인해요. 처음이면 가입부터 해요',
-      '"Create Key"를 누르고 이름을 아무거나 적어요 (예: 성공)',
       '만들어진 키를 복사해요. 키는 이때 한 번만 보여요',
       '여기로 돌아와 키를 붙여 넣고 "연결하기"를 눌러요'],
   },
@@ -47,7 +39,7 @@ async function failure(error: unknown, fallback: string): Promise<Error> {
 export async function loadAiKeyStatuses(client: SupabaseClient, userId: string): Promise<AiKeyStatus[]> {
   const { data, error } = await client.from('user_ai_keys').select('provider,key_hint,model,disabled_at,last_error,used_today').eq('user_id', userId);
   if (error) return [];
-  return (data ?? []).flatMap((row) => (row.provider === 'groq' || row.provider === 'openrouter'
+  return (data ?? []).flatMap((row) => (row.provider === 'groq'
     ? [{ provider: row.provider as AiProvider, keyHint: String(row.key_hint), model: String(row.model), disabled: !!row.disabled_at,
       lastError: typeof row.last_error === 'string' ? row.last_error : null, usedToday: Number(row.used_today) || 0 }] : []));
 }
