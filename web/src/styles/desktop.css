@@ -30,7 +30,7 @@
     .rows { border-radius: 0; background: none; }
     /* 선택 모드에서 체크박스가 줄 왼쪽 여백(24px) 안에 겹쳐 들어가, 모드를 바꿔도 분류·제목 열이 밀리지 않는다. */
     .batch-row { position: relative; }
-    .batch-row .selection-check { position: absolute; inset: 0 auto 0 0; width: 36px; z-index: 1; background: none !important; }
+    .batch-row .selection-check { position: absolute; inset: 0 auto 0 0; width: 50px; padding-left: 24px; z-index: 1; background: none !important; }
 
     @media (hover: hover) {
       .batch-row:has(.row:hover:not([aria-current="true"])) .selection-check {

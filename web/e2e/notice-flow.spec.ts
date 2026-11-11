@@ -1536,3 +1536,14 @@ test('the unread filter checkbox starts at the same left edge as the date headin
   const check = await left('.view-toggle .filter-check');
   expect(Math.abs(check - title)).toBeLessThanOrEqual(1);
 });
+
+test('selection mode keeps the select-all and row checkboxes on the date headings left edge', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await expect(page.locator('notice-rows-screen a.row').first()).toBeVisible();
+  const heading = (await page.locator('main h2').first().boundingBox())!.x;
+  await page.locator('button.select-trigger').click();
+  const all = (await page.locator('.select-all input').boundingBox())!.x;
+  const row = (await page.locator('.selection-check input').first().boundingBox())!.x;
+  expect(Math.abs(all - heading)).toBeLessThanOrEqual(1);
+  expect(Math.abs(row - heading)).toBeLessThanOrEqual(1);
+});
