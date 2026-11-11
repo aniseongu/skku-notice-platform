@@ -463,6 +463,31 @@ test('first-run setup cannot be skipped: no skip button, Escape does nothing; se
   await expect(page.getByText('주전공을 골라 주세요')).toHaveCount(0);
 });
 
+test('a new notice that is not judged yet says so while an AI key exists, and says nothing without a key or after a day and a half', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  const rows = page.locator('notice-rows-screen a.row');
+  await rows.first().waitFor();
+  await page.waitForLoadState('networkidle');
+  const ids = await page.evaluate(() => (document.querySelector('notice-app') as unknown as { notices: { id: string }[] }).notices.slice(0, 3).map((n) => n.id));
+  await page.evaluate((list) => {
+    const app = document.querySelector('notice-app') as unknown as { notices: { id: string; first_seen: string | null }[] } & Record<string, unknown>;
+    const hours = (h: number) => new Date(Date.now() - h * 3600 * 1000).toISOString();
+    for (const notice of app.notices) { if (notice.id === list[0]) notice.first_seen = hours(1); if (notice.id === list[1]) notice.first_seen = hours(48); }
+    app.authUserId = 'account-a'; app.profileStatus = 'ready'; app.onboardingDismissed = true; app.subscriptions = ['skku-notice01']; app.subscriptionsLoading = false;
+    app.byokStatus = null; app.aiKeys = [];
+    app.myJudgments = new Map([[list[2], { verdict: 'relevant', reason: '지원할 수 있어요', model: 'm', deadline: null, deadlineKind: null }]]);
+    app.notices = [...app.notices];
+  }, ids);
+  const reason = (id: string) => page.locator(`notice-rows-screen a.row[data-id="${id}"] .reason`);
+  // 키가 없으면 판정을 약속할 수 없으니 아무 말도 하지 않는다.
+  await expect(reason(ids[0])).toHaveCount(0);
+  await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).byokStatus = { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 }; });
+  await expect(reason(ids[0])).toContainText('AI가 확인하고 있어요');   // 방금 수집됐고 판정 전
+  await expect(reason(ids[1])).toHaveCount(0);                          // 36시간이 지나면 거짓으로 약속하지 않는다
+  await expect(reason(ids[2])).toContainText('해당');                    // 판정이 있으면 그 라벨
+  await expect(reason(ids[2])).not.toContainText('확인하고 있어요');
+});
+
 test('refresh button and R refetch the notice list, lock while loading, and keep the list with a message on failure', async ({ page }) => {
   let hits = 0;
   let mode: 'ok' | 'slow' | 'fail' = 'ok';

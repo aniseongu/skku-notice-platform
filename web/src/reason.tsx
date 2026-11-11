@@ -21,8 +21,8 @@ function GradParts({ parts, read }: { parts: GradPart[]; read: boolean }) {
     {part.name} {part.met ? '충족' : '미달'}{index < parts.length - 1 ? ',' : ''}</b>)}</>;
 }
 
-export function Reason({ interests, ai, rule, read = false, grad = [] }: {
-  interests: string[]; ai: { verdict: Verdict; reason: string } | null; rule: string | null; read?: boolean; grad?: GradPart[];
+export function Reason({ interests, ai, rule, read = false, grad = [], pending = false }: {
+  interests: string[]; ai: { verdict: Verdict; reason: string } | null; rule: string | null; read?: boolean; grad?: GradPart[]; pending?: boolean;
 }) {
   const parts = grad.length ? <GradParts parts={grad} read={read} /> : null;
   const sentence = ai && ai.verdict !== 'not_relevant' ? ai.reason : '';
@@ -37,5 +37,7 @@ export function Reason({ interests, ai, rule, read = false, grad = [] }: {
     const tone = ai.verdict === 'relevant' ? 'text-accent' : 'text-soon';
     return <span className={`reason ${ai.verdict}`}><b className={strong(read, tone)}>{VERDICT_LABEL[ai.verdict]}</b><Dot show={!!ai.reason} />{ai.reason}</span>;
   }
+  // 판정 전: 해당 없음과 같은 연한 회색으로, 판단이 아니라 상태임을 분명히 한다.
+  if (pending && !rule) return <span className="reason pending text-ink-3"><b className={`${LABEL} font-normal`}>AI가 확인하고 있어요</b></span>;
   return rule ? <span className="reason rule"><b className={strong(read, 'text-ink-2')}>기준</b><Dot show={!!rule} />{rule}</span> : null;
 }

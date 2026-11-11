@@ -15,6 +15,8 @@ export interface NoticeRowModel {
   ai: { verdict: Verdict; reason: string } | null;
   rule: string | null;
   grad?: GradPart[];
+  /** AI 판정 전(키가 있는 사용자의 새 공지). 줄이 비어 보이지 않게 "판정 중"을 적는다. */
+  pending?: boolean;
 }
 export interface NoticeRowsModel {
   rows: NoticeRowModel[];
@@ -42,7 +44,7 @@ function NoticeRows({ model }: { model: NoticeRowsModel }) {
     const tags = [n.category, n.pinned ? '고정' : '', n.changed_at ? '수정됨' : '', !model.savedView && row.saved ? '저장함' : ''].filter(Boolean).join(', ');
     const passed = n.deadline ? deadlinePassed(n.deadline) : false;
     const urgent = !!n.deadline && !passed && daysLeft(n.deadline, model.today) <= 3;
-    const hasReason = row.interests.length > 0 || !!row.ai || !!row.rule || (row.grad?.length ?? 0) > 0;
+    const hasReason = row.interests.length > 0 || !!row.ai || !!row.rule || (row.grad?.length ?? 0) > 0 || !!row.pending;
     const bg = model.selecting && row.selected ? 'bg-sunken' : row.current && !model.selecting ? 'bg-sunken' : row.read ? 'bg-read' : 'bg-surface';
     const hover = row.current ? '' : 'min-[720px]:hover:bg-hover';
     const border = index > 0 ? 'border-t border-line' : 'min-[720px]:border-t min-[720px]:border-line';
@@ -56,7 +58,7 @@ function NoticeRows({ model }: { model: NoticeRowsModel }) {
         <span className="visually-hidden">{row.read ? '읽은 공지' : '읽지 않은 공지'}</span>
         <span className={`meta ${META}`}><span className={`board ${META_SPAN} ${row.read ? '' : 'min-[720px]:text-ink-2 min-[720px]:font-semibold'}`}>{row.source}</span>{tags ? <span className={`cat ${META_SPAN}`} title={tags}>{tags}</span> : null}</span>
         <span className={`title [grid-area:title] line-clamp-2 text-[16px] leading-[23px] min-[720px]:text-[15px] min-[720px]:leading-[22px] ${row.read ? 'font-normal text-ink-2' : 'font-semibold'} ${n.deadline ? 'mt-[4px] min-[720px]:mt-0' : ''}`}>{title}</span>
-        <span className="sub [grid-area:reason] mt-[2px] text-[14px] leading-[20px] text-ink-2 empty:hidden min-[720px]:mt-0 min-[720px]:overflow-hidden min-[720px]:text-[13px] min-[720px]:leading-[19px] min-[720px]:text-ellipsis min-[720px]:whitespace-nowrap"><Reason interests={row.interests} ai={row.ai} rule={row.rule} read={row.read} grad={row.grad} /></span>
+        <span className="sub [grid-area:reason] mt-[2px] text-[14px] leading-[20px] text-ink-2 empty:hidden min-[720px]:mt-0 min-[720px]:overflow-hidden min-[720px]:text-[13px] min-[720px]:leading-[19px] min-[720px]:text-ellipsis min-[720px]:whitespace-nowrap"><Reason interests={row.interests} ai={row.ai} rule={row.rule} read={row.read} grad={row.grad} pending={row.pending} /></span>
         {n.deadline ? <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''} [grid-area:dday] self-center text-[14px] leading-[18px] tabular-nums min-[720px]:self-start min-[720px]:pt-[2px] min-[720px]:text-right ${ddayWeight} ${ddayColor}`}>{deadlineText(n.deadline, model.today)}</span> : null}
       </a>
     </li>;

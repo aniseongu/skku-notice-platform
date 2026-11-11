@@ -556,6 +556,15 @@ export class AppController extends Reactive {
     return this.matched?.items[notice.id] ?? (mine ? asJudgement(mine) : undefined);
   }
 
+  /** AI 키가 있는 사용자의 새 공지가 아직 판정 전인지. 판정은 수집 직후부터 이미지 글자 읽기를 기다려 최대 하루까지 걸릴 수 있어서, 그동안 줄이 비어 보이지 않게 목록에 "판정 중"을 보여 준다.
+   * 36시간이 지나도 판정이 없으면(한도 초과 등) 거짓으로 약속하지 않게 아무것도 보이지 않는다. */
+  judgePending(notice: Notice): boolean {
+    if (!this.authUserId || !(this.byokStatus && !this.byokStatus.disabled) && !this.aiKeys.some((key) => !key.disabled)) return false;
+    if (this.judgement(notice) || !notice.first_seen) return false;
+    const age = Date.now() - new Date(notice.first_seen).getTime();
+    return age >= 0 && age < 36 * 3600 * 1000;
+  }
+
   /** 내 판정과 관심 키워드를 다시 읽는다. 로그인할 때와 공지를 새로 불러올 때 부른다. */
   async refreshMine(userId: string, epoch: number): Promise<void> {
     if (!authClient) return;

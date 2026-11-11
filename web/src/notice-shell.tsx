@@ -311,7 +311,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
         return { notice: rowNotice, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
           read: app.isRead(notice), saved: app.isSaved(notice), current: app.isWide && app.detailOpen && app.shownId === notice.id,
           selected: app.selectedReads.includes(notice.id), dim: ai?.verdict === 'not_relevant' && !interests.length,
-          interests, ai, rule: app.judgement(notice)?.rule_name ?? null, grad };
+          interests, ai, rule: app.judgement(notice)?.rule_name ?? null, grad, pending: !ai && !interests.length && !grad.length && app.judgePending(notice) };
       }),
       today, selecting: app.selecting, savedView: app.view === 'saved',
       open: (event: MouseEvent, notice: Notice) => app.onRow(event, notice),
