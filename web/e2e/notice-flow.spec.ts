@@ -983,11 +983,24 @@ test('iCampus page: switch on → token → summary time, each in its own sectio
   await withApp(page, { canvasStatus: null, summaryTime: null });
   await expect(sw).toHaveAttribute('aria-checked', 'true');
   await expect(screen.getByLabel('아이캠퍼스 토큰', { exact: true })).toBeVisible();
-  // 기기 알림이 꺼져 있으면 스위치를 켤 수 없고 이유를 알려 주지만, 토큰은 여전히 넣을 수 있다.
-  await withApp(page, { pushStatus: 'off' });
-  await expect(sw).toBeDisabled();
-  await expect(screen.getByLabel('아이캠퍼스 토큰', { exact: true })).toBeVisible();
-  await expect(screen.getByText('먼저 알림 설정에서 이 기기 알림을 켜 주세요')).toBeVisible();
+  // 이 기기 알림이 꺼져 있어도 스위치는 눌리고 설정이 열린다. 같은 자리에서 이 기기 알림을 켜게 한다.
+  await withApp(page, { pushStatus: 'off', enablePush: 'fn:enablePush', canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null }, summaryTime: '21:00' });
+  await expect(sw).toBeEnabled();
+  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  await expect(screen.getByRole('group', { name: '하루 요약 시간' })).toBeVisible();
+  await screen.getByRole('button', { name: '이 기기 알림 켜기' }).click();
+  expect((await calls(page)).filter((c) => c[0] === 'enablePush')).toHaveLength(1);
+  // 처음부터 꺼져 있던 기기에서도 스위치를 켜면 설정이 열린다.
+  await settingsAt(page, '&section=canvas');
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false, pushStatus: 'off', devices: [], thisDeviceId: null,
+    summaryTime: null, canvasStatus: null, refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode' });
+  await expect(sw).toHaveAttribute('aria-checked', 'false');
+  await expect(sw).toBeEnabled();
+  await sw.click();
+  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  await expect(screen.getByRole('group', { name: '하루 요약 시간' })).toBeVisible();
+  await expect(screen.getByRole('button', { name: '이 기기 알림 켜기' })).toBeVisible();
+  expect((await calls(page)).filter((c) => c[0] === 'mode')).toEqual([]);   // 기기가 없으면 모드를 저장하지 않는다
 });
 
 test('iCampus page: a device that already has alerts on shows them open, and the switch turns them off', async ({ page }) => {

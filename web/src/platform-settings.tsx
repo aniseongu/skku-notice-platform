@@ -358,6 +358,7 @@ function Canvas({ model }: { model: SettingsModel }) {
   useEffect(() => { if (open && pushOn && hasToken && mode === 'off') info?.setMode('reminders'); }, [open, pushOn, hasToken, mode]);
   if (!model.userId) return <div className="settings"><Section id="s-canvas" title="아이캠퍼스"><LoginNote model={model} what="아이캠퍼스 알림" /></Section></div>;
   if (!info) return <div className="settings"><Section id="s-canvas" title="아이캠퍼스"><Setting name="아이캠퍼스 알림" help="지금은 설정할 수 없어요. 잠시 뒤 다시 열어 주세요" /></Section></div>;
+  const pushHelp: Record<string, string> = { unsupported: '이 브라우저는 알림을 지원하지 않아요. 최신 브라우저에서 열어 주세요', denied: '브라우저 설정에서 알림을 허용하면 켤 수 있어요', busy: '연결하고 있어요', checking: '확인하고 있어요', off: '알림을 켜면 이 기기로 받아요' };
   const toggle = (next: boolean) => {
     setOpen(next);
     if (next && hasToken && mode === 'off') info.setMode('reminders');
@@ -365,12 +366,15 @@ function Canvas({ model }: { model: SettingsModel }) {
   };
   return <div className="settings">
     <Section id="s-canvas" title="알림">
-      <SwitchRow label="아이캠퍼스 알림" description={pushOn ? '과제 마감과 하루 요약을 이 기기로 받아요' : '먼저 알림 설정에서 이 기기 알림을 켜 주세요'}
-        checked={open && pushOn} disabled={!pushOn || info.busy} onChange={toggle} />
+      <SwitchRow label="아이캠퍼스 알림" description="과제 마감과 하루 요약을 이 기기로 받아요" checked={open} disabled={info.busy} onChange={toggle} />
+      {/* 이 기기 알림이 꺼져 있어도 스위치와 설정은 열린다. 실제로 알림이 가려면 이 기기 알림이 필요해서 같은 자리에서 켜게 한다. */}
+      {open && !pushOn ? <Setting name="이 기기 알림도 켜 주세요" help={pushHelp[model.pushStatus] ?? '알림을 켜면 이 기기로 받아요'}>
+        {model.pushStatus === 'off' ? <button type="button" className="ghost-button" onClick={model.enablePush}>{model.pushRetry ? '다시 시도하기' : '이 기기 알림 켜기'}</button> : null}
+      </Setting> : null}
     </Section>
     {/* 토큰은 계정에 저장하는 값이라 알림을 켜기 전에도 넣을 수 있다. 입력 방식은 연결 키 쪽과 같은 줄이다. */}
     <Section id="s-canvas-token" title="토큰"><CanvasRow model={model} alignEnd /></Section>
-    {open && pushOn ? <>
+    {open ? <>
       <Section id="s-canvas-time" title="하루 요약">
         <Setting name="요약 시간" help={hasToken ? '모든 기기에 같은 시간을 적용해요. 할 일이 없어도 알려요' : '토큰을 연결하면 바꿀 수 있어요'}>
           <p className="setting-name visually-hidden" id="summary-time-label">하루 요약 시간</p>
