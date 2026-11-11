@@ -1672,8 +1672,10 @@ test('share button in the open detail: opens the device share sheet, stays quiet
   });
   const open = async (share: string) => {
     await page.goto(`/?api=sample/api/v1&share=${share}`);
-    await page.locator('notice-rows-screen a.row').nth(1).click();
-    return page.locator(testInfo.project.name === 'mobile' ? '.read-actions' : '.detail-head').getByRole('button', { name: '공유하기' });
+    const button = page.locator(testInfo.project.name === 'mobile' ? '.read-actions' : '.detail-head').getByRole('button', { name: '공유하기' });
+    await expect(page.locator('notice-rows-screen a.row').nth(1)).toBeVisible();
+    if (!(await button.isVisible())) await page.locator('notice-rows-screen a.row').nth(1).click();
+    return button;
   };
   await (await open('ok')).click();
   const shared = await page.evaluate(() => (window as unknown as { shared: { title: string; url: string }[] }).shared);
