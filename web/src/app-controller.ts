@@ -1354,9 +1354,16 @@ export class AppController extends Reactive {
     return external ? this.sources.filter((s) => Boolean(s.external)) : applyBoardOrder(this.schoolSources(), this.boardOrder);
   }
 
+  /** 로그인했고 받을 게시판을 아직 하나도 고르지 않았는지(불러오는 중이거나 불러오지 못한 때는 아니다). 첫 설정을 건너뛴 사람이 여기에 해당한다. */
+  noBoards(): boolean {
+    return !!this.authUserId && !this.subscriptionsLoading && !this.subscriptionsError && this.subscriptions.length === 0;
+  }
+
   /** 학교 게시판 중 사이드바에 보일 것(순서 적용 전, 서버 목록 순서). */
   schoolSources(): Source[] {
     const all = this.sources.filter((s) => !s.external);
+    // 로그인했고 받을 게시판을 하나도 안 골랐으면 게시판 목록은 비어 있다(공지가 있다고 대신 보여 주지 않는다).
+    if (this.noBoards()) return [];
     const subscribed = this.authUserId && !this.subscriptionsLoading && this.subscriptions.length > 0;
     const withNotices = new Set(this.notices.map((n) => n.source_id));
     const chosen = all.filter((s) => (subscribed ? this.subscriptions.includes(s.id) : withNotices.has(s.id)));
@@ -1377,6 +1384,7 @@ export class AppController extends Reactive {
     // 읽고 있는 글은 상세를 닫거나 다른 글로 옮길 때까지 남긴다.
     const scoped = list.filter((n) => !n.deadline || !deadlinePassed(n.deadline))
       .filter((n) => this.isExternal(n) === external)
+      .filter(() => external || !this.noBoards())
       .filter((n) => !this.unreadOnly || !this.isRead(n) || n.id === this.selectedId || n.id === this.openedId)
       .filter((n) => !this.graduationOnly || !this.gradEnabled() || this.gradPartsFor(n, this.judgement(n)?.ai?.verdict).some((part) => part.met) || n.id === this.selectedId || n.id === this.openedId);
     return orderNotices(scoped, this.sortFor(tab));

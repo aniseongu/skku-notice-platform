@@ -14,7 +14,7 @@ import {
 import { APP_NAME } from './brand';
 import { Card, ChipGroup, ChoiceList, Segmented, SwitchRow } from './ui';
 
-const STEP_LABELS = ['주전공', '복수전공', '학년·재학 상태', '인턴십', '받을 공지', '기타 게시판', 'AI 키', '알림'] as const;
+const STEP_LABELS = ['주전공', '복수전공', '학교 정보', '받을 공지', '알림', 'AI 키'] as const;
 
 const YEARS = [1, 2, 3, 4, 5].map((year) => ({ value: year, label: year === 5 ? '5학년 이상' : `${year}학년` }));
 const STATUS = ENROLLMENT.map((value) => ({ value, label: value }));
@@ -37,9 +37,13 @@ export function ProgramPicker({ onPick, current, listClass = '', lead = true }: 
   if (!found) {
     return <div className="onb-group">
       {lead ? <p className="onb-lead">대학을 먼저 고르면 학과가 나와요</p> : null}
+      {/* 대학은 17개라 한 줄씩 늘어놓으면 스크롤해야 한다. 2열로 두어 한 화면에 모두 보이게 한다. */}
       <div ref={listRef} className={listClass}>
-        <ChoiceList nav label="대학 선택" items={COLLEGES.map((item) => ({ id: item.name, label: item.name }))}
-          onSelect={(name) => { setCollege(name); setQuery(''); }} />
+        <div role="group" aria-label="대학 선택" className="grid grid-cols-2 gap-2">
+          {COLLEGES.map((item) => <button key={item.name} type="button" onClick={() => { setCollege(item.name); setQuery(''); }}
+            className="flex min-h-[48px] items-center justify-between gap-1 rounded-md border border-line bg-surface px-3 text-left text-[14px] font-medium text-ink break-keep">
+            <span>{item.name}</span><span className="choice-chevron" aria-hidden="true" /></button>)}
+        </div>
       </div>
     </div>;
   }
@@ -116,8 +120,10 @@ export function Onboarding({ app }: { app: AppController }) {
   const keywordOptions = [...KEYWORD_SUGGESTIONS, ...draft.keywords.filter((word) => !(KEYWORD_SUGGESTIONS as readonly string[]).includes(word))];
   const pushAsk = app.pushStatus === 'off';
 
-  const afterAi = () => { if (app.pushStatus === 'off') go('notify'); else app.closeOnboarding(); };
-  const save = async () => { if (await app.finishOnboarding(draft)) { setSaved(true); if (app.byokOn && !app.byokStatus && app.aiKeys.length === 0) go('ai'); else afterAi(); } };
+  // 알림 → AI 키 순서. 알림을 이미 켰거나 지원하지 않으면 알림 단계를 건너뛰고, 키가 이미 있으면 AI 단계를 건너뛴다.
+  const needAi = () => app.byokOn && !app.byokStatus && app.aiKeys.length === 0;
+  const afterNotify = () => { if (needAi()) go('ai'); else app.closeOnboarding(); };
+  const save = async () => { if (await app.finishOnboarding(draft)) { setSaved(true); if (app.pushStatus === 'off') go('notify'); else afterNotify(); } };
 
   let title = '', lead = '', body: React.ReactNode = null, foot: React.ReactNode = null;
   if (step === 'primary') {
@@ -147,14 +153,15 @@ export function Onboarding({ app }: { app: AppController }) {
             ? <ChoiceList nav label="복수전공 추가" items={[{ id: 'add', label: '복수전공 더 추가하기' }]} onSelect={() => setAddingDouble(true)} />
             : <ChoiceList label="복수전공 선택" selected={doubleAnswer}
               items={[{ id: 'yes', label: '있어요' }, { id: 'no', label: '없어요' }]}
-              onSelect={(id) => { if (id === 'no') setDoubleAnswer('no'); else { setDoubleAnswer('yes'); setAddingDouble(true); } }} /> : null}
+              onSelect={(id) => { if (id === 'no') { setDoubleAnswer('no'); go('status'); } else { setDoubleAnswer('yes'); setAddingDouble(true); } }} /> : null}
       </div>;
     foot = addingDouble
       ? <button type="button" className="solid-button" disabled={!pendingDouble} onClick={() => { if (pendingDouble) { addDouble(pendingDouble); go('status'); } }}>다음</button>
       : <button type="button" className="solid-button" disabled={!canContinue('double', draft, doubleAnswer)} onClick={() => go('status')}>다음</button>;
   } else if (step === 'status') {
     title = '학교 정보를 알려 주세요';
-    lead = '지원 자격에 맞는 공지를 고를 때만 써요';
+    lead = '지원 자격에 맞는 공지를 고르고, 이미 채운 인턴십 요건은 인턴 공고에서 빼 드려요';
+    const software = isSoftwareOriginal({ programs: draft.programs });
     body = <div className="onb-group">
       <h2>학년</h2>
       <Segmented label="학년" options={YEARS} columns={3} value={draft.year} onChange={(year) => setDraft({ ...draft, year })} />
@@ -163,14 +170,7 @@ export function Onboarding({ app }: { app: AppController }) {
       <p className="card-note">졸업예정은 이번 학기에 졸업하는 경우, 졸업은 학위를 이미 받은 경우예요</p>
       <h2>병역</h2>
       <Segmented label="병역" options={SERVICE} columns={3} value={draft.militaryService} onChange={(militaryService) => setDraft({ ...draft, militaryService })} />
-    </div>;
-    foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('internship')}>다음</button>;
-  } else if (step === 'internship') {
-    title = '인턴십 진행 상황을 알려 주세요';
-    lead = '이미 채운 요건은 인턴 공고에서 빼 드려요';
-    // 질문마다 제목이 곧 질문이다(제목 아래에 같은 말을 설명으로 되풀이하지 않는다). 입학 연도만 이유를 한 줄로 덧붙인다.
-    body = <div className="onb-group">
-      {isSoftwareOriginal({ programs: draft.programs }) ? <>
+      {software ? <>
         <h2>입학 연도가 언제예요?</h2>
         <p className="card-note">입학 연도마다 졸업요건이 달라요. 학번 전체는 받지 않아요</p>
         <Segmented label="입학 연도" options={ADMISSION} columns={4} value={draft.admissionYear} onChange={(admissionYear) => setDraft({ ...draft, admissionYear })} />
@@ -178,38 +178,33 @@ export function Onboarding({ app }: { app: AppController }) {
       <h2>3품 인턴십 영역을 채웠나요?</h2>
       <Segmented label="3품 인턴십" options={THREE_P} columns={3} value={threePAnswer(draft)}
         onChange={(value) => setDraft({ ...draft, ...threePFields(value as ThreePAnswer) })} />
-      {isSoftwareOriginal({ programs: draft.programs }) ? <>
+      {software ? <>
         <h2>솦 인턴십을 마쳤나요?</h2>
         <Segmented label="솦 인턴십" options={DEPT_DONE} columns={2}
           value={draft.deptInternshipDone === null ? null : draft.deptInternshipDone ? 'yes' : 'no'}
           onChange={(value) => setDraft({ ...draft, deptInternshipDone: value === 'yes' })} />
       </> : null}
     </div>;
-    foot = <button type="button" className="solid-button" disabled={!canContinue('internship', draft)} onClick={() => go('boards')}>다음</button>;
+    foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('boards')}>다음</button>;
   } else if (step === 'boards') {
     title = '어떤 공지를 받을까요?';
     lead = '고른 전공을 기준으로 켜 뒀어요';
+    // 서버 이름을 받기 전에도 내부 id가 보이지 않게 목록의 한글 이름으로 채운다.
+    const nameOf = (id: string) => sources.find((source) => source.id === id)?.name ?? BOARD_CATALOG.find((board) => board.id === id)?.name ?? OTHER_BOARDS.find((board) => board.id === id)?.name ?? id;
     body = <div className="onb-group">
       <Card id="boards" title="게시판">
         {orderedSources.filter((source) => !OTHER_BOARDS.some((board) => board.id === source.id)).map((source) => <SwitchRow key={source.id} label={source.name}
           checked={draft.boards.includes(source.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, source.id), boardsTouched: true })} />)}
         {orderedSources.length === 0 ? <p className="hint" role="status">게시판 목록을 불러오지 못했어요. 잠시 뒤 설정에서 다시 골라 주세요.</p> : null}
       </Card>
-      <h2>관심 키워드</h2>
-      <p className="card-note">안 골라도 모든 공지를 받아요</p>
-      <ChipGroup label="관심 키워드" options={keywordOptions} selected={draft.keywords} onToggle={(word) => setDraft({ ...draft, keywords: toggleValue(draft.keywords, word) })} />
-    </div>;
-    foot = <button type="button" className="solid-button" onClick={() => go('etc')}>다음</button>;
-  } else if (step === 'etc') {
-    title = '전공과 상관없는 게시판도 받을까요?';
-    lead = '필요한 것만 켜요';
-    // 서버 이름을 받기 전에도 내부 id가 보이지 않게 목록의 한글 이름으로 채운다.
-    const nameOf = (id: string) => sources.find((source) => source.id === id)?.name ?? BOARD_CATALOG.find((board) => board.id === id)?.name ?? OTHER_BOARDS.find((board) => board.id === id)?.name ?? id;
-    body = <div className="onb-group">
+      <h2>전공과 상관없는 게시판</h2>
       <div className="box" role="group" aria-label="기타 게시판">
         {OTHER_BOARDS.map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
           checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
       </div>
+      <h2>관심 키워드</h2>
+      <p className="card-note">안 골라도 모든 공지를 받아요</p>
+      <ChipGroup label="관심 키워드" options={keywordOptions} selected={draft.keywords} onToggle={(word) => setDraft({ ...draft, keywords: toggleValue(draft.keywords, word) })} />
       {app.onboardingError ? <p className="error-text" role="alert">{app.onboardingError}</p> : null}
     </div>;
     foot = <button type="button" className="solid-button" disabled={app.onboardingBusy} onClick={() => { void save(); }}>
@@ -220,8 +215,8 @@ export function Onboarding({ app }: { app: AppController }) {
     const connected = !!app.byokStatus || app.aiKeys.length > 0;
     body = <div className="onb-group"><div className="box"><AiRows byok={aiConnectModel(app)} /></div></div>;
     foot = connected
-      ? <button type="button" className="solid-button" onClick={afterAi}>다음</button>
-      : <button type="button" className="ghost-button" disabled={app.byokBusy || app.aiBusy} onClick={afterAi}>나중에 할게요</button>;
+      ? <button type="button" className="solid-button" onClick={() => app.closeOnboarding()}>끝내기</button>
+      : <button type="button" className="ghost-button" disabled={app.byokBusy || app.aiBusy} onClick={() => app.closeOnboarding()}>나중에 할게요</button>;
   } else {
     title = '알림을 켜 둘까요?';
     lead = '새 공지가 올라오면 이 기기로 알려드려요. 키워드와 맞지 않는 공지는 조용히 보여드려요.';
@@ -231,10 +226,10 @@ export function Onboarding({ app }: { app: AppController }) {
     </div>;
     foot = <>
       {pushAsk || app.pushStatus === 'busy'
-        ? <button type="button" className="solid-button" disabled={app.pushStatus === 'busy'} onClick={() => { void app.enablePush().then(() => { if (app.pushStatus === 'on') app.closeOnboarding(); }); }}>
+        ? <button type="button" className="solid-button" disabled={app.pushStatus === 'busy'} onClick={() => { void app.enablePush().then(() => { if (app.pushStatus === 'on') afterNotify(); }); }}>
           {app.pushStatus === 'busy' ? '확인하고 있어요' : app.pushRetry ? '다시 시도하기' : '알림 받기'}</button>
-        : <button type="button" className="solid-button" onClick={() => app.closeOnboarding()}>끝내기</button>}
-      {pushAsk ? <button type="button" className="ghost-button" onClick={() => app.closeOnboarding()}>나중에 할게요</button> : null}
+        : <button type="button" className="solid-button" onClick={afterNotify}>{needAi() ? '다음' : '끝내기'}</button>}
+      {pushAsk ? <button type="button" className="ghost-button" onClick={afterNotify}>나중에 할게요</button> : null}
     </>;
   }
 

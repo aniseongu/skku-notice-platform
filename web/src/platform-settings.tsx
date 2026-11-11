@@ -174,6 +174,11 @@ function profileSummary(profile: UserProfile): string {
 
 function Overview({ model }: { model: SettingsModel }) {
   return <div className="settings settings-overview">
+    {model.userId && !model.profile.onboardedAt ? <Section id="s-setup" title="첫 설정">
+      <Setting name="내 전공에 맞게 설정하기" help="전공과 학년을 알려 주면 받을 게시판과 알림을 맞춰 드려요">
+        <button type="button" className="solid-button" onClick={model.openOnboarding}>설정 시작하기</button>
+      </Setting>
+    </Section> : null}
     <Section id="s-preferences" title="내 설정">
       <SettingsLink model={model} label="알림" help="받을 게시판과 이 기기 알림" section="notifications" />
       <SettingsLink model={model} label="아이캠퍼스" help="과제 마감과 하루 요약 알림" section="canvas" />

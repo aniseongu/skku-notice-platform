@@ -6,8 +6,9 @@ import { isSoftwareOriginal as isSwOriginal } from './graduation-assessment.ts';
 
 const isSoftwareOriginal = (draft: { programs: Program[] }) => isSwOriginal({ programs: draft.programs });
 
-export type Step = 'primary' | 'double' | 'status' | 'internship' | 'boards' | 'etc' | 'ai' | 'notify';
-export const STEPS: readonly Step[] = ['primary', 'double', 'status', 'internship', 'boards', 'etc', 'ai', 'notify'];
+// 6단계: 알림은 핵심 가치라 먼저 묻고, 입력이 번거로운 선택 사항(AI 키)은 마지막에 둔다. 인턴십은 학교 정보에, 기타 게시판은 게시판에 합쳤다.
+export type Step = 'primary' | 'double' | 'status' | 'boards' | 'notify' | 'ai';
+export const STEPS: readonly Step[] = ['primary', 'double', 'status', 'boards', 'notify', 'ai'];
 
 // 골라서 쓰는 키워드. 직접 쓰는 입력은 설정에서 한다(처음에는 고르기만 해도 되게).
 export const KEYWORD_SUGGESTIONS = ['장학', '인턴', '채용', '공모전', '대외활동', '교환학생', '수강신청', '졸업', '특강', '등록금'] as const;
@@ -65,11 +66,9 @@ export function canContinue(step: Step, draft: Draft, doubleAnswer: DoubleAnswer
     case 'primary': return draft.programs.length >= 1;
     case 'double': return doubleAnswer === 'no' || draft.programs.length >= 2;
     // 졸업한 사람은 학년이 없어도 된다.
-    case 'status': return draft.enrollmentStatus !== null && (draft.year !== null || draft.enrollmentStatus === '졸업');
     // 소프트웨어학과 원전공은 인턴십 졸업요건 판정에 입학 연도가 필요하다.
-    case 'internship': return !isSoftwareOriginal(draft) || draft.admissionYear !== null;
+    case 'status': return draft.enrollmentStatus !== null && (draft.year !== null || draft.enrollmentStatus === '졸업') && (!isSoftwareOriginal(draft) || draft.admissionYear !== null);
     case 'ai': return true;
-    case 'etc': return true;
     case 'boards': return true;
     case 'notify': return true;
   }

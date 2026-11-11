@@ -286,7 +286,7 @@ test('first-run setup: choices only, department list follows the college, double
     app.finishOnboarding = (draft: unknown) => { w.calls.push(['finish', draft]); (app.applyOnboardingSaved as (profile: unknown) => void)({ ...(app.profile as object), onboardedAt: 'x' }); return Promise.resolve(true); };
     app.closeOnboarding = () => { w.calls.push(['close']); app.onboardingOpen = false; app.profile = { ...(app.profile as object), onboardedAt: 'x' }; };
     app.enablePush = () => { w.calls.push(['push']); return Promise.resolve(); };
-    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null };
+    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
     app.profileStatus = 'ready';
     app.pushStatus = 'off';
     app.authUserId = 'account-a';
@@ -322,20 +322,19 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('heading', { name: '복수전공이 있나요?' })).toBeFocused();
   await expect(dialog.getByRole('radiogroup', { name: '복수전공 선택' }).getByRole('radio')).toHaveCount(2);
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
-  await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '8단계 중 2단계');
+  await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '6단계 중 2단계');
   expect(Math.abs((await dialog.getByRole('progressbar').boundingBox())!.width - barWidth1)).toBeLessThanOrEqual(0.5);
   await dialog.getByRole('radio', { name: '있어요', exact: true }).click();
   await dialog.getByRole('button', { name: '경영대학', exact: true }).click();
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('radio', { name: '경영학과', exact: true }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
-  // 학년·재학 상태: 재학이 미리 골라져 있고 학년을 골라야 넘어간다.
+  // 학교 정보: 학년·재학 상태·병역과 인턴십이 한 화면이다. 재학이 미리 골라져 있고, 학년과 (소프트웨어학과 원전공은) 입학 연도를 골라야 넘어간다.
+  await expect(dialog.getByRole('heading', { name: '학교 정보를 알려 주세요' })).toBeFocused();
   await expect(dialog.getByRole('button', { name: '재학', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('button', { name: '3학년' }).click();
-  await dialog.getByRole('button', { name: '다음' }).click();
-  // 인턴십 졸업요건: 학년과 따로 한 단계로 묻는다. 소프트웨어학과 원전공은 입학 연도를 골라야 넘어간다.
-  await expect(dialog.getByRole('heading', { name: '인턴십 진행 상황을 알려 주세요' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('button', { name: '2022', exact: true }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   // 게시판·키워드: 내 전공에 맞춰 추천이 켜져 있다.
@@ -345,9 +344,8 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('switch', { name: /^소프트웨어학과 공지/ })).toHaveAttribute('aria-checked', 'true');
   expect((await dialog.getByRole('button', { name: '장학' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await dialog.getByRole('button', { name: '장학' }).click();
-  await dialog.getByRole('button', { name: '다음' }).click();
-  // 기타 게시판은 전공 게시판 다음에 나온다. 부트캠프 게시판을 고를 수 있고, 건너뛰어도 된다.
-  await expect(dialog.getByRole('heading', { name: '전공과 상관없는 게시판도 받을까요?' })).toBeVisible();
+  // 기타 게시판도 같은 화면 아래에 있다. 부트캠프 게시판을 고를 수 있고, 건너뛰어도 된다.
+  await expect(dialog.getByRole('group', { name: '기타 게시판' })).toBeVisible();
   await expect(dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ })).toHaveAttribute('aria-checked', 'false');
   await dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
@@ -362,6 +360,38 @@ test('first-run setup: choices only, department list follows the college, double
   await dialog.getByRole('button', { name: '나중에 할게요' }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.locator('.app')).not.toHaveAttribute('inert', '');
+});
+
+test('nothing chosen after skipping first-run: no boards and no notices, with a way back into the setup from the list and from settings', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
+    app.profileStatus = 'ready'; app.authUserId = 'account-a'; app.subscriptions = []; app.subscriptionsLoading = false; app.onboardingDismissed = false;
+  });
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '나중에 하기' }).click();
+  await expect(dialog).toHaveCount(0);
+  // 고른 게시판이 없으면 사이드바에도 게시판이 없고(소프트웨어학과 같은 대체 목록 없음) 공지도 없다.
+  if (page.viewportSize()!.width >= 720) await expect(page.locator('.sidebar').getByRole('button', { name: /소프트웨어학과|경영대학|성균관대/ })).toHaveCount(0);
+  await expect(page.locator('notice-rows-screen a.row')).toHaveCount(0);
+  await expect(page.getByText('아직 설정을 안 했어요')).toBeVisible();
+  // 목록에서 바로 첫 설정으로 돌아간다(클릭 1번).
+  await page.getByRole('button', { name: '설정 시작하기' }).click();
+  await expect(dialog.getByRole('heading', { name: '주전공이 어디예요?' })).toBeVisible();
+  await dialog.getByRole('button', { name: '닫기' }).click();
+  // 설정 홈에도 같은 입구가 있다.
+  await page.evaluate(() => (document.querySelector('notice-app') as unknown as { openSettings: (s: null) => void }).openSettings(null));
+  const screen = page.locator('platform-settings-screen');
+  await expect(screen.getByRole('heading', { name: '첫 설정' })).toBeVisible();
+  await screen.getByRole('button', { name: '설정 시작하기' }).click();
+  await expect(dialog.getByRole('heading', { name: '주전공이 어디예요?' })).toBeVisible();
+  // 이미 마친 사람이 게시판을 모두 끄면 게시판 고르기로 이어 준다.
+  await dialog.getByRole('button', { name: '닫기' }).click();
+  await page.evaluate(() => { const app = document.querySelector('notice-app') as unknown as Record<string, unknown>; app.profile = { ...(app.profile as object), onboardedAt: 'x' }; (app.setView as (v: string) => void)('all'); });
+  await expect(page.getByText('받을 게시판이 없어요')).toBeVisible();
+  await expect(page.getByRole('button', { name: '게시판 고르기' })).toBeVisible();
 });
 
 test('first-run setup can be skipped and then stays out of the way; it can be reopened from settings', async ({ page }) => {
@@ -1146,17 +1176,14 @@ test('software original major is asked for the admission year and the internship
   await dialog.getByRole('button', { name: '소프트웨어융합대학', exact: true }).click();
   await dialog.getByRole('radio', { name: '소프트웨어학과', exact: true }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
-  await dialog.getByRole('radio', { name: '없어요', exact: true }).click();
-  await dialog.getByRole('button', { name: '다음' }).click();
+  await dialog.getByRole('radio', { name: '없어요', exact: true }).click();   // 없어요를 누르면 바로 다음 단계로 간다
   await dialog.getByRole('button', { name: '3학년' }).click();
-  await dialog.getByRole('button', { name: '다음' }).click();
   await expect(dialog.getByRole('group', { name: '입학 연도' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('button', { name: '2022', exact: true }).click();
   await expect(dialog.getByRole('button', { name: '다음' })).toBeEnabled();
   await dialog.getByRole('group', { name: '솦 인턴십' }).getByRole('button', { name: '아직이에요' }).click();
   await dialog.getByRole('group', { name: '3품 인턴십' }).getByRole('button', { name: '안 해요' }).click();
-  await dialog.getByRole('button', { name: '다음' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   const saved = await page.evaluate(() => (window as unknown as { calls: unknown[][] }).calls.find((call) => call[0] === 'finish')![1] as Record<string, unknown>);
@@ -1169,6 +1196,7 @@ test('software original major is asked for the admission year and the internship
   await page.evaluate(() => {
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
     const track = (status: string, label: string, note: string, result: string) => ({ status, label, checks: [{ ruleId: 'X', result, note }], unknowns: [], afterCompletion: [], notes: [] });
+    app.subscriptions = ['skku-notice01'];   // 받을 게시판을 고른 사람(안 고르면 목록이 비어 있다)
     app.profile = { ...(app.profile as object), programs: [{ college: '소프트웨어융합대학', department: '소프트웨어학과' }], deptInternshipDone: false, university3pInternshipDone: false, university3pInternshipSelected: true };
     app.showsGraduation = () => true;
     app.graduationFor = () => ({ state: 'ready', aiStatus: 'no_key', department: track('NEEDS_REVIEW', '학과 확인 필요', '담당 업무가 SW와 맞는지 확인하지 못했어요', 'unknown'), university3p: track('NOT_ELIGIBLE', '3품 기준에 못 미쳐요', '최대 240시간이라 280시간에 못 미쳐요', 'fail'), facts: { organizationName: null, workMode: 'unknown', startDate: null, endDate: null, hours: null, taskCategory: 'unknown', missing: ['담당 업무'] } });
@@ -1306,19 +1334,15 @@ test('first-run setup keeps answers when going back and forward, and a stored "n
   await dialog.getByRole('button', { name: '소프트웨어융합대학', exact: true }).click();
   await dialog.getByRole('radio', { name: '소프트웨어학과', exact: true }).click();
   await next();
-  await dialog.getByRole('radio', { name: '없어요', exact: true }).click();
-  await next();
+  await dialog.getByRole('radio', { name: '없어요', exact: true }).click();                         // 없어요를 누르면 바로 학교 정보로 간다
   await dialog.getByRole('button', { name: '3학년' }).click();
-  await next();
   await expect(dialog.getByRole('heading', { name: '입학 연도가 언제예요?' })).toBeVisible();   // 질문이 곧 제목이다
   await dialog.getByRole('button', { name: '2022', exact: true }).click();
-  await back();                                                                                  // 학년 단계: 고른 학년이 남아 있다
-  await expect(dialog.getByRole('button', { name: '3학년' })).toHaveAttribute('aria-pressed', 'true');
   await back();                                                                                  // 복수전공 단계: 없어요가 남아 있다
   await expect(dialog.getByRole('radio', { name: '없어요', exact: true })).toHaveAttribute('aria-checked', 'true');
-  await next();
-  await next();
-  await expect(dialog.getByRole('button', { name: '2022', exact: true })).toHaveAttribute('aria-pressed', 'true');   // 입학 연도가 남아 있다
+  await next();                                                                                  // 학교 정보: 학년과 입학 연도가 남아 있다
+  await expect(dialog.getByRole('button', { name: '3학년' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(dialog.getByRole('button', { name: '2022', exact: true })).toHaveAttribute('aria-pressed', 'true');
   // 이미 첫 설정을 마친 사람이 다시 열면 복수전공 없음이 골라진 채로 보인다.
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
