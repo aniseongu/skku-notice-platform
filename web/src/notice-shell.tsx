@@ -360,12 +360,12 @@ function ViewFilters({ app }: { app: AppController }) {
     <div className="view-filters">
       <button type="button" className="view-toggle" aria-pressed={app.unreadOnly} onClick={() => {
         app.unreadOnly = !app.unreadOnly;
-        app.selectedId = null;
+        app.listChanged();
         remember('view-unread', app.unreadOnly ? '1' : '0');
       }}><span className="filter-check" aria-hidden="true"></span>읽지 않은 공지만</button>
       {app.gradEnabled() ? <button type="button" className="view-toggle" aria-pressed={app.graduationOnly} onClick={() => {
         app.graduationOnly = !app.graduationOnly;
-        app.selectedId = null;
+        app.listChanged();
         remember('view-grad', app.graduationOnly ? '1' : '0');
       }}><span className="filter-check" aria-hidden="true"></span>인턴십 충족만</button> : null}
     </div>
@@ -402,7 +402,7 @@ function SortSelect({ app }: { app: AppController }) {
           else if (app.view === 'intern') app.internSort = option.id;
           else app.sort = option.id;
           remember(app.view === 'saved' ? 'saved-sort' : app.view === 'intern' ? 'intern-sort' : 'notice-sort', option.id);
-          app.selectedId = null;
+          app.listChanged();
           app.sortMenuOpen = false;
           history.replaceState(null, '', `${location.pathname}?tab=${app.tab()}&sort=${option.id}`);
           void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.sort-trigger')?.focus());

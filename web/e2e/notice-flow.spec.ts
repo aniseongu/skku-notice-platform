@@ -1547,3 +1547,24 @@ test('selection mode keeps the select-all and row checkboxes on the date heading
   expect(Math.abs(all - heading)).toBeLessThanOrEqual(1);
   expect(Math.abs(row - heading)).toBeLessThanOrEqual(1);
 });
+
+test('changing a list condition (filter check, sort) closes the open detail pane', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '상세 칸은 넓은 화면에서만 옆에 열려 있다');
+  await page.goto('/?api=sample/api/v1');
+  const rows = page.locator('notice-rows-screen a.row');
+  const title = page.locator('.detail-pane notice-detail-screen .detail-title');
+  const open = async () => { await rows.nth(1).click(); await expect(title).toBeVisible(); };
+  await open();
+  await page.getByRole('button', { name: /정렬:/ }).click();
+  await page.locator('.sort-option').nth(1).click();
+  await expect(title).toBeHidden();
+  await open();
+  const unread = page.getByRole('button', { name: /^읽지 않은 공지만$/ });
+  await unread.click();
+  await expect(title).toBeHidden();
+  await unread.click();   // 끄기
+  await expect(title).toBeHidden();
+  await open();
+  await rows.nth(1).click();   // 같은 행을 다시 누르면 닫히는 기존 동작은 그대로
+  await expect(title).toBeHidden();
+});

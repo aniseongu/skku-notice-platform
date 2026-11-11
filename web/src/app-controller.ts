@@ -1574,13 +1574,21 @@ export class AppController extends Reactive {
     }
   };
 
+  /** 목록 조건(보기, 게시판, 키워드, 필터, 정렬)이 바뀌면 상세 칸은 닫힌 채로 새 목록을 보여 준다.
+   *  첫 공지가 저절로 열려 읽은 글로 오해되지 않게 하며, 사용자가 정해 둔 열림 설정(remember)은 건드리지 않고 이번만 닫는다. */
+  listChanged() {
+    this.selectedId = null;
+    this.detailOpen = false;
+  }
+
   setBoard(board: string) {
-    this.board = board; this.boardMenuOpen = false; this.selectedId = null; this.selectedReads = []; remember('board', board);
+    this.board = board; this.boardMenuOpen = false; this.selectedReads = []; remember('board', board);
+    this.listChanged();
   }
   setKeyword(word: string | null) {
     this.keyword = word;
     this.selectedReads = [];
-    this.selectedId = null;
+    this.listChanged();
     if (this.view === 'settings') this.setView('all');
   }
 
