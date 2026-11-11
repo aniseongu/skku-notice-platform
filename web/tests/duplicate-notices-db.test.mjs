@@ -14,7 +14,7 @@ test('duplicate notices: first seen wins, school needs the same body, external n
         first_seen timestamptz not null, body text, dup_key text);
       create table platform_notice_images (notice_id text, image_url text, status text, content_sha256 text, engine_version text);
       create table platform_ocr_cache (content_sha256 text, engine_version text, extracted_text text);
-      create table user_source_subscriptions (user_id uuid, source_id text);
+      create table user_source_subscriptions (user_id uuid, source_id text, notifications_enabled boolean not null default true);
       create table user_notice_judgments (user_id uuid, notice_id text);
       create table user_notice_translations (user_id uuid, notice_id text);
       insert into platform_sources values ('skku','f'), ('biz','f'), ('cse','f'), ('ja','t'), ('lk','t');`.replace("'f'", 'false').replace("'f'", 'false').replace("'f'", 'false').replace("'t'", 'true').replace("'t'", 'true'));
@@ -24,6 +24,8 @@ test('duplicate notices: first seen wins, school needs the same body, external n
     await db.exec(await readFile(new URL('../../supabase/migrations/20261112130000_duplicate_notices_ocr_text.sql', import.meta.url), 'utf8'));
     await db.exec(await readFile(new URL('../../supabase/migrations/20261112140000_duplicate_notices_title_only_for_image.sql', import.meta.url), 'utf8'));
     await db.exec(await readFile(new URL('../../supabase/migrations/20261112170000_duplicate_external_company_title.sql', import.meta.url), 'utf8'));
+    const notify = await readFile(new URL('../../supabase/migrations/20261112180000_push_dup_notifications_enabled.sql', import.meta.url), 'utf8');
+    await db.exec(notify.slice(0, notify.indexOf('create or replace function public.list_notice_push_candidates')));
     const long = '장학금 신청 안내입니다. 신청 기간과 제출 서류를 확인하세요. '.repeat(4);
     await db.exec(`insert into platform_notices (id, source_id, title, posted_on, first_seen, body) values
       ('skku/1','skku','[장학] 2026학년도 동계 장학금 신청 안내','2026-11-10','2026-11-10 01:00+00','${long}'),
@@ -49,6 +51,12 @@ test('duplicate notices: first seen wins, school needs the same body, external n
     await db.exec(`insert into user_source_subscriptions values ('${u}', 'skku')`);
     assert.equal(await loser('biz/9', u), true);
     assert.equal(await loser('lk/2', u), true);                // 외부 공고는 구독과 상관없이 볼 수 있다
+    // 알림용: 대표 글의 게시판 알림이 꺼져 있으면 사본의 알림을 막지 않는다.
+    const quiet = async (id) => (await db.query('select dup_loser_notify($1, $2) l', [id, u])).rows[0].l;
+    assert.equal(await quiet('biz/9'), true);                  // skku 알림이 켜져 있다 → 대표가 알리니 사본은 알리지 않는다
+    await db.exec(`update user_source_subscriptions set notifications_enabled = false where source_id = 'skku'`);
+    assert.equal(await quiet('biz/9'), false);                 // skku 알림이 꺼졌다 → 사본이 알린다
+    assert.equal(await loser('biz/9', u), true);               // 목록과 판정은 구독만 보면 되므로 그대로다
     // 글이 고쳐지면 그 글의 판정·번역만 지운다. 본문이 처음 채워지는 경우는 지우지 않는다.
     await db.exec(`insert into user_notice_judgments values ('${u}','skku/1'), ('${u}','biz/9');
       insert into user_notice_translations values ('${u}','skku/1');
