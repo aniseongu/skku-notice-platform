@@ -12,7 +12,7 @@ async function setup() {
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
     grant usage on schema auth to authenticated; insert into auth.users values ('${a}');`);
   for (const name of ['20261107030000_public_notices.sql', '20261107050000_user_notice_states.sql', '20261107070000_public_ocr_cache.sql',
-    '20261108100000_user_canvas_tokens.sql', '20261108120000_canvas_worker.sql', '20261111140000_retention_purge.sql']) {
+    '20261108100000_user_canvas_tokens.sql', '20261108120000_canvas_worker.sql', '20261111180000_retention_purge.sql']) {
     try { await db.exec(await readFile(new URL(`../../supabase/migrations/${name}`, import.meta.url), 'utf8')); }
     catch (error) { throw new Error(`${name}: ${error.message}`); }
   }
