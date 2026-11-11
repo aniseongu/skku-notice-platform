@@ -2,7 +2,7 @@
 import { boardsForPrograms } from './skku-boards.ts';
 import { MAX_PROGRAMS, programKey, type Program } from './skku-programs.ts';
 import type { UserProfile } from './profile.ts';
-import { isSoftwareOriginal as isSwOriginal } from './graduation-assessment.ts';
+import { isSoftwareOriginal as isSwOriginal, threePAnswer } from './graduation-assessment.ts';
 
 const isSoftwareOriginal = (draft: { programs: Program[] }) => isSwOriginal({ programs: draft.programs });
 
@@ -65,7 +65,10 @@ export function missingHint(step: Step, draft: Draft, doubleAnswer: DoubleAnswer
     case 'primary': return '학과를 골라 주세요';
     case 'double': return '있는지 없는지 골라 주세요';
     case 'status': return draft.year === null && draft.enrollmentStatus !== '졸업' ? '학년을 골라 주세요' : '재학 상태를 골라 주세요';
-    case 'internship': return '입학 연도를 골라 주세요';
+    case 'internship':
+      if (isSoftwareOriginal(draft) && draft.admissionYear === null) return '입학 연도를 골라 주세요';
+      if (threePAnswer(draft) === null) return '3품 인턴십을 골라 주세요';
+      return '솦 인턴십을 골라 주세요';
     default: return '';
   }
 }
@@ -80,7 +83,8 @@ export function canContinue(step: Step, draft: Draft, doubleAnswer: DoubleAnswer
     // 졸업한 사람은 학년이 없어도 된다.
     case 'status': return draft.enrollmentStatus !== null && (draft.year !== null || draft.enrollmentStatus === '졸업');
     // 소프트웨어학과 원전공은 인턴십 졸업요건 판정에 입학 연도가 필요하다.
-    case 'internship': return !isSoftwareOriginal(draft) || draft.admissionYear !== null;
+    // 3품 인턴십은 모두 답해야 하고, 소프트웨어학과 원전공은 입학 연도와 솦 인턴십도 답해야 한다(아무것도 안 골라도 켜져 있으면 무엇이 빠졌는지 모른다).
+    case 'internship': return threePAnswer(draft) !== null && (!isSoftwareOriginal(draft) || (draft.admissionYear !== null && draft.deptInternshipDone !== null));
     case 'ai': return true;
     case 'boards': return true;
     case 'notify': return true;

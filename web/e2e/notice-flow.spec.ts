@@ -352,6 +352,8 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await expect(dialog.getByText('입학 연도를 골라 주세요')).toBeVisible();
   await dialog.getByRole('button', { name: '2022', exact: true }).click();
+  await dialog.getByRole('group', { name: '3품 인턴십' }).getByRole('button', { name: '채웠어요' }).click();
+  await dialog.getByRole('group', { name: '솦 인턴십' }).getByRole('button', { name: '마쳤어요' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   // 게시판·키워드: 내 전공에 맞춰 추천이 켜져 있다.
   await expect(dialog.getByRole('heading', { name: '어떤 공지를 받을까요?' })).toBeFocused();
@@ -398,7 +400,10 @@ test('first-run setup requires one AI key at the end and records completion only
   await dialog.getByRole('radio', { name: '없어요', exact: true }).click();
   await dialog.getByRole('button', { name: '3학년' }).click();
   await next();
-  await next();     // 인턴십(비소프트웨어는 질문 하나라 그대로 넘어간다)
+  await expect(dialog.getByRole('heading', { name: '3품 인턴십 영역을 채웠나요?' })).toBeVisible();   // 질문이 하나뿐이라 제목이 곧 질문이다
+  await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
+  await dialog.getByRole('button', { name: '채웠어요' }).click();
+  await next();
   await next();     // 받을 공지: 저장. 키가 없으니 완료 표시는 미룬다.
   expect((await calls(page)).filter((c) => c[0] === 'finish')).toEqual([['finish', false]]);
   // 알림이 이미 켜져 있으면 건너뛰고 AI 키로 간다.
@@ -1299,9 +1304,12 @@ test('software original major is asked for the admission year and the internship
   await expect(dialog.getByRole('group', { name: '입학 연도' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('button', { name: '2022', exact: true }).click();
-  await expect(dialog.getByRole('button', { name: '다음' })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();   // 3품 인턴십과 솦 인턴십도 답해야 한다
+  await expect(dialog.getByText('3품 인턴십을 골라 주세요')).toBeVisible();
   await dialog.getByRole('group', { name: '솦 인턴십' }).getByRole('button', { name: '아직이에요' }).click();
+  await expect(dialog.getByText('3품 인턴십을 골라 주세요')).toBeVisible();
   await dialog.getByRole('group', { name: '3품 인턴십' }).getByRole('button', { name: '안 해요' }).click();
+  await expect(dialog.getByRole('button', { name: '다음' })).toBeEnabled();
   await dialog.getByRole('button', { name: '다음' }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   const saved = await page.evaluate(() => (window as unknown as { calls: unknown[][] }).calls.find((call) => call[0] === 'finish')![1] as Record<string, unknown>);

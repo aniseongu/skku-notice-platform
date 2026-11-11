@@ -156,23 +156,24 @@ export function Onboarding({ app }: { app: AppController }) {
       <h2>학년</h2>
       <Segmented label="학년" options={YEARS} columns={3} value={draft.year} onChange={(year) => setDraft({ ...draft, year })} />
       <h2>재학 상태</h2>
-      <Segmented label="재학 상태" options={STATUS} value={draft.enrollmentStatus} onChange={(enrollmentStatus) => setDraft({ ...draft, enrollmentStatus })} />
-      <p className="card-note">졸업예정은 이번 학기에 졸업하는 경우, 졸업은 학위를 이미 받은 경우예요</p>
-      <h2>병역</h2>
+      <Segmented label="재학 상태" options={STATUS} columns={4} value={draft.enrollmentStatus} onChange={(enrollmentStatus) => setDraft({ ...draft, enrollmentStatus })} />
+      <p className="card-note">졸업예정은 이번 학기에 졸업하는 경우예요</p>
+      <h2>병역 (선택)</h2>
       <Segmented label="병역" options={SERVICE} columns={3} value={draft.militaryService} onChange={(militaryService) => setDraft({ ...draft, militaryService })} />
     </div>;
     foot = <button type="button" className="solid-button" disabled={!canContinue('status', draft)} onClick={() => go('internship')}>다음</button>;
   } else if (step === 'internship') {
-    title = '인턴십 진행 상황을 알려 주세요';
-    lead = '이미 채운 요건은 인턴 공고에서 빼 드려요';
     const software = isSoftwareOriginal({ programs: draft.programs });
+    // 질문이 하나뿐이면 제목이 곧 질문이다(제목, 부제, 질문 세 겹으로 쓰지 않는다).
+    title = software ? '인턴십 진행 상황을 알려 주세요' : '3품 인턴십 영역을 채웠나요?';
+    lead = '이미 채운 요건은 인턴 공고에서 빼 드려요';
     body = <div className="onb-group">
       {software ? <>
         <h2>입학 연도가 언제예요?</h2>
-        <p className="card-note">입학 연도마다 졸업요건이 달라요. 학번 전체는 받지 않아요</p>
+        <p className="card-note">입학 연도마다 졸업요건이 달라요. 입학 연도만 저장해요</p>
         <Segmented label="입학 연도" options={ADMISSION} columns={4} value={draft.admissionYear} onChange={(admissionYear) => setDraft({ ...draft, admissionYear })} />
       </> : null}
-      <h2>3품 인턴십 영역을 채웠나요?</h2>
+      {software ? <h2>3품 인턴십 영역을 채웠나요?</h2> : null}
       <Segmented label="3품 인턴십" options={THREE_P} columns={3} value={threePAnswer(draft)}
         onChange={(value) => setDraft({ ...draft, ...threePFields(value as ThreePAnswer) })} />
       {software ? <>
@@ -185,15 +186,16 @@ export function Onboarding({ app }: { app: AppController }) {
     foot = <button type="button" className="solid-button" disabled={!canContinue('internship', draft)} onClick={() => go('boards')}>다음</button>;
   } else if (step === 'boards') {
     title = '어떤 공지를 받을까요?';
-    lead = '고른 전공에 맞춰 켜 뒀어요. 바꿀 수 있어요';
+    lead = '고른 전공에 맞춰 켜 뒀어요';
     // 서버 이름을 받기 전에도 내부 id가 보이지 않게 목록의 한글 이름으로 채운다.
     const nameOf = (id: string) => sources.find((source) => source.id === id)?.name ?? BOARD_CATALOG.find((board) => board.id === id)?.name ?? OTHER_BOARDS.find((board) => board.id === id)?.name ?? id;
     body = <div className="onb-group">
-      <Card id="boards" title="게시판">
+      <h2>게시판</h2>
+      <div className="box" role="group" aria-label="게시판">
         {orderedSources.filter((source) => !OTHER_BOARDS.some((board) => board.id === source.id)).map((source) => <SwitchRow key={source.id} label={source.name}
           checked={draft.boards.includes(source.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, source.id), boardsTouched: true })} />)}
         {orderedSources.length === 0 ? <p className="hint" role="status">게시판 목록을 불러오지 못했어요. 잠시 뒤 설정에서 다시 골라 주세요.</p> : null}
-      </Card>
+      </div>
       <h2>전공과 상관없는 게시판</h2>
       <div className="box" role="group" aria-label="기타 게시판">
         {OTHER_BOARDS.map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
@@ -213,7 +215,7 @@ export function Onboarding({ app }: { app: AppController }) {
     body = <div className="onb-group"><div className="box"><AiRows byok={aiConnectModel(app)} /></div>
       {app.onboardingError ? <p className="error-text" role="alert">{app.onboardingError}</p> : null}</div>;
     foot = <>
-      {connected ? null : <p className="m-0 text-center text-[13px] text-ink-3" role="status">키를 하나 연결해 주세요</p>}
+      {connected ? null : <p className="m-0 text-center text-[14px] text-ink-2" role="status">키를 하나 연결해 주세요</p>}
       <button type="button" className="solid-button" disabled={!connected || app.onboardingBusy || app.byokBusy || app.aiBusy} onClick={finishWithKey}>
         {app.onboardingBusy ? '저장하고 있어요' : '끝내기'}</button>
     </>;
@@ -267,7 +269,7 @@ export function Onboarding({ app }: { app: AppController }) {
         {body}
       </div>
       {foot ? <div className="onb-foot"><div className="onb-foot-inner">
-        {missingHint(step, draft, doubleAnswer) && !addingDouble ? <p className="m-0 text-center text-[13px] text-ink-3" role="status">{missingHint(step, draft, doubleAnswer)}</p> : null}
+        {missingHint(step, draft, doubleAnswer) && !addingDouble ? <p className="m-0 text-center text-[14px] text-ink-2" role="status">{missingHint(step, draft, doubleAnswer)}</p> : null}
         {foot}</div></div> : null}
     </div>
   </div>;

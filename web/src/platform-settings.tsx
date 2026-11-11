@@ -794,7 +794,7 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
             </svg>
           </button>
         </div>
-        <button type="button" className="solid-button min-h-[44px] shrink-0 px-4" aria-label={`${name} ${labels.save}`} disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인 중' : labels.save}</button>
+        <button type="button" className="solid-button min-h-[44px] shrink-0 px-4 disabled:border-line disabled:text-ink-2" aria-label={`${name} ${labels.save}`} disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인 중' : labels.save}</button>
       </div>
       {extra}
       {error ? <p className="field-note error" role="alert">{error}</p> : null}
