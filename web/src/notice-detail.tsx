@@ -45,7 +45,7 @@ function BodyImage({ src, alt }: { src: string; alt: string }) {
 }
 
 /** 글자가 거의 없는(줄표뿐인) 본문은 본문이 없는 것으로 본다. 그림을 보여 준다. */
-const readable = (text: string | null | undefined): boolean => (text ?? '').replace(/<[^>]*>/g, '').match(/[0-9A-Za-z가-힣]/g)?.length! >= 3;
+const readable = (text: string | null | undefined): boolean => (text ?? '').replace(/<[^>]*>/g, '').replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, ' ').match(/[0-9A-Za-z가-힣]/g)?.length! >= 3;
 
 function Body({ body: rawBody, heading = '본문' }: { body: NoticeBody; heading?: string }) {
   const empty = !readable(rawBody.body) && !readable(rawBody.body_html);
