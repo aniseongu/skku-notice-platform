@@ -157,3 +157,17 @@ test('확인할 것이 없고 통과한 검사만 있으면 조건부여도 가�
   assert.equal(displayStatus(track('CONDITIONAL', [pass, { ruleId: 'X', result: 'unknown', note: '확인 못 했어요' }])), 'CONDITIONAL');
   assert.equal(displayStatus(track('NOT_ELIGIBLE', [{ ruleId: 'X', result: 'fail', note: '안 돼요' }])), 'NOT_ELIGIBLE');
 });
+
+test('목록 표지는 상세와 같은 기준이다: 조건부라도 확인할 것이 남으면 확인 필요, 통과한 검사뿐이면 가능', async () => {
+  const { loadGraduationStatuses, gradParts } = await import('../src/graduation-assessment.ts');
+  const rows = [
+    { notice_id: 'a', department: { status: 'CONDITIONAL', checks: [{ result: 'pass' }, { result: 'unknown' }] }, university_3p: { status: 'CONDITIONAL', checks: [{ result: 'unknown' }] }, facts: null },
+    { notice_id: 'b', department: { status: 'LIKELY', checks: [] }, university_3p: { status: 'CONDITIONAL', checks: [{ result: 'pass' }] }, facts: null },
+  ];
+  const query = { select: () => query, eq: () => query, limit: async () => ({ data: rows, error: null }) };
+  const map = await loadGraduationStatuses({ from: () => query }, 'u');
+  assert.deepEqual([map.get('a').dept, map.get('a').p3], ['NEEDS_REVIEW', 'NEEDS_REVIEW']);
+  assert.deepEqual([map.get('b').dept, map.get('b').p3], ['LIKELY', 'LIKELY']);
+  assert.deepEqual(gradParts(map.get('a'), { dept: true, p3: true }), []);
+  assert.equal(gradParts(map.get('b'), { dept: true, p3: true }).every((part) => part.met), true);
+});

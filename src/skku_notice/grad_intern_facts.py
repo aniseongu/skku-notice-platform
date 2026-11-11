@@ -24,6 +24,12 @@ DATE = r"(20\d{2})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})\s*일?"
 PERIOD = re.compile(
     r"(?:근무|인턴(?:십)?|실습|활동|교육)\s*(?:기간|일정)\s*[:：]?\s*" + DATE + r"\s*\(?[가-힣]?\)?\s*[~\-–∼부터]+\s*" + DATE
 )
+# 표로 된 공고: "근무기간 '27. 1. 4.(월) ~ 2. 12.(금) 예정"처럼 연도를 두 자리로 줄이고 끝 날짜의 연도를 생략한 경우
+_SD = r"\s*[.\-/]\s*"
+PERIOD_SHORT = re.compile(
+    r"(?:근무|인턴(?:십)?|실습|활동|교육)\s*(?:기간|일정)\s*[:：]?\s*['’‘`](\d{2})" + _SD + r"(\d{1,2})" + _SD + r"(\d{1,2})\s*\.?\s*\(?[가-힣]?\)?"
+    r"\s*[~\-–∼]\s*(?:['’‘`]?(\d{2})" + _SD + r")?(\d{1,2})" + _SD + r"(\d{1,2})"
+)
 FULL_TIME = re.compile(r"전일제|풀\s*타임|full[\s-]?time|주\s*5\s*일\s*(?:\(?\s*)?(?:풀|전일)", re.I)
 PART_TIME = re.compile(r"파트\s*타임|시간제|part[\s-]?time", re.I)
 TOTAL_HOURS = re.compile(r"(?:총|합계)\s*(\d{2,4})\s*시간")
@@ -196,6 +202,16 @@ def static_facts(title: str, body: str) -> dict:
         if start and end and end >= start:
             found["start_date"], found["end_date"] = start, end
             found["evidence"].append({"field": "period", "quote": period.group(0)})
+    if "start_date" not in found and (short := PERIOD_SHORT.search(text)):
+        year = 2000 + int(short.group(1))
+        end_year = 2000 + int(short.group(4)) if short.group(4) else year
+        start = _iso(str(year), short.group(2), short.group(3))
+        end = _iso(str(end_year), short.group(5), short.group(6))
+        if start and end and not short.group(4) and end < start:
+            end = _iso(str(year + 1), short.group(5), short.group(6))
+        if start and end and end >= start:
+            found["start_date"], found["end_date"] = start, end
+            found["evidence"].append({"field": "period", "quote": short.group(0)})
     if "start_date" not in found:
         month_hits = {int(next(g for g in m.groups() if g)) for m in MONTHS.finditer(text)}
         if len(month_hits) == 1 and 1 <= (months := month_hits.pop()) <= 24:
@@ -214,6 +230,11 @@ def static_facts(title: str, body: str) -> dict:
     # 하루 근무시간과 주당 일수는 각각 한 값으로 모일 때만 읽는다(여러 값이면 어느 것인지 몰라서 비운다).
     per_day = {int(m.group(1)) for m in DAY_HOURS.finditer(text) if 1 <= int(m.group(1)) <= 12}
     per_week = {int(m.group(1)) for m in DAYS_PER_WEEK.finditer(text)}
+    week_hours = {int(m.group(1)) for m in WEEK_HOURS.finditer(text)}
+    if len(per_day) == 1 and not per_week and len(week_hours) == 1:
+        daily, weekly = next(iter(per_day)), next(iter(week_hours))
+        if daily and weekly % daily == 0 and 1 <= weekly // daily <= 7:
+            per_week = {weekly // daily}  # "주 35시간, 1일 7시간"이면 주 5일
     if len(per_day) == 1 and len(per_week) == 1:
         found["daily_hours"], found["days_per_week"] = per_day.pop(), per_week.pop()
         found["evidence"].append({"field": "hours", "quote": f"1일 {found['daily_hours']}시간, 주 {found['days_per_week']}일"})

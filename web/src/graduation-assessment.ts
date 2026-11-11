@@ -185,9 +185,13 @@ export async function loadGraduationStatuses(client: SupabaseClient, userId: str
   const { data, error } = await client.from('user_notice_graduation_assessments').select('notice_id,department,university_3p,facts')
     .eq('user_id', userId).eq('status', 'READY').limit(1000);
   if (error) throw error;
+  // 상세와 같은 기준(displayStatus)으로 읽는다: 조건부라도 확인할 것이 남았으면 확인 필요, 통과한 검사뿐이면 가능.
   const read = (value: unknown): Status | null => {
-    const status = (value as { status?: unknown } | null)?.status;
-    return STATUSES.includes(status as Status) ? status as Status : null;
+    const raw = value as { status?: unknown; checks?: unknown } | null;
+    if (!STATUSES.includes(raw?.status as Status)) return null;
+    if (raw?.status !== 'CONDITIONAL') return raw?.status as Status;
+    const results = Array.isArray(raw.checks) ? raw.checks.map((c) => (c as { result?: unknown } | null)?.result) : [];
+    return results.length > 0 && results.every((r) => r === 'pass') ? 'LIKELY' : 'NEEDS_REVIEW';
   };
   const period = (value: unknown): WorkPeriod | undefined => {
     const facts = value as { start_date?: unknown; end_date?: unknown; duration_days?: unknown } | null;

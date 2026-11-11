@@ -293,3 +293,15 @@ def test_duration_months_are_read_from_label_on_the_previous_line_and_from_inter
 def test_daily_hours_and_days_per_week_are_read_when_both_are_written():
     found = gf.build_facts("중소기업중앙회 인턴", "근무시간: 09:00 ~ 18:00 (1일 8시간, 주 5일)", None)
     assert found.facts.daily_hours == 8 and found.facts.days_per_week == 5
+
+
+def test_table_period_with_short_year_and_hours_per_week_are_read():
+    text = "근무기간 '27. 1. 4.(월) ~ 2. 12.(금) 예정\n근무시간 주 35시간, 1일 7시간 근무(09:00 ~ 17:00)"
+    found = gf.build_facts("[IBK기업은행] 체험형 청년인턴 채용", text, None).facts
+    assert found.start_date == date(2027, 1, 4) and found.end_date == date(2027, 2, 12)
+    assert found.daily_hours == 7 and found.days_per_week == 5
+
+
+def test_short_period_end_rolls_into_next_year_when_it_is_earlier():
+    found = gf.build_facts("인턴", "근무기간 '26. 12. 15. ~ 1. 20.", None).facts
+    assert found.start_date == date(2026, 12, 15) and found.end_date == date(2027, 1, 20)
