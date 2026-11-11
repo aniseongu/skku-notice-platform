@@ -426,3 +426,13 @@ def test_ui_ux_and_web_design_roles_count_as_software():
     assert found is not None and found[0] == "application_embedded"
     plain = gf.static_task_category("브랜드 디자인 인턴", "담당업무: 포스터 디자인과 패키지 디자인 보조 업무입니다. 디자인 경험자 우대")
     assert plain is None or plain[0] == "non_software"
+
+
+def test_ml_data_labeling_roles_count_as_data_ai():
+    """ML 학습 데이터 라벨링·데이터 품질 검증 직무는 학과가 정한 데이터·AI 업무 분야로 본다(심의는 따로 있다)."""
+    body = ("- ML 및 딥러닝 모델 학습을 위한 데이터 라벨링 작업을 수행해요.\n\n- 상품 및 검색 속성 분류 모델의 기존 데이터 품질을 꼼꼼하게 검증하고 고도화해요.\n\n"
+            "- 데이터 품질을 높이기 위한 문제 정의부터 개선안 도출까지 실무 전 과정에 적극적으로 참여해요.")
+    assert gf.static_task_category("[㈜가나] 데이터 라벨링 인턴", body)[0] == "data_ai"
+    # '딥러닝'이라는 말이 없어도 라벨링·품질 검증만으로 같은 분야가 된다
+    assert gf.static_task_category("[㈜가나] 인턴 모집", "주요 업무\n- 데이터 라벨링 작업을 수행해요.\n- 학습 데이터의 품질 검증과 개선을 맡아요.")[0] == "data_ai"
+    assert gf.static_task_category("[㈜가나] 인턴 모집", "주요 업무\n- 제품 포장 라벨 부착과 재고 정리를 해요. 사무 보조 업무예요.")[0] == "non_software"

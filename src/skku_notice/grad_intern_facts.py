@@ -197,7 +197,7 @@ CLOCK = re.compile(r"(\d{1,2})\s*:\s*(\d{2})\s*[~\-–∼]\s*(\d{1,2})\s*:\s*(\d
 TASK_SECTION = re.compile(r"(?:\[?\s*담당\s*업무\s*\]?|모집\s*직무|주요\s*업무|하는\s*일)\s*[:：]?\s*(.{20,900}?)(?=\n\s*\n\s*\n|\[\s*(?:접수|자격|우대|근무|복리|채용|지원)|자격\s*요건|우대\s*(?:사항|조건)|$)", re.S)
 SW_WORDS: dict[str, re.Pattern[str]] = {
     "application_embedded": re.compile(r"UI\s*/?\s*UX|웹\s*디자인|UX\s*리서치|프로덕트\s*디자인|앱\s*디자인|소프트웨어\s*개발|SW\s*개발|프로그래밍|프론트\s*엔드|백\s*엔드|웹\s*개발|앱\s*개발|모바일\s*앱|임베디드|펌웨어|게임\s*개발|클라이언트\s*개발|서버\s*개발|Android|iOS|React|Spring|\bJava\b|Python|C\+\+|JavaScript|TypeScript|Kotlin|Swift|\bSQL\b|코딩|알고리즘|프로그램\s*(?:개발|제작)|(?:앱|웹|서비스|플랫폼|시스템|서버|API|SW|S/W|소프트웨어|게임|AI|데이터)\s*개발|개발자|프로그래머|\bdeveloper\b|software engineer", re.I),
-    "data_ai": re.compile(r"데이터\s*분석|데이터\s*엔지니어|데이터\s*사이언|통계\s*분석|데이터\s*베이스|\bDBA\b|머신\s*러닝|딥\s*러닝|AI\s*모델|인공지능\s*(?:모델|개발)|LLM|MLOps|data\s*(?:scientist|engineer|analyst)", re.I),
+    "data_ai": re.compile(r"데이터\s*(?:라벨링|레이블링|어노테이션)|\bannotation\b|학습\s*데이터|모델\s*학습|\bML\b|데이터\s*품질\s*(?:검증|관리|개선)|데이터\s*분석|데이터\s*엔지니어|데이터\s*사이언|통계\s*분석|데이터\s*베이스|\bDBA\b|머신\s*러닝|딥\s*러닝|AI\s*모델|인공지능\s*(?:모델|개발)|LLM|MLOps|data\s*(?:scientist|engineer|analyst)", re.I),
     "cloud_platform": re.compile(r"클라우드|인프라|DevOps|Kubernetes|\bAWS\b|\bGCP\b|Azure", re.I),
     "system_network": re.compile(r"시스템\s*(?:운영|엔지니어|관리)|IT\s*(?:인프라|운영)|네트워크\s*(?:운영|엔지니어|구축)|서버\s*(?:운영|관리)"),
     "security": re.compile(r"정보\s*보호|보안\s*(?:관제|운영|엔지니어|점검)|침투\s*테스트|사이버\s*보안", re.I),
@@ -384,7 +384,7 @@ SYSTEM = (
     "incorporated_institute, 공공기관·공기업은 public_agency, 성균관대학교 소프트웨어융합대학 소속 교수 연구실은 "
     "skku_sw_lab, 다른 대학 연구실은 other_university_lab, 그 밖에 기관 종류가 분명하면 other, 모르면 unknown입니다. "
     "회사 소개나 홍보 문구의 기술 단어가 아니라 모집 직무의 담당 업무로 task_category를 정하세요: 응용·임베디드·앱·UI/UX "
-    "개발·디자인·리서치(웹 디자인 포함)는 application_embedded, 클라우드·인프라는 cloud_platform, 데이터 분석·인공지능은 data_ai, 시스템·네트워크는 "
+    "개발·디자인·리서치(웹 디자인 포함)는 application_embedded, 클라우드·인프라는 cloud_platform, 데이터 분석·인공지능·머신러닝 학습 데이터 라벨링·데이터 품질 검증은 data_ai, 시스템·네트워크는 "
     "system_network, 보안은 security, 소프트웨어 테스트·품질 보증은 software_qa, 소프트웨어와 무관한 업무(영업, 회계, 행정, "
     "기계 점검 등)는 non_software, 그 밖이거나 업무가 안 적혀 있으면 unknown입니다. 모집 직무가 여러 개이면 가장 먼저 나온 "
     "직무만 보세요. 날짜는 근무(실습) 기간이며 모집 마감일이 아닙니다. YYYY-MM-DD로 쓰세요. duration_months는 "
