@@ -253,7 +253,7 @@ def test_important_notice_waits_twelve_hours_and_passed_deadlines_are_skipped(mo
     assert _recheck_requests(monkeypatch, [("1", 10, 4)], deadline=(NOW.replace(day=1)).isoformat()) == []
 
 
-def _recheck_requests(monkeypatch, specs, important=frozenset(), deadline=None):
+def _recheck_requests(monkeypatch, specs, important=frozenset(), deadline=None, pinned=False):
     """specs: [(article_no, first_seen_hours_ago, fetched_hours_ago)] -> requested detail URLs."""
     from dataclasses import replace
     from datetime import timedelta
@@ -262,12 +262,12 @@ def _recheck_requests(monkeypatch, specs, important=frozenset(), deadline=None):
     store.important = set(important)
     notices = []
     for no, seen_h, fetched_h in specs:
-        n = replace(NOTICE, article_no=no, title=f"공지{no}", url=f"https://www.skku.edu/notice?articleNo={no}")
+        n = replace(NOTICE, article_no=no, pinned=pinned, title=f"공지{no}", url=f"https://www.skku.edu/notice?articleNo={no}")
         notices.append(n)
         store.rows[f"school/{no}"] = {
             "id": f"school/{no}", "source_id": "school", "article_no": no, "title": n.title,
             "category": n.category, "url": n.url, "posted_on": n.posted_on.isoformat(),
-            "pinned": False, "deadline": deadline,
+            "pinned": pinned, "deadline": deadline,
             "first_seen": (NOW - timedelta(hours=seen_h)).isoformat(),
             "fetched_at": (NOW - timedelta(hours=fetched_h)).isoformat(),
             "body": "본문", "body_html": "<p>본문</p>", "attachments": [], "images": [],
@@ -478,3 +478,16 @@ def test_dormant_boards_lose_their_last_success_time_so_they_do_not_make_the_fee
     seen.clear()
     Fake().clear_dormant([])
     assert seen == []   # 비울 게시판이 없으면 아무것도 하지 않는다
+
+
+def test_old_pinned_notice_is_rechecked_once_a_day_but_other_old_notices_are_not(monkeypatch):
+    # 오래된 고정 공지는 하루가 지났을 때만 다시 본다. 하루가 안 지났거나 고정이 아니면 읽지 않는다.
+    assert len(_recheck_requests(monkeypatch, [("1", 500, 30)], pinned=True)) == 1
+    assert _recheck_requests(monkeypatch, [("1", 500, 10)], pinned=True) == []
+    assert _recheck_requests(monkeypatch, [("1", 500, 30)], pinned=False) == []
+
+
+def test_pinned_recheck_only_uses_the_slots_left_after_new_and_important_notices(monkeypatch):
+    specs = [("1", 10, 4), ("2", 12, 5), ("3", 14, 6), ("4", 500, 40)]   # 갓 올라온 글 셋이 세 자리를 다 쓴다
+    assert len(_recheck_requests(monkeypatch, specs, pinned=True)) == 3
+    assert "https://www.skku.edu/notice?articleNo=4" not in _recheck_requests(monkeypatch, specs, pinned=True)

@@ -91,6 +91,11 @@ class NoticeStore:
         rows = self._request("GET", "platform_notices", params={
             "source_id": f"in.({sources})", "fetched_at": "not.is.null", "first_seen": f"gte.{recent_since}",
             "select": cols, "limit": "500"}).json()
+        pinned = self._request("GET", "platform_notices", params={
+            "source_id": f"in.({sources})", "fetched_at": "not.is.null", "pinned": "eq.true",
+            "select": cols, "limit": "200"}).json()
+        have = {row["id"] for row in rows}
+        rows += [row for row in pinned if row["id"] not in have]
         have = {row["id"] for row in rows}
         wanted = sorted(i for i in important if i not in have and i.split("/")[0] in source_ids)[:200]
         if wanted:
@@ -304,6 +309,7 @@ RECHECK_PER_RUN = 3
 RECHECK_IMPORTANT_INTERVAL = timedelta(hours=12)
 RECHECK_RECENT_INTERVAL = timedelta(hours=3)
 RECHECK_RECENT_WINDOW = timedelta(hours=48)
+RECHECK_PINNED_INTERVAL = timedelta(hours=24)   # 오래된 고정 공지도 하루에 한 번은 본문이 바뀌었는지 본다
 EXTERNAL_INTERVAL = timedelta(minutes=55)
 EXTERNAL_DETAILS_PER_RUN = 5
 EXTERNAL_DETAIL_WINDOW = timedelta(days=45)
@@ -321,6 +327,7 @@ def recheck_candidates(rows: list[dict], important: set[str], now: datetime) -> 
     """다시 읽을 글을 정한다(원본 _recheck_candidates와 같은 순서): 중요한 글, 그다음 갓 올라온 글(최신순)."""
     urgent: list[tuple[datetime, str, dict]] = []
     fresh: list[tuple[datetime, str, dict]] = []
+    stale: list[tuple[datetime, str, dict]] = []
     for row in rows:
         fetched, seen = _when(row.get("fetched_at")), _when(row.get("first_seen"))
         deadline = _when(row.get("deadline"))
@@ -332,10 +339,14 @@ def recheck_candidates(rows: list[dict], important: set[str], now: datetime) -> 
             urgent.append((fetched, row["id"], row))
         elif is_recent and age >= RECHECK_RECENT_INTERVAL:
             fresh.append((seen, row["id"], row))
+        elif row.get("pinned") and age >= RECHECK_PINNED_INTERVAL:
+            stale.append((fetched, row["id"], row))
     urgent.sort(key=lambda item: (item[0], item[1]))
     fresh.sort(key=lambda item: item[1])
     fresh.sort(key=lambda item: item[0], reverse=True)
-    return [row for _, _, row in (urgent + fresh)][:RECHECK_PER_RUN]
+    # 고정 공지는 가장 오래 안 본 것부터, 위 두 종류가 자리를 다 쓰지 않았을 때만 본다.
+    stale.sort(key=lambda item: (item[0], item[1]))
+    return [row for _, _, row in (urgent + fresh + stale)][:RECHECK_PER_RUN]
 
 
 def run_recheck(sources: list[dict], store: NoticeStore, settings: dict, now: datetime) -> int:

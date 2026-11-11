@@ -42,7 +42,21 @@ def wants_image_text(notice: dict, external_ids: set[str]) -> bool:
 ENGINE_VERSION = "rapidocr-3.10.0-ppocrv5-korean-tiled-v1"
 
 
+def skips_as_duplicate(store: "OCRStore", notice: dict) -> bool:
+    """같은 글을 먼저 감지한 다른 글이 있고 본문에 읽을 글자가 있으면 그림 글자를 읽지 않는다.
+
+    메모리와 키 호출을 아끼려는 것이다. 본문이 비어 있는 글은 그림이 곧 내용이라 건너뛰지 않는다."""
+    return has_readable_text(notice.get("body")) and store.is_duplicate_loser(str(notice.get("id") or ""))
+
+
 class OCRStore(NoticeStore):
+    def is_duplicate_loser(self, notice_id: str) -> bool:
+        """DB 함수 dup_loser. 함수가 아직 없는 환경이면 건너뛰지 않는다."""
+        try:
+            return self._request("POST", "rpc/dup_loser", json={"p_id": notice_id}).json() is True
+        except StoreError:
+            return False
+
     def discover(self) -> None:
         notices = self._request(
             "GET",
@@ -56,7 +70,7 @@ class OCRStore(NoticeStore):
         external_ids = self.external_source_ids()
         rows = []
         for notice in notices:
-            if not wants_image_text(notice, external_ids):
+            if not wants_image_text(notice, external_ids) or skips_as_duplicate(self, notice):
                 continue
             images = notice.get("images")
             if not isinstance(images, list):
@@ -104,11 +118,12 @@ class OCRStore(NoticeStore):
             "platform_notices",
             params={
                 "id": f"eq.{notice_id}",
-                "select": "images,body,title,source_id",
+                "select": "id,images,body,title,source_id",
                 "limit": "1",
             },
         ).json()
         return bool(rows and wants_image_text(rows[0], self.external_source_ids())
+                    and not skips_as_duplicate(self, rows[0])
                     and isinstance(rows[0].get("images"), list) and image_url in rows[0]["images"])
 
     def notice_row(self, notice_id: str) -> dict | None:

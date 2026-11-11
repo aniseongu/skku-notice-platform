@@ -221,3 +221,20 @@ def test_lacks_work_hours_reads_hours_written_without_spaces():
     from skku_notice.grad_intern_facts import lacks_work_hours
     assert lacks_work_hours("인턴", "근무지역: 서울") is True
     assert lacks_work_hours("인턴", "근무시간: 09:00~18:00 (1일8시간, 주5일)") is False
+
+
+def test_a_duplicate_with_readable_body_skips_image_text_but_an_image_only_duplicate_does_not():
+    from skku_notice.ocr_collection import skips_as_duplicate
+
+    class Store:
+        def __init__(self, loser):
+            self.loser = loser
+
+        def is_duplicate_loser(self, notice_id):
+            return self.loser
+
+    readable = {"id": "biz/9", "body": "장학금 신청 안내입니다. 기간을 확인하세요."}
+    image_only = {"id": "ja/1", "body": "—"}
+    assert skips_as_duplicate(Store(True), readable) is True    # 먼저 본 글이 있고 본문이 있다
+    assert skips_as_duplicate(Store(False), readable) is False   # 대표 글은 읽는다
+    assert skips_as_duplicate(Store(True), image_only) is False  # 본문이 비면 그림이 내용이라 읽는다

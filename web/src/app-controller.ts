@@ -28,6 +28,7 @@ import type { Draft } from './onboarding-flow';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
 import { localKey, setLocalOwner } from './local-scope.ts';
 import type { Subscription } from '@supabase/supabase-js';
+import { dropDuplicates } from './dup-notices';
 import { orderNotices, type Sort } from './notice-order';
 import { Reactive, defineReactive } from './reactive';
 
@@ -1444,10 +1445,14 @@ export class AppController extends Reactive {
     const scoped = list.filter((n) => !n.deadline || !deadlinePassed(n.deadline))
       .filter((n) => this.isExternal(n) === external)
       .filter(() => external || !this.noBoards())
-      .filter((n) => external || this.inChosenBoards(n) || n.id === this.selectedId || n.id === this.openedId)
+      .filter((n) => external || this.inChosenBoards(n) || n.id === this.selectedId || n.id === this.openedId);
+    // 같은 공지가 여러 게시판에 올라오면 가장 먼저 감지된 글만 보여 준다. 읽고 있는 글은 남긴다.
+    const firstSeen = new Set(dropDuplicates(scoped).map((n) => n.id));
+    const unique = scoped.filter((n) => firstSeen.has(n.id) || n.id === this.selectedId || n.id === this.openedId);
+    const shown = unique
       .filter((n) => !this.unreadOnly || !this.isRead(n) || n.id === this.selectedId || n.id === this.openedId)
       .filter((n) => !this.graduationOnly || !this.gradEnabled() || this.gradPartsFor(n, this.judgement(n)?.ai?.verdict).some((part) => part.met) || n.id === this.selectedId || n.id === this.openedId);
-    return orderNotices(scoped, this.sortFor(tab));
+    return orderNotices(shown, this.sortFor(tab));
   }
 
   sortFor(tab: Tab): Sort { return tab === 'saved' ? this.savedSort : tab === 'intern' ? this.internSort : this.sort; }
