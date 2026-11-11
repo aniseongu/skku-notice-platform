@@ -31,7 +31,7 @@ export interface NoticeRowsModel {
 // 줄 배치: 휴대폰은 [메타 | D-day] > 제목 > 판정, 720px부터는 [메타 열 120px] [제목과 판정] [D-day 48px].
 export const ROW_LAYOUT = 'grid grid-cols-[minmax(0,1fr)_auto] [grid-template-areas:"meta_dday""title_title""reason_reason"] gap-x-[12px] gap-y-[2px] px-[16px] py-[14px] text-inherit no-underline min-[720px]:grid-cols-[120px_minmax(0,1fr)_48px] min-[720px]:gap-x-[24px] min-[720px]:px-[24px] min-[720px]:py-[12px]';
 // 선택 모드: 체크박스 자리를 줄 왼쪽에 48px 만들어(체크칸이 제목 글자와 같은 왼쪽 선에 오게) 열 사이 간격을 줄여, 분류·제목 열이 평소와 같은 자리에 있게 한다.
-const ROW_LAYOUT_SELECTING = ROW_LAYOUT.replace('min-[720px]:grid-cols-[120px_minmax(0,1fr)_48px]', 'min-[720px]:grid-cols-[108px_minmax(0,1fr)_48px]').replace('min-[720px]:gap-x-[24px]', 'min-[720px]:gap-x-[12px]').replace('min-[720px]:px-[24px]', 'min-[720px]:pl-[48px] min-[720px]:pr-[24px]');
+const ROW_LAYOUT_SELECTING = ROW_LAYOUT.replace('min-[720px]:grid-cols-[120px_minmax(0,1fr)_48px]', 'min-[720px]:grid-cols-[106px_minmax(0,1fr)_48px]').replace('px-[16px]', 'pl-0 pr-[16px]').replace('min-[720px]:gap-x-[24px]', 'min-[720px]:gap-x-[12px]').replace('min-[720px]:px-[24px]', 'min-[720px]:pl-[50px] min-[720px]:pr-[24px]');
 const DESKTOP_AREAS = 'min-[720px]:[grid-template-areas:"meta_title_dday"_"meta_reason_dday"]';
 const DESKTOP_AREAS_NO_REASON = 'min-[720px]:[grid-template-areas:"meta_title_dday"]';
 
@@ -54,7 +54,7 @@ function NoticeRows({ model }: { model: NoticeRowsModel }) {
     // 선택 칸의 면(휴대폰): 고른 줄과 열린 줄은 짙게, 읽은 줄은 읽은 줄 면, 눌린 줄은 짙게. 넓은 화면은 칸이 줄 위에 겹쳐 면이 없다.
     const checkBg = row.selected || row.current ? 'max-[719px]:bg-sunken' : row.read ? 'max-[719px]:bg-read' : 'max-[719px]:bg-transparent';
     return <li key={n.id} className={model.selecting ? 'batch-row flex items-stretch bg-surface min-[720px]:relative max-[719px]:[&:has(.row:active)_.selection-check]:bg-sunken' : ''}>
-      {model.selecting ? <label className={`selection-check box-border grid min-h-[44px] w-[40px] flex-none cursor-pointer [place-items:center_start] pl-[var(--gutter)] min-[720px]:absolute min-[720px]:inset-y-0 min-[720px]:left-0 min-[720px]:z-[1] min-[720px]:w-[48px] min-[720px]:bg-transparent! min-[720px]:pl-[24px] ${checkBg} ${index > 0 ? 'border-t border-line' : ''}`}><input className={CHECKBOX} type="checkbox" aria-label={`${title} 선택`} checked={row.selected}
+      {model.selecting ? <label className={`selection-check box-border grid min-h-[44px] w-[42px] flex-none cursor-pointer [place-items:center_start] pl-[var(--gutter)] min-[720px]:absolute min-[720px]:inset-y-0 min-[720px]:left-0 min-[720px]:z-[1] min-[720px]:w-[48px] min-[720px]:bg-transparent! min-[720px]:pl-[24px] ${checkBg} ${index > 0 ? 'border-t border-line' : ''}`}><input className={CHECKBOX} type="checkbox" aria-label={`${title} 선택`} checked={row.selected}
         onChange={() => model.toggleSelection(n.id)} /></label> : null}
       <a className={`row ${row.dim ? 'dim' : ''} ${row.read ? 'read' : 'unread'} ${model.selecting ? `${ROW_LAYOUT_SELECTING} min-w-0 flex-1` : ROW_LAYOUT} ${hasReason ? DESKTOP_AREAS : DESKTOP_AREAS_NO_REASON} ${border} ${bg} ${hover} active:bg-sunken focus-visible:outline-offset-[-2px]`} href={safeUrl(n.url)} target="_blank" rel="noopener"
         data-id={n.id} aria-current={row.current ? 'true' : 'false'} onClick={(event) => model.open(event.nativeEvent, n)}>
