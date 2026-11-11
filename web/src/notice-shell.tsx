@@ -327,17 +327,17 @@ function ViewFilters({ app }: { app: AppController }) {
     const selectedUnread = selectedVisible.filter((notice) => !app.isRead(notice)).length;
     const selectedRead = selectedVisible.length - selectedUnread;
     const count = selectedVisible.length;
-    return <div className="view-options select-options flex-wrap gap-y-[8px] bg-surface border-b border-line min-h-[48px] py-[4px] min-[720px]:pt-[4px] min-[720px]:pb-0" role="group" aria-label="공지 선택">
+    return <div className="view-options select-options min-[720px]:bg-[var(--glass)] min-[720px]:backdrop-blur-[20px] min-[720px]:backdrop-saturate-[1.6] min-[720px]:sticky min-[720px]:top-0 min-[720px]:z-[2] flex-wrap gap-y-[8px] border-b border-line min-h-[48px] py-[4px] min-[720px]:pt-[4px] min-[720px]:pb-0" role="group" aria-label="공지 선택">
       <label className={`select-all order-1 ${count ? 'font-medium text-ink' : ''}`}><input type="checkbox" ref={allBox} checked={everyone} disabled={!list.length}
         onChange={(event) => { app.selectedReads = event.currentTarget.checked ? list.map((notice) => notice.id) : []; }} />
         <span aria-live="polite">{count ? `${count}개 선택됨` : '전체 선택'}</span>
         {count ? null : <span className="ml-[12px] text-[14px] font-normal text-ink">공지를 골라 주세요</span>}</label>
       <button type="button" className={`${SELECT_BTN} order-2 ml-auto border-0 bg-transparent px-[16px] font-medium text-ink-2 hover:bg-hover min-[720px]:order-3 min-[720px]:ml-[12px]`} onClick={() => app.closeSelection()}>선택 끝내기</button>
-      <div className={`order-3 flex gap-[8px] min-[720px]:gap-[12px] ${count ? '' : 'hidden'} max-[719px]:fixed max-[719px]:inset-x-0 max-[719px]:bottom-0 max-[719px]:pb-[calc(16px+env(safe-area-inset-bottom))] max-[719px]:z-[3] max-[719px]:border-t max-[719px]:border-line max-[719px]:bg-surface max-[719px]:px-[var(--gutter)] max-[719px]:pt-[8px] min-[720px]:order-2 min-[720px]:ml-auto`}>
-        {selectedUnread > 0 ? <button type="button" className={`${SELECT_BTN} border border-line bg-surface font-medium text-ink hover:bg-hover max-[719px]:flex-1`} disabled={!selectedUnread}
+      <div className={`order-3 flex gap-[8px] min-[720px]:gap-[12px] ${count ? '' : 'hidden'} max-[719px]:fixed max-[719px]:inset-x-0 max-[719px]:bottom-0 max-[719px]:pb-[calc(16px+env(safe-area-inset-bottom))] max-[719px]:z-[3] max-[719px]:bg-[var(--glass)] max-[719px]:backdrop-blur-[20px] max-[719px]:backdrop-saturate-[1.6] max-[719px]:border-t max-[719px]:border-line max-[719px]:px-[var(--gutter)] max-[719px]:pt-[8px] min-[720px]:order-2 min-[720px]:ml-auto`}>
+        {selectedUnread > 0 ? <button type="button" className={`${SELECT_BTN} solid-button max-[719px]:flex-1`} disabled={!selectedUnread}
           aria-label={`선택한 읽지 않은 공지 ${selectedUnread}개 읽음으로 표시`}
           onClick={() => app.markSelectedRead(true)}>읽음으로 표시</button> : null}
-        {selectedRead > 0 ? <button type="button" className={`${SELECT_BTN} border border-line bg-surface font-medium text-ink hover:bg-hover max-[719px]:flex-1`} disabled={!selectedRead}
+        {selectedRead > 0 ? <button type="button" className={`${SELECT_BTN} ghost-button max-[719px]:flex-1`} disabled={!selectedRead}
           aria-label={`선택한 읽은 공지 ${selectedRead}개 읽지 않음으로 표시`}
           onClick={() => app.markSelectedRead(false)}>안 읽음으로 표시</button> : null}
       </div>
