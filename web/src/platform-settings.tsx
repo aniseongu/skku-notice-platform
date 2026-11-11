@@ -761,7 +761,7 @@ function CanvasRow({ model, alignEnd }: { model: SettingsModel; alignEnd: boolea
     labels={{ empty: '연결 안 됨', saved: '연결됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '연결하기', edit: '바꾸기', remove: '연결 끊기', save: '연결하기' }}
     error={byok.canvasError} onRegister={byok.registerCanvas} onRemove={byok.removeCanvas} guide={null}
     valid={(value) => /^[0-9A-Za-z~_-]{16,200}$/.test(value)} />
-    <StepGuide label="토큰은 어디서 받나요?" note="읽기만 하고 내용은 바꾸지 않아요"
+    <StepGuide label="토큰은 어디서 받나요?" sub="무료로 만들 수 있어요" note="읽기만 하고 내용은 바꾸지 않아요"
       steps={[<>{ext('https://canvas.skku.edu/profile/settings', '아이캠퍼스 설정')}에서 로그인해요</>, '"새 액세스 토큰"을 눌러요', '이름을 적고 "토큰 생성"을 눌러요', '토큰을 복사해요. 한 번만 보여요', '위 칸에 붙여 넣고 "연결하기"를 눌러요']} /></>;
 }
 
