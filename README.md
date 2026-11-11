@@ -18,73 +18,59 @@
 
 ## 사용 화면
 
-### PC
+### 1. 로그인
 
-목록과 공지 상세를 함께 봅니다. 목록에는 관심 키워드와 내 AI 판정 이유, 마감 D-day가 보이고, 공지를 누르면 오른쪽에 판정 이유와 본문이 열립니다. 열린 공지를 다시 누르면 상세 칸이 닫힙니다.
+Google 계정으로 로그인합니다.
 
-**라이트**
-
-<p align="center"><img src="assets/readme/me-desktop-light.jpg" alt="PC 라이트 모드: 관심 키워드, 판정 이유와 D-day가 붙은 공지 목록과 오른쪽 상세" width="840"></p>
-
-**다크**
-
-<p align="center"><img src="assets/readme/me-desktop-dark.jpg" alt="PC 다크 모드: 같은 화면" width="840"></p>
-
-### 모바일
-
-아래 탭으로 성대 공지, 인턴 공고, 저장한 공지를 오가고, 공지를 눌러 상세와 원문을 확인합니다.
-
-| 공지 목록: 라이트 | 공지 목록: 다크 |
-|:---:|:---:|
-| <img src="assets/readme/me-mobile-list-light.jpg" alt="모바일 공지 목록 (라이트)" width="320"> | <img src="assets/readme/me-mobile-list-dark.jpg" alt="모바일 공지 목록 (다크)" width="320"> |
-
-| 공지 상세: 라이트 | 공지 상세: 다크 |
-|:---:|:---:|
-| <img src="assets/readme/me-mobile-detail-light.jpg" alt="모바일 공지 상세 (라이트)" width="320"> | <img src="assets/readme/me-mobile-detail-dark.jpg" alt="모바일 공지 상세 (다크)" width="320"> |
-
-### 알림 설정
-
-설정의 알림에서는 이 기기의 알림을 켜고 끄며, 등록된 기기 이름을 바꾸거나 다른 기기를 지우고, 받을 게시판을 고릅니다.
-
-| 알림 설정: 라이트 | 알림 설정: 다크 |
-|:---:|:---:|
-| <img src="assets/readme/me-mobile-notifications-light.jpg" alt="모바일 알림 설정 (라이트)" width="320"> | <img src="assets/readme/me-mobile-notifications-dark.jpg" alt="모바일 알림 설정 (다크)" width="320"> |
-
-| 알림 기기: 라이트 | 알림 기기: 다크 |
-|:---:|:---:|
-| <img src="assets/readme/me-mobile-devices-light.jpg" alt="모바일 알림 기기 목록과 받을 게시판 (라이트)" width="320"> | <img src="assets/readme/me-mobile-devices-dark.jpg" alt="모바일 알림 기기 목록과 받을 게시판 (다크)" width="320"> |
-
-### 로그인과 첫 설정
-
-처음 들어오면 Google 로그인 화면이 나오고, 로그인하면 7단계 첫 설정이 시작됩니다. 주전공은 대학을 먼저 고른 뒤 학과를 고르고, 다음 단추가 막혀 있으면 이유를 한 줄로 알려 줍니다. 건너뛸 수 없으며 전공과 AI 키 하나는 꼭 입력해야 끝납니다.
-
-**PC (1440×900)**
-
-| 로그인: 라이트 | 로그인: 다크 |
+| PC: 라이트 | PC: 다크 |
 |:---:|:---:|
 | <img src="assets/readme/login-desktop-light.jpg" alt="PC 로그인 화면 (라이트)" width="420"> | <img src="assets/readme/login-desktop-dark.jpg" alt="PC 로그인 화면 (다크)" width="420"> |
 
-| 1단계 주전공 | 5단계 받을 공지 |
+| 모바일: 라이트 | 모바일: 다크 |
 |:---:|:---:|
-| <img src="assets/readme/onboarding-desktop-1.jpg" alt="PC 첫 설정 1단계: 대학을 2열로 고르는 화면과 왼쪽 단계 목록" width="420"> | <img src="assets/readme/onboarding-desktop-5.jpg" alt="PC 첫 설정 5단계: 받을 게시판 스위치" width="420"> |
+| <img src="assets/readme/login-mobile-light.jpg" alt="모바일 로그인 화면 (라이트)" width="200"> | <img src="assets/readme/login-mobile-dark.jpg" alt="모바일 로그인 화면 (다크)" width="200"> |
 
-<p align="center"><img src="assets/readme/onboarding-desktop-7.jpg" alt="PC 첫 설정 7단계: Groq, Gemini, OpenRouter 키 입력과 끝내기가 막힌 이유" width="420"></p>
+### 2. 첫 설정
 
-**모바일**
+처음 로그인하면 7단계 설정이 시작됩니다. 주전공(대학을 먼저 고른 뒤 학과), 복수전공, 학교 정보, 인턴십, 받을 공지, 알림, AI 키 순서이며, 건너뛸 수 없고 전공과 AI 키 하나는 꼭 입력해야 끝납니다. 다음 단추가 막혀 있으면 이유를 한 줄로 알려 줍니다.
 
-| 로그인: 라이트 | 로그인: 다크 | 1단계 주전공 | 주전공: 학과 고르기 |
+| 1단계 주전공 | 5단계 받을 공지 | 7단계 AI 키 |
+|:---:|:---:|:---:|
+| <img src="assets/readme/onboarding-desktop-1.jpg" alt="PC 첫 설정 1단계: 대학 고르기" width="300"> | <img src="assets/readme/onboarding-desktop-5.jpg" alt="PC 첫 설정 5단계: 받을 공지" width="300"> | <img src="assets/readme/onboarding-desktop-7.jpg" alt="PC 첫 설정 7단계: AI 키 연결" width="300"> |
+
+| 1. 주전공 | 2. 학과 | 3. 학교 정보 | 4. 인턴십 |
 |:---:|:---:|:---:|:---:|
-| <img src="assets/readme/login-mobile-light.jpg" alt="모바일 로그인 (라이트)" width="180"> | <img src="assets/readme/login-mobile-dark.jpg" alt="모바일 로그인 (다크)" width="180"> | <img src="assets/readme/onboarding-mobile-1.jpg" alt="모바일 첫 설정 1단계: 대학 고르기" width="180"> | <img src="assets/readme/onboarding-mobile-2.jpg" alt="모바일 첫 설정: 선택한 대학의 학과 고르기" width="180"> |
+| <img src="assets/readme/onboarding-mobile-1.jpg" alt="모바일 첫 설정 1단계" width="180"> | <img src="assets/readme/onboarding-mobile-2.jpg" alt="모바일 첫 설정: 학과 고르기" width="180"> | <img src="assets/readme/onboarding-mobile-3.jpg" alt="모바일 첫 설정 3단계" width="180"> | <img src="assets/readme/onboarding-mobile-4.jpg" alt="모바일 첫 설정 4단계" width="180"> |
 
-| 3단계 학교 정보 | 4단계 인턴십 | 5단계 받을 공지 | 6단계 알림 |
+| 5. 받을 공지 | 6. 알림 | 7. AI 키 |
+|:---:|:---:|:---:|
+| <img src="assets/readme/onboarding-mobile-5.jpg" alt="모바일 첫 설정 5단계" width="180"> | <img src="assets/readme/onboarding-mobile-6.jpg" alt="모바일 첫 설정 6단계" width="180"> | <img src="assets/readme/onboarding-mobile-7.jpg" alt="모바일 첫 설정 7단계" width="180"> |
+
+### 3. 공지 보기
+
+#### PC
+
+목록과 공지 상세를 함께 봅니다. 목록에는 관심 키워드, AI 판정 이유, 마감 D-day가 보이고, 공지를 누르면 오른쪽에 판정 이유와 본문이 열립니다. 열린 공지를 다시 누르면 상세 칸이 닫힙니다.
+
+| 라이트 | 다크 |
+|:---:|:---:|
+| <img src="assets/readme/pc-list-light.jpg" alt="PC 공지 목록과 상세 (라이트)" width="420"> | <img src="assets/readme/pc-list-dark.jpg" alt="PC 공지 목록과 상세 (다크)" width="420"> |
+
+#### 모바일
+
+아래 탭으로 성대 공지, 인턴 공고, 저장한 공지를 오가고, 공지를 눌러 상세와 원문을 확인합니다.
+
+| 목록: 라이트 | 목록: 다크 | 상세: 라이트 | 상세: 다크 |
 |:---:|:---:|:---:|:---:|
-| <img src="assets/readme/onboarding-mobile-3.jpg" alt="모바일 첫 설정 3단계: 학년, 재학 상태, 병역" width="180"> | <img src="assets/readme/onboarding-mobile-4.jpg" alt="모바일 첫 설정 4단계: 3품 인턴십" width="180"> | <img src="assets/readme/onboarding-mobile-5.jpg" alt="모바일 첫 설정 5단계: 받을 공지" width="180"> | <img src="assets/readme/onboarding-mobile-6.jpg" alt="모바일 첫 설정 6단계: 알림 켜기" width="180"> |
+| <img src="assets/readme/mobile-list-light.jpg" alt="모바일 공지 목록 (라이트)" width="180"> | <img src="assets/readme/mobile-list-dark.jpg" alt="모바일 공지 목록 (다크)" width="180"> | <img src="assets/readme/mobile-detail-light.jpg" alt="모바일 공지 상세 (라이트)" width="180"> | <img src="assets/readme/mobile-detail-dark.jpg" alt="모바일 공지 상세 (다크)" width="180"> |
 
-<p align="center"><img src="assets/readme/onboarding-mobile-7.jpg" alt="모바일 첫 설정 7단계: AI 키 연결" width="180"></p>
+### 4. 설정
 
-로그인 화면은 배포된 사이트의 로그아웃 상태를 Playwright로 캡처했고, 첫 설정은 예시 데이터로 같은 방식으로 캡처했습니다(PC는 1440×900, 모바일은 390×844 화면). 첫 설정 화면의 학과, 게시판 목록, 입력칸은 보여 주기 위한 예시이며 실제 사용자 정보가 아닙니다.
+설정 홈에서 알림과 관심 키워드, 계정, 화면 모드를 바꾸고, 아이캠퍼스와 구글 캘린더는 "기타"에 있습니다. 라이트·다크·자동 모드는 설정에서 고릅니다.
 
-위 화면은 예시 계정과 예시 공지 데이터로 캡처했습니다. 키워드, 판정 이유, 마감, 기기 이름은 보여 주기 위해 넣은 값이며 실제 사용자 정보가 아닙니다. 라이트·다크·자동 모드는 설정에서 고릅니다.
+| 설정 홈 | 알림 | 아이캠퍼스 |
+|:---:|:---:|:---:|
+| <img src="assets/readme/settings-home.jpg" alt="설정 홈" width="200"> | <img src="assets/readme/settings-notifications.jpg" alt="알림 설정: 이 기기 알림과 등록된 기기" width="200"> | <img src="assets/readme/settings-icampus.jpg" alt="아이캠퍼스 설정: 알림, 토큰, 하루 요약" width="200"> |
 
 ## 할 수 있는 것
 
