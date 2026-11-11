@@ -289,10 +289,10 @@ def _p3_hours_check(facts: InternFacts) -> Check:
             return Check("3P-HOURS", PASS, f"공고에 {hours}시간으로 적혀 있어요(실제 인정은 출근 기록 기준이에요)")
         return Check("3P-HOURS", FAIL, f"공고의 {hours}시간은 비교과 현장실습 기준 280시간에 못 미쳐요")
     if facts.work_mode in ("full_time", "unknown"):
-        # 근무시간이 공고에 없으면 전일 근무(1일 8시간, 주 5일)로 보고 계산한다. 파트타임이라고 적힌 공고는 여기에 오지 않는다.
+        # 근무시간이 공고에 없으면 전일 근무(1일 8시간, 주 5일)로 보고 계산한다(설명에는 쓰지 않는다). 파트타임이라고 적힌 공고는 여기에 오지 않는다.
         stated = bool(facts.daily_hours and facts.days_per_week)
         daily, weekly = (facts.daily_hours, facts.days_per_week) if stated else (P3_MAX_DAILY_HOURS, 5)
-        basis = f"1일 {daily}시간, 주 {weekly}일로" if stated else "근무시간이 없어서 전일 근무(1일 8시간, 주 5일)로 보고"
+        basis = f"1일 {daily}시간, 주 {weekly}일로" if stated else "근무 기간으로"
         estimate = None
         if facts.start_date and facts.end_date and facts.end_date >= facts.start_date:
             estimate = ((facts.end_date - facts.start_date).days + 1) * weekly * daily // 7  # 공휴일은 빼지 않아 실제와 조금 다를 수 있다

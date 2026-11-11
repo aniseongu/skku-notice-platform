@@ -208,7 +208,7 @@ def test_assessment_serializes_without_extra_fields():
 def test_3p_hours_use_the_period_even_when_the_work_mode_is_not_written():
     from skku_notice.grad_intern_rules import _p3_hours_check
     long = _p3_hours_check(facts(work_mode="unknown", start_date=None, end_date=None, duration_days=90))
-    assert long.result == "pass" and "전일 근무" in long.note  # 근무시간이 없으면 전일 근무로 보고 계산한다
+    assert long.result == "pass" and "근무 기간으로" in long.note  # 근무시간이 없으면 전일 근무로 보고 계산한다
     short = _p3_hours_check(facts(work_mode="unknown", start_date=None, end_date=None, duration_days=28))
     assert short.result == "fail"  # 평일 8시간으로도 280시간에 못 미치면 형태와 상관없이 미달
     assert _p3_hours_check(facts(work_mode="part_time", start_date=None, end_date=None, duration_days=90)).result == "unknown"
@@ -218,7 +218,7 @@ def test_3p_hours_default_to_full_time_when_hours_are_not_written():
     from skku_notice.grad_intern_rules import _p3_hours_check
     # 중소기업중앙회 공고: 2027-02-15 ~ 04-30, 근무시간 없음 -> 전일 근무로 계산해 280시간을 넘는다
     check = _p3_hours_check(facts(work_mode="full_time", start_date=date(2027, 2, 15), end_date=date(2027, 4, 30)))
-    assert check.result == "pass" and "전일 근무" in check.note and "약 428시간" in check.note
+    assert check.result == "pass" and "근무 기간으로" in check.note and "약 428시간" in check.note
 
 
 def test_3p_hours_use_written_daily_hours_and_days_per_week():
