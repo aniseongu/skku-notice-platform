@@ -498,7 +498,7 @@ test('first-run setup cannot be skipped: no skip button, Escape does nothing; se
   await expect(page.getByText('주전공을 골라 주세요')).toHaveCount(0);
 });
 
-test('a new notice that is not judged yet says so while an AI key exists, and says nothing without a key or after a day and a half', async ({ page }) => {
+test('a notice waiting for its turn says so while an AI key exists, and says nothing without a key or outside the queue window', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   const rows = page.locator('notice-rows-screen a.row');
   await rows.first().waitFor();
@@ -507,9 +507,12 @@ test('a new notice that is not judged yet says so while an AI key exists, and sa
   await page.evaluate((list) => {
     const app = document.querySelector('notice-app') as unknown as { notices: { id: string; first_seen: string | null }[] } & Record<string, unknown>;
     const hours = (h: number) => new Date(Date.now() - h * 3600 * 1000).toISOString();
-    for (const notice of app.notices) { if (notice.id === list[0]) notice.first_seen = hours(1); if (notice.id === list[1]) notice.first_seen = hours(48); }
+    for (const notice of app.notices as unknown as Record<string, unknown>[]) {
+      if (notice.id === list[0]) { notice.first_seen = hours(1); notice.deadline = null; }
+      if (notice.id === list[1]) { notice.first_seen = hours(24 * 40); notice.deadline = null; }   // 30일이 지난 마감 없는 학교 공지: 대기 범위 밖
+    }
     app.authUserId = 'account-a'; app.profileStatus = 'ready'; app.onboardingDismissed = true; app.subscriptions = ['skku-notice01']; app.subscriptionsLoading = false;
-    app.byokStatus = null; app.aiKeys = [];
+    app.byokStatus = null; app.aiKeys = []; app.generatedAt = new Date().toISOString();   // 샘플 데이터의 받은 시각이 오래돼 지연 문구가 나오지 않게 한다
     app.myJudgments = new Map([[list[2], { verdict: 'relevant', reason: '지원할 수 있어요', model: 'm', deadline: null, deadlineKind: null }]]);
     app.notices = [...app.notices];
   }, ids);
@@ -518,7 +521,11 @@ test('a new notice that is not judged yet says so while an AI key exists, and sa
   await expect(reason(ids[0])).toHaveCount(0);
   await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).byokStatus = { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 }; });
   await expect(reason(ids[0])).toContainText('AI가 확인하고 있어요');   // 방금 수집됐고 판정 전
-  await expect(reason(ids[1])).toHaveCount(0);                          // 36시간이 지나면 거짓으로 약속하지 않는다
+  await expect(reason(ids[1])).toHaveCount(0);                          // 대기 범위 밖이면 거짓으로 약속하지 않는다
+  // 진행 상황은 목록 위 한 줄에 같이 보인다(기다리는 공지가 하나도 없으면 말하지 않는다).
+  await expect(page.locator('p.updated').first()).toContainText(/AI 확인 중 \d+건/);
+  await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).byokStatus = null; });
+  await expect(page.locator('p.updated').first()).not.toContainText('AI 확인 중');
   await expect(reason(ids[2])).toContainText('해당');                    // 판정이 있으면 그 라벨
   await expect(reason(ids[2])).not.toContainText('확인하고 있어요');
 });

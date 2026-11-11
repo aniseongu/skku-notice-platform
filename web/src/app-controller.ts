@@ -556,14 +556,22 @@ export class AppController extends Reactive {
     return this.matched?.items[notice.id] ?? (mine ? asJudgement(mine) : undefined);
   }
 
-  /** AI 키가 있는 사용자의 새 공지가 아직 판정 전인지. 판정은 수집 직후부터 이미지 글자 읽기를 기다려 최대 하루까지 걸릴 수 있어서, 그동안 줄이 비어 보이지 않게 목록에 "판정 중"을 보여 준다.
-   * 36시간이 지나도 판정이 없으면(한도 초과 등) 거짓으로 약속하지 않게 아무것도 보이지 않는다. */
+  /** AI 키가 있는 사용자의 공지가 판정 차례를 기다리는 중인지. 서버가 키를 쓰는 대기 범위와 같다:
+   * 외부 인턴 공고는 처음 본 지 14일 안이고 마감 전, 학교 공지는 마감이 남았거나 마감이 없고 30일 안.
+   * 새로 가입해 밀린 공지가 많아도 차례를 기다리는 줄이 비어 보이지 않게 목록에 "AI가 확인하고 있어요"를 보여 준다.
+   * 범위 밖(오래됐거나 마감된 공지)에는 거짓으로 약속하지 않아 아무것도 보이지 않는다. */
   judgePending(notice: Notice): boolean {
     if (!this.authUserId || !(this.byokStatus && !this.byokStatus.disabled) && !this.aiKeys.some((key) => !key.disabled)) return false;
     if (this.judgement(notice) || !notice.first_seen) return false;
-    const age = Date.now() - new Date(notice.first_seen).getTime();
-    return age >= 0 && age < 36 * 3600 * 1000;
+    const now = Date.now(), day = 24 * 3600 * 1000;
+    const age = now - new Date(notice.first_seen).getTime();
+    const open = !notice.deadline || new Date(notice.deadline).getTime() >= now;
+    if (this.isExternal(notice)) return age >= 0 && age < 14 * day && open;
+    return notice.deadline ? open : age >= 0 && age < 30 * day;
   }
+
+  /** 목록에서 판정 차례를 기다리는 공지 수(진행 상황을 한 줄로 알린다). */
+  pendingCount(list: Notice[]): number { return list.filter((notice) => this.judgePending(notice)).length; }
 
   /** 내 판정과 관심 키워드를 다시 읽는다. 로그인할 때와 공지를 새로 불러올 때 부른다. */
   async refreshMine(userId: string, epoch: number): Promise<void> {

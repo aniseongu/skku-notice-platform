@@ -111,7 +111,7 @@ export function NoticeShell({ app }: { app: AppController }) {
               {settings ? null : <Brand className="brand-mark narrow-only mr-[8px] h-[36px] w-[36px] flex-none text-accent" />}
               <div className={TOPBAR_TEXT}>
                 <h1 className={`${TOPBAR_H1} ${settings ? '' : 'max-[719px]:text-[21px] max-[719px]:leading-[28px] max-[719px]:font-extrabold'}`}>{title}</h1>
-                {settings ? null : <UpdatedLine app={app} count={list.length} />}
+                {settings ? null : <UpdatedLine app={app} count={list.length} pending={app.tab() === 'saved' ? 0 : app.pendingCount(list)} />}
               </div>
               {settings ? null : <>
                 <label className="search wide-only min-[720px]:h-[36px] min-[720px]:min-w-[120px] min-[720px]:w-[260px] min-[720px]:flex-[0_1_260px] min-[720px]:px-[12px] min-[720px]:py-0"><Icon name="search" />
@@ -244,7 +244,7 @@ function SideGroup({ app, id, title, count, children }: { app: AppController; id
   </>;
 }
 
-function UpdatedLine({ app, count }: { app: AppController; count?: number }) {
+function UpdatedLine({ app, count, pending = 0 }: { app: AppController; count?: number; pending?: number }) {
   if (app.loading && !app.generatedAt) return <p className={`${UPDATED} text-ink-3`}>공지를 불러오고 있어요</p>;
   if (!app.generatedAt) return <p className={`${UPDATED} text-ink-3`}>받은 시각을 알 수 없어요</p>;
   const stale = Date.now() - Date.parse(app.generatedAt) > STALE_MS;
@@ -253,7 +253,7 @@ function UpdatedLine({ app, count }: { app: AppController; count?: number }) {
   }).format(new Date(app.generatedAt));
   const total = count === undefined ? '' : `${count}건, `;
   // "확인 필요"(판정)와 겹치지 않게 수집 지연은 다른 말로 쓴다.
-  return <p className={`${UPDATED} ${stale ? 'stale text-ink-2' : 'text-ink-3'}`}>{stale ? `${time} 이후 새 공지를 못 가져왔어요` : `${total}${time} 기준`}</p>;
+  return <p className={`${UPDATED} ${stale ? 'stale text-ink-2' : 'text-ink-3'}`}>{stale ? `${time} 이후 새 공지를 못 가져왔어요` : `${total}${time} 기준${pending ? ` · AI 확인 중 ${pending}건` : ''}`}</p>;
 }
 
 const Empty = ({ title, body, action, onAction }: { title: string; body: string; action?: string; onAction?: () => void }) =>
