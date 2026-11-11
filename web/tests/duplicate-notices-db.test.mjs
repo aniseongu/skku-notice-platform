@@ -22,6 +22,7 @@ test('duplicate notices: first seen wins, school needs the same body, external n
     await db.exec(await readFile(new URL('../../supabase/migrations/20261112110000_duplicate_notices.sql', import.meta.url), 'utf8'));
     await db.exec(await readFile(new URL('../../supabase/migrations/20261112120000_duplicate_notices_image_only.sql', import.meta.url), 'utf8'));
     await db.exec(await readFile(new URL('../../supabase/migrations/20261112130000_duplicate_notices_ocr_text.sql', import.meta.url), 'utf8'));
+    await db.exec(await readFile(new URL('../../supabase/migrations/20261112140000_duplicate_notices_title_only_for_image.sql', import.meta.url), 'utf8'));
     const long = '장학금 신청 안내입니다. 신청 기간과 제출 서류를 확인하세요. '.repeat(4);
     await db.exec(`insert into platform_notices (id, source_id, title, posted_on, first_seen, body) values
       ('skku/1','skku','[장학] 2026학년도 동계 장학금 신청 안내','2026-11-10','2026-11-10 01:00+00','${long}'),
@@ -33,14 +34,12 @@ test('duplicate notices: first seen wins, school needs the same body, external n
       ('lk/3','lk','[NHN AD] 2027년 상반기 인턴채용','2026-11-20','2026-11-20 02:00+00','먼 날짜의 같은 제목'),
       ('skku/2','skku','공지','2026-11-10','2026-11-10 01:00+00','${long}');`);
     const keys = Object.fromEntries((await db.query('select id, dup_key from platform_notices')).rows.map((r) => [r.id, r.dup_key]));
-    assert.equal(keys['skku/1'], keys['biz/9']);              // 표기 부호만 다른 제목, 같은 본문 → 같은 글
-    assert.equal(keys['skku/1'], keys['cse/5']);               // 제목이 같으면 본문이 달라도 같은 글
-    assert.match(keys['ja/1'], /^x:/); assert.equal(keys['ja/1'], keys['lk/2']);
-    assert.equal(keys['skku/2'], null);                        // 너무 짧은 제목은 제목으로 합치지 않는다
+    assert.equal(keys['skku/1'], null);                         // 본문이 있는 글은 제목 열쇠가 없다(제목만으로 합치지 않는다)
+    assert.match(keys['ja/1'], /^x:img:/); assert.equal(keys['ja/1'], keys['lk/2']);   // 외부 공고도 본문이 사진뿐일 때만 제목으로 본다
     const loser = async (id, user = null) => (await db.query('select dup_loser($1, $2) l', [id, user])).rows[0].l;
     assert.equal(await loser('skku/1'), false);                // 가장 먼저 본 글이 대표
     assert.equal(await loser('biz/9'), true);
-    assert.equal(await loser('cse/5'), true);
+    assert.equal(await loser('cse/5'), false);                 // 제목이 같아도 본문이 다르면 다른 글
     assert.equal(await loser('skku/2'), true);                 // 제목은 짧아도 본문이 같으면 같은 글이다
     assert.equal(await loser('lk/2'), true);                   // 외부 공고는 사이트가 달라도 합친다
     assert.equal(await loser('lk/3'), false);                  // 같은 제목이라도 게시일이 3일 넘게 멀면 별개 글
@@ -65,13 +64,13 @@ test('duplicate notices: first seen wins, school needs the same body, external n
       ('skku/20','skku','2026학년도 동계 현장실습 안내 포스터','2026-11-10','2026-11-10 01:00+00','—'),
       ('biz/20','biz','2026학년도 동계 현장실습 안내 포스터!','2026-11-11','2026-11-11 03:00+00',''),
       ('cse/20','cse','2026학년도 동계 현장실습 안내 포스터','2026-11-30','2026-11-30 04:00+00','—'),
-      ('cse/21','cse','2026학년도 동계 현장실습 안내 포스터','2026-11-10','2026-11-10 06:00+00','${long}');`);
+      ('cse/21','cse','2026학년도 동계 현장실습 안내 포스터','2026-11-10','2026-11-10 06:00+00','${long.replace('신청', '제출')}');`);
     const key = async (id) => (await db.query('select dup_key k from platform_notices where id = $1', [id])).rows[0].k;
     assert.equal(await key('skku/20'), await key('biz/20'));
     assert.equal(await loser('biz/20'), true); assert.equal(await loser('skku/20'), false);
     assert.equal(await loser('cse/20'), false);                 // 게시일이 멀면 별개 글
-    assert.equal(await key('cse/21'), await key('skku/20'));     // 제목이 같으면 본문이 있어도 같은 글
-    assert.equal(await loser('cse/21'), true);
+    assert.notEqual(await key('cse/21'), await key('skku/20'));  // 본문이 있는 글과 사진뿐인 글은 제목이 같아도 합치지 않는다
+    assert.equal(await loser('cse/21'), false);
     // 제목이 달라도 그림에서 읽은 글자가 같으면 같은 글이다. 글자가 짧거나 다르면 합치지 않는다.
     const poster = '2026학년도 동계 현장실습 참여 기업 모집 안내 신청 기간 11월 15일까지 접수 방법 이메일 제출 문의 학과 사무실';
     await db.exec(`insert into platform_notices (id, source_id, title, posted_on, first_seen, body) values
