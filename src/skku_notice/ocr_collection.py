@@ -10,8 +10,8 @@ from pathlib import Path
 import yaml
 
 from skku_notice.fetch import fetch_image
-from skku_notice.grad_intern_facts import lacks_key_facts
-from skku_notice.ocr import read_images
+from skku_notice.grad_intern_facts import lacks_key_facts, lacks_work_hours
+from skku_notice.ocr import read_images, read_until_complete
 from skku_notice.scheduled_collection import NoticeStore, StoreError
 
 _LETTERS = re.compile(r"[0-9A-Za-z가-힣]")
@@ -111,6 +111,13 @@ class OCRStore(NoticeStore):
         return bool(rows and wants_image_text(rows[0], self.external_source_ids())
                     and isinstance(rows[0].get("images"), list) and image_url in rows[0]["images"])
 
+    def notice_row(self, notice_id: str) -> dict | None:
+        rows = self._request(
+            "GET", "platform_notices",
+            params={"id": f"eq.{notice_id}", "select": "title,body,source_id", "limit": "1"},
+        ).json()
+        return rows[0] if rows and isinstance(rows[0], dict) else None
+
     def remove_image(self, notice_id: str, image_url: str) -> None:
         self._request(
             "DELETE",
@@ -175,6 +182,23 @@ class OCRStore(NoticeStore):
         )
 
 
+def deepen(store: "OCRStore", notice_id: str, images: list[bytes], text: str) -> str:
+    """인턴 공고인데 회사·기간·업무나 근무 시간이 아직 안 읽혔으면 더 꼼꼼한 방법으로 놓친 줄을 보탠다."""
+    notice = store.notice_row(notice_id) if hasattr(store, "notice_row") else None
+    if not notice:
+        return text
+    title = str(notice.get("title") or "")
+    body = notice["body"] if isinstance(notice.get("body"), str) else ""
+    if not (notice.get("source_id") in store.external_source_ids() or INTERN_TITLE.search(title)):
+        return text
+
+    def complete(current: str) -> bool:
+        combined = f"{body}\n{current}"
+        return not (lacks_key_facts(title, combined) or lacks_work_hours(title, combined))
+
+    return read_until_complete(images, text, complete)
+
+
 def run_one(store: OCRStore, user_agent: str, now: datetime, *, discover: bool = True) -> str:
     """Process one due image, optionally discovering recent images first."""
     if discover:
@@ -199,6 +223,8 @@ def run_one(store: OCRStore, user_agent: str, now: datetime, *, discover: bool =
         store.mark(notice_id, image_url, now, digest, was_ready=was_ready)
         return "cached"
     text = read_images([image.data])
+    if text:
+        text = deepen(store, notice_id, [image.data], text)
     if not text or len(text.encode("utf-8")) > 1_000_000:
         store.mark(notice_id, image_url, now, None, was_ready=was_ready)
         return "failed"

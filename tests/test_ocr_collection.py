@@ -192,3 +192,32 @@ def test_인턴_공고는_본문에_회사_이름과_기간과_업무가_모자�
     assert wants_image_text(thin, {"jasoseol-intern"})
     assert not wants_image_text(full, {"jasoseol-intern"})
     assert not wants_image_text(school, {"jasoseol-intern"})
+
+
+def test_read_until_complete_adds_missed_lines_and_stops_when_complete(monkeypatch):
+    from skku_notice import ocr
+    calls = []
+    second = "처음 줄\n근무시간: 1일 8시간, 주 5일"
+    monkeypatch.setattr(ocr, "read_images", lambda images, sensitive=False: calls.append(sensitive) or second)
+    monkeypatch.setattr(ocr, "_tesseract", lambda images: calls.append("tess") or "")
+    text = ocr.read_until_complete([b"x"], "처음 줄", lambda t: "1일 8시간" in t)
+    assert text.splitlines() == ["처음 줄", "근무시간: 1일 8시간, 주 5일"]
+    assert calls == [True]  # 충분해져서 tesseract는 부르지 않는다
+
+
+def test_read_until_complete_survives_a_failing_step_and_keeps_earlier_text(monkeypatch):
+    from skku_notice import ocr
+
+    def boom(images, sensitive=False):
+        raise RuntimeError("메모리 부족")
+    monkeypatch.setattr(ocr, "read_images", boom)
+    monkeypatch.setattr(ocr, "_tesseract", lambda images: "보조 도구가 읽은 줄")
+    text = ocr.read_until_complete([b"x"], "처음 줄", lambda t: False)
+    assert text.splitlines() == ["처음 줄", "보조 도구가 읽은 줄"]
+    assert ocr.read_until_complete([b"x"], "처음 줄", lambda t: True) == "처음 줄"
+
+
+def test_lacks_work_hours_reads_hours_written_without_spaces():
+    from skku_notice.grad_intern_facts import lacks_work_hours
+    assert lacks_work_hours("인턴", "근무지역: 서울") is True
+    assert lacks_work_hours("인턴", "근무시간: 09:00~18:00 (1일8시간, 주5일)") is False

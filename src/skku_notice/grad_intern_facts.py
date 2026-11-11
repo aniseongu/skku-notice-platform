@@ -459,3 +459,9 @@ def build_facts(title: str, body: str, ai: dict | None, judgment: tuple[str | No
         if empty:
             missing.append(name)
     return Extracted(facts, org_name, tasks, evidence, missing, ai_used=ai is not None)
+
+
+def lacks_work_hours(title: str, body: str) -> bool:
+    """근무 시간(총 시간, 또는 1일 시간과 주당 일수)을 읽을 수 없으면 True. 그림 글자를 더 꼼꼼히 읽을지 정하는 데 쓴다."""
+    found = static_facts(title, body)
+    return not ("explicitly_stated_hours" in found or ("daily_hours" in found and "days_per_week" in found))
