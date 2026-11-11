@@ -24,12 +24,8 @@ def preferences_from_row(row: dict | None) -> Preferences:
     row = row or {}
     return Preferences(
         ai_enabled=row.get("ai_enabled") is not False,
-        routing_mode=row.get("routing_mode") if row.get("routing_mode") in ("manual", "auto") else "manual",
-        auto_routing_consent=bool(row.get("auto_routing_consent_at")),
+        routing_mode="manual" if row.get("routing_mode") == "manual" else "auto",
         manual_provider=row.get("manual_provider") if row.get("manual_provider") in ("gemini", "groq", "openrouter") else None,
-        free_only=row.get("free_only") is not False,
-        paid_opt_in=bool(row.get("paid_calls_opt_in_at")),
-        daily_request_cap=row.get("daily_request_cap") if isinstance(row.get("daily_request_cap"), int) else None,
     )
 
 

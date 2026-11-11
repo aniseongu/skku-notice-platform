@@ -112,15 +112,16 @@ def test_legacy_gemini_only_user_behaves_exactly_as_before():
     assert store.saved[0]["model"] == "gemini-3.1-flash-lite" and store.updates[-1][1]["used_today"] == 1
 
 
-def test_two_keys_without_consent_never_send_to_the_other_provider():
-    store = AiStore(gem_rows=[gem_row("u1")], extra={"u1": [ai_row("u1", "groq", GROQ_KEY, "openai/gpt-oss-20b")]})
+def test_manual_row_from_an_old_setting_never_sends_to_the_other_provider():
+    prefs = {"u1": {"routing_mode": "manual", "manual_provider": "gemini"}}
+    store = AiStore(gem_rows=[gem_row("u1")], extra={"u1": [ai_row("u1", "groq", GROQ_KEY, "openai/gpt-oss-20b")]}, prefs=prefs)
     net, gem = Net({}), SimpleNamespace(calls=0, outcome=ApiError(503))
     counts, _ = run(store, net, gem)
-    assert net.requests == [] and counts["judged"] == 0  # Gemini가 실패해도 Groq로 몰래 보내지 않는다
+    assert net.requests == [] and counts["judged"] == 0
 
 
-def test_two_keys_with_consent_fall_back_and_the_failed_key_gets_its_own_error():
-    prefs = {"u1": {"routing_mode": "auto", "auto_routing_consent_at": "2026-11-07T00:00:00Z"}}
+def test_two_keys_fall_back_automatically_and_the_failed_key_gets_its_own_error():
+    prefs = None
     store = AiStore(gem_rows=[gem_row("u1")], extra={"u1": [ai_row("u1", "groq", GROQ_KEY, "openai/gpt-oss-20b")]}, prefs=prefs)
     net, gem = Net({}), SimpleNamespace(calls=0, outcome=ApiError(429))
     counts, _ = run(store, net, gem)
@@ -131,7 +132,7 @@ def test_two_keys_with_consent_fall_back_and_the_failed_key_gets_its_own_error()
 
 
 def test_all_providers_fail_keeps_pending_work_and_raises_nothing():
-    prefs = {"u1": {"routing_mode": "auto", "auto_routing_consent_at": "2026-11-07T00:00:00Z"}}
+    prefs = None
     extra = {"u1": [ai_row("u1", "groq", GROQ_KEY, "openai/gpt-oss-20b"), ai_row("u1", "openrouter", OR_KEY, "openrouter/free")]}
     store = AiStore(gem_rows=[gem_row("u1")], extra=extra, prefs=prefs)
     net, gem = Net({GROQ: 429, OPENROUTER: 503}), SimpleNamespace(calls=0, outcome=ApiError(401))
@@ -140,17 +141,6 @@ def test_all_providers_fail_keeps_pending_work_and_raises_nothing():
     assert net.hosts().count(GROQ) == 1 and net.hosts().count(OPENROUTER) == 1 and gem.calls == 1  # 키마다 한 번
     assert "disabled_at" in store.updates[-1][1]  # 거부된 Gemini 키만 비활성
     assert all("disabled_at" not in f for _, _, f in store.ai_updates)
-
-
-def test_free_only_blocks_a_paid_openrouter_model_without_any_call():
-    row = ai_row("u1", "openrouter", OR_KEY, "anthropic/claude-sonnet")
-    store = AiStore(extra={"u1": [row]})
-    net = Net({})
-    counts, _ = run(store, net)
-    assert net.requests == [] and counts["judged"] == 0 and counts.get("ai_fallback") == 1
-    store = AiStore(extra={"u1": [row]}, prefs={"u1": {"free_only": False, "paid_calls_opt_in_at": "2026-11-07T00:00:00Z"}})
-    counts, _ = run(store, Net({}))
-    assert counts["judged"] == 1
 
 
 def test_ai_off_with_keys_makes_no_external_call():

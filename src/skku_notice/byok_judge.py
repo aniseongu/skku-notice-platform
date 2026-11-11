@@ -98,8 +98,7 @@ class JudgeStore(NoticeStore):
     def preferences(self, user_id: str) -> dict | None:
         try:
             rows = self._request("GET", "user_ai_preferences", params={
-                "user_id": f"eq.{user_id}", "select": "ai_enabled,routing_mode,auto_routing_consent_at,"
-                "manual_provider,free_only,paid_calls_opt_in_at,daily_request_cap"}).json()
+                "user_id": f"eq.{user_id}", "select": "ai_enabled,routing_mode,manual_provider"}).json()
         except StoreError:
             return None
         return rows[0] if rows else None

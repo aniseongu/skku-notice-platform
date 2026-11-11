@@ -43,7 +43,7 @@ class Provider:
         return len([c for c in self.calls if provider in (None, c[0])])
 
 
-AUTO = Preferences(routing_mode="auto", auto_routing_consent=True)
+AUTO = Preferences()
 
 
 def run(providers, outcomes=None, prefs=None, **kw):
@@ -93,44 +93,25 @@ def test_three_keys_are_all_candidates_but_called_one_at_a_time():
 
 
 def test_manual_mode_never_falls_back_to_another_provider():
-    found, client, fake = run(["gemini", "groq"], {"groq": ProviderError(429, "rate_limit")}, Preferences(manual_provider="groq"))
+    found, client, fake = run(["gemini", "groq"], {"groq": ProviderError(429, "rate_limit")}, Preferences(routing_mode="manual", manual_provider="groq"))
     assert found == {} and [c[0] for c in fake.calls] == ["groq"] and client.fallback_reason == "quota_exhausted"
 
 
-def test_auto_without_consent_behaves_like_manual():
-    prefs = Preferences(routing_mode="auto", auto_routing_consent=False)
-    found, client, fake = run(["gemini", "groq"], {"gemini": ProviderError(503, "unavailable")}, prefs)
-    assert found == {} and [c[0] for c in fake.calls] == ["gemini"]  # 옛 사용자 호환: Gemini 하나만
+def test_default_is_automatic_across_own_keys_without_any_question():
+    found, client, fake = run(["gemini", "groq"], {"gemini": ProviderError(503, "unavailable")})
+    assert found and [c[0] for c in fake.calls] == ["gemini", "groq"]
 
 
 def test_manual_provider_not_registered_means_no_call():
-    found, client, fake = run(["gemini"], None, Preferences(manual_provider="groq"))
+    found, client, fake = run(["gemini"], None, Preferences(routing_mode="manual", manual_provider="groq"))
     assert found == {} and fake.calls == [] and client.fallback_reason == "no_key"
 
 
-# ---- 무료/유료 ----
-def test_free_only_blocks_paid_models_even_with_registered_key():
-    paid = [Candidate("openrouter", "anthropic/claude-sonnet", KEYS["openrouter"])]
-    ranked, reason = select_candidates(paid, Preferences())
-    assert ranked == [] and reason == "paid_not_allowed"
-    ranked, reason = select_candidates(paid, Preferences(free_only=False, paid_opt_in=True))
-    assert len(ranked) == 1 and reason is None
-
-
-def test_paid_opt_in_alone_is_not_enough_while_free_only_is_on():
-    paid = [Candidate("openrouter", "anthropic/claude-sonnet", KEYS["openrouter"])]
-    assert select_candidates(paid, Preferences(free_only=True, paid_opt_in=True))[1] == "paid_not_allowed"
-
-
-def test_unknown_priced_model_is_not_auto_used_under_free_only():
-    unknown = [Candidate("groq", "some/new-model", KEYS["groq"])]
-    assert select_candidates(unknown, Preferences())[1] == "paid_not_allowed"
-
-
-def test_free_candidates_are_ranked_before_paid_when_paid_allowed():
-    pool = [Candidate("openrouter", "anthropic/claude-sonnet", KEYS["openrouter"]), Candidate("groq", MODELS["groq"], KEYS["groq"])]
-    ranked, _ = select_candidates(pool, Preferences(routing_mode="auto", auto_routing_consent=True, free_only=False, paid_opt_in=True))
-    assert [c.provider for c in ranked] == ["groq", "openrouter"]
+# ---- 무료만 쓴다: 요금 설정이 없고 어떤 키도 막지 않는다 ----
+def test_no_price_gate_and_less_used_key_goes_first():
+    pool = cands("gemini", "groq", "openrouter", used={"gemini": 4})
+    ranked, reason = select_candidates(pool, Preferences())
+    assert reason is None and [c.provider for c in ranked] == ["groq", "openrouter", "gemini"]
 
 
 # ---- 오류별 ----
@@ -174,11 +155,11 @@ def test_authentication_failure_marks_provider_rejected_and_skips_it_afterwards(
     assert client.rejected == {"gemini"} and [c[0] for c in fake.calls] == ["gemini", "groq", "groq"]
 
 
-def test_daily_request_cap_blocks_all_calls_and_total_across_providers():
-    found, client, fake = run(["gemini", "groq"], None, Preferences(daily_request_cap=5), used={"gemini": 3, "groq": 2})
-    assert found == {} and fake.calls == [] and client.fallback_reason == "quota_exhausted"
-    found, client, fake = run(["gemini", "groq"], {"gemini": ProviderError(503, "unavailable")}, Preferences(routing_mode="auto", auto_routing_consent=True, daily_request_cap=2))
-    assert fake.count() <= 2  # 분산해도 합산 상한을 넘지 않는다
+def test_per_provider_daily_cap_skips_a_capped_key_but_not_the_others():
+    fake = Provider({})
+    client = RoutedClient(cands("gemini", "groq", used={"gemini": 60}), Preferences(), factory=fake.factory, provider_cap=60)
+    judge_school_notices(ITEMS, "x", "k", client=client)
+    assert [c[0] for c in fake.calls] == ["groq"]
 
 
 # ---- 입력 형식 ----

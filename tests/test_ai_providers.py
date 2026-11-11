@@ -5,7 +5,7 @@ import httpx
 import pytest
 from google.genai import types
 
-from skku_notice.ai_models import cost_class, provider_or_default
+from skku_notice.ai_models import provider_or_default, valid_model_id
 from skku_notice.ai_providers import OpenAICompatClient, ProviderError, json_schema
 from skku_notice.school_ai import SCHEMA, SYSTEM, judge_school_notices
 
@@ -113,13 +113,7 @@ def test_provider_failure_makes_existing_judge_return_no_decision():
     assert judge_school_notices([{"id": "a/1", "title": "t", "body": "b"}], "openai/gpt-oss-20b", SECRET, client=client) == {}
 
 
-def test_cost_classes_and_legacy_provider_default():
-    assert cost_class("openrouter", "openrouter/free") == "free"
-    assert cost_class("openrouter", "meta-llama/llama-4:free") == "free"
-    assert cost_class("openrouter", "anthropic/claude-sonnet") == "paid"
-    assert cost_class("gemini", "gemini-3.1-flash-lite") == "free"
-    assert cost_class("gemini", "gemini-2.5-pro") == "paid"
-    assert cost_class("groq", "made-up/model") == "unknown"
-    assert cost_class("groq", "bad model!") == "unknown"
+def test_legacy_provider_default_and_model_id_check():
     assert provider_or_default(None) == "gemini" and provider_or_default("") == "gemini" and provider_or_default("x") == "gemini"
     assert provider_or_default("groq") == "groq"
+    assert valid_model_id("openai/gpt-oss-20b") and valid_model_id("vendor/model:free") and not valid_model_id("bad model!")

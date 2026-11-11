@@ -3,8 +3,9 @@
 
 `RoutedClient`는 Gemini 클라이언트와 같은 `client.models.generate_content(...)` 인터페이스를 가진다. 판정 모듈은 그대로 쓴다.
 - 후보는 사용자가 등록하고 켜 둔 본인 키뿐이다. 운영자 키나 다른 사용자의 키는 없다.
-- 직접 선택이면 고른 업체 하나만 쓰고 다른 업체로 몰래 넘기지 않는다. 자동 선택은 사용자가 동의한 뒤에만 후보를 순회한다.
-- 무료 우선(기본)이면 무료로 확인되지 않은 모델은 후보에서 뺀다. 유료는 사용자가 허용했을 때만 쓴다.
+- 기본은 자동 선택이다: 사용자가 키를 연결한 곳 사이에서 알아서 고르고, 실패하면 다음 곳으로 넘어간다. 업체를 고르는 질문은 하지 않는다.
+  (옛 설정 행이 직접 선택(manual)이면 그 업체 하나만 쓰고 넘기지 않는다.)
+- 무료만 쓴다고 본다. 유료 키는 지원하지 않으므로 요금 설정도, 유료 모델 분류도 없다(사용자 결정, 2026-11-11).
 - 모든 후보가 없거나 실패하면 예외를 올린다. 호출한 쪽은 기존처럼 결정 없음으로 돌려 코드 기반 경로를 유지한다.
 - 같은 요청을 여러 업체에 동시에 보내지 않는다. 한 후보씩 시도한다.
 이 모듈은 google-genai 없이 가져올 수 있어야 한다.
@@ -16,7 +17,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 
-from skku_notice.ai_models import PROVIDERS, cost_class, supports_images
+from skku_notice.ai_models import PROVIDERS, supports_images
 from skku_notice.ai_providers import ProviderError, classify, make_client
 
 # 이 사유들일 때만 자동 선택에서 다음 본인 키로 넘어간다. 요청 규격 오류(400)는 키를 바꿔도 같다.
@@ -35,20 +36,13 @@ class Candidate:
 @dataclass
 class Preferences:
     ai_enabled: bool = True
-    routing_mode: str = "manual"  # manual | auto
-    auto_routing_consent: bool = False
+    routing_mode: str = "auto"  # auto(기본) | manual(옛 설정 행)
     manual_provider: str | None = None
-    free_only: bool = True
-    paid_opt_in: bool = False
-    daily_request_cap: int | None = None
 
     @property
     def auto(self) -> bool:
-        return self.routing_mode == "auto" and self.auto_routing_consent
+        return self.routing_mode == "auto"
 
-    @property
-    def paid_allowed(self) -> bool:
-        return self.paid_opt_in and not self.free_only
 
 
 class NoProvider(Exception):
@@ -85,15 +79,8 @@ def select_candidates(candidates: list[Candidate], prefs: Preferences, needs_ima
         pool = [c for c in pool if supports_images(c.provider, c.model)]
         if not pool:
             return [], "model_unavailable"
-    if not prefs.paid_allowed:
-        pool = [c for c in pool if cost_class(c.provider, c.model) == "free"]
-        if not pool:
-            return [], "paid_not_allowed"
-    total = sum(c.used_today for c in candidates)  # 분산해도 예산은 연결한 모든 업체의 합산이다
-    if prefs.daily_request_cap is not None and total >= prefs.daily_request_cap:
-        return [], "quota_exhausted"
-    # 무료 후보를 먼저, 그다음 오늘 덜 쓴 키, 같으면 고정 순서. 어느 업체가 낫다고 하드코딩하지 않는다.
-    pool.sort(key=lambda c: (cost_class(c.provider, c.model) != "free", c.used_today, PROVIDER_ORDER[c.provider]))
+    # 오늘 덜 쓴 키를 먼저, 같으면 고정 순서. 어느 업체가 낫다고 하드코딩하지 않는다.
+    pool.sort(key=lambda c: (c.used_today, PROVIDER_ORDER[c.provider]))
     return pool, None
 
 
@@ -126,9 +113,6 @@ class RoutedClient:
             raise NoProvider(self.fallback_reason or "quota_exhausted")
         last: ProviderError | Exception | None = None
         for candidate in ranked:
-            cap = self._prefs.daily_request_cap
-            if cap is not None and sum(c.used_today + self.usage.get(c.provider, 0) for c in self._candidates) >= cap:
-                break
             client = self._factory(candidate.provider, candidate.api_key)
             self.usage[candidate.provider] = self.usage.get(candidate.provider, 0) + 1
             try:
