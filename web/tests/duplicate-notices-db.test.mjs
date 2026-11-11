@@ -93,8 +93,8 @@ test('duplicate notices: first seen wins, school needs the same body, external n
       ('skku/42','skku','[카카오뱅크] DevOps 엔지니어링팀 정규직 전환형 인턴 채용','2026-11-10','2026-11-10 02:00+00','${long.replace('신청', '문의')}');`);
     // 같은 게시판의 글끼리는 본문 앞부분이 같아도 합치지 않는다(한 회사의 여러 직무 공고).
     await db.exec(`insert into platform_notices (id, source_id, title, posted_on, first_seen, body) values
-      ('lk/50','lk','[오오비] 마케팅 AE 오프라인 인턴','2026-11-10','2026-11-10 01:00+00','${long}'),
-      ('lk/51','lk','[오오비] 디자이너 인턴 체험형','2026-11-10','2026-11-10 02:00+00','${long}');`);
+      ('lk/50','lk','[오오비] 마케팅 AE 오프라인 인턴','2026-11-10','2026-11-10 01:00+00','${long.replace('신청', '채용')}'),
+      ('lk/51','lk','[오오비] 디자이너 인턴 체험형','2026-11-10','2026-11-10 02:00+00','${long.replace('신청', '채용')}');`);
     assert.equal(await loser('lk/51'), false);
     assert.equal(await loser('lk/40'), true);
     assert.equal(await loser('lk/41'), false);                   // 회사 표기가 없으면 본문이 달라서 합치지 않는다
