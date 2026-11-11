@@ -29,9 +29,9 @@ _YEAR = r"(?:['’‘`](?P<{p}2>\d{{2}})|(?P<{p}4>20\d{{2}}))"
 PERIOD = re.compile(
     r"(?:(?:근무|인턴(?:\s{0,5}십)?|실습|활동|교육)\s{0,5}(?:기간|일정)|인턴\s{0,5}십)\s{0,5}[:：]?\s{0,5}"
     r"(?:약\s{0,5}\d+(?:\.\d+)?\s{0,5}(?:개월|주|일)\s{0,5})?[(\[]?\s{0,5}"
-    + _YEAR.format(p="sy") + r"\s{0,5}[.\-/년]\s{0,5}(?P<sm>\d{1,2})\s{0,5}[.\-/월]\s{0,5}(?P<sd>\d{1,2})\s{0,5}일?"
+    + _YEAR.format(p="sy") + r"\s{0,5}[.\-/년年]\s{0,5}(?P<sm>\d{1,2})\s{0,5}[.\-/월月]\s{0,5}(?P<sd>\d{1,2})\s{0,5}일?"
     r"\s{0,5}\.?\s{0,5}\(?[가-힣]?\)?\s{0,5}(?:[~\-–∼]|부터)\s{0,5}"
-    r"(?:" + _YEAR.format(p="ey") + r"\s{0,5}[.\-/년]\s{0,5})?(?P<em>\d{1,2})\s{0,5}[.\-/월]\s{0,5}(?P<ed>\d{1,2})\s{0,5}일?"
+    r"(?:" + _YEAR.format(p="ey") + r"\s{0,5}[.\-/년年]\s{0,5})?(?P<em>\d{1,2})\s{0,5}[.\-/월月]\s{0,5}(?P<ed>\d{1,2})\s{0,5}일?"
 )
 
 
@@ -174,7 +174,7 @@ SW_WORDS: dict[str, re.Pattern[str]] = {
     "security": re.compile(r"정보\s*보호|보안\s*(?:관제|운영|엔지니어|점검)|침투\s*테스트|사이버\s*보안", re.I),
     "software_qa": re.compile(r"소프트웨어\s*테스트|테스트\s*자동화|QA\s*엔지니어|SW\s*품질", re.I),
 }
-NON_SW_WORDS = re.compile(r"영업|마케팅|회계|재무|인사|총무|상품\s*기획|MD\b|매장|점포|고객\s*(?:응대|관리)|\bCS\b|물류|생산\s*관리|설비|전기\s*(?:공사|설비)|디자인|콘텐츠\s*제작|경영\s*지원|행정|사무\s*보조|운영\s*지원|가맹점|브랜드|PR\b|홍보|번역|통역|연구\s*보조")
+NON_SW_WORDS = re.compile(r"\b(?:Marketing|CRM|E-?Commerce|Finance|Accounting|Sourcing|SCM|Supply\s*Chain|Procurement|Merchandising|Logistics|Sales|Brand|Packaging|Human\s*Resources|HR|Public\s*Relations|Communications?)\b|영업|마케팅|회계|재무|인사|총무|상품\s*기획|MD\b|매장|점포|고객\s*(?:응대|관리)|\bCS\b|물류|생산\s*관리|설비|전기\s*(?:공사|설비)|디자인|콘텐츠\s*제작|경영\s*지원|행정|사무\s*보조|운영\s*지원|가맹점|브랜드|PR\b|홍보|번역|통역|연구\s*보조", re.I)
 
 
 _WIDE_SPACE = re.compile(r"[ \t\u00a0\u3000]{4,}")

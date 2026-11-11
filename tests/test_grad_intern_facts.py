@@ -335,3 +335,14 @@ def test_multi_track_posting_with_a_digital_it_track_is_not_called_unknown_work(
     work = next(check for check in result.checks if check.rule_id == "DEPT-WORK")
     assert work.result == "unknown" and "디지털·IT 분야로 지원하면" in work.note
     assert result.status != LIKELY and result.status != CONDITIONAL  # 업무를 단정하지 않으므로 확인 필요에 머문다
+
+
+def test_english_job_list_is_non_software():
+    body = "모집 직무 : Marketing / CRM / E-Commerce / Finance / Product Development / Packaging Engineering / SCM / Sourcing 등\n\n지원 : https://x.example/\n\n\n"
+    got = gf.static_task_category("[로레알코리아] 2027 상반기 채용 전제형 인턴십 모집", body)
+    assert got and got[0] == "non_software"
+
+
+def test_period_with_cjk_year_month_marks():
+    found = gf.static_facts("t", "근무 기간\n2027年 1月 11일 ~ 6月 18일")
+    assert str(found["start_date"]) == "2027-01-11" and str(found["end_date"]) == "2027-06-18"
