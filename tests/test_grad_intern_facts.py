@@ -367,6 +367,14 @@ def test_table_style_office_role_is_read_even_when_the_label_and_value_are_on_di
     assert only_label is not None and only_label[0] == "non_software"
 
 
+def test_office_role_without_headcount_in_a_requirements_table_is_read():
+    """"모집분야 | 자격요건" 표에서 일반사무가 인원수 없이 한 칸으로 적힌 공고도 SW 직무가 아니라고 읽는다."""
+    for body in ("02.지원자격\n모집분야\n자격요건\n일반사무\n·다음조건을모두충족하는자\n",
+                 "02.지원자격\n모집분야 자격요건 일반사무 ·다음조건을모두충족하는자\n"):
+        found = gf.static_task_category("인턴 채용", body)
+        assert found is not None and found[0] == "non_software" and found[1] in body
+
+
 def test_office_role_rule_does_not_decide_when_it_roles_exist_or_the_words_are_just_prose():
     # 디지털·IT 직무가 함께 있으면 코드로 정하지 않는다(섞인 직무를 단정하지 않는다).
     mixed = gf.static_task_category("[은행] 인턴", "채용분야\n일반사무 250명\n디지털·IT(50명)\n")
