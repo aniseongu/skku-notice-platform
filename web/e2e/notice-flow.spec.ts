@@ -1527,3 +1527,12 @@ test('switching the tab shows only the list (detail pane closed, no notice opene
   await rows.first().click();
   await expect(pane).not.toHaveClass(/no-detail/);                               // 행을 누르면 상세가 열린다
 });
+
+test('the unread filter checkbox starts at the same left edge as the date headings', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await expect(page.locator('notice-rows-screen a.row').first()).toBeVisible();
+  const left = async (selector: string) => (await page.locator(selector).first().boundingBox())!.x;
+  const title = await left('main h2');
+  const check = await left('.view-toggle .filter-check');
+  expect(Math.abs(check - title)).toBeLessThanOrEqual(1);
+});
