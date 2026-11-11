@@ -5,17 +5,9 @@ export type AiProvider = 'groq' | 'openrouter';
 export const AI_PROVIDERS: readonly AiProvider[] = ['groq', 'openrouter'];
 
 export interface AiKeyStatus { provider: AiProvider; keyHint: string; model: string; disabled: boolean; lastError: string | null; usedToday: number }
-export interface AiPreferences {
-  aiEnabled: boolean;
-  routingMode: 'manual' | 'auto';
-  autoRoutingConsent: boolean;
-  manualProvider: 'gemini' | AiProvider | null;
-  freeOnly: boolean;
-  paidOptIn: boolean;
-}
-export const DEFAULT_AI_PREFERENCES: AiPreferences = {
-  aiEnabled: true, routingMode: 'manual', autoRoutingConsent: false, manualProvider: null, freeOnly: true, paidOptIn: false,
-};
+/** 업체와 요금은 사용자가 고르지 않는다. 켜기·끄기만 사용자가 정한다. 무료가 기본이고 유료 모델을 직접 고른 키는 막지 않는다. */
+export interface AiPreferences { aiEnabled: boolean }
+export const DEFAULT_AI_PREFERENCES: AiPreferences = { aiEnabled: true };
 
 /** 발급 안내. 화면 이름과 한도는 바뀔 수 있어 숫자를 약속하지 않는다. */
 export const PROVIDER_GUIDE: Record<AiProvider, { name: string; url: string; blurb: string; steps: string[]; placeholder: string }> = {
@@ -58,9 +50,9 @@ export async function loadAiKeyStatuses(client: SupabaseClient, userId: string):
       lastError: typeof row.last_error === 'string' ? row.last_error : null, usedToday: Number(row.used_today) || 0 }] : []));
 }
 
-export async function registerAiKey(client: SupabaseClient, provider: AiProvider, apiKey: string): Promise<void> {
+export async function registerAiKey(client: SupabaseClient, provider: AiProvider, apiKey: string, model?: string): Promise<void> {
   if (!looksLikeAiKey(apiKey)) throw new Error('키를 끝까지 복사해 공백 없이 붙여 넣어 주세요.');
-  const { error } = await client.functions.invoke('byok', { method: 'POST', body: { provider, apiKey } });
+  const { error } = await client.functions.invoke('byok', { method: 'POST', body: { provider, apiKey, ...(model ? { model } : {}) } });
   if (error) throw await failure(error, '키를 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
 }
 
@@ -70,28 +62,14 @@ export async function removeAiKey(client: SupabaseClient, provider: AiProvider):
 }
 
 export async function loadAiPreferences(client: SupabaseClient, userId: string): Promise<AiPreferences> {
-  const { data, error } = await client.from('user_ai_preferences')
-    .select('ai_enabled,routing_mode,auto_routing_consent_at,manual_provider,free_only,paid_calls_opt_in_at').eq('user_id', userId).maybeSingle();
+  const { data, error } = await client.from('user_ai_preferences').select('ai_enabled').eq('user_id', userId).maybeSingle();
   if (error || !data) return DEFAULT_AI_PREFERENCES;
-  const manual = data.manual_provider;
-  return {
-    aiEnabled: data.ai_enabled !== false,
-    routingMode: data.routing_mode === 'auto' && data.auto_routing_consent_at ? 'auto' : 'manual',
-    autoRoutingConsent: !!data.auto_routing_consent_at,
-    manualProvider: manual === 'gemini' || manual === 'groq' || manual === 'openrouter' ? manual : null,
-    freeOnly: data.free_only !== false,
-    paidOptIn: !!data.paid_calls_opt_in_at,
-  };
+  return { aiEnabled: data.ai_enabled !== false };
 }
 
-/** 설정 행으로 바꾼다. 자동 선택은 동의 시각이, 유료 허용은 허용 시각이 있어야 DB가 받아 준다. */
+/** 설정 행으로 바꾼다. 업체 선택은 항상 자동이다. */
 export function preferencesRow(userId: string, prefs: AiPreferences, now = new Date().toISOString()) {
-  const auto = prefs.routingMode === 'auto';
-  return {
-    user_id: userId, ai_enabled: prefs.aiEnabled, routing_mode: auto ? 'auto' : 'manual',
-    auto_routing_consent_at: auto ? now : null, manual_provider: auto ? null : prefs.manualProvider,
-    free_only: !prefs.paidOptIn, paid_calls_opt_in_at: prefs.paidOptIn ? now : null, updated_at: now,
-  };
+  return { user_id: userId, ai_enabled: prefs.aiEnabled, routing_mode: 'auto', manual_provider: null, updated_at: now };
 }
 
 export async function saveAiPreferences(client: SupabaseClient, userId: string, prefs: AiPreferences): Promise<void> {
@@ -101,8 +79,7 @@ export async function saveAiPreferences(client: SupabaseClient, userId: string, 
 
 /** 키 개수에 따른 한 줄 상태. 키가 없어도 기본 분석은 계속 쓰는 상태다. */
 export function aiModeLabel(connected: number, prefs: AiPreferences): string {
-  if (!prefs.aiEnabled) return 'AI 꺼짐 · 코드 기반 분석 사용 중';
-  if (connected === 0) return 'AI 미연결 · 코드 기반 분석 사용 중';
-  if (connected > 1 && prefs.routingMode === 'auto') return `AI ${connected}곳 자동 선택`;
-  return connected > 1 ? `AI ${connected}곳 연결 · 직접 선택` : 'AI 1곳 연결';
+  if (!prefs.aiEnabled) return 'AI 꺼짐 · 기본 방식으로 분석 중';
+  if (connected === 0) return 'AI 미연결 · 기본 방식으로 분석 중';
+  return connected > 1 ? `AI ${connected}곳 연결 · 알아서 골라 써요` : 'AI 1곳 연결';
 }

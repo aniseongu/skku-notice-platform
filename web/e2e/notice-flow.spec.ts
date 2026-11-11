@@ -223,7 +223,7 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   const screen = page.locator('platform-settings-screen');
   await withApp(page, { authUserId: 'account-a', byokOn: false, registerKey: 'fn:register', removeKey: 'fn:remove', registerCanvas: 'fn:registerCanvas', removeCanvas: 'fn:removeCanvas', profileStatus: 'ready', onboardingDismissed: true });
   // 서버 기능이 아직 없을 때도 줄은 보이고 이유를 알려 준다.
-  await expect(screen.getByRole('heading', { name: '연결 키' })).toBeVisible();
+  await expect(screen.getByRole('heading', { name: 'AI 연결' })).toBeVisible();
   await expect(screen.getByText('지금은 키를 연결할 수 없어요')).toBeVisible();
   await expect(screen.locator('.setting', { hasText: '아이캠퍼스 토큰' }).getByText('준비 중')).toBeVisible();
   await expect(screen.getByLabel('Gemini 키', { exact: true })).toHaveCount(0);
@@ -231,8 +231,11 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await expect(screen.getByRole('radio', { name: '2학기' })).toHaveCount(0);
   await expect(screen.getByRole('radio', { name: '복무 전' })).toHaveCount(0);
   await withApp(page, { byokOn: true, byokLoading: false, byokStatus: null });
-  await expect(screen.locator('[data-provider="gemini"]').getByText('연결 안 됨')).toBeVisible();
-  await expect(screen.getByText('연결하지 않아도 괜찮아요')).toBeVisible();
+  await expect(screen.locator('.setting', { hasText: 'Gemini 키' }).getByText('연결 안 됨')).toBeVisible();
+  await expect(screen.getByText(/연결하지 않아도 기본 방식으로 분석해요/)).toBeVisible();
+  // 업체나 요금을 고르라는 질문은 없다. 연결이 하나도 없으면 켜기·끄기도 보이지 않는다.
+  await expect(screen.getByRole('radiogroup', { name: 'AI 분석' })).toHaveCount(0);
+  await expect(screen.getByText('요금')).toHaveCount(0);
   await expect(screen.locator('.setting', { hasText: '아이캠퍼스 토큰' }).getByText('미설정')).toBeVisible();
   await screen.getByRole('button', { name: 'Gemini 키 연결하기' }).click();
   const save = screen.getByRole('button', { name: '연결하기', exact: true });
@@ -244,7 +247,8 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await screen.getByRole('button', { name: '보기' }).click();
   await expect(input).toHaveAttribute('type', 'text');
   await screen.getByRole('button', { name: '숨기기' }).click();
-  await expect(screen.getByRole('link', { name: 'Gemini에서 키 만들기' })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
+  await screen.getByText('받는 방법').first().click();
+  await expect(screen.getByRole('link', { name: /Google AI Studio/ })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
   await save.click();
   expect(await calls(page)).toEqual([['register', key]]);
   await withApp(page, { byokStatus: { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 } });
@@ -758,7 +762,8 @@ test('google calendar page: connect first, then sync and disconnect, with plain 
   await screen.getByRole('link', { name: /구글 캘린더/ }).click();
   await expect(page).toHaveURL(/section=calendar/);
   await expect(screen.getByRole('heading', { name: '저장한 공지의 마감' })).toBeVisible();
-  await expect(screen.getByText('연결 안 됨')).toBeVisible();
+  await expect(screen.getByRole('button', { name: '구글 캘린더에 연결하기' })).toBeVisible();   // 연결 전에는 누르는 단추만 있고 연결됨 표시는 없다
+  await expect(screen.getByText('연결됨')).toHaveCount(0);
   await expect(screen.getByText(/내 다른 캘린더는 읽지 못해요/)).toBeVisible();
   // 단계 안내: 누르면 무슨 일이 생기는지, "확인되지 않은 앱"이 나오면 어떻게 하는지 알려 준다.
   await screen.getByText('연결하는 방법').click();

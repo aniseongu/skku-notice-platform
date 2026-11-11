@@ -1,6 +1,6 @@
 // 첫 로그인 설정. 한 화면에 한 질문, 모두 골라서 답하고, 이전·건너뛰기가 항상 있다.
 // 순서: 주전공 → 복수전공(선택) → 학년·재학 상태·병역 → 받을 게시판·키워드 → 기타 게시판(부트캠프 등) → 알림.
-import { AiConnect, aiConnectModel } from './ai-connect';
+import { AiRows, aiConnectModel } from './ai-connect';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { AppController } from './app-controller';
 import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR } from './profile';
@@ -211,7 +211,7 @@ export function Onboarding({ app }: { app: AppController }) {
     title = 'AI를 연결할까요?';
     lead = '연결하지 않아도 공지와 알림은 똑같이 써요. 나중에 설정에서 연결해도 돼요';
     const connected = !!app.byokStatus || app.aiKeys.length > 0;
-    body = <div className="onb-group"><AiConnect byok={aiConnectModel(app)} /></div>;
+    body = <div className="onb-group"><div className="box"><AiRows byok={aiConnectModel(app)} /></div></div>;
     foot = connected
       ? <button type="button" className="solid-button" onClick={afterAi}>다음</button>
       : <button type="button" className="ghost-button" disabled={app.byokBusy || app.aiBusy} onClick={afterAi}>나중에 할게요</button>;

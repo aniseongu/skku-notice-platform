@@ -30,17 +30,14 @@ test('AI provider keys are unreadable by browsers and preferences stay per user'
     await assert.rejects(db.exec('delete from user_ai_keys'), /permission denied/);
     // 설정: 본인 행만 쓰고 읽는다. 다른 사용자 행은 보이지도 바꿀 수도 없다.
     assert.equal((await db.query('select * from user_ai_preferences')).rows.length, 0);
-    await db.exec(`insert into user_ai_preferences(user_id, free_only) values ('${a}', true)`);
+    await db.exec(`insert into user_ai_preferences(user_id) values ('${a}')`);
     await assert.rejects(db.exec(`insert into user_ai_preferences(user_id) values ('${b}')`), /(permission denied|row-level security|duplicate key)/);
     await db.exec(`update user_ai_preferences set ai_enabled=false`);
     const mine = (await db.query('select user_id, ai_enabled from user_ai_preferences')).rows;
     assert.deepEqual(mine, [{ user_id: a, ai_enabled: false }]);
     const other = await db.query(`select ai_enabled from user_ai_preferences where user_id='${b}'`);
     assert.equal(other.rows.length, 0);
-    // 동의 없이 자동 선택이나 유료 호출을 켤 수 없다.
-    await assert.rejects(db.exec(`update user_ai_preferences set routing_mode='auto'`), /auto_needs_consent/);
-    await assert.rejects(db.exec(`update user_ai_preferences set free_only=false`), /paid_needs_opt_in/);
-    await db.exec(`update user_ai_preferences set routing_mode='auto', auto_routing_consent_at=now()`);
+    assert.equal((await db.query('select routing_mode from user_ai_preferences')).rows[0].routing_mode, 'auto');
     await assert.rejects(db.exec(`update user_ai_preferences set manual_provider='bing'`), /check/);
     await db.exec('reset role; set role anon');
     await assert.rejects(db.exec('select key_hint from user_ai_keys'), /permission denied/);

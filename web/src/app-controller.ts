@@ -81,7 +81,7 @@ export function settingsSubtitle(): string {
     case 'keywords': return '관심 있는 공지를 골라 봐요';
     case 'calendar': return '저장한 공지의 마감을 구글 캘린더에 넣어요';
     case 'profile': return '내 정보와 Gemini에 알려줄 내용을 적어요';
-    case 'keys': return 'Gemini 키와 아이캠퍼스 토큰을 관리해요';
+    case 'keys': return 'AI 키와 아이캠퍼스 토큰을 관리해요';
     default: return '알림과 연결을 정해요';
   }
 }
@@ -1106,12 +1106,12 @@ export class AppController extends Reactive {
     }
   }
 
-  async registerAi(provider: AiProvider, apiKey: string): Promise<void> {
+  async registerAi(provider: AiProvider, apiKey: string, model?: string): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     if (!authClient || !userId || this.aiBusy || !AI_PROVIDERS.includes(provider)) return;
     this.aiBusy = true; this.aiError = '';
     try {
-      await registerAiKey(authClient, provider, apiKey);
+      await registerAiKey(authClient, provider, apiKey, model);
       const keys = await loadAiKeyStatuses(authClient, userId);
       if (epoch === this.subscriptionsEpoch) this.aiKeys = keys;
     } catch (error) {

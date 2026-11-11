@@ -3,7 +3,7 @@
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
-import { AiConnect } from './ai-connect';
+import { AiRows } from './ai-connect';
 import type { AiKeyStatus, AiPreferences, AiProvider } from './ai-providers';
 import { type ByokStatus, type CanvasStatus } from './byok';
 import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, validDeviceName, type CanvasMode, type Device } from './devices';
@@ -99,7 +99,7 @@ export interface SettingsModel {
     remove: () => void;
     ai?: {
       keys: AiKeyStatus[]; prefs: AiPreferences; busy: boolean; error: string; gemini: boolean;
-      register: (provider: AiProvider, key: string) => void; remove: (provider: AiProvider) => void; savePrefs: (prefs: AiPreferences) => void;
+      register: (provider: AiProvider, key: string, model?: string) => void; remove: (provider: AiProvider) => void; savePrefs: (prefs: AiPreferences) => void;
     };
     canvas: CanvasStatus | null;
     canvasBusy: boolean;
@@ -120,14 +120,14 @@ function Section({ id, title, action, children }: { id: string; title: string; a
     <div className="box">{children}</div></section>;
 }
 
-function Setting({ name, help, children, className = '' }: { name: string; help?: ReactNode; children?: ReactNode; className?: string }) {
+export function Setting({ name, help, children, className = '' }: { name: string; help?: ReactNode; children?: ReactNode; className?: string }) {
   return <div className={`setting ${className}`}>
     <div className="setting-text"><p className="setting-name">{name}</p>{help ? <p className="setting-help">{help}</p> : null}</div>
     {children ? <div className="setting-control">{children}</div> : null}
   </div>;
 }
 
-function Choice<T extends string | number>({ label, options, value, onPick, disabled, grid }: {
+export function Choice<T extends string | number>({ label, options, value, onPick, disabled, grid }: {
   label: string; options: readonly (readonly [T, string])[]; value: T | null; onPick: (value: T) => void; disabled?: boolean; grid?: boolean;
 }) {
   // 선택지가 많으면(입학 연도) 한 줄로 늘어놓지 않고 4열 격자로 칸 안에 담는다.
@@ -568,16 +568,18 @@ function CalendarPage({ model }: { model: SettingsModel }) {
     <Back model={model} />
     <Section id="s-calendar" title="저장한 공지의 마감">
       <Setting name="구글 캘린더" help={'마감이 남은 저장 공지를 "성대 공지" 캘린더에 넣어요'}>
-        <span className="setting-state">{connected ? (auto.active ? '연결됨 · 30분마다 자동으로 맞춰요' : '연결됨') : '연결 안 됨'}</span>
-        {connected && !auto.active ? <p className={`field-note m-0 ${auto.error ? 'error' : ''}`} role={auto.error ? 'alert' : 'status'}>{auto.error ?? '자동으로 맞추려면 다시 연결해 주세요'}</p> : null}
-        {connected ? <p className="field-note m-0">저장한 공지 {calendar.savedCount}개{syncedAt ? ` · 마지막 맞춤 ${syncedAt}` : ''}</p> : null}
-        <div className="inline-row">
-          {connected ? <button type="button" className="text-button" disabled={calendar.busy} onClick={calendar.disconnect}>연결 끊기</button> : null}
-          {connected && !auto.active ? <button type="button" className="ghost-button" disabled={calendar.busy} onClick={calendar.connect}>다시 연결하기</button> : null}
-          {connected
-            ? <button type="button" className="solid-button" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '맞추고 있어요' : '지금 맞추기'}</button>
-            : <button type="button" className="solid-button" disabled={calendar.busy} onClick={calendar.connect}>구글 캘린더에 연결하기</button>}
-        </div>
+        {/* 상태와 단추를 따로 두지 않고 하나로 합친다: 연결 전에는 누르는 "연결하기", 연결되면 누를 수 없는 민트색 "연결됨"으로 바뀐다. */}
+        {connected
+          ? <span role="status" className="inline-flex min-h-[44px] items-center gap-[6px] rounded-md bg-accent px-[16px] text-[15px] font-semibold text-on-accent self-start min-[720px]:self-end">
+            <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>연결됨</span>
+          : <button type="button" className="ghost-button" aria-label="구글 캘린더에 연결하기" disabled={calendar.busy} onClick={calendar.connect}>연결하기</button>}
+        {connected ? <p className="field-note m-0">{auto.active ? '30분마다 자동으로 맞춰요' : '자동으로 맞추려면 다시 연결해 주세요'}{calendar.savedCount !== undefined ? ` · 저장한 공지 ${calendar.savedCount}개` : ''}{syncedAt ? ` · 마지막 맞춤 ${syncedAt}` : ''}</p> : null}
+        {connected && !auto.active && auto.error ? <p className="field-note error m-0" role="alert">{auto.error}</p> : null}
+        {connected ? <div className="inline-row">
+          <button type="button" className="text-button" disabled={calendar.busy} onClick={calendar.disconnect}>연결 끊기</button>
+          {!auto.active ? <button type="button" className="ghost-button" disabled={calendar.busy} onClick={calendar.connect}>다시 연결하기</button> : null}
+          <button type="button" className="ghost-button" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '맞추고 있어요' : '지금 맞추기'}</button>
+        </div> : null}
         {calendar.message ? <p className="field-note ok m-0" role="status">{calendar.message}</p> : null}
         {calendar.error ? <p className="field-note error m-0" role="alert">{calendar.error}</p> : null}
       </Setting>
@@ -659,11 +661,11 @@ function Profile({ model }: { model: SettingsModel }) {
 }
 
 // bare: 이미 위에 구분선이 있는 묶음 안에서는 자기 윗선과 여백을 없애 선이 두 줄로 겹치지 않게 한다.
-function Guide({ label, steps, bare = false }: { label: string; steps: ReactNode[]; bare?: boolean }) {
+export function Guide({ label, steps, bare = false }: { label: string; steps: ReactNode[]; bare?: boolean }) {
   return <details className={`connection-manual group ${bare ? 'mt-0 border-t-0' : ''}`}><summary className={SUMMARY}>{label}{chevron('M6 9l6 6 6-6', CHEVRON)}</summary><ol className="steps">{steps.map((step, index) => <li key={index}>{step}</li>)}</ol></details>;
 }
 
-const ext = (href: string, text: string) => <a href={href} target="_blank" rel="noopener noreferrer">{text}</a>;
+export const ext = (href: string, text: string) => <a href={href} target="_blank" rel="noopener noreferrer">{text}</a>;
 
 /** 키 한 줄: 저장 상태와 입력하기·수정하기, 눌러서 펼치는 입력칸, 받는 방법 안내(원본의 연결 키 줄과 같은 모양). */
 function KeyRow({ name, help, state, children, guide }: { name: string; help: string; state: string; children?: ReactNode; guide?: ReactNode }) {
@@ -673,9 +675,11 @@ function KeyRow({ name, help, state, children, guide }: { name: string; help: st
   </Setting>;
 }
 
+const SECRET_LABELS = { empty: '미설정', saved: '저장됨', disabled: ' (사용 중지됨)', broken: '', add: '입력하기', edit: '수정하기', remove: '지우기', save: '저장하기' };
+
 /** 비밀 한 줄: 저장 상태, 입력하기·수정하기·지우기, 눌러서 펼치는 입력칸과 받는 방법(Gemini 키와 아이캠퍼스 토큰이 같이 쓴다). */
-function SecretRow({ name, help, placeholder, status, loading, busy, error, onRegister, onRemove, guide, valid, note }: {
-  note?: string | null;
+export function SecretRow({ name, help, placeholder, status, loading, busy, error, onRegister, onRemove, guide, valid, note, labels = SECRET_LABELS, extra }: {
+  note?: string | null; labels?: typeof SECRET_LABELS; extra?: ReactNode;
   name: string; help: string; placeholder: string;
   status: { keyHint: string; disabled: boolean; lastError: string | null } | null;
   loading: boolean; busy: boolean; error: string;
@@ -686,7 +690,7 @@ function SecretRow({ name, help, placeholder, status, loading, busy, error, onRe
   const [value, setValue] = useState('');
   // 저장이 끝나 상태가 바뀌면 입력칸을 닫고 비운다. 값은 이 입력칸 밖에 남기지 않는다.
   useEffect(() => { if (status) { setValue(''); setEditing(false); setShown(false); } }, [status?.keyHint]);
-  const state = loading ? '확인 중' : status ? `저장됨 ····${status.keyHint}${status.disabled ? ' (사용 중지됨)' : ''}` : '미설정';
+  const state = loading ? '확인 중' : status ? (status.disabled && labels.broken ? labels.broken : `${labels.saved} ····${status.keyHint}${status.disabled ? labels.disabled : ''}`) : labels.empty;
   return <Setting name={name} help={help}>
     {editing ? <>
       <div className="inline-row">
@@ -694,16 +698,17 @@ function SecretRow({ name, help, placeholder, status, loading, busy, error, onRe
           placeholder={placeholder} value={value} disabled={busy} onChange={(event) => setValue(event.currentTarget.value.trim())} />
         <button type="button" className="ghost-button" aria-pressed={shown} disabled={busy} onClick={() => setShown(!shown)}>{shown ? '숨기기' : '보기'}</button>
       </div>
+      {extra}
       <div className="inline-row">
-        <button type="button" className="solid-button" disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인하고 있어요' : '저장하기'}</button>
+        <button type="button" className="solid-button" disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인하고 있어요' : labels.save}</button>
         <button type="button" className="ghost-button" disabled={busy} onClick={() => { setEditing(false); setValue(''); setShown(false); }}>닫기</button>
       </div>
       {error ? <p className="field-note error" role="alert">{error}</p> : null}
       {guide}
     </> : <>
       <div className="connection-summary"><span className="setting-state">{state}</span>
-        <button type="button" className="ghost-button key-action min-h-[40px] px-[14px] py-0" aria-label={`${name} ${status ? '수정하기' : '입력하기'}`} disabled={loading} onClick={() => setEditing(true)}>{status ? '수정하기' : '입력하기'}</button>
-        {status ? <button type="button" className="ghost-button key-action min-h-[40px] px-[14px] py-0 text-danger" aria-label={`${name} 지우기`} disabled={busy} onClick={onRemove}>지우기</button> : null}
+        <button type="button" className="ghost-button key-action min-h-[40px] px-[14px] py-0" aria-label={`${name} ${status ? labels.edit : labels.add}`} disabled={loading} onClick={() => setEditing(true)}>{status ? labels.edit : labels.add}</button>
+        {status ? <button type="button" className="ghost-button key-action min-h-[40px] px-[14px] py-0 text-danger" aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={onRemove}>{labels.remove}</button> : null}
       </div>
       {status?.lastError ? <p className="field-note error" role="alert">{status.lastError}</p> : null}
       {note ? <p className="field-note" role="status">{note}</p> : null}
@@ -736,8 +741,10 @@ function Keys({ model }: { model: SettingsModel }) {
   if (!model.userId) return <div className="settings"><Back model={model} /><Section id="s-keys" title="연결 키"><LoginNote model={model} what="연결 키" /></Section></div>;
   return <div className="settings">
     <Back model={model} />
-    <Section id="s-keys" title="연결 키">
-      {model.byok ? <div className="flex flex-col gap-3 p-4"><h3 className="m-0 text-[17px] font-semibold text-ink">AI 연결</h3><AiConnect byok={model.byok} /></div> : null}
+    <Section id="s-ai" title="AI 연결">
+      <AiRows byok={model.byok} />
+    </Section>
+    <Section id="s-keys" title="아이캠퍼스 연결">
       <CanvasRow model={model} />
     </Section>
   </div>;
