@@ -227,7 +227,7 @@ def _combine(checks: list[Check], rough: bool = False) -> str:
 
 
 DEPT_LABELS = {
-    LIKELY: "학과 졸업 인턴십 인정 가능성 높음 — 수행 후 평가·증빙 필요",
+    LIKELY: "학과 졸업 인턴십 인정 가능성이 높아요",
     CONDITIONAL: "학과 졸업 인턴십: 되는 쪽으로 보이지만 공고에서 확인되지 않은 조건이 있어요",
     NEEDS_REVIEW: "학과 졸업 인턴십: 공고에서 확인되지 않은 조건이 있어요",
     NOT_ELIGIBLE: "학과 졸업 인턴십 기준에 맞지 않아 보여요",

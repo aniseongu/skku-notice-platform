@@ -236,3 +236,11 @@ def test_3p_part_time_without_hours_stays_unknown():
     from skku_notice.grad_intern_rules import _p3_hours_check
     check = _p3_hours_check(facts(work_mode="part_time", start_date=date(2027, 2, 15), end_date=date(2027, 4, 30)))
     assert check.result == "unknown"
+
+
+def test_labels_do_not_carry_after_the_fact_reminders():
+    """판정 문장에는 수행 후 평가·증빙 같은 꼬리말을 붙이지 않는다(해당 요건은 상세의 따로 영역에 있다)."""
+    from skku_notice.grad_intern_rules import DEPT_LABELS, P3_LABELS
+
+    for label in [*DEPT_LABELS.values(), *P3_LABELS.values()]:
+        assert "수행 후" not in label and "—" not in label and "증빙 필요" not in label
