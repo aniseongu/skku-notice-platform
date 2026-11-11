@@ -12,31 +12,30 @@ const ORDER: readonly Id[] = ['groq', 'gemini', 'openrouter'];
 const NAME: Record<Id, string> = { groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter' };
 const BLURB: Record<Id, string> = {
   groq: '빠르게 답해요',
-  gemini: '요약, 번역, 인턴 판정에 써요',
-  openrouter: '한 키로 여러 모델을 써요',
+  gemini: '공지 요약과 번역에 써요',
+  openrouter: '여러 모델을 한 키로 써요',
 };
 const GUIDE: Record<Id, { url: string; placeholder: string; steps: string[] }> = {
-  groq: { url: PROVIDER_GUIDE.groq.url, placeholder: PROVIDER_GUIDE.groq.placeholder, steps: PROVIDER_GUIDE.groq.steps },
-  openrouter: { url: PROVIDER_GUIDE.openrouter.url, placeholder: PROVIDER_GUIDE.openrouter.placeholder, steps: PROVIDER_GUIDE.openrouter.steps },
+  groq: { url: PROVIDER_GUIDE.groq.url, placeholder: '키를 붙여 넣어 주세요', steps: PROVIDER_GUIDE.groq.steps },
+  openrouter: { url: PROVIDER_GUIDE.openrouter.url, placeholder: '키를 붙여 넣어 주세요', steps: PROVIDER_GUIDE.openrouter.steps },
   gemini: {
-    url: 'https://aistudio.google.com/apikey', placeholder: 'Google AI Studio에서 만든 키',
+    url: 'https://aistudio.google.com/apikey', placeholder: '키를 붙여 넣어 주세요',
     steps: ['Google AI Studio의 API 키 화면을 열고 Google 계정으로 로그인해요', '"API 키 만들기"를 누르고, 프로젝트를 고르라고 하면 새 프로젝트를 만들어요',
       '만들어진 키를 붙여 넣고 "연결하기"를 눌러요. Gemini에 확인한 뒤 암호화해 서버에만 보관해요',
       '무료 등급은 보낸 내용이 Google 제품 개선에 쓰일 수 있어요'],
   },
 };
 
-const LABELS = { empty: '연결 안 됨', saved: '연결됨', disabled: '', broken: '다시 연결해 주세요', add: '연결하기', edit: '바꾸기', remove: '연결 끊기', save: '연결하기' };
+const LABELS = { empty: '연결 안 됨', saved: '연결됨', disabled: '', broken: '키가 거절됐어요', retry: '다시 연결', close: '취소', add: '연결하기', edit: '바꾸기', remove: '연결 끊기', save: '연결하기' };
 
 function guideOf(id: Id) {
   const g = GUIDE[id];
-  return <Guide label="받는 방법" steps={[ext(g.url, g.steps[0]), ...g.steps.slice(1)]} />;
+  return <Guide label="키는 어디서 받나요?" steps={[ext(g.url, g.steps[0]), ...g.steps.slice(1)]} />;
 }
 
 /** AI 연결 줄들. 다른 설정 쪽과 같은 줄(이름, 설명, 오른쪽 조작) 모양이고, 연결한 개수에 따라 필요한 줄만 보인다. */
 export function AiRows({ byok }: { byok?: Byok }) {
   const [last, setLast] = useState<Id | null>(null);
-  const [models, setModels] = useState<Record<string, string>>({});
   const ai = byok?.ai;
   if (!byok?.available || !ai) {
     return <Setting name="AI 연결" help="지금은 키를 연결할 수 없어요. 잠시 뒤 다시 열어 주세요" />;
@@ -44,7 +43,7 @@ export function AiRows({ byok }: { byok?: Byok }) {
   const { prefs } = ai;
   const usable = ORDER.filter((id) => (id === 'gemini' ? !!byok.status && !byok.status.disabled : ai.keys.some((key) => key.provider === id && !key.disabled)));
   const count = usable.length;
-  const lead = count === 0 ? '연결하지 않아도 기본 방식으로 분석해요. 연결하면 요약과 맞춤 판정이 더 자세해져요'
+  const lead = count === 0 ? '안 넣어도 괜찮아요. 한 곳만 연결해도 공지 요약과 분석이 더 자세해져요'
     : !prefs.aiEnabled ? '키는 그대로 두고 기본 방식으로만 분석해요'
       : count === 1 ? '연결한 키로 요약과 판정을 만들어요. 한도가 차면 기본 방식으로 이어서 분석해요'
         : '연결한 곳 중 쓸 수 있는 곳을 알아서 골라 써요. 공지 글은 연결한 곳으로 보내져요';
@@ -57,15 +56,13 @@ export function AiRows({ byok }: { byok?: Byok }) {
       const name = `${NAME[id]} 키`;
       if (id === 'gemini') {
         return <SecretRow key={id} name={name} help={BLURB[id]} placeholder={GUIDE[id].placeholder} status={byok.status} loading={byok.loading} busy={byok.busy}
-          error={byok.error} labels={LABELS} guide={guideOf(id)} valid={looksLikeAiKey} note={backfillNote(byok.backfill, !!byok.status?.disabled)}
+          error={byok.error} labels={LABELS} guide={guideOf(id)} guideFirst valid={looksLikeAiKey} note={backfillNote(byok.backfill, !!byok.status?.disabled)}
           onRegister={byok.register} onRemove={byok.remove} />;
       }
       const status = ai.keys.find((key) => key.provider === id) ?? null;
       return <SecretRow key={id} name={name} help={BLURB[id]} placeholder={GUIDE[id].placeholder} status={status} loading={byok.loading} busy={ai.busy}
-        error={last === id ? ai.error : ''} labels={LABELS} guide={guideOf(id)} valid={looksLikeAiKey}
-        extra={<input className="input" type="text" autoComplete="off" spellCheck={false} aria-label={`${NAME[id]} 모델 (선택)`} placeholder="모델 이름 (비워 두면 무료 모델로 시작해요)"
-          value={models[id] ?? ''} disabled={ai.busy} onChange={(event) => setModels({ ...models, [id]: event.currentTarget.value.trim() })} />}
-        onRegister={(key) => { setLast(id); ai.register(id as AiProvider, key, models[id] || undefined); }} onRemove={() => { setLast(id); ai.remove(id as AiProvider); }} />;
+        error={last === id ? ai.error : ''} labels={LABELS} guide={guideOf(id)} guideFirst valid={looksLikeAiKey}
+        onRegister={(key) => { setLast(id); ai.register(id as AiProvider, key); }} onRemove={() => { setLast(id); ai.remove(id as AiProvider); }} />;
     })}
   </>;
 }

@@ -232,11 +232,11 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await expect(screen.getByRole('radio', { name: '복무 전' })).toHaveCount(0);
   await withApp(page, { byokOn: true, byokLoading: false, byokStatus: null });
   await expect(screen.locator('.setting', { hasText: 'Gemini 키' }).getByText('연결 안 됨')).toBeVisible();
-  await expect(screen.getByText(/연결하지 않아도 기본 방식으로 분석해요/)).toBeVisible();
+  await expect(screen.getByText(/안 넣어도 괜찮아요/)).toBeVisible();
   // 업체나 요금을 고르라는 질문은 없다. 연결이 하나도 없으면 켜기·끄기도 보이지 않는다.
   await expect(screen.getByRole('radiogroup', { name: 'AI 분석' })).toHaveCount(0);
   await expect(screen.getByText('요금')).toHaveCount(0);
-  await expect(screen.locator('.setting', { hasText: '아이캠퍼스 토큰' }).getByText('미설정')).toBeVisible();
+  await expect(screen.locator('.setting', { hasText: '아이캠퍼스 토큰' }).getByText('연결 안 됨')).toBeVisible();
   await screen.getByRole('button', { name: 'Gemini 키 연결하기' }).click();
   const save = screen.getByRole('button', { name: '연결하기', exact: true });
   await expect(save).toBeDisabled();
@@ -247,7 +247,7 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   await screen.getByRole('button', { name: '보기' }).click();
   await expect(input).toHaveAttribute('type', 'text');
   await screen.getByRole('button', { name: '숨기기' }).click();
-  await screen.getByText('받는 방법').first().click();
+  await screen.getByText('키는 어디서 받나요?').first().click();
   await expect(screen.getByRole('link', { name: /Google AI Studio/ })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
   await save.click();
   expect(await calls(page)).toEqual([['register', key]]);
@@ -256,27 +256,27 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   expect(await screen.innerText()).not.toContain(key);
   await expect(screen.getByLabel('Gemini 키', { exact: true })).toHaveCount(0);
   await withApp(page, { byokStatus: { keyHint: 'DDDD', model: 'm', disabled: true, lastError: 'Gemini가 이 키를 받아 주지 않아요. 키를 다시 등록해 주세요.', usedToday: 0 } });
-  await expect(screen.getByRole('alert')).toContainText('다시 등록');
+  await expect(screen.locator('[data-provider], .setting', { hasText: 'Gemini 키' }).first().getByText('키가 거절됐어요')).toBeVisible();
   await screen.getByRole('button', { name: 'Gemini 키 연결 끊기' }).click();
   expect(await calls(page)).toEqual([['remove']]);
   // 아이캠퍼스 토큰도 같은 흐름이다. 형식이 맞지 않으면 저장할 수 없다.
   await withApp(page, {});
-  await screen.getByRole('button', { name: '아이캠퍼스 토큰 입력하기' }).click();
+  await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' }).click();
   const canvasInput = screen.getByLabel('아이캠퍼스 토큰', { exact: true });
   await expect(canvasInput).toHaveAttribute('type', 'password');
   await canvasInput.fill('짧음');
-  await expect(screen.getByRole('button', { name: '저장하기' })).toBeDisabled();
+  await expect(screen.getByRole('button', { name: '연결하기', exact: true })).toBeDisabled();
   const token = `1234~${'Z'.repeat(40)}`;
   await canvasInput.fill(token);
   await screen.getByText('받는 방법').click();
   await expect(screen.getByRole('link', { name: /아이캠퍼스 계정 설정/ })).toHaveAttribute('href', 'https://canvas.skku.edu/profile/settings');
-  await screen.getByRole('button', { name: '저장하기' }).click();
+  await screen.getByRole('button', { name: '연결하기', exact: true }).click();
   expect(await calls(page)).toEqual([['registerCanvas', token]]);
   await withApp(page, { canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null } });
-  await expect(screen.getByText('저장됨 ····ZZZZ')).toBeVisible();
+  await expect(screen.getByText('연결됨 ····ZZZZ')).toBeVisible();
   expect(await screen.innerText()).not.toContain(token);
   await withApp(page, {});
-  await screen.getByRole('button', { name: '아이캠퍼스 토큰 지우기' }).click();
+  await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결 끊기' }).click();
   expect(await calls(page)).toEqual([['removeCanvas']]);
 });
 
@@ -727,9 +727,9 @@ test('core settings tasks finish within their click budget and in the expected o
   // 2) 같은 쪽에서 아이캠퍼스 토큰: 입력하기 → 저장하기 = 추가 2클릭(쪽 이동 없음)
   await withApp(page, { byokStatus: { keyHint: 'aaaa', model: 'm', disabled: false, lastError: null, usedToday: 0 }, registerCanvas: 'fn:registerCanvas' });
   log.length = 0;
-  await click('아이캠퍼스 입력하기', screen.getByRole('button', { name: '아이캠퍼스 토큰 입력하기' }));
+  await click('아이캠퍼스 입력하기', screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' }));
   await screen.getByLabel('아이캠퍼스 토큰', { exact: true }).fill(`1234~${'b'.repeat(40)}`);
-  await click('아이캠퍼스 저장하기', screen.getByRole('button', { name: '저장하기' }));
+  await click('아이캠퍼스 연결 확정', screen.getByRole('button', { name: '연결하기', exact: true }));
   expect(log.length).toBe(2);
   expect((await calls(page))[0][0]).toBe('registerCanvas');
   // 3) 쪽 이동은 X(데스크톱) 또는 뒤로 가기(모바일) 한 번에 첫 쪽으로 돌아온다.
@@ -1194,4 +1194,33 @@ test('selection mode click order: enter → tick → count → action → toast 
   await expect(page.getByText(/1개를 (읽음|읽지 않음)으로 표시했어요/)).toBeVisible();
   await expect(bar).toHaveCount(0);
   await expect(trigger).toBeFocused();
+});
+
+test('board order: edit mode shows drag handles only, the keyboard can lift, move and drop a board, and the new order is kept', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, any>;
+    app.authUserId = 'account-a'; app.profileStatus = 'ready'; app.profile = { ...app.profile, onboardedAt: 'x' };
+    app.subscriptions = app.sources.filter((s: { external?: boolean }) => !s.external).slice(0, 3).map((s: { id: string }) => s.id);
+    app.openSettings('notifications');
+  });
+  const screen = page.locator('platform-settings-screen');
+  const names = () => screen.locator('.order-list li .order-name').allInnerTexts();
+  await expect(screen.locator('.order-handle')).toHaveCount(0);                   // 평소에는 손잡이가 없고 스위치만 있다
+  const before = await names();
+  expect(before.length).toBeGreaterThanOrEqual(2);
+  await screen.getByRole('button', { name: '순서 바꾸기' }).click();
+  await expect(screen.locator('.order-handle')).toHaveCount(before.length);
+  await expect(screen.getByRole('switch')).toHaveCount(0);                        // 순서를 바꾸는 중에는 받기 스위치를 숨긴다
+  const first = screen.locator('.order-handle').first();
+  await first.focus();
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(200);                                                 // 집는 동작이 자리를 계산할 시간
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(250);
+  await page.keyboard.press('Space');
+  await expect.poll(async () => (await names())[1]).toBe(before[0]);              // 첫 줄이 둘째 줄로 내려갔다
+  await screen.getByRole('button', { name: '완료' }).click();
+  expect((await names())[1]).toBe(before[0]);                                     // 끝낸 뒤에도 순서가 남는다
 });

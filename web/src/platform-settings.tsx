@@ -10,8 +10,10 @@ import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, vali
 import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
 import { programLabel } from './skku-programs';
 import { BOARD_CATALOG, COLLEGE_BOARD, DEPARTMENT_BOARD, OTHER_BOARDS } from './skku-boards';
-import Sortable from 'sortablejs';
-import { moveBoardId } from './board-order';
+// 순서 바꾸기는 dnd-kit(MIT)을 쓴다: 손잡이로 끌기(마우스·터치)와 키보드(Space로 집고 방향키로 옮기고 Space로 놓기), 낭독기 안내가 들어 있다.
+import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type Modifier } from '@dnd-kit/core';
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Avatar, SwitchRow } from './ui';
 
 export interface SettingsModel {
@@ -349,7 +351,6 @@ function Notifications({ model }: { model: SettingsModel }) {
     <Section id="s-notify" title="이 기기">
       <Setting name="이 기기 알림" help="앱을 닫아도 브라우저가 켜져 있으면 알림으로 받아요. 이 기기에만 적용돼요">
         {!model.userId ? <p className="field-note">로그인하면 이 기기로 알림을 받을 수 있어요</p> : <>
-          <span className="setting-state">{on ? '켜져 있어요' : '꺼져 있어요'} · 브라우저 권한 {permissionText(model.pushStatus)}</span>
           <div className="inline-row">
             {on
               ? <><button type="button" className="ghost-button" onClick={model.disablePush}>알림 끄기</button>
@@ -357,6 +358,8 @@ function Notifications({ model }: { model: SettingsModel }) {
               : <button type="button" className="ghost-button" disabled={model.pushStatus !== 'off'} onClick={model.enablePush}>
                 {model.pushStatus === 'busy' ? '연결 중' : model.pushStatus === 'checking' ? '확인하고 있어요' : model.pushRetry ? '다시 시도하기' : '알림 받기'}</button>}
           </div>
+          {/* 조작 먼저, 보조 안내는 그 아래(다른 행과 같은 순서). */}
+          <span className="field-note">{on ? '켜져 있어요' : '꺼져 있어요'} · 브라우저 권한 {permissionText(model.pushStatus)}</span>
           {model.pushStatus === 'unsupported' ? <p className="field-note">이 브라우저는 알림을 지원하지 않아요. 최신 브라우저에서 열어 주세요</p> : null}
           {model.pushStatus === 'denied' ? <p className="field-note">브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요</p> : null}
           {model.pushError ? <p className="field-note error" role="alert">{model.pushError}</p> : null}
@@ -422,69 +425,58 @@ function chevron(d: string, className?: string) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" className={className}><path d={d} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
+const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
+
+/** 게시판 한 줄. 순서를 바꾸는 중에는 왼쪽 손잡이로 끌고, 아닐 때는 오른쪽에서 받기를 켜고 끈다. */
+function BoardRow({ board, editing, onToggle, busy }: { board: { id: string; label: string }; editing: boolean; onToggle?: (id: string) => void; busy: boolean }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: board.id, disabled: !editing });
+  return <li ref={setNodeRef} data-board-id={board.id} style={{ transform: CSS.Transform.toString(transform), transition }}
+    className={`flex min-h-[56px] items-center gap-[12px] border-t border-line first:border-t-0 ${isDragging ? 'relative z-10 rounded-md border-transparent bg-surface shadow-pop ring-1 ring-accent' : ''}`}>
+    {editing ? <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} aria-label={`${board.label} 순서 옮기기`}
+      className="order-handle -ml-[10px] grid size-[44px] flex-none cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent text-ink-3 hover:bg-sunken active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-accent">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">{[7, 12, 17].flatMap((y) => [9, 15].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.7" />))}</svg></button> : null}
+    <span className="order-name min-w-0 flex-1 text-[15px] font-semibold [overflow-wrap:anywhere]">{board.label}</span>
+    {onToggle && !editing ? <button type="button" role="switch" className="switch-row switch-only" aria-checked="true" aria-label={`${board.label} 받기`} disabled={busy}
+      onClick={() => onToggle(board.id)}><span className="switch" aria-hidden="true" /></button> : null}
+  </li>;
+}
+
 function BoardOrderList({ order, editing, onToggle, busy = false }: { order: SettingsModel['boardOrder']; editing: boolean; onToggle?: (id: string) => void; busy?: boolean }) {
-  const listRef = useRef<HTMLUListElement>(null);
   const latest = useRef(order);
   latest.current = order;
-  // 옮긴 줄에서 다시 포커스할 단추. 끝에 닿아 꺼진 단추면 반대쪽 단추로 간다.
-  const focusId = useRef<{ id: string; kind: 'handle' | 'up' | 'down' } | null>(null);
-  const [message, setMessage] = useState('');
   const ids = order.boards.map((board) => board.id);
-  const move = (from: number, to: number) => {
-    const boards = latest.current.boards;
-    if (to < 0 || to >= boards.length || from === to) return;
-    latest.current.move(moveBoardId(boards.map((board) => board.id), from, to));
-    setMessage(`${boards[from].label}, ${to + 1}번째로 옮겼어요`);
+  const labelOf = (id: unknown) => order.boards.find((board) => board.id === id)?.label ?? '';
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    const from = ids.indexOf(String(active.id)), to = ids.indexOf(String(over.id));
+    if (from < 0 || to < 0) return;
+    latest.current.move(arrayMove(ids, from, to));
   };
-  useEffect(() => {
-    const list = listRef.current;
-    if (!editing || !list) return;
-    let anchor: ChildNode | null = null;
-    const sortable = new Sortable(list, {
-      handle: '.order-handle', animation: 0,
-      onStart: (event) => { anchor = event.item.nextSibling; },
-      onEnd: (event) => {
-        // SortableJS가 옮긴 DOM을 처음 자리로 되돌려 React가 DOM을 계속 소유하게 한다.
-        const { item, from, oldIndex, newIndex } = event;
-        from.insertBefore(item, anchor);
-        if (oldIndex !== undefined && newIndex !== undefined) move(oldIndex, newIndex);
-      },
-    });
-    return () => sortable.destroy();
-  }, [editing]);
-  useEffect(() => {
-    const want = focusId.current;
-    if (!want) return;
-    focusId.current = null;
-    const row = listRef.current?.querySelector(`[data-board-id="${CSS.escape(want.id)}"]`);
-    const pick = (kind: string) => row?.querySelector<HTMLButtonElement>(kind === 'handle' ? '.order-handle' : `.order-move[data-dir="${kind}"]`);
-    const target = pick(want.kind);
-    (target && !target.disabled ? target : pick(want.kind === 'up' ? 'down' : want.kind === 'down' ? 'up' : 'handle'))?.focus();
-  });
+  const position = (id: unknown) => `${ids.indexOf(String(id)) + 1}번째`;
   return <div className="order-box">
-    <ul className={`order-list ${editing ? 'editing' : ''}`} ref={listRef}>
-      {order.boards.map((board, index) => <li key={board.id} data-board-id={board.id}>
-        {editing ? <button type="button" className="order-handle" aria-label={`${board.label} 순서 옮기기`}
-            onKeyDown={(event) => {
-              if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-              event.preventDefault();
-              focusId.current = { id: board.id, kind: 'handle' };
-              move(ids.indexOf(board.id), index + (event.key === 'ArrowUp' ? -1 : 1));
-            }}>{chevron('M5 8h14M5 12h14M5 16h14')}</button> : null}
-        <span className="order-name">{board.label}</span>
-        {editing ? <span className="order-controls">
-          <button type="button" className="order-move" data-dir="up" aria-label={`${board.label} 위로 옮기기`} disabled={index === 0}
-            onClick={() => { focusId.current = { id: board.id, kind: 'up' }; move(index, index - 1); }}>{chevron('M6 15l6-6 6 6')}</button>
-          <button type="button" className="order-move" data-dir="down" aria-label={`${board.label} 아래로 옮기기`} disabled={index === order.boards.length - 1}
-            onClick={() => { focusId.current = { id: board.id, kind: 'down' }; move(index, index + 1); }}>{chevron('M6 9l6 6 6-6')}</button>
-        </span> : null}
-        {onToggle && !editing ? <button type="button" role="switch" className="switch-row switch-only" aria-checked="true" aria-label={`${board.label} 받기`} disabled={busy}
-          onClick={() => onToggle(board.id)}><span className="switch" aria-hidden="true" /></button> : null}
-      </li>)}
-    </ul>
-    {editing ? <p className="field-note order-help">손잡이를 끌거나 화살표를 눌러 순서를 바꿔요. 바꾸면 바로 저장돼요</p> : null}
-    {editing && order.status ? <p className="field-note" role="status">{order.status === 'saved' ? '저장했어요' : '저장하지 못했어요. 다시 옮기면 또 저장해요'}</p> : null}
-    <p className="visually-hidden" role="status" aria-live="polite">{message}</p>
+    <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[verticalOnly]} onDragEnd={onDragEnd}
+      accessibility={{
+        screenReaderInstructions: { draggable: '순서를 바꾸려면 Space를 눌러 집고, 위아래 방향키로 옮긴 뒤 Space로 놓으세요. 취소는 Esc예요.' },
+        announcements: {
+          onDragStart: ({ active }) => `${labelOf(active.id)}을 집었어요. 지금 ${position(active.id)}예요`,
+          onDragOver: ({ active, over }) => (over ? `${labelOf(active.id)}이 ${position(over.id)} 자리 위에 있어요` : undefined),
+          onDragEnd: ({ active, over }) => (over ? `${labelOf(active.id)}을 ${position(over.id)}로 옮겼어요` : `${labelOf(active.id)}을 제자리에 놓았어요`),
+          onDragCancel: ({ active }) => `${labelOf(active.id)} 옮기기를 취소했어요`,
+        },
+      }}>
+      <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+        <ul className={`order-list m-0 list-none p-0 ${editing ? 'editing' : ''}`}>
+          {order.boards.map((board) => <BoardRow key={board.id} board={board} editing={editing} onToggle={onToggle} busy={busy} />)}
+        </ul>
+      </SortableContext>
+    </DndContext>
+    {editing ? <p className="field-note m-0 mt-[8px]">손잡이를 끌어 순서를 바꿔요. 바꾸면 바로 저장돼요</p> : null}
+    {editing && order.status ? <p className="field-note m-0" role="status">{order.status === 'saved' ? '저장했어요' : '저장하지 못했어요. 다시 옮기면 또 저장해요'}</p> : null}
   </div>;
 }
 
@@ -675,11 +667,11 @@ function KeyRow({ name, help, state, children, guide }: { name: string; help: st
   </Setting>;
 }
 
-const SECRET_LABELS = { empty: '미설정', saved: '저장됨', disabled: ' (사용 중지됨)', broken: '', add: '입력하기', edit: '수정하기', remove: '지우기', save: '저장하기' };
+const SECRET_LABELS = { empty: '미설정', saved: '저장됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '입력하기', edit: '수정하기', remove: '지우기', save: '저장하기' };
 
 /** 비밀 한 줄: 저장 상태, 입력하기·수정하기·지우기, 눌러서 펼치는 입력칸과 받는 방법(Gemini 키와 아이캠퍼스 토큰이 같이 쓴다). */
-export function SecretRow({ name, help, placeholder, status, loading, busy, error, onRegister, onRemove, guide, valid, note, labels = SECRET_LABELS, extra }: {
-  note?: string | null; labels?: typeof SECRET_LABELS; extra?: ReactNode;
+export function SecretRow({ name, help, placeholder, status, loading, busy, error, onRegister, onRemove, guide, valid, note, labels = SECRET_LABELS, extra, guideFirst = false }: {
+  note?: string | null; labels?: typeof SECRET_LABELS; extra?: ReactNode; guideFirst?: boolean;
   name: string; help: string; placeholder: string;
   status: { keyHint: string; disabled: boolean; lastError: string | null } | null;
   loading: boolean; busy: boolean; error: string;
@@ -693,6 +685,7 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
   const state = loading ? '확인 중' : status ? (status.disabled && labels.broken ? labels.broken : `${labels.saved} ····${status.keyHint}${status.disabled ? labels.disabled : ''}`) : labels.empty;
   return <Setting name={name} help={help}>
     {editing ? <>
+      {guideFirst ? guide : null}
       <div className="inline-row">
         <input className="input" type={shown ? 'text' : 'password'} autoComplete="off" spellCheck={false} aria-label={name}
           placeholder={placeholder} value={value} disabled={busy} onChange={(event) => setValue(event.currentTarget.value.trim())} />
@@ -701,16 +694,16 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
       {extra}
       <div className="inline-row">
         <button type="button" className="solid-button" disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인하고 있어요' : labels.save}</button>
-        <button type="button" className="ghost-button" disabled={busy} onClick={() => { setEditing(false); setValue(''); setShown(false); }}>닫기</button>
+        <button type="button" className="ghost-button" disabled={busy} onClick={() => { setEditing(false); setValue(''); setShown(false); }}>{labels.close}</button>
       </div>
       {error ? <p className="field-note error" role="alert">{error}</p> : null}
-      {guide}
+      {guideFirst ? null : guide}
     </> : <>
-      <div className="connection-summary"><span className="setting-state">{state}</span>
-        <button type="button" className="ghost-button key-action min-h-[40px] px-[14px] py-0" aria-label={`${name} ${status ? labels.edit : labels.add}`} disabled={loading} onClick={() => setEditing(true)}>{status ? labels.edit : labels.add}</button>
-        {status ? <button type="button" className="ghost-button key-action min-h-[40px] px-[14px] py-0 text-danger" aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={onRemove}>{labels.remove}</button> : null}
+      <div className="connection-summary"><span className={`setting-state ${status?.disabled ? 'text-danger' : ''}`}>{state}</span>
+        <button type="button" className="ghost-button key-action min-h-[44px] px-[14px] py-0" aria-label={`${name} ${status ? (status.disabled && labels.retry ? labels.retry : labels.edit) : labels.add}`} disabled={loading} onClick={() => setEditing(true)}>{status ? (status.disabled && labels.retry ? labels.retry : labels.edit) : labels.add}</button>
+        {status ? <button type="button" className={`ghost-button key-action min-h-[44px] px-[14px] py-0 ${labels.broken ? '' : 'text-danger'}`} aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={onRemove}>{labels.remove}</button> : null}
       </div>
-      {status?.lastError ? <p className="field-note error" role="alert">{status.lastError}</p> : null}
+      {status?.lastError && !labels.broken ? <p className="field-note error" role="alert">{status.lastError}</p> : null}
       {note ? <p className="field-note" role="status">{note}</p> : null}
       {error ? <p className="field-note error" role="alert">{error}</p> : null}
     </>}
@@ -729,10 +722,11 @@ function CanvasRow({ model }: { model: SettingsModel }) {
     <>{ext('https://canvas.skku.edu/profile/settings', '아이캠퍼스 계정 설정')}을 열고 로그인해요</>,
     '"승인된 통합" 아래의 "새 액세스 토큰"을 눌러요',
     '목적에 "성공 알림" 같은 이름을 쓰고 만료일은 비워 두거나 학기 끝으로 정해요',
-    '"토큰 생성"을 누르면 한 번만 보이는 긴 글자가 나와요. 복사해서 붙여 넣고 "저장하기"를 눌러요',
+    '"토큰 생성"을 누르면 한 번만 보이는 긴 글자가 나와요. 복사해서 붙여 넣고 "연결하기"를 눌러요',
     '저장하면 아이캠퍼스에 확인한 뒤 암호화해 서버에만 보관해요. 읽기만 하고 아이캠퍼스 내용을 바꾸지 않아요',
   ]} />;
   return <SecretRow name="아이캠퍼스 토큰" help={help} placeholder="숫자~로 시작하는 토큰" status={byok.canvas} loading={byok.loading} busy={byok.canvasBusy}
+    labels={{ empty: '연결 안 됨', saved: '연결됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '연결하기', edit: '바꾸기', remove: '연결 끊기', save: '연결하기' }}
     error={byok.canvasError} onRegister={byok.registerCanvas} onRemove={byok.removeCanvas} guide={guide}
     valid={(value) => /^[0-9A-Za-z~_-]{16,200}$/.test(value)} />;
 }
