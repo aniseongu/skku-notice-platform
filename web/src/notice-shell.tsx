@@ -210,7 +210,6 @@ function settingsModel(app: AppController) {
     testNotification: () => { void app.testNotification(); },
     profile: app.profile, profileStatus: app.profileStatus, profileMessage: app.profileMessage, profileError: app.profileError,
     saveProfile: (profile: UserProfile) => { void app.saveProfile(profile); },
-    openOnboarding: () => app.openOnboarding(),
     byok: aiConnectModel(app),
     account: { busy: app.accountBusy, error: app.accountError, remove: () => { void app.deleteAccount(); } },
     devicesInfo: { devices: app.devices, thisId: app.thisDeviceId, summaryTime: app.summaryTime, hasCanvasToken: !!app.canvasStatus, busy: app.devicesBusy, error: app.devicesError,
@@ -286,7 +285,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
       if (app.tab() === 'all' && app.noBoards()) {
         return app.profile.onboardedAt
           ? <Empty title="받을 게시판이 없어요" body="게시판을 고르면 새 공지가 여기에 보여요" action="게시판 고르기" onAction={() => app.openSettings('notifications')} />
-          : <Empty title="아직 설정을 안 했어요" body="전공을 알려 주면 맞는 게시판을 켜 드려요" action="설정 시작하기" onAction={() => app.openOnboarding()} />;
+          : <Empty title="아직 설정을 안 했어요" body="첫 설정을 마치면 맞는 게시판을 켜 드려요" />;
       }
       if (app.query) return <Empty title={`'${app.query}'에 맞는 공지가 없어요`} body="다른 단어로 찾아보세요" action="검색어 지우기" onAction={() => { app.query = ''; }} />;
       if (app.keyword && app.view !== 'saved' && app.unreadOnly) return <Empty title={`'${app.keyword}'에 맞는 읽지 않은 공지가 없어요`} body="읽지 않은 공지만 보기를 끄면 모든 공지를 볼 수 있어요" />;

@@ -91,15 +91,11 @@ export function Onboarding({ app }: { app: AppController }) {
   const [saved, setSaved] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const manual = app.onboardingManual;
   // 단계가 바뀌면 새 질문을 화면 낭독기가 읽도록 제목으로 포커스를 옮긴다.
   // 이전 화면의 스크롤 위치가 남아 제목이 가려지지 않게 맨 위로 되돌린 뒤 제목으로 포커스를 옮긴다.
   useEffect(() => { bodyRef.current?.scrollTo({ top: 0 }); heading.current?.focus({ preventScroll: true }); }, [step, addingDouble, changingPrimary, saved]);
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && app.onboardingManual) app.dismissOnboarding(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [app]);
+  // AI 키 단계에 들어오면 키 기능이 켜져 있는지 한 번 더 확인한다(처음 확인이 실패했어도 여기서 이어진다).
+  useEffect(() => { if (step === 'ai' && !app.byokOn) void app.recheckByok(); }, [step, app]);
 
   const index = stepIndex(step);
   const primary = draft.programs[0];
@@ -139,7 +135,8 @@ export function Onboarding({ app }: { app: AppController }) {
   const pushAsk = app.pushStatus === 'off';
 
   // 알림 → AI 키 순서. 알림을 이미 켰거나 지원하지 않으면 알림 단계를 건너뛰고, 키가 이미 있으면 AI 단계를 건너뛴다.
-  const needAi = () => app.byokOn && !app.byokStatus && app.aiKeys.length === 0;
+  // 키 기능이 꺼져 있거나 확인하지 못했어도 키 없이 끝내지 않는다(예외 없음). 그때는 AI 단계에서 다시 확인하게 한다.
+  const needAi = () => !app.byokStatus && app.aiKeys.length === 0;
   const afterNotify = () => { if (needAi()) go('ai'); else app.closeOnboarding(); };
   const finishWithKey = () => { void app.completeOnboarding(); };
   const save = async () => { if (await app.finishOnboarding(draft, !needAi())) { setSaved(true); if (app.pushStatus === 'off') go('notify'); else afterNotify(); } };
@@ -244,6 +241,7 @@ export function Onboarding({ app }: { app: AppController }) {
     lead = '최소 1개 이상 연결해야 해요';
     const connected = !!app.byokStatus || app.aiKeys.length > 0;
     body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]"><div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0 min-[720px]:[&_.setting]:grid-cols-[minmax(0,1fr)] min-[720px]:[&_.setting]:gap-[8px]"><AiRows byok={aiConnectModel(app)} /></div>
+      {app.byokOn ? null : <button type="button" className="ghost-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold whitespace-nowrap self-start" onClick={() => { void app.recheckByok(); }}>다시 확인하기</button>}
       {app.onboardingError ? <p className="error-text text-[14px] text-danger" role="alert">{app.onboardingError}</p> : null}</div>;
     foot = <>
       {connected ? null : <p className="m-0 text-center text-[14px] text-ink-2" role="status">키를 연결하면 끝낼 수 있어요</p>}
@@ -288,10 +286,8 @@ export function Onboarding({ app }: { app: AppController }) {
             aria-valuetext={`${STEPS.length}단계 중 ${index + 1}단계`} aria-label="첫 설정 진행">
             {STEPS.map((name, i) => <span className={`h-[4px] flex-1 rounded-pill [transition:background_.2s] ${i <= index ? 'bg-ink' : 'bg-line'}`} key={name} data-done={i <= index} />)}
           </div>
-          {/* 처음 설정은 건너뛸 수 없다(전공과 키는 필수). 설정에서 다시 연 경우에만 닫을 수 있다. */}
-          {manual
-            ? <button type="button" className="onb-x inline-flex h-[44px] w-[44px] items-center justify-center gap-[4px] rounded-pill border border-line bg-surface p-0 text-[14px] font-semibold whitespace-nowrap text-ink [&:hover]:bg-sunken active:bg-sunken [&_.i]:size-[20px]" aria-label="닫기" onClick={() => app.dismissOnboarding()}><svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href="icons/sprite.svg#close" /></svg></button>
-            : <span className="onb-top-slot block size-[44px]" aria-hidden="true" />}
+          {/* 첫 설정은 처음에만 열리고 건너뛸 수도, 닫을 수도 없다(전공과 AI 키는 필수). */}
+          <span className="onb-top-slot block size-[44px]" aria-hidden="true" />
         </div>
       </div>
       <div className="onb-body mx-auto grid w-[min(100%,36rem)] flex-[1_0_auto] auto-rows-max content-start gap-[16px] px-[16px] pt-[8px] pb-[24px] min-[900px]:flex-none [&>p]:m-0 [&>p]:text-ink-2 [&_h1:focus]:outline-none [&_h1]:mt-[8px] [&_h1]:mb-0 [&_h1]:overflow-visible [&_h1]:text-clip [&_h1]:whitespace-normal min-[900px]:[&_h1]:text-[21px] min-[900px]:[&_h1]:leading-[28px]">

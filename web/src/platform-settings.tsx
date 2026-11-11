@@ -65,7 +65,6 @@ export interface SettingsModel {
   profileMessage: string;
   profileError: string;
   saveProfile: (profile: UserProfile) => void;
-  openOnboarding: () => void;
   account?: { busy: boolean; error: string; remove: () => void };
   devicesInfo?: {
     devices: Device[];
@@ -178,11 +177,6 @@ function profileSummary(profile: UserProfile): string {
 
 function Overview({ model }: { model: SettingsModel }) {
   return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px] settings-overview">
-    {model.userId && !model.profile.onboardedAt ? <Section id="s-setup" title="첫 설정">
-      <Setting name="내 전공에 맞게 설정하기" help="전공과 학년을 알려 주면 받을 게시판과 알림을 맞춰 드려요">
-        <button type="button" className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.openOnboarding}>설정 시작하기</button>
-      </Setting>
-    </Section> : null}
     <Section id="s-preferences" title="내 설정">
       <SettingsLink model={model} label="알림" help="받을 게시판과 이 기기 알림" section="notifications" />
       <SettingsLink model={model} label="관심 키워드" help={model.keywords.length ? `${model.keywords.length}개 키워드를 쓰고 있어요` : '관심 있는 공지를 골라 봐요'} section="keywords" />

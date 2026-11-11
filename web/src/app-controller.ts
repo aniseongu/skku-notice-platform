@@ -194,7 +194,7 @@ export class AppController extends Reactive {
     accountBusy: { state: true }, accountError: { state: true },
     summarizing: { state: true }, summaryError: { state: true }, summaryErrorId: { state: true },
     profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, profileError: { state: true }, settingsSection: { state: true },
-    onboardingOpen: { state: true }, onboardingManual: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
+    onboardingOpen: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
     keywordNote: { state: true },
     subscriptions: { state: true }, subscriptionsLoading: { state: true }, subscriptionsError: { state: true },
     boardOrder: { state: true }, boardOrderStatus: { state: true },
@@ -268,7 +268,6 @@ export class AppController extends Reactive {
   // 설정 화면의 하위 쪽(원본과 같은 ?view=settings&section=... 주소). keys=1은 연결 키 쪽이다.
   settingsSection: string | null = settingsSectionFromUrl();
   onboardingOpen = false;
-  onboardingManual = false;
   onboardingDismissed = false;
   onboardingBusy = false;
   onboardingError = '';
@@ -344,6 +343,14 @@ export class AppController extends Reactive {
   // 상세 칸에 실제로 보이는 글(고른 글이 없으면 첫 글). 목록 행 표시와 맞춘다.
   shownId: string | null = null;
 
+  /** 키 연결 기능이 켜져 있는지 서버에 다시 묻는다. 첫 설정의 AI 키 단계에서 "다시 확인하기"도 이걸 쓴다. */
+  async recheckByok(): Promise<boolean> {
+    const available = await byokAvailable(import.meta.env.VITE_SUPABASE_URL);
+    this.byokOn = available;
+    if (available && this.authUserId) { this.byokLoading = true; void this.refreshByok(this.authUserId, this.subscriptionsEpoch); }
+    return available;
+  }
+
   /** 화면에 붙을 때 한 번 부른다. 이벤트 구독과 첫 데이터 읽기를 시작한다. */
   start() {
     this.subscribe(() => { if (this.selectionReady) storeSelection(this.selecting ? { user: this.authUserId ?? 'guest', ids: this.selectedReads } : null); });
@@ -352,10 +359,7 @@ export class AppController extends Reactive {
     remember('notice-sort', this.sort);
     remember('intern-sort', this.internSort);
     applyTheme(this.theme);
-    void byokAvailable(import.meta.env.VITE_SUPABASE_URL).then((available) => {
-      this.byokOn = available;
-      if (available && this.authUserId) { this.byokLoading = true; void this.refreshByok(this.authUserId, this.subscriptionsEpoch); }
-    });
+    void this.recheckByok();
     // 구글 화면에서 취소하고 돌아오면 주소에 오류가 붙는다. 조용히 지운다(오류 문구 없음).
     if (authClient && /[?&#](error|error_description)=/.test(location.search + location.hash)) history.replaceState(history.state, '', cleanReturnUrl());
     if (authClient) {
@@ -369,7 +373,7 @@ export class AppController extends Reactive {
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
           this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.thisDeviceId = null; this.devicesError = ''; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
-          this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingManual = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
+          this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
           if (staleChain) void staleChain.chain.discard();
@@ -383,7 +387,6 @@ export class AppController extends Reactive {
           this.preferencesUnavailable = false;
           if (userId) setTimeout(() => { void this.refreshMyDeadlines(userId, epoch); void this.refreshMyTranslations(userId, epoch); void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshBoardOrder(userId, epoch); void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.refreshMine(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch); }, 0);
           setLocalOwner(userId);
-          this.onboardingDismissed = !!userId && remember('onboarding-dismissed') === '1';
           this.saved = loadSaved();
           this.keywords = loadKeywords();
           this.boardOrder = loadBoardOrder();
@@ -794,15 +797,7 @@ export class AppController extends Reactive {
     return this.profileStatus === 'ready' && !this.profile.onboardedAt && !this.onboardingDismissed;
   }
 
-  openOnboarding() { this.onboardingManual = true; this.onboardingError = ''; this.onboardingOpen = true; }
-
-  closeOnboarding() { this.onboardingOpen = false; this.onboardingManual = false; this.onboardingError = ''; }
-
-  /** 나중에 하기. 직접 연 경우는 닫기만 하고, 처음이면 이 계정에서는 다시 묻지 않는다. */
-  dismissOnboarding() {
-    if (!this.onboardingManual) { remember('onboarding-dismissed', '1'); this.onboardingDismissed = true; }
-    this.closeOnboarding();
-  }
+  closeOnboarding() { this.onboardingOpen = false; this.onboardingError = ''; }
 
   /**
    * 프로필 저장 → 게시판 구독 반영 → 키워드 저장 순서로 끝낸다. 중간에 실패하면 같은 내용으로 다시 부를 때

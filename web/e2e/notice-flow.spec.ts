@@ -318,7 +318,7 @@ test('first-run setup: choices only, department list follows the college, double
     app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
     app.profileStatus = 'ready';
     app.pushStatus = 'off';
-    app.authUserId = 'account-a';
+    app.byokStatus = { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 }; app.authUserId = 'account-a';
   });
   const dialog = page.getByRole('dialog');
   await expect(page.locator('.app')).toHaveAttribute('inert', '');
@@ -442,7 +442,42 @@ test('first-run setup requires one AI key at the end and records completion only
   await expect(dialog).toHaveCount(0);
 });
 
-test('nothing chosen yet (an old skip): no boards and no notices, with a way back into the setup from the list and from settings', async ({ page }) => {
+test('first-run setup never finishes without a key, even when the key service is unreachable (no exception)', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    const w = window as unknown as { calls: unknown[][] };
+    w.calls = [];
+    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
+    app.profileStatus = 'ready'; app.authUserId = 'account-a'; app.pushStatus = 'on'; app.byokOn = false; app.byokLoading = false; app.byokStatus = null; app.aiKeys = []; app.recheckByok = () => Promise.resolve(false);
+    app.finishOnboarding = (draft: unknown, final: unknown) => { w.calls.push(['finish', final]); (app.applyOnboardingSaved as (p: unknown) => void)({ ...(app.profile as object) }); return Promise.resolve(true); };
+    app.completeOnboarding = () => { w.calls.push(['complete']); app.profile = { ...(app.profile as object), onboardedAt: 'x' }; (app.closeOnboarding as () => void)(); return Promise.resolve(true); };
+  });
+  const dialog = page.getByRole('dialog');
+  const next = () => dialog.getByRole('button', { name: '다음' }).click();
+  await dialog.getByRole('button', { name: '경영대학', exact: true }).click();
+  await dialog.getByRole('radio', { name: '경영학과', exact: true }).click();
+  await next();
+  await dialog.getByRole('radio', { name: '없어요', exact: true }).click();
+  await dialog.getByRole('button', { name: '3학년' }).click();
+  await next();
+  await expect(dialog.getByRole('heading', { name: '3품 인턴십 영역을 채웠나요?' })).toBeVisible();   // 질문이 하나뿐이라 제목이 곧 질문이다
+  await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
+  await dialog.getByRole('button', { name: '채웠어요' }).click();
+  await next();
+  await next();     // 받을 공지: 저장. 키가 없으니 완료 표시는 미룬다.
+  expect((await calls(page)).filter((c) => c[0] === 'finish')).toEqual([['finish', false]]);
+  // 알림이 이미 켜져 있으면 건너뛰고 AI 키로 간다.
+  await expect(dialog.getByRole('heading', { name: 'AI를 연결해 주세요' })).toBeVisible();
+  // 키 기능을 확인하지 못했어도 키 없이 끝낼 수 없다. 끝내기는 막혀 있고, 다시 확인할 수 있다.
+  await expect(dialog.getByRole('button', { name: '나중에 할게요' })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: '끝내기' })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: '다시 확인하기' })).toBeVisible();
+  expect((await calls(page)).filter((c) => c[0] === 'complete')).toHaveLength(0);
+});
+
+test('nothing chosen yet (an old skip): no boards and no notices, and no way to reopen the first-run setup from the list or settings', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
   await page.evaluate(() => {
@@ -456,18 +491,13 @@ test('nothing chosen yet (an old skip): no boards and no notices, with a way bac
   if (page.viewportSize()!.width >= 720) await expect(page.locator('.sidebar').getByRole('button', { name: /소프트웨어학과|경영대학|성균관대/ })).toHaveCount(0);
   await expect(page.locator('notice-rows-screen a.row')).toHaveCount(0);
   await expect(page.getByText('아직 설정을 안 했어요')).toBeVisible();
-  // 목록에서 바로 첫 설정으로 돌아간다(클릭 1번).
-  await page.getByRole('button', { name: '설정 시작하기' }).click();
-  await expect(dialog.getByRole('heading', { name: '주전공이 어디예요?' })).toBeVisible();
-  await dialog.getByRole('button', { name: '닫기' }).click();
-  // 설정 홈에도 같은 입구가 있다.
+  // 첫 설정은 처음에만 열린다. 목록과 설정 어디에도 다시 여는 입구가 없다.
+  await expect(page.getByRole('button', { name: '설정 시작하기' })).toHaveCount(0);
   await page.evaluate(() => (document.querySelector('notice-app') as unknown as { openSettings: (s: null) => void }).openSettings(null));
   const screen = page.locator('platform-settings-screen');
-  await expect(screen.getByRole('heading', { name: '첫 설정' })).toBeVisible();
-  await screen.getByRole('button', { name: '설정 시작하기' }).click();
-  await expect(dialog.getByRole('heading', { name: '주전공이 어디예요?' })).toBeVisible();
+  await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
+  await expect(screen.getByRole('heading', { name: '첫 설정' })).toHaveCount(0);
   // 이미 마친 사람이 게시판을 모두 끄면 게시판 고르기로 이어 준다.
-  await dialog.getByRole('button', { name: '닫기' }).click();
   await page.evaluate(() => { const app = document.querySelector('notice-app') as unknown as Record<string, unknown>; app.profile = { ...(app.profile as object), onboardedAt: 'x' }; (app.setView as (v: string) => void)('all'); });
   await expect(page.getByText('받을 게시판이 없어요')).toBeVisible();
   await expect(page.getByRole('button', { name: '게시판 고르기' })).toBeVisible();
@@ -696,7 +726,7 @@ test('first-run setup layout: header and body share one column, the close contro
     if (isManual) (app.openOnboarding as () => void)();
   }, manual);
   const box = async (selector: string) => (await page.locator(selector).first().boundingBox())!;
-  for (const manual of [false, true]) {
+  for (const manual of [false]) {   // 첫 설정은 처음에만 열린다(다시 여는 경로는 없다)
     await open(manual);
     const dialog = page.getByRole('dialog');
     await dialog.waitFor();
@@ -1323,7 +1353,7 @@ test('software original major is asked for the admission year and the internship
     app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
     app.profileStatus = 'ready';
     app.pushStatus = 'on';
-    app.authUserId = 'account-a';
+    app.byokStatus = { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 }; app.authUserId = 'account-a';
   });
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: '소프트웨어융합대학', exact: true }).click();
@@ -1506,16 +1536,6 @@ test('first-run setup keeps answers when going back and forward, and a stored "n
   await next();
   await next();                                                                                  // 인턴십: 입학 연도가 남아 있다
   await expect(dialog.getByRole('button', { name: '2022', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  // 이미 첫 설정을 마친 사람이 다시 열면 복수전공 없음이 골라진 채로 보인다.
-  await page.evaluate(() => { const app = document.querySelector('notice-app') as unknown as { closeOnboarding: () => void; onboardingDismissed: boolean }; app.onboardingDismissed = true; app.closeOnboarding(); });
-  await expect(dialog).toHaveCount(0);
-  await page.evaluate(() => {
-    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
-    app.profile = { programs: [{ college: '경영대학', department: '경영학과' }], year: 2, semester: 1, enrollmentStatus: '재학', militaryService: '해당 없음', onboardedAt: '2026-11-07T00:00:00Z' };
-    (app.openOnboarding as () => void)();
-  });
-  await dialog.getByRole('button', { name: '다음' }).click();
-  await expect(dialog.getByRole('radio', { name: '없어요', exact: true })).toHaveAttribute('aria-checked', 'true');
 });
 
 test('switching the tab shows only the list (detail pane closed, no notice opened or marked read); a row click opens the detail again', async ({ page }) => {
