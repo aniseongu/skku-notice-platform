@@ -1112,12 +1112,13 @@ test('software original major is asked for the admission year and the internship
   await page.locator('notice-rows-screen a.row').nth(1).click();
   const section = page.getByRole('region', { name: '인턴십 요건 확인' });
   await expect(section).toBeVisible();
-  await expect(section.getByText('솦 인턴십 · 확인 필요', { exact: true })).toBeVisible();
-  const p3 = section.getByText('3품 인턴십 · 어려울 수 있음', { exact: true });
+  await expect(section.getByText('솦 인턴십 확인 필요', { exact: true })).toBeVisible();
+  const p3 = section.getByText('3품 인턴십 어려움', { exact: true });
   await expect(p3).toBeVisible();
   await expect(section.getByText('최대 240시간이라 280시간에 못 미쳐요')).toBeVisible();
-  // 안 되는 쪽은 빨강 계열 글자다(배지나 카드가 아니다).
-  expect(await p3.evaluate((el) => getComputedStyle(el).color)).toBe(await page.evaluate(() => { const probe = document.createElement('span'); probe.style.color = 'var(--danger)'; document.body.append(probe); const c = getComputedStyle(probe).color; probe.remove(); return c; }));
+  // 안 되는 쪽은 "해당 없음"처럼 굵지 않은 옅은 회색이다(빨강이나 배지가 아니다).
+  expect(await p3.evaluate((el) => getComputedStyle(el).fontWeight)).toBe('400');
+  expect(await p3.evaluate((el) => getComputedStyle(el).color)).toBe(await page.evaluate(() => { const probe = document.createElement('span'); probe.style.color = 'var(--text-3)'; document.body.append(probe); const c = getComputedStyle(probe).color; probe.remove(); return c; }));
   // 인정 기준은 적지 않는다. 판정 한 줄과 이유 한 문장만 보인다.
   await expect(section).not.toContainText('인정 기준');
   await expect(section.getByRole('button')).toHaveCount(0);  // 판정은 서버가 미리 해 두므로 누를 것이 없다

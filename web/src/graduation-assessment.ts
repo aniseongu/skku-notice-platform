@@ -9,7 +9,7 @@ const STATUSES: readonly Status[] = ['LIKELY', 'CONDITIONAL', 'NEEDS_REVIEW', 'N
 
 /** 색만으로 구분하지 않도록 글자로도 보여 준다. */
 export const STATUS_TEXT: Record<Status, string> = {
-  LIKELY: '가능성 높음', CONDITIONAL: '조건부 가능', NEEDS_REVIEW: '확인 필요', NOT_ELIGIBLE: '어려울 수 있음', NOT_APPLICABLE: '해당 없음',
+  LIKELY: '가능', CONDITIONAL: '확인 필요', NEEDS_REVIEW: '확인 필요', NOT_ELIGIBLE: '어려움', NOT_APPLICABLE: '해당 없음',
 };
 
 export interface Check { ruleId: string; result: 'pass' | 'fail' | 'unknown'; note: string }

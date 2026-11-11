@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { cleanTitle, deadlineDetail, deadlinePassed, deadlineText, daysLeft, koreanDate, safeUrl, type Notice, type NoticeBody, type Verdict } from './data';
 import { useState } from 'react';
 import type { GradPart } from './graduation-assessment';
-import { GraduationSection, type GraduationModel } from './graduation-assessment-view';
+import { GraduationNotes, GraduationSection, type GraduationModel } from './graduation-assessment-view';
 import { cleanHtml, fileType, IMAGE_MISSING, replaceBrokenImage } from './rich';
 
 export interface NoticeDetailModel {
@@ -98,6 +98,7 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
       {notice.previous_title ? <div><dt>이전 제목</dt><dd>{cleanTitle(notice.previous_title)}</dd></div> : null}
       {interests.length ? <div><dt>관심</dt><dd><b className="interest font-semibold text-accent">{interests.join(', ')}</b></dd></div> : null}
       {model.notified ? <div><dt>알림</dt><dd>알림을 보냈어요</dd></div> : null}</dl>
+    {model.graduation ? <GraduationNotes model={model.graduation} /> : null}
   </div>;
 }
 class NoticeDetailElement extends HTMLElement {
