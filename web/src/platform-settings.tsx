@@ -732,10 +732,10 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
       {status ? <button type="button" className="text-button self-start" disabled={busy} onClick={() => { setEditing(false); setValue(''); setShown(false); }}>{labels.close}</button> : null}
       {guide}
     </> : <>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
         <span className={`inline-flex min-h-[32px] items-center rounded-pill bg-sunken px-3 text-[14px] font-medium ${status?.disabled ? 'text-danger' : 'text-accent'}`}>{state}</span>
-        <button type="button" className="ghost-button key-action min-h-[44px] px-3 py-0" aria-label={`${name} ${retry}`} disabled={loading} onClick={() => setEditing(true)}>{retry}</button>
-        {status ? <button type="button" className="ghost-button key-action min-h-[44px] px-3 py-0 text-danger" aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={onRemove}>{labels.remove}</button> : null}
+        <span className="flex shrink-0 gap-2"><button type="button" className="ghost-button key-action min-h-[44px] px-3 py-0" aria-label={`${name} ${retry}`} disabled={loading} onClick={() => setEditing(true)}>{retry}</button>
+        {status ? <button type="button" className="ghost-button key-action min-h-[44px] px-3 py-0 text-danger" aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={onRemove}>{labels.remove}</button> : null}</span>
       </div>
       {status?.lastError && !labels.broken ? <p className="field-note error" role="alert">{status.lastError}</p> : null}
       {note ? <p className="field-note" role="status">{note}</p> : null}

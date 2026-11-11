@@ -32,7 +32,7 @@ const link = (id: Id) => <a key={id} href={GUIDE[id].url} target="_blank" rel="n
 
 /** 키 받는 방법은 모든 키가 같아서 맨 아래에 하나로 둔다. 연결했든 안 했든 언제든 펼쳐 볼 수 있다. */
 function SharedGuide() {
-  return <div className="setting"><Guide label="키는 어디서 받나요?" steps={[
+  return <div className="setting"><Guide bare label="키는 어디서 받나요?" steps={[
     <>쓸 곳을 하나 골라 키 만들기 화면을 열고 로그인해요. 처음이면 가입부터 해요<br />{link('groq')}{link('gemini')}{link('openrouter')}</>,
     '"키 만들기"를 누르고 이름을 아무거나 적어요 (예: 성공). Gemini는 "API 키 만들기"를 눌러요',
     '만들어진 키를 복사해요. 키는 이때 한 번만 보여요',
