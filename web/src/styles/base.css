@@ -75,10 +75,6 @@
 
   .wco-bar { display: none; }
 
-  /* 상세 본문은 Tailwind 클래스로 옮겼다(notice-detail.tsx, cls.ts). 상세 칸이 비었을 때의 안내 글만 남긴다. */
-  .detail-note { margin-top: 20px; font-size: 13px; line-height: 19px; color: var(--text-3); }
-  .detail-empty { margin: 0; padding: 24px 32px; }
-
   /* 마우스와 키보드가 있는 기기에서만 보인다(휴대폰에는 단축키가 없다) */
   @media not ((hover: hover) and (pointer: fine)) { .kbd-group, .kbd-only { display: none !important; } }
 }

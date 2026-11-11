@@ -81,13 +81,16 @@ export function NoticeShell({ app }: { app: AppController }) {
     ? app.notices.find((n) => n.id === app.openedId) ?? list.find((n) => n.id === app.openedId) : undefined;
   // 첫 로그인 설정 창이 떠 있는 동안 뒤쪽 화면은 비활성으로 두어 Tab 키 포커스와 화면 낭독기가 새지 않게 한다.
   const onboarding = app.needsOnboarding();
-  const classes = [settings ? 'is-settings' : '', app.isWide && (!app.detailOpen || !selected) ? 'no-detail' : '', reading ? 'is-reading' : ''].join(' ');
+  const noDetail = app.isWide && (!app.detailOpen || !selected);
+  const classes = [settings ? 'is-settings' : '', noDetail ? 'no-detail' : '', reading ? 'is-reading' : ''].join(' ');
+  // 1080px 이상에서는 목록·상세 두 칸, 설정이거나 상세를 닫았으면 한 칸이다.
+  const oneColumn = settings || noDetail;
 
   return <>
     <div className="wco-bar" aria-hidden="true"><Brand />{APP_NAME}</div>
-    <div className={`app ${classes}`} inert={onboarding}>
+    <div className={`app min-[720px]:grid min-[720px]:h-[calc(100dvh-var(--wco-h))] min-[720px]:grid-cols-[248px_minmax(0,1fr)] ${oneColumn ? 'min-[1080px]:grid-cols-[248px_minmax(0,1fr)]' : 'min-[1080px]:grid-cols-[248px_minmax(0,680px)_minmax(400px,1fr)]'} ${classes}`} inert={onboarding}>
       <aside className="sidebar hidden border-r border-line bg-mica px-[12px] pt-0 pb-[12px] min-[720px]:flex min-[720px]:min-h-0 min-[720px]:flex-col min-[720px]:overflow-y-auto" aria-label="탐색">
-        <div className="pane-head brand"><Brand />{APP_NAME}</div>
+        <div className="pane-head brand min-[720px]:-mx-[12px] min-[720px]:mt-0 min-[720px]:mb-[12px] min-[720px]:flex min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:items-center min-[720px]:gap-[8px] min-[720px]:border-b min-[720px]:border-line min-[720px]:px-[24px] min-[720px]:text-[17px] min-[720px]:font-bold min-[720px]:tracking-[-0.02em] min-[720px]:[&_.brand-mark]:text-accent min-[720px]:[&_.brand-mark]:size-[32px]"><Brand />{APP_NAME}</div>
         <nav className="side-group flex flex-col gap-[1px]" aria-label="보기">
           {TABS.map((t, index) => <SideItem key={t.id} label={t.label} count={counts[t.id]} active={app.view === t.id}
             onClick={() => app.setView(t.id)} shortcut={String(index + 1)} icon={t.icon} />)}
@@ -108,28 +111,28 @@ export function NoticeShell({ app }: { app: AppController }) {
         </div>
       </aside>
 
-      <main className={`list-pane ${app.selecting ? 'max-[719px]:pb-[calc(88px+env(safe-area-inset-bottom))]' : ''}`}>
+      <main className={`list-pane min-[720px]:min-h-0 min-[720px]:overflow-y-auto min-[720px]:bg-surface min-[720px]:pb-[32px] ${app.selecting ? 'max-[719px]:pb-[calc(88px+env(safe-area-inset-bottom))]' : 'max-[719px]:pb-[calc(var(--tabbar-h)+24px+env(safe-area-inset-bottom))]'} ${noDetail ? '' : 'min-[1080px]:border-r min-[1080px]:border-line'}`}>
         {reading ? <ReadingView app={app} notice={reading} /> : <>
           <div className="navigation-head contents">
             <header className={`${TOPBAR} ${settings ? TOPBAR_SETTINGS : TOPBAR_FEED}`}>
-              {settings ? <button type="button" className="icon-button narrow-only back -ml-[12px]" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} onClick={app.backSettings}><Icon name="back" /></button> : null}
-              {settings ? null : <Brand className="brand-mark narrow-only mr-[8px] h-[36px] w-[36px] flex-none text-accent" />}
+              {settings ? <button type="button" className="icon-button narrow-only back -ml-[12px] min-[720px]:hidden!" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} onClick={app.backSettings}><Icon name="back" /></button> : null}
+              {settings ? null : <Brand className="brand-mark narrow-only min-[720px]:hidden! mr-[8px] h-[36px] w-[36px] flex-none text-accent" />}
               <div className={TOPBAR_TEXT}>
                 <h1 className={`${TOPBAR_H1} ${settings ? '' : 'max-[719px]:text-[21px] max-[719px]:leading-[28px] max-[719px]:font-extrabold'}`}>{title}</h1>
                 {settings ? null : <UpdatedLine app={app} count={list.length} pending={app.tab() === 'saved' ? 0 : app.pendingCount(list)} />}
               </div>
               {settings ? null : <>
-                <label className="search wide-only min-[720px]:h-[36px] min-[720px]:min-w-[120px] min-[720px]:w-[260px] min-[720px]:flex-[0_1_260px] min-[720px]:px-[12px] min-[720px]:py-0"><Icon name="search" />
+                <label className="search wide-only max-[719px]:hidden min-[720px]:flex min-[720px]:h-[36px] min-[720px]:min-w-[120px] min-[720px]:w-[260px] min-[720px]:flex-[0_1_260px] min-[720px]:px-[12px] min-[720px]:py-0"><Icon name="search" />
                   <input type="search" placeholder="공지 찾기" autoComplete="off" aria-label="공지 검색" aria-keyshortcuts="/" value={app.query}
                     onChange={(event) => { app.query = event.currentTarget.value; app.selectedId = null; app.selectedReads = []; }} />
                   {app.query ? null : <Kbd keys={['/']} className="ml-auto" />}</label>
-                {app.detailOpen || !selected ? null : <button type="button" className="icon-button wide-only" aria-label="상세 칸 열기" title="상세 칸 열기"
+                {app.detailOpen || !selected ? null : <button type="button" className="icon-button wide-only max-[719px]:hidden min-[720px]:flex" aria-label="상세 칸 열기" title="상세 칸 열기"
                   onClick={() => app.setDetail(true)}><Icon name="panel" /></button>}
                 <button type="button" className="icon-button" aria-label="공지 다시 가져오기" title="공지 다시 가져오기 (R)" aria-keyshortcuts="r"
                   disabled={app.loading} onClick={() => { void app.collectNow(); }}><Icon name="refresh" /></button>
               </>}
-              {settings ? null : <button type="button" className="icon-button narrow-only" aria-label="설정" onClick={app.openSettingsHome}><GearIcon /></button>}
-              {settings ? <button type="button" className="icon-button wide-only" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} title={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 (Esc)' : '설정 닫기 (Esc)'}
+              {settings ? null : <button type="button" className="icon-button narrow-only min-[720px]:hidden!" aria-label="설정" onClick={app.openSettingsHome}><GearIcon /></button>}
+              {settings ? <button type="button" className="icon-button wide-only max-[719px]:hidden min-[720px]:flex" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} title={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 (Esc)' : '설정 닫기 (Esc)'}
                 aria-keyshortcuts="Escape" onClick={app.backSettings}><Icon name="close" /></button> : null}
             </header>
           </div>
@@ -153,16 +156,16 @@ export function NoticeShell({ app }: { app: AppController }) {
         </>}
       </main>
 
-      <aside className="detail-pane" aria-label="공지 상세">
-        <div className="pane-head detail-head">
+      <aside className={`detail-pane hidden min-[720px]:min-h-0 min-[720px]:overflow-y-auto min-[1080px]:bg-bg ${oneColumn ? '' : 'min-[1080px]:block'}`} aria-label="공지 상세">
+        <div className="pane-head detail-head min-[720px]:flex min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:items-center min-[720px]:gap-[8px] min-[720px]:border-b min-[720px]:border-line min-[1080px]:justify-between min-[1080px]:pr-[32px] min-[1080px]:pl-[20px] min-[1080px]:[&_.save-button]:size-[36px] min-[1080px]:[&_.save-button]:rounded-md min-[1080px]:[&_.solid-button]:min-h-[36px] min-[1080px]:[&_.solid-button]:px-[14px] min-[1080px]:[&_.solid-button]:text-[14px] min-[1080px]:[&_.ghost-button]:min-h-[36px] min-[1080px]:[&_.ghost-button]:px-[14px] min-[1080px]:[&_.ghost-button]:text-[14px]">
           {selected ? <button type="button" className="icon-button" aria-label="상세 칸 닫기" title="상세 칸 닫기 (Esc)" aria-keyshortcuts="Escape"
             onClick={() => app.setDetail(false)}><Icon name="close" /></button> : null}
-          {selected ? <div className="detail-actions">
+          {selected ? <div className="detail-actions min-[1080px]:flex min-[1080px]:gap-[8px]">
             <SaveButton app={app} notice={selected} />
             <button type="button" className="ghost-button" onClick={() => { void app.copyLink(selected); }}>링크 복사하기</button>
             <a className="solid-button" href={safeUrl(selected.url)} target="_blank" rel="noopener" aria-keyshortcuts="Enter">원문 열기<Kbd keys={['Enter']} className="ml-[8px]" onSolid /></a></div> : null}
         </div>
-        {selected ? <Detail app={app} notice={selected} /> : <p className="detail-note detail-empty">공지를 고르면 여기에 보여요</p>}
+        {selected ? <Detail app={app} notice={selected} /> : <p className="detail-note detail-empty m-0 grid min-h-[60%] place-items-center px-[32px] py-[24px] text-[14px] leading-[19px] text-ink-3">공지를 고르면 여기에 보여요</p>}
       </aside>
     </div>
 
@@ -486,8 +489,8 @@ function ReadingView({ app, notice }: { app: AppController; notice: Notice }) {
       <button type="button" className="icon-button back -ml-[12px]" aria-label="목록으로" onClick={() => history.back()}><Icon name="back" /></button>
       <div className={TOPBAR_TEXT}><h1 className={TOPBAR_H1}>공지</h1></div>
     </header>
-    <div className="reading"><Detail app={app} notice={notice} /></div>
-    <div className="read-actions glass">
+    <div className="reading px-[var(--gutter)] pt-[16px] pb-[calc(96px+env(safe-area-inset-bottom))]"><Detail app={app} notice={notice} /></div>
+    <div className="read-actions glass fixed inset-x-0 bottom-0 z-[3] flex gap-[8px] border-t border-line px-[var(--gutter)] pt-[12px] pb-[calc(12px+env(safe-area-inset-bottom))] [&>*]:flex-1 [&>.save-button]:flex-none">
       <SaveButton app={app} notice={notice} />
       {'share' in navigator
         ? <button type="button" className="ghost-button" onClick={() => { void app.share(notice); }}>공유하기</button>

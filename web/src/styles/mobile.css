@@ -1,7 +1,5 @@
 /* 휴대폰 (One UI, 720px 미만). 목록과 검색은 같은 시작선에 맞춘다. */
 @layer mobile {
-  .detail-pane, .wide-only { display: none; }
-  .list-pane { padding-bottom: calc(var(--tabbar-h) + 24px + env(safe-area-inset-bottom)); }
   /* 상단 바와 갱신 줄은 Tailwind 클래스로 옮겼다(notice-shell.tsx). h1 기본 모양만 남긴다. */
   h1 { font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -38,14 +36,5 @@
   .selection-check input:focus-visible, .select-all input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .rows li + li .selection-check { border-top: 1px solid var(--line); }
   .select-all { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; font-weight: 500; color: var(--text-2); cursor: pointer; }
-  /* 휴대폰 앱 안 상세 화면 */
-  .reading { padding: 16px var(--gutter) calc(96px + env(safe-area-inset-bottom)); }
-  .read-actions {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 3;
-    display: flex; gap: 8px; padding: 12px var(--gutter) calc(12px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line);
-  }
-  .read-actions > * { flex: 1; }
-  .read-actions > .save-button { flex: none; }
 }
 

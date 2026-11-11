@@ -1,27 +1,8 @@
-/* PC (브라우저 창, 설치 앱): 바닥까지 닿는 평평한 칸, 칸마다 따로 스크롤, 64px 머리 줄이 한 줄로 이어진다 */
+/* PC (브라우저 창, 설치 앱): 칸 배치와 머리 줄은 Tailwind 클래스로 옮겼다(notice-shell.tsx). 아래는 전역 규칙과 아이콘 단추 변형만 남긴다. */
 @layer desktop {
   @media (min-width: 720px) {
     body { overflow: hidden; }
-    .narrow-only { display: none !important; }
-    .wide-only { display: flex; }
-    .app {
-      display: grid; grid-template-columns: 248px minmax(0, 1fr);
-      height: calc(100dvh - var(--wco-h));
-    }
-    .list-pane, .detail-pane { min-height: 0; overflow-y: auto; }
-    .list-pane { padding-bottom: 32px; background: var(--surface); }
-
-    /* 상단 바(.topbar)는 Tailwind 클래스로 옮겼다(notice-shell.tsx의 TOPBAR). 사이드바 브랜드 줄과 상세 머리가 .pane-head를 쓴다. */
-    .pane-head {
-      display: flex; align-items: center; gap: 8px; height: var(--head-h); flex: none;
-      border-bottom: 1px solid var(--line);
-    }
-    .brand { margin: 0 -12px 12px; padding: 0 24px; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
-    .brand .brand-mark { width: 32px; height: 32px; color: var(--accent); }
     .icon-button { width: 36px; height: 36px; border-radius: var(--r-sm); }
-
-    /* 사이드바 항목은 Tailwind 클래스로 옮겼다(notice-shell.tsx의 SideItem, SideGroup). */
-
     /* 선택 모드에서 체크박스가 줄 왼쪽 여백(24px) 안에 겹쳐 들어가, 모드를 바꿔도 분류·제목 열이 밀리지 않는다. */
     .batch-row { position: relative; }
     .batch-row .selection-check { position: absolute; inset: 0 auto 0 0; width: 48px; padding-left: 24px; z-index: 1; background: none !important; }
@@ -34,21 +15,5 @@
         background: color-mix(in oklch, var(--sunken) 70%, transparent);
       }
     }
-  }
-
-  @media (min-width: 1080px) {
-    .app { grid-template-columns: 248px minmax(0, 680px) minmax(400px, 1fr); }
-    .app.is-settings { grid-template-columns: 248px minmax(0, 1fr); }
-    .app.is-settings .detail-pane { display: none; }
-    .app.no-detail { grid-template-columns: 248px minmax(0, 1fr); }
-    .app.no-detail .detail-pane { display: none; }
-    .app.no-detail .list-pane { border-right: 0; }
-    .list-pane { border-right: 1px solid var(--line); }
-    .detail-pane { display: block; background: var(--bg); }
-    .detail-head { justify-content: space-between; padding: 0 32px 0 20px; }
-    .detail-actions { display: flex; gap: 8px; }
-    .detail { padding: 24px 32px; }
-    .detail-head .solid-button, .detail-head .ghost-button { min-height: 36px; padding: 0 14px; font-size: 14px; }
-    .detail-head .save-button { width: 36px; height: 36px; border-radius: var(--r-md); }
   }
 }

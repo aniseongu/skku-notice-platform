@@ -111,6 +111,4 @@
   [data-needs-link] > .link-note { display: none; }
   .unlinked [data-needs-link] > :not(.link-note) { display: none; }
   .unlinked [data-needs-link] > .link-note { display: block; }
-  /* 빈 상세 칸 안내는 칸 가운데에 */
-  .detail-pane:not(:has(.detail)) .detail-empty { display: grid; place-items: center; min-height: 60%; font-size: 14px; }
 }
