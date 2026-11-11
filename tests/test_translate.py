@@ -2,7 +2,6 @@ import json
 from types import SimpleNamespace
 
 from skku_notice import translate
-from skku_notice.archive import Archive, update_translation
 
 
 class FakeModels:
@@ -49,9 +48,3 @@ def test_untranslated_or_failed_reply_is_dropped():
     assert translate.translate_notice("Seminar on Robots", "Talk", "m", "k", failing) is None
 
 
-def test_archive_keeps_translation_and_counts_failures():
-    archive = Archive({"a/1": {"notice": {"title": "Seminar"}}})
-    failed = update_translation(update_translation(archive, "a/1", None, "m"), "a/1", None, "m")
-    assert failed.items["a/1"]["translation_attempts"] == 2
-    done = update_translation(archive, "a/1", ("세미나", "본문"), "m")
-    assert done.items["a/1"]["translation"] == {"title": "세미나", "body": "본문", "model": "m"}

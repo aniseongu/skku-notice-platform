@@ -1,12 +1,8 @@
 # 출처: WhaleExtentions/extensions/icampus-check/notify.js
 """Pure Canvas alert decisions and the private, minimal reminder state."""
 
-import json
-import os
-import tempfile
 from dataclasses import dataclass, field, replace
 from datetime import datetime, time, timedelta
-from pathlib import Path
 
 from skku_notice.deadline import KST
 
@@ -43,43 +39,6 @@ class CanvasAlert:
     priority: str = "default"
     keys: tuple[str, ...] = ()
     summary_day: str | None = None
-
-
-def load_canvas_state(path: Path) -> CanvasState:
-    if not path.exists():
-        return CanvasState()
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    if raw.get("version") != 1 or not isinstance(raw.get("notified"), dict):
-        raise ValueError("unsupported Canvas state format")
-    return CanvasState(raw["notified"], raw.get("summary_sent_on"), raw.get("problem"),
-                       initialized=raw.get("initialized", True),
-                       last_learningx_launch=raw.get("last_learningx_launch"),
-                       partial_summary_sent_on=raw.get("partial_summary_sent_on"))
-
-
-def save_canvas_state(path: Path, state: CanvasState) -> None:
-    data = {
-        "version": 1,
-        "notified": state.notified,
-        "summary_sent_on": state.summary_sent_on,
-        "partial_summary_sent_on": state.partial_summary_sent_on,
-        "problem": state.problem,
-        "initialized": state.initialized,
-        "last_learningx_launch": state.last_learningx_launch,
-    }
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = None
-    try:
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as output:
-            temporary = Path(output.name)
-            json.dump(data, output, ensure_ascii=False, indent=2)
-            output.write("\n")
-            output.flush()
-            os.fsync(output.fileno())
-        temporary.replace(path)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
 
 
 def remaining_text(delta: timedelta) -> str:

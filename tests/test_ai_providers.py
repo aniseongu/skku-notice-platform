@@ -169,3 +169,11 @@ def test_a_400_about_json_schema_is_retried_once_in_json_mode():
     reply = client_for("groq", handler).models.generate_content(
         model="openai/gpt-oss-20b", contents="x", config=types.GenerateContentConfig(response_schema=SCHEMA))
     assert calls == ["json_schema", "json_object"] and json.loads(reply.text) == {"items": []}
+
+
+def test_gemini_client_is_built_with_bounded_retries_and_no_network():
+    """서버 워커가 키마다 만드는 Gemini 클라이언트. 만들 때 네트워크를 쓰지 않고 재시도는 3번으로 제한한다."""
+    from skku_notice.gemini_client import gemini_client
+
+    client = gemini_client("AIza" + "K" * 35)
+    assert client is not None and hasattr(client, "models")

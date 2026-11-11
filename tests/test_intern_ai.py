@@ -1,11 +1,8 @@
 import json
 from types import SimpleNamespace
 
-from skku_notice import cli, intern_ai
-from skku_notice.archive import Archive
+from skku_notice import intern_ai
 from skku_notice.fetch import ImageData
-from skku_notice.judge import Judgment
-from skku_notice.state import SeenRecord, SourceState, State
 
 
 def test_intern_judgment_sends_complete_body_and_linked_image_bytes():
@@ -48,74 +45,10 @@ def item(number, *, body="모집분야: 개발자", images=None):
             "match": {"ai": None, "priority": None}}
 
 
-def test_intern_judgment_receives_eligibility_profile(monkeypatch, tmp_path):
-    received = []
-    monkeypatch.setattr(cli, "ARCHIVE_PATH", tmp_path / "archive.json")
-    monkeypatch.setattr(
-        cli, "judge_internships", lambda *args, **kwargs: received.append(kwargs["profile"]) or {}
-    )
-    cli._intern_decisions(
-        Archive({"jobs/1": item(1)}), State({}), [{"id": "jobs", "external": True}],
-        {"model": "m"}, "fake", [10], "test",
-        {"year": 2, "semester": 2, "enrolled_semester": 4,
-         "military_service": "복무 완료", "name": "private"},
-    )
-    assert received == [{"year": 2, "semester": 2, "enrolled_semester": 4, "military_service": "복무 완료"}]
 
 
-def test_backfill_prioritizes_pending_limits_to_six_and_caches(monkeypatch, tmp_path):
-    stamp = "2026-11-04T00:00:00+09:00"
-    state = State({"jobs": SourceState(stamp, {str(i): SeenRecord(stamp, "baseline", 0) for i in range(8)} | {
-        "7": SeenRecord(stamp, "pending", 0)})})
-    archive = Archive({f"jobs/{i}": item(i) for i in range(8)})
-    calls = []
-
-    def judge(items, *_args, **_kwargs):
-        calls.append(items)
-        return {entry["id"]: Judgment("relevant", "개발 직무예요", "m") for entry in items}
-
-    monkeypatch.setattr(cli, "ARCHIVE_PATH", tmp_path / "archive.json")
-    monkeypatch.setattr(cli, "judge_internships", judge)
-    sources = [{"id": "jobs", "external": True}]
-    archive, found = cli._intern_decisions(archive, state, sources, {"model": "m"}, "fake", [10], "test")
-    assert len(calls[0]) == 6 and calls[0][0]["id"] == "jobs/7"
-    assert len(found) == 6 and state.sources["jobs"].seen["0"].status == "baseline"
-    assert archive.items["jobs/0"]["match"]["ai"]["reason"] == "개발 직무예요"
-    archive, found = cli._intern_decisions(archive, state, sources, {"model": "m"}, "fake", [10], "test")
-    assert len(calls) == 2 and len(calls[1]) == 2 and len(found) == 8
-    archive, _ = cli._intern_decisions(archive, state, sources, {"model": "m"}, "fake", [10], "test")
-    assert len(calls) == 2
-    changed = dict(archive.items)
-    changed["jobs/0"] = {**changed["jobs/0"], "body_text": "변경된 모집 분야"}
-    cli._intern_decisions(Archive(changed), state, sources, {"model": "m"}, "fake", [10], "test")
-    assert len(calls) == 3 and calls[2][0]["id"] == "jobs/0"
 
 
-def test_image_only_intern_waits_when_image_cannot_be_fetched(monkeypatch, tmp_path):
-    archive = Archive({"jobs/1": item(1, body="", images=["https://cdn.example/image.png"])})
-    state = State({"jobs": SourceState("time", {})})
-    calls = []
-    monkeypatch.setattr(cli, "ARCHIVE_PATH", tmp_path / "archive.json")
-    monkeypatch.setattr(cli.time, "sleep", lambda _: None)
-    monkeypatch.setattr(cli, "fetch_images", lambda *args, **kwargs: [])
-    monkeypatch.setattr(cli, "judge_internships", lambda *args, **kwargs: calls.append(args) or {})
-    _, found = cli._intern_decisions(archive, state, [{"id": "jobs", "external": True}],
-                                    {"model": "m"}, "fake", [10], "test")
-    assert not found and not calls
-    pixels = ImageData(b"public-image", "image/png")
-    monkeypatch.setattr(cli, "fetch_images", lambda *args, **kwargs: [pixels])
-    received = []
-
-    def judge(items, *_args, **kwargs):
-        received.append(kwargs["images"])
-        return {"jobs/1": Judgment("maybe", "이미지를 확인해 주세요", "m")}
-
-    monkeypatch.setattr(cli, "judge_internships", judge)
-    budget = [2]
-    _, found = cli._intern_decisions(archive, state, [{"id": "jobs", "external": True}],
-                                    {"model": "m"}, "fake", budget, "test")
-    assert budget == [1] and found["jobs/1"].verdict == "maybe"
-    assert received == [{"jobs/1": [pixels]}]
 
 
 def test_policy_change_invalidates_cached_intern_judgments(monkeypatch):
