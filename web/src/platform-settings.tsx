@@ -754,9 +754,8 @@ function CanvasRow({ model }: { model: SettingsModel }) {
     labels={{ empty: '연결 안 됨', saved: '연결됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '연결하기', edit: '바꾸기', remove: '연결 끊기', save: '연결하기' }}
     error={byok.canvasError} onRegister={byok.registerCanvas} onRemove={byok.removeCanvas} guide={null}
     valid={(value) => /^[0-9A-Za-z~_-]{16,200}$/.test(value)} />
-    <StepGuide label="토큰은 어디서 받나요?" links={[{ href: 'https://canvas.skku.edu/profile/settings', text: '아이캠퍼스 설정 열기' }]}
-      steps={['위 버튼으로 아이캠퍼스를 열고 로그인해요', '"승인된 통합" 아래의 "새 액세스 토큰"을 눌러요', '목적에 "성공 알림" 같은 이름을 쓰고 만료일은 비워 두거나 학기 끝으로 정해요', '"토큰 생성"을 누르고 나오는 긴 글자를 복사해요. 한 번만 보여요', '위 입력칸에 붙여 넣고 "연결하기"를 눌러요']}
-      note="아이캠퍼스에 확인한 뒤 암호화해 서버에만 보관해요. 읽기만 하고 내용을 바꾸지 않아요" /></>;
+    <StepGuide label="토큰은 어디서 받나요?" note="읽기만 하고 내용은 바꾸지 않아요"
+      steps={[<>{ext('https://canvas.skku.edu/profile/settings', '아이캠퍼스 설정')}에서 로그인해요</>, '"새 액세스 토큰"을 눌러요', '이름을 적고 "토큰 생성"을 눌러요', '토큰을 복사해요. 한 번만 보여요', '위 칸에 붙여 넣고 "연결하기"를 눌러요']} /></>;
 }
 
 function Keys({ model }: { model: SettingsModel }) {
