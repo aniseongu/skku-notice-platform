@@ -279,7 +279,7 @@ export function Onboarding({ app }: { app: AppController }) {
         {mainSources.filter((source) => shownBoards.has(source.id) || inlineRest).map(boardSwitch)}
         {/* "더 보기"는 같은 카드의 마지막 줄이다. 카드 밖에 따로 떠 있으면 구역 제목처럼 읽힌다(독립 평가). 펼친 목록은 카드 바로 아래에 둔다. */}
         {moreSources.length ? <button type="button" aria-expanded={moreOpen} aria-controls="more-boards" onClick={() => setMoreOpen(!moreOpen)}
-          className="flex min-h-[52px] w-full items-center justify-between gap-[12px] border-0 border-t border-line bg-transparent px-0 text-left text-[15px] font-semibold text-ink-2 [.box>&:first-child]:border-t-0">
+          className="flex min-h-[52px] w-full items-center justify-between gap-[12px] border-0 border-t border-line bg-transparent px-0 text-left text-[15px] font-medium text-ink [.box>&:first-child]:border-t-0">
           {moreOpen ? '게시판 접기' : `학과·단과대 게시판 ${moreSources.length}개 더 보기`}
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`text-ink-3 transition-transform ${moreOpen ? 'rotate-180' : ''}`}><path d="M6 9l6 6 6-6" /></svg>
         </button> : null}
@@ -291,7 +291,7 @@ export function Onboarding({ app }: { app: AppController }) {
         {[...new Set(OTHER_BOARDS.map((board) => board.group))]
           .sort((a, b) => Number(OTHER_BOARDS.some((board) => board.group === b && recommended.includes(board.id))) - Number(OTHER_BOARDS.some((board) => board.group === a && recommended.includes(board.id))))   // 추천이 든 묶음을 위로
           .map((group, index) => <div key={group} role="group" aria-labelledby={`other-${index}`} className="[&>h3+button]:border-t-0">
-            <h3 id={`other-${index}`} className="m-0 pt-[16px] pb-[2px] text-[13px] font-medium leading-[20px] text-ink-2 min-[720px]:pt-[20px]">{group}</h3>
+            <h3 id={`other-${index}`} className="m-0 pt-[20px] pb-[2px] text-[13px] font-semibold leading-[20px] text-ink-2 min-[720px]:pt-[24px]">{group}</h3>
             {OTHER_BOARDS.filter((board) => board.group === group).sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id))).map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
                   checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
           </div>)}

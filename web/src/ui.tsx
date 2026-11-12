@@ -16,7 +16,7 @@ export function SwitchRow({ checked, onChange, label, description, badge, disabl
 }) {
   return <button type="button" role="switch" className={SWITCH_ROW} aria-checked={checked} disabled={disabled} onClick={() => onChange(!checked)}>
     <span className="switch-text grid gap-[2px]"><span className="switch-label inline-flex items-center gap-[8px] text-[15px] font-medium">{label}{badge ? <>{" "}<span className={BADGE}>{badge}</span></> : null}</span>
-      {description ? <span className="switch-note text-[13px] text-ink-3">{description}</span> : null}</span>
+      {description ? <span className="switch-note text-[13px] text-ink-2">{description}</span> : null}</span>
     <span className={SWITCH} aria-hidden="true" />
   </button>;
 }
