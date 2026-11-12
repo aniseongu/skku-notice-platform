@@ -1711,3 +1711,18 @@ test('opening settings keeps the left menu as it was (tab, pressed keyword, boar
   await expect(side.getByRole('button', { name: '설정' })).toHaveClass(/bg-sunken/);
   await expect(side.getByRole('button', { name: /^성대 공지\s*\d*$/ })).not.toHaveClass(/bg-sunken/);
 });
+
+test('typing in search closes the open detail pane instead of opening another notice', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 800 });
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.waitForLoadState('networkidle');
+  const state = () => page.evaluate(() => { const a = document.querySelector('notice-app') as unknown as Record<string, unknown>; return { detailOpen: a.detailOpen, selectedId: a.selectedId }; });
+  await page.locator('notice-rows-screen a.row').nth(1).click();
+  expect(await state()).toMatchObject({ detailOpen: true });
+  const search = page.getByRole('searchbox', { name: '공지 검색' }).first();
+  await search.fill('인턴');
+  expect(await state()).toMatchObject({ detailOpen: false, selectedId: null });
+  await search.fill('인턴십');
+  expect(await state()).toMatchObject({ detailOpen: false, selectedId: null });
+});

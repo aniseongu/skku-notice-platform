@@ -127,7 +127,7 @@ export function NoticeShell({ app }: { app: AppController }) {
               {settings ? null : <>
                 <label className="search flex h-[44px] items-center gap-[8px] rounded-md bg-sunken px-[16px] text-ink-3 focus-within:outline-2 focus-within:outline-accent [&_.i]:size-[20px] [&_input]:h-full [&_input]:min-w-0 [&_input]:flex-1 [&_input]:border-0 [&_input]:bg-transparent [&_input]:text-ink [&_input]:[outline:0] [&_input]:placeholder:text-ink-3 wide-only max-[719px]:hidden min-[720px]:flex min-[720px]:h-[36px] min-[720px]:min-w-[120px] min-[720px]:w-[260px] min-[720px]:flex-[0_1_260px] min-[720px]:px-[12px] min-[720px]:py-0"><Icon name="search" />
                   <input type="search" placeholder="공지 찾기" autoComplete="off" aria-label="공지 검색" aria-keyshortcuts="/" value={app.query}
-                    onChange={(event) => { app.query = event.currentTarget.value; app.selectedId = null; app.selectedReads = []; }} />
+                    onChange={(event) => { app.query = event.currentTarget.value; app.selectedReads = []; app.listChanged(); }} />
                   {app.query ? null : <Kbd keys={['/']} className="ml-auto" />}</label>
                 {app.detailOpen || !selected ? null : <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft wide-only max-[719px]:hidden min-[720px]:flex" aria-label="상세 칸 열기" title="상세 칸 열기"
                   onClick={() => app.setDetail(true)}><Icon name="panel" /></button>}
@@ -144,7 +144,7 @@ export function NoticeShell({ app }: { app: AppController }) {
             <div className="tools narrow-only px-[var(--gutter)] pt-[4px] pb-0 min-[720px]:hidden!">
               <label className="search flex h-[44px] items-center gap-[8px] rounded-md bg-sunken px-[16px] text-ink-3 focus-within:outline-2 focus-within:outline-accent [&_.i]:size-[20px] [&_input]:h-full [&_input]:min-w-0 [&_input]:flex-1 [&_input]:border-0 [&_input]:bg-transparent [&_input]:text-ink [&_input]:[outline:0] [&_input]:placeholder:text-ink-3"><Icon name="search" />
                 <input type="search" placeholder="공지 찾기" autoComplete="off" aria-label="공지 검색" value={app.query}
-                  onChange={(event) => { app.query = event.currentTarget.value; app.selectedId = null; app.selectedReads = []; }} /></label>
+                  onChange={(event) => { app.query = event.currentTarget.value; app.selectedReads = []; app.listChanged(); }} /></label>
               <div className={CHIPS} role="group" aria-label="관심 키워드">
                 {app.keywords.length ? <button type="button" className={CHIP} aria-pressed={!app.keyword} onClick={() => app.setKeyword(null)}>모두</button> : null}
                 {app.keywords.map((word) => <button type="button" className={CHIP} key={word} aria-pressed={app.keyword === word}
@@ -291,7 +291,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
           ? <Empty title="받을 게시판이 없어요" body="게시판을 고르면 새 공지가 여기에 보여요" action="게시판 고르기" onAction={() => app.openSettings('notifications')} />
           : <Empty title="아직 설정을 안 했어요" body="첫 설정을 마치면 맞는 게시판을 켜 드려요" />;
       }
-      if (app.query) return <Empty title={`'${app.query}'에 맞는 공지가 없어요`} body="다른 단어로 찾아보세요" action="검색어 지우기" onAction={() => { app.query = ''; }} />;
+      if (app.query) return <Empty title={`'${app.query}'에 맞는 공지가 없어요`} body="다른 단어로 찾아보세요" action="검색어 지우기" onAction={() => { app.query = ''; app.listChanged(); }} />;
       if (app.keyword && app.view !== 'saved' && app.unreadOnly) return <Empty title={`'${app.keyword}'에 맞는 읽지 않은 공지가 없어요`} body="읽지 않은 공지만 보기를 끄면 모든 공지를 볼 수 있어요" />;
       if (app.keyword) return <Empty title={`'${app.keyword}'에 맞는 공지가 아직 없어요`} body="새 글이 오면 여기에 모여요" />;
       if (app.view !== 'saved' && app.graduationOnly && app.gradEnabled()) return <Empty title="인턴십 요건에 맞는 공고가 아직 없어요" body="인턴십 충족만 보기를 끄면 모든 공고를 볼 수 있어요" />;
