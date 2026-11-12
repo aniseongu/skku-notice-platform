@@ -495,7 +495,7 @@ test('first-run "more boards" works like settings: search or pick a college, tog
   await dialog.getByRole('button', { name: '채웠어요' }).click();
   await next();
   await expect(dialog.getByRole('heading', { name: '어떤 공지를 받을까요?' })).toBeVisible();
-  await dialog.getByText('게시판 더 보기').click();
+  await dialog.getByRole('button', { name: /게시판 [0-9]+개 더 보기/ }).click();
   // 한 줄씩 늘어놓은 목록이 아니라 검색 칸과 단과대 격자가 먼저 보인다.
   const grid = dialog.getByRole('group', { name: '단과대 선택' });
   await expect(dialog.getByRole('searchbox', { name: '게시판 검색' })).toBeVisible();
@@ -537,7 +537,7 @@ test('first-run boards: when only a few boards are left they sit in the list wit
   const boards = dialog.getByRole('group', { name: '게시판', exact: true });
   for (const name of ['성균관대 공지', '경영대학 공지', '경영학과 공지']) await expect(boards.getByRole('switch', { name })).toBeChecked();
   await expect(boards.getByRole('switch', { name: '문과대학 공지' })).not.toBeChecked();   // 하나 남은 게시판은 접지 않고 바로 보인다
-  await expect(dialog.getByText('게시판 더 보기')).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: /더 보기/ })).toHaveCount(0);
 });
 
 test('reopening a setup that was saved but left at the AI key step resumes at that step instead of asking everything again', async ({ page }) => {

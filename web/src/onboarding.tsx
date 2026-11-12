@@ -134,6 +134,10 @@ export function Onboarding({ app }: { app: AppController }) {
   const [doubleAnswer, setDoubleAnswer] = useState<DoubleAnswer>(() => (draft.programs.length > 1 ? 'yes' : app.profile.onboardedAt || savedBefore(app.profile) ? 'no' : null));
   const [changingPrimary, setChangingPrimary] = useState(() => app.profile.programs.length === 0);
   const [saved, setSaved] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+  // "더 보기"를 펼치면 펼친 목록의 첫 부분(검색 칸)이 화면 안에 들어오게 한다.
+  useEffect(() => { if (moreOpen) moreRef.current?.firstElementChild?.scrollIntoView({ block: 'nearest' }); }, [moreOpen]);
   const heading = useRef<HTMLHeadingElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   // 단계가 바뀌면 새 질문을 화면 낭독기가 읽도록 제목으로 포커스를 옮긴다.
@@ -262,26 +266,28 @@ export function Onboarding({ app }: { app: AppController }) {
     foot = <button type="button" className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!canContinue('internship', draft)} onClick={() => go('boards')}>다음</button>;
   } else if (step === 'boards') {
     title = '어떤 공지를 받을까요?';
-    lead = '고른 전공에 맞춰 켜 뒀어요';
     // 서버 이름을 받기 전에도 내부 id가 보이지 않게 목록의 한글 이름으로 채운다.
     const nameOf = (id: string) => sources.find((source) => source.id === id)?.name ?? BOARD_CATALOG.find((board) => board.id === id)?.name ?? OTHER_BOARDS.find((board) => board.id === id)?.name ?? id;
     body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]">
       <h2>게시판</h2>
+      {/* 설명은 구역 제목 아래 한 줄, 화면에 한 번만(제목 아래 부제와 기타 게시판 설명에서 같은 말을 되풀이하지 않는다). */}
+      {draft.programs.length ? <p className="card-note m-0 text-[14px] text-ink-2">내 전공 게시판은 미리 켜 뒀어요</p> : null}
       <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label="게시판">
         {mainSources.filter((source) => shownBoards.has(source.id) || inlineRest).map(boardSwitch)}
+        {/* "더 보기"는 같은 카드의 마지막 줄이다. 카드 밖에 따로 떠 있으면 구역 제목처럼 읽힌다(독립 평가). 펼친 목록은 카드 바로 아래에 둔다. */}
+        {moreSources.length ? <button type="button" aria-expanded={moreOpen} aria-controls="more-boards" onClick={() => setMoreOpen(!moreOpen)}
+          className="flex min-h-[52px] w-full items-center justify-between gap-[12px] border-0 border-t border-line bg-transparent px-0 text-left text-[15px] font-medium text-ink-2 [.box>&:first-child]:border-t-0">
+          게시판 {moreSources.length}개 더 보기
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`text-ink-3 transition-transform ${moreOpen ? 'rotate-180' : ''}`}><path d="M6 9l6 6 6-6" /></svg>
+        </button> : null}
         {orderedSources.length === 0 ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2" role="status">게시판 목록을 불러오지 못했어요. 잠시 뒤 설정에서 다시 골라 주세요.</p> : null}
       </div>
-      {moreSources.length ? <details className="group">
-        <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between rounded-md text-[14px] text-ink-2 focus-visible:outline-offset-[-2px] [&::-webkit-details-marker]:hidden">게시판 더 보기 ({moreSources.length}개)
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-ink-3 transition-transform group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg></summary>
-        <MoreBoards sources={moreSources} on={draft.boards} render={boardSwitch} />
-      </details> : null}
+      {moreSources.length && moreOpen ? <div id="more-boards" ref={moreRef}><MoreBoards sources={moreSources} on={draft.boards} render={boardSwitch} /></div> : null}
       <h2>기타 게시판</h2>
-      {OTHER_BOARDS.some((board) => recommended.includes(board.id)) ? <p className="card-note m-0 text-[14px] text-ink-2">내 전공에 맞는 게시판은 켜 뒀어요</p> : null}
       <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label="기타 게시판">
         {[...new Set(OTHER_BOARDS.map((board) => board.group))]
           .sort((a, b) => Number(OTHER_BOARDS.some((board) => board.group === b && recommended.includes(board.id))) - Number(OTHER_BOARDS.some((board) => board.group === a && recommended.includes(board.id))))   // 추천이 든 묶음을 위로
-          .map((group, index) => <div key={group} role="group" aria-labelledby={`other-${index}`}>
+          .map((group, index) => <div key={group} role="group" aria-labelledby={`other-${index}`} className="[&>h3+button]:border-t-0">
             <h3 id={`other-${index}`} className="m-0 pt-[16px] pb-[2px] text-[13px] font-semibold leading-[20px] text-ink-2 min-[720px]:pt-[20px]">{group}</h3>
             {OTHER_BOARDS.filter((board) => board.group === group).sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id))).map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
                   checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
