@@ -76,6 +76,8 @@ BOARDS: list[tuple[str, str, str]] = [
     ("energy-notice", "에너지학과 공지", "https://energy.skku.edu/energy/notice.do"),
     ("ssbat-notice", "배터리학과 공지", "https://ssbat.skku.edu/ssbat/notice.do"),
     ("aiuniv-notice", "AI중심대학사업단 공지", "https://aiuniv.skku.edu/aiuniv/notice.do"),
+    ("fabtech-notice", "지능형팹테크융합전공 공지", "https://skb.skku.edu/FabTech/notice.do"),
+    ("ase-notice", "차세대반도체공학연계전공 공지", "https://skb.skku.edu/ase/notice.do"),
 ]
 
 # 단과대학 이름 -> 게시판 id (이미 있는 sw-notice 포함)
@@ -114,12 +116,15 @@ DEPARTMENT_BOARD = {
 }
 
 # 전공과 상관없이 누구나 고를 수 있는 게시판(온보딩의 "기타 게시판" 단계). (id, 묶음, 설명, 추천 대학)
-# 추천 대학에 속한 전공이면 게시판 추천에 자동으로 들어간다(켜진 채로 시작). 비워 두면 누구에게도 추천하지 않는다.
+# 추천 대상은 "대학" 또는 "대학/학과"다. 주전공·복수전공 중 하나라도 맞으면 게시판 추천에 들어가 켜진 채로 시작한다. 비워 두면 누구에게도 추천하지 않는다.
+# 묶음은 설정과 첫 설정에서 "기타" 아래 소제목이 된다. 2026-11-12 조사: 인공지능·디스플레이 부트캠프 사업단은 따로 공지 게시판을 찾지 못했다(공지는 성균관대 공지에 올라온다).
 # 부트캠프 모집 안내(청년도약·첨단산업 인재양성)는 성균관대 공지 전체 게시판에도 올라온다. 아래는 사업단이 따로 올리는 게시판이다.
 # 디스플레이 부트캠프 사업단은 공개 공지 게시판을 찾지 못했고, 인공지능·반도체 사업단은 주소가 확인되지 않아 넣지 않았다.
 OTHER_BOARDS: list[tuple[str, str, str, tuple[str, ...]]] = [
     ("futurecar-notice", "부트캠프", "수강 모집과 행사 안내", ()),
-    ("aiuniv-notice", "사업단", "AI 교육·챌린지·장학 안내", ("소프트웨어융합대학",)),
+    ("aiuniv-notice", "사업단", "AI 교육·챌린지 안내", ("소프트웨어융합대학",)),
+    ("fabtech-notice", "융합·연계전공", "반도체 공정·팹 교육과 학위 안내", ("정보통신대학/반도체시스템공학과", "정보통신대학/반도체융합공학과")),
+    ("ase-notice", "융합·연계전공", "차세대 반도체 교육과 인턴 안내", ("정보통신대학/반도체시스템공학과", "정보통신대학/반도체융합공학과")),
 ]
 
 # 이미 운영 중인 기본 게시판(모든 사용자에게 추천). sources.yaml의 앞쪽 4개는 이 스크립트가 건드리지 않는다.
@@ -191,7 +196,7 @@ def typescript() -> str:
         "    const department = program.department ? DEPARTMENT_BOARD[`${program.college}/${program.department}`] : undefined;",
         "    const college = COLLEGE_BOARD[program.college];",
         "    for (const id of [department, college]) if (id && !ids.includes(id)) ids.push(id);",
-        "    for (const other of OTHER_BOARDS) if (other.recommendFor.includes(program.college) && !ids.includes(other.id)) ids.push(other.id);",
+        "    for (const other of OTHER_BOARDS) if (other.recommendFor.some((key) => key === program.college || key === `${program.college}/${program.department}`) && !ids.includes(other.id)) ids.push(other.id);",
         "  }",
         "  return ids;",
         "}",

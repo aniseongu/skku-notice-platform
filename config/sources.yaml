@@ -408,4 +408,16 @@ sources:
     url: https://aiuniv.skku.edu/aiuniv/notice.do
     on_demand: true
 
+  - id: fabtech-notice
+    name: 지능형팹테크융합전공 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/FabTech/notice.do
+    on_demand: true
+
+  - id: ase-notice
+    name: 차세대반도체공학연계전공 공지
+    kind: skku-cms
+    url: https://skb.skku.edu/ase/notice.do
+    on_demand: true
+
 # END catalog

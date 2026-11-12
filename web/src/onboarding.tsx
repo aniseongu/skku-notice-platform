@@ -126,8 +126,7 @@ export function Onboarding({ app }: { app: AppController }) {
   const orderedSources = [...sources].sort((a, b) => boardRank(a) - boardRank(b) || Number(recommended.includes(b.id)) - Number(recommended.includes(a.id)));
   // 켜 둔 게시판(고른 전공에 맞는 것과 이미 고른 것)만 먼저 보이고, 나머지는 "게시판 더 보기"에 접어 둔다. 기타 게시판과 키워드가 길게 스크롤하지 않아도 보이게 한다.
   const [initialBoards] = useState(() => draft.boards);
-  // 전공과 상관없는 게시판(부트캠프)만 아래 구역으로 나누고, 고른 대학에 추천된 게시판(사업단 등)은 위 게시판 목록에 함께 둔다.
-  const mainSources = orderedSources.filter((source) => !OTHER_BOARDS.some((board) => board.id === source.id && !recommended.includes(board.id)));
+  const mainSources = orderedSources.filter((source) => !OTHER_BOARDS.some((board) => board.id === source.id));
   const shownBoards = new Set([...recommended, ...initialBoards]);
   const moreSources = mainSources.filter((source) => !shownBoards.has(source.id));
   const boardSwitch = (source: (typeof mainSources)[number]) => <SwitchRow key={source.id} label={source.name}
@@ -225,10 +224,16 @@ export function Onboarding({ app }: { app: AppController }) {
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-ink-3 transition-transform group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg></summary>
         <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label="더 많은 게시판">{moreSources.map(boardSwitch)}</div>
       </details> : null}
-      <h2>전공과 상관없는 게시판</h2>
-      <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label="기타 게시판">
-        {OTHER_BOARDS.filter((board) => !recommended.includes(board.id)).map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
-          checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
+      <h2>기타 게시판</h2>
+      <div className="grid gap-[16px]" role="group" aria-label="기타 게시판">
+        {[...new Set(OTHER_BOARDS.map((board) => board.group))].map((group) => <div key={group}>
+          <h3 className="m-0 mb-[4px] text-[14px] font-semibold leading-[20px] text-ink-2">{group}</h3>
+          <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label={group}>
+            {OTHER_BOARDS.filter((board) => board.group === group).sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id))).map((board) =>
+              <SwitchRow key={board.id} label={nameOf(board.id)} description={recommended.includes(board.id) ? `내 전공 추천 · ${board.help}` : board.help}
+                checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
+          </div>
+        </div>)}
       </div>
       <h2>관심 키워드</h2>
       <p className="card-note m-0 text-[14px] text-ink-2">고르지 않으면 모든 공지를 받아요</p>

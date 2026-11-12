@@ -64,13 +64,17 @@ export const BOARD_CATALOG: readonly BoardRef[] = [
   { id: 'energy-notice', name: '에너지학과 공지', url: 'https://energy.skku.edu/energy/notice.do' },
   { id: 'ssbat-notice', name: '배터리학과 공지', url: 'https://ssbat.skku.edu/ssbat/notice.do' },
   { id: 'aiuniv-notice', name: 'AI중심대학사업단 공지', url: 'https://aiuniv.skku.edu/aiuniv/notice.do' },
+  { id: 'fabtech-notice', name: '지능형팹테크융합전공 공지', url: 'https://skb.skku.edu/FabTech/notice.do' },
+  { id: 'ase-notice', name: '차세대반도체공학연계전공 공지', url: 'https://skb.skku.edu/ase/notice.do' },
 ];
 
 /** 전공과 상관없이 고르는 게시판(부트캠프 등). */
 export interface OtherBoard { id: string; name: string; group: string; help: string; recommendFor: readonly string[] }
 export const OTHER_BOARDS: readonly OtherBoard[] = [
   { id: 'futurecar-notice', name: '미래차 부트캠프 공지', group: '부트캠프', help: '수강 모집과 행사 안내', recommendFor: [] },
-  { id: 'aiuniv-notice', name: 'AI중심대학사업단 공지', group: '사업단', help: 'AI 교육·챌린지·장학 안내', recommendFor: ['소프트웨어융합대학'] },
+  { id: 'aiuniv-notice', name: 'AI중심대학사업단 공지', group: '사업단', help: 'AI 교육·챌린지 안내', recommendFor: ['소프트웨어융합대학'] },
+  { id: 'fabtech-notice', name: '지능형팹테크융합전공 공지', group: '융합·연계전공', help: '반도체 공정·팹 교육과 학위 안내', recommendFor: ['정보통신대학/반도체시스템공학과', '정보통신대학/반도체융합공학과'] },
+  { id: 'ase-notice', name: '차세대반도체공학연계전공 공지', group: '융합·연계전공', help: '차세대 반도체 교육과 인턴 안내', recommendFor: ['정보통신대학/반도체시스템공학과', '정보통신대학/반도체융합공학과'] },
 ];
 
 export const COLLEGE_BOARD: Readonly<Record<string, string>> = {
@@ -148,7 +152,7 @@ export function boardsForPrograms(programs: readonly Program[]): string[] {
     const department = program.department ? DEPARTMENT_BOARD[`${program.college}/${program.department}`] : undefined;
     const college = COLLEGE_BOARD[program.college];
     for (const id of [department, college]) if (id && !ids.includes(id)) ids.push(id);
-    for (const other of OTHER_BOARDS) if (other.recommendFor.includes(program.college) && !ids.includes(other.id)) ids.push(other.id);
+    for (const other of OTHER_BOARDS) if (other.recommendFor.some((key) => key === program.college || key === `${program.college}/${program.department}`) && !ids.includes(other.id)) ids.push(other.id);
   }
   return ids;
 }

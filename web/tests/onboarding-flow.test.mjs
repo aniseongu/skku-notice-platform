@@ -27,6 +27,12 @@ test('소프트웨어융합대학 전공이면 AI중심대학사업단이 추천
   assert.ok(!boardsForPrograms([{ college: '공과대학', department: '기계공학부' }]).includes('aiuniv-notice'));
 });
 
+test('반도체 학과 전공이면 학과 단위로 추천된다', () => {
+  const rec = boardsForPrograms([{ college: '정보통신대학', department: '반도체시스템공학과' }]);
+  assert.ok(rec.includes('fabtech-notice') && rec.includes('ase-notice') && !rec.includes('aiuniv-notice'));
+  assert.ok(!boardsForPrograms([{ college: '정보통신대학', department: '전자전기공학부' }]).includes('ase-notice'));
+});
+
 test('board catalog only points at known boards and valid college/department pairs', () => {
   const known = new Set([...BOARD_CATALOG.map((board) => board.id), 'skku-notice01', 'cse-notice', 'sw-notice', 'futurecar-notice']);
   assert.equal(new Set(BOARD_CATALOG.map((board) => board.id)).size, BOARD_CATALOG.length);
