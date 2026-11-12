@@ -70,11 +70,12 @@ export const BOARD_CATALOG: readonly BoardRef[] = [
 
 /** 전공과 상관없이 고르는 게시판(부트캠프 등). */
 export interface OtherBoard { id: string; name: string; group: string; help: string; recommendFor: readonly string[] }
+// 같은 묶음 안에서는 이 순서대로 보인다(융합·연계전공은 차세대반도체가 팹테크보다 위, 사용자 지시 2026-11-12).
 export const OTHER_BOARDS: readonly OtherBoard[] = [
   { id: 'futurecar-notice', name: '미래차 부트캠프 공지', group: '부트캠프', help: '수강 모집과 행사 안내', recommendFor: [] },
   { id: 'aiuniv-notice', name: 'AI중심대학사업단 공지', group: '사업단', help: 'AI 교육, 챌린지 안내', recommendFor: ['소프트웨어융합대학'] },
-  { id: 'fabtech-notice', name: '지능형팹테크융합전공 공지', group: '융합·연계전공', help: '반도체 공정과 팹 교육, 학위 안내', recommendFor: ['정보통신대학/반도체시스템공학과', '정보통신대학/반도체융합공학과', '정보통신대학/전자전기공학부', '공과대학/화학공학부', '공과대학/신소재공학부'] },
   { id: 'ase-notice', name: '차세대반도체공학연계전공 공지', group: '융합·연계전공', help: '차세대 반도체 교육과 인턴 안내', recommendFor: ['정보통신대학/반도체시스템공학과', '정보통신대학/반도체융합공학과', '정보통신대학/전자전기공학부', '공과대학/화학공학부', '공과대학/신소재공학부'] },
+  { id: 'fabtech-notice', name: '지능형팹테크융합전공 공지', group: '융합·연계전공', help: '반도체 공정과 팹 교육, 학위 안내', recommendFor: ['정보통신대학/반도체시스템공학과', '정보통신대학/반도체융합공학과', '정보통신대학/전자전기공학부', '공과대학/화학공학부', '공과대학/신소재공학부'] },
 ];
 
 export const COLLEGE_BOARD: Readonly<Record<string, string>> = {

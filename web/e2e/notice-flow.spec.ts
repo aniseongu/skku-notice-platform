@@ -413,6 +413,8 @@ test('first-run setup: choices only, department list follows the college, double
   expect(chipBox.y + chipBox.height).toBeLessThanOrEqual(next.y);
   await expect(dialog.getByRole('group', { name: '사업단' }).getByRole('switch', { name: /^AI중심대학사업단 공지/ })).toHaveAttribute('aria-checked', 'true');   // 소프트웨어융합대학 전공 추천은 켜져 있다
   await expect(dialog.getByRole('group', { name: '융합·연계전공' }).getByRole('switch', { name: /^차세대반도체공학연계전공 공지/ })).toHaveAttribute('aria-checked', 'false');
+  // 융합·연계전공은 차세대반도체가 팹테크보다 위에 있다(사용자 지시).
+  expect((await dialog.getByRole('group', { name: '융합·연계전공' }).getByRole('switch').allInnerTexts()).map((t) => t.split('\n')[0])).toEqual(['차세대반도체공학연계전공 공지', '지능형팹테크융합전공 공지']);
   await expect(dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ })).toHaveAttribute('aria-checked', 'false');
   await dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ }).click();
   // 참여 여부는 묻지 않는다(사용자 지시 2026-11-12).
