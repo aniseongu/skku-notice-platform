@@ -78,18 +78,22 @@ def test_vapid_subject_is_normalized_to_what_py_vapid_accepts():
             worker.normalize_subject(bad)
 
 
-def test_message_matches_original_wording():
-    base = {"notice_id": "school/1", "title": "장학 안내", "source_name": "소프트웨어학과"}
-    assert worker.compose_message(base) == ("[소프트웨어학과] 장학 안내", "새 공지")
+def test_message_puts_the_notice_title_first_and_never_says_only_new_notice():
+    base = {"notice_id": "school/1", "title": "장학 안내", "source_name": "소프트웨어학과 공지"}
+    # 더 알릴 것이 없으면 "새 공지" 대신 어느 게시판의 글인지 적는다.
+    # 제목에는 게시판을 붙이지 않는다(접힌 알림에서 제목이 잘린다).
+    assert worker.compose_message(base) == ("장학 안내", "소프트웨어학과 공지")
     interested = {**base, "matched_words": ["인턴", "장학"], "deadline": "2026-11-09T14:59:00+00:00"}
-    title, body = worker.compose_message(interested)
-    assert title == "[소프트웨어학과] 장학 안내"
-    assert body == "관심 인턴, 장학\n마감 11월 9일(월)"
+    assert worker.compose_message(interested) == (
+        "장학 안내", "관심 인턴, 장학\n마감 11월 9일(월)\n소프트웨어학과 공지"
+    )
     title, body = worker.compose_message(
         {**base, "kind": "changed", "change_kind": "제목", "deadline": "2026-11-09T03:30:00+00:00"}
     )
-    assert title == "[소프트웨어학과] [수정] 장학 안내"
-    assert body == "학교가 글을 고쳤어요. 제목이 바뀌었어요\n마감 11월 9일(월) 12:30"
+    assert title == "장학 안내"
+    assert body == "학교가 제목을 고쳤어요\n마감 11월 9일(월) 12:30\n소프트웨어학과 공지"
+    assert worker.compose_message({**base, "kind": "changed"})[1].startswith("학교가 본문을 고쳤어요")
+    assert "새 공지" not in worker.compose_message({"notice_id": "school/2", "title": "t"})[1]
 
 
 def test_changed_claim_carries_kind_and_marker():
@@ -125,8 +129,8 @@ def test_external_posting_message_carries_the_judgment_reason_before_the_deadlin
         "deadline": "2026-11-09T14:59:00+00:00",
     }
     assert worker.compose_message(candidate) == (
-        "[링커리어] [회사] 백엔드 인턴",
-        "서버 개발 직무예요\n마감 11월 9일(월)",
+        "[회사] 백엔드 인턴",
+        "서버 개발 직무예요\n마감 11월 9일(월)\n링커리어",
     )
 
 

@@ -117,14 +117,20 @@ def _deadline_label(value: str | None) -> str | None:
 
 
 def compose_message(candidate: dict) -> tuple[str, str]:
-    """Same wording as the original service: [board] title, with interest and deadline lines."""
+    """Notification text, reviewed against the Toss writing rules (2026-11-12, user request).
+
+    A phone shows the title and only the first body line until the user expands it, so the title is the
+    notice title alone (the board in brackets used to push it out of the visible line) and the body starts
+    with the most useful line: what changed, interest keywords, the AI reason, then the deadline. The board
+    name closes the body, which replaces the old "새 공지" that said nothing. The original service used
+    "[board] title" and "새 공지"; this difference is intentional and recorded in MIGRATION_MATRIX.
+    """
     changed = candidate.get("kind") == "changed"
-    title = f"[{candidate.get('source_name') or candidate['notice_id'].split('/')[0]}] "
-    title += f"[수정] {candidate['title']}" if changed else candidate["title"]
+    board = candidate.get("source_name") or candidate["notice_id"].split("/")[0]
     lines = []
     if changed:
-        what = "제목이 바뀌었어요" if candidate.get("change_kind") == "제목" else "본문이 바뀌었어요"
-        lines.append(f"학교가 글을 고쳤어요. {what}")
+        what = "제목" if candidate.get("change_kind") == "제목" else "본문"
+        lines.append(f"학교가 {what}을 고쳤어요")
     else:
         if candidate.get("matched_words"):
             lines.append(f"관심 {', '.join(candidate['matched_words'])}")
@@ -133,7 +139,8 @@ def compose_message(candidate: dict) -> tuple[str, str]:
     deadline = _deadline_label(candidate.get("deadline"))
     if deadline:
         lines.append(deadline)
-    return title, "\n".join(lines) or "새 공지"
+    lines.append(board)
+    return candidate["title"], "\n".join(lines)
 
 
 def normalize_subject(subject: str) -> str:
