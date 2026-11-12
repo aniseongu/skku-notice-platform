@@ -8,8 +8,9 @@ import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR } from './pro
 import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
 import { COLLEGES, MAX_PROGRAMS, findCollege, programKey, programLabel, type Program } from './skku-programs';
 import { BOARD_CATALOG, boardsForPrograms, OTHER_BOARDS } from './skku-boards';
+import { JOINED_PROGRAMS } from './joined-programs';
 import {
-  KEYWORD_SUGGESTIONS, STEPS, canContinue, filterDepartments, initialDraft, missingHint, nextStep, previousStep,
+  KEYWORD_SUGGESTIONS, STEPS, STEP_LABEL, canContinue, earlierMissing, filterDepartments, initialDraft, missingHint, nextStep, previousStep,
   stepIndex, toggleValue, withPrograms, type Draft, type DoubleAnswer, type Step,
 } from './onboarding-flow';
 import { APP_NAME } from './brand';
@@ -101,6 +102,8 @@ export function Onboarding({ app }: { app: AppController }) {
   const primary = draft.programs[0];
   const doubles = draft.programs.slice(1);
   const go = (to: Step | null) => { if (to) setStep(to); };
+  // 앞 단계에 필수 답이 비어 있으면(새 필수 항목이 생겼을 때 등) 이 단계는 넘어가지 않고 그 단계로 돌아가게 한다.
+  const blocked = earlierMissing(step, draft, doubleAnswer);
   const setPrimary = (program: Program) => {
     setDraft(withPrograms(draft, [program, ...doubles.filter((other) => programKey(other) !== programKey(program))]));
   };
@@ -231,9 +234,17 @@ export function Onboarding({ app }: { app: AppController }) {
           .sort((a, b) => Number(OTHER_BOARDS.some((board) => board.group === b && recommended.includes(board.id))) - Number(OTHER_BOARDS.some((board) => board.group === a && recommended.includes(board.id))))   // 추천이 든 묶음을 위로
           .map((group, index) => <div key={group} role="group" aria-labelledby={`other-${index}`}>
             <h3 id={`other-${index}`} className="m-0 pt-[16px] pb-[2px] text-[13px] font-semibold leading-[20px] text-ink-2 min-[720px]:pt-[20px]">{group}</h3>
-            {OTHER_BOARDS.filter((board) => board.group === group).sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id))).map((board) =>
-              <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
-                checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
+            {OTHER_BOARDS.filter((board) => board.group === group).sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id))).map((board) => {
+                const joined = JOINED_PROGRAMS.find((program) => program.boardId === board.id);
+                return <div key={board.id}>
+                  <SwitchRow label={nameOf(board.id)} description={board.help}
+                    checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />
+                  {/* 게시판을 켠 줄 바로 아래에서 참여 여부를 정한다(참여 학생만 신청하는 공지를 AI가 가릴 때 쓴다). */}
+                  {joined && draft.boards.includes(board.id)
+                    ? <div className="ml-[12px] border-l-2 border-line pl-[12px]"><SwitchRow label={joined.ask} description="참여 학생만 신청하는 공지를 알려 드려요"
+                      checked={draft.joinedPrograms.includes(joined.id)} onChange={() => setDraft({ ...draft, joinedPrograms: toggleValue(draft.joinedPrograms, joined.id) })} /></div> : null}
+                </div>;
+              })}
           </div>)}
       </div>
       <h2>관심 키워드</h2>
@@ -303,8 +314,13 @@ export function Onboarding({ app }: { app: AppController }) {
         {body}
       </div>
       {foot ? <div className="onb-foot sticky bottom-0 z-[2] [background:linear-gradient(to_bottom,transparent,var(--bg)_14px)] pt-[18px] [&_.solid-button]:w-full [&_.ghost-button]:w-full [&_.solid-button:disabled]:border-line [&_.solid-button:disabled]:bg-sunken [&_.solid-button:disabled]:text-ink-2 [&_.solid-button:disabled]:opacity-100"><div className="onb-foot-inner mx-auto grid w-[min(100%,36rem)] gap-[8px] px-[16px] pt-0 pb-[calc(12px+env(safe-area-inset-bottom))]">
-        {missingHint(step, draft, doubleAnswer) && !addingDouble ? <p className="m-0 text-center text-[14px] text-ink-2" role="status">{missingHint(step, draft, doubleAnswer)}</p> : null}
-        {foot}</div></div> : null}
+        {blocked ? <>
+          <p className="m-0 text-center text-[14px] text-ink-2" role="alert"><span className="font-semibold text-ink">필수 선택이 남았어요</span><br /><span>{STEP_LABEL[blocked]}에서 골라 주세요</span></p>
+          <button type="button" className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none]" onClick={() => go(blocked)}>{STEP_LABEL[blocked]}(으)로 돌아가기</button>
+        </> : <>
+          {missingHint(step, draft, doubleAnswer) && !addingDouble ? <p className="m-0 text-center text-[14px] text-ink-2" role="status"><span className="font-semibold text-ink">필수 선택이에요</span><br /><span>{missingHint(step, draft, doubleAnswer)}</span></p> : null}
+          {foot}
+        </>}</div></div> : null}
     </div>
   </div>;
 }

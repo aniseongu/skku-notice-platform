@@ -415,6 +415,9 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('group', { name: '융합·연계전공' }).getByRole('switch', { name: /^차세대반도체공학연계전공 공지/ })).toHaveAttribute('aria-checked', 'false');
   await expect(dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ })).toHaveAttribute('aria-checked', 'false');
   await dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ }).click();
+  // 게시판을 켠 줄 바로 아래에서 참여 여부를 고른다(꺼 둔 게시판에는 묻지 않는다).
+  await expect(dialog.getByRole('switch', { name: /^참여 중이에요/ })).toHaveCount(2);   // 미래차 부트캠프와 AI중심대학사업단(추천으로 켜짐)
+  await dialog.getByRole('group', { name: '부트캠프' }).getByRole('switch', { name: /^참여 중이에요/ }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   const saved = (await calls(page)).find((call) => call[0] === 'finish')![1] as Record<string, unknown>;
   expect(saved).toMatchObject({
@@ -422,6 +425,7 @@ test('first-run setup: choices only, department list follows the college, double
     year: 3, enrollmentStatus: '재학', keywords: ['장학'],
   });
   expect(saved.boards).toEqual(expect.arrayContaining(['skku-notice01', 'cse-notice', 'futurecar-notice', 'aiuniv-notice']));
+  expect(saved.joinedPrograms).toEqual(['futurecar']);
   // 알림은 나중에 해도 된다.
   await expect(dialog.getByRole('heading', { name: '알림을 켜 둘까요?' })).toBeFocused();
   await dialog.getByRole('button', { name: '나중에 할게요' }).click();
@@ -651,13 +655,20 @@ test('settings home puts the daily settings first and groups iCampus and Google 
   expect(heads).toEqual(['내 설정', '계정', '화면', '기타']);
   const mine = screen.getByRole('region', { name: '내 설정' }), etc = screen.getByRole('region', { name: '기타' });
   expect(await mine.getByRole('link').allInnerTexts().then((list) => list.map((text) => text.split('\n')[0]))).toEqual(['알림', '관심 키워드']);
-  expect(await etc.getByRole('link').allInnerTexts().then((list) => list.map((text) => text.split('\n')[0]))).toEqual(['아이캠퍼스', '구글 캘린더']);
+  expect(await etc.getByRole('link').allInnerTexts().then((list) => list.map((text) => text.split('\n')[0]))).toEqual(['참여 사업', '아이캠퍼스', '구글 캘린더']);
   const y = async (loc: import('@playwright/test').Locator) => (await loc.boundingBox())!.y;
   expect(await y(etc)).toBeGreaterThan(await y(mine));
   expect(await y(etc)).toBeGreaterThan(await y(screen.getByRole('region', { name: '계정' })));
   // 기타 안의 항목도 한 번 눌러 자기 페이지로 간다.
   await etc.getByRole('link', { name: /아이캠퍼스/ }).click();
   await expect(page).toHaveURL(/section=canvas/);
+  // 참여 사업은 홈에서는 한 줄로 닫혀 있고, 눌러 들어가면 묶음별 스위치가 나온다(기본은 모두 꺼짐).
+  await page.goBack();
+  await screen.getByRole('region', { name: '기타' }).getByRole('link', { name: /참여 사업/ }).click();
+  await expect(page).toHaveURL(/section=programs/);
+  await expect(screen.getByRole('switch', { name: /^미래차 부트캠프/ })).toHaveAttribute('aria-checked', 'false');
+  for (const group of ['부트캠프', '사업단', '융합·연계전공']) await expect(screen.getByRole('heading', { name: group })).toBeVisible();
+  expect((await screen.getByRole('switch', { name: /^차세대반도체공학연계전공/ }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
 });
 
 test('settings opened straight from the side menu shortcut closes with one X instead of showing the settings home', async ({ page }, testInfo) => {
@@ -1769,4 +1780,20 @@ test('typing in search closes the open detail pane instead of opening another no
   expect(await state()).toMatchObject({ detailOpen: false, selectedId: null });
   await search.fill('인턴십');
   expect(await state()).toMatchObject({ detailOpen: false, selectedId: null });
+});
+
+test('a new version while in use only shows a bar; nothing changes until the user presses it', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await expect(page.locator('notice-rows-screen a.row').first()).toBeVisible();
+  await page.evaluate(() => { (window as unknown as { __kept: number }).__kept = 1; });
+  // 새 배포로 예전 조각 파일을 못 받으면 앱이 이 이벤트를 받는다. 화면은 그대로이고 알림 줄만 나온다.
+  await page.evaluate(() => window.dispatchEvent(new Event('vite:preloadError', { cancelable: true })));
+  const bar = page.locator('.update-bar');
+  await expect(bar).toBeVisible();
+  await expect(bar.getByRole('button', { name: '지금 바꾸기' })).toBeVisible();
+  expect((await bar.getByRole('button', { name: '나중에' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  expect(await page.evaluate(() => (window as unknown as { __kept?: number }).__kept)).toBe(1);   // 다시 열리지 않았다
+  await bar.getByRole('button', { name: '나중에' }).click();
+  await expect(bar).toBeHidden();
+  expect(await page.evaluate(() => (window as unknown as { __kept?: number }).__kept)).toBe(1);
 });

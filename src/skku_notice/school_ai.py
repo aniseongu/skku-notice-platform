@@ -30,11 +30,13 @@ SCHEMA = {
 }
 SYSTEM = (
     "성균관대학교 공지가 아래 프로필의 학생에게 알려야 할 만큼 관련 있는지 판정하세요. "
-    "프로필은 majors(전공), year(학년), semester, enrollment_status(재학 상태), military_service와 학생이 직접 쓴 "
+    "프로필은 majors(전공), year(학년), semester, enrollment_status(재학 상태), military_service, 학생이 참여 중이라고 알린 "
+    "사업 joined_programs와 학생이 직접 쓴 "
     "interests, wants, does_not_want입니다. 다음이면 relevant입니다: 학생의 전공이나 학과가 대상이거나 모든 학생이 "
     "대상인 신청·마감·장학·수강·졸업·학사 일정, 학생의 학년과 재학 상태에 해당하는 안내, wants나 interests와 분명히 "
     "맞는 공지. 다음이면 not_relevant입니다: 다른 단과대학이나 학과만 대상, 대학원생·졸업생·교직원·외국인 유학생 전용, "
-    "다른 학년만 대상, does_not_want에 해당. 대상이 불분명하거나 일부만 겹치면 maybe입니다. "
+    "다른 학년만 대상, does_not_want에 해당. 공지가 특정 사업이나 융합·연계전공(부트캠프, 사업단) 참여 학생만 신청할 수 있다고 하면 그 사업이 joined_programs에 있을 때 relevant, "
+    "joined_programs에 없으면 not_relevant, joined_programs가 비어 있으면 참여 여부를 모르므로 maybe입니다. 대상이 불분명하거나 일부만 겹치면 maybe입니다. "
     + ELIGIBILITY_RULE +
     "공지 제목과 본문에 적힌 대상과 조건만 근거로 삼고 추측하지 마세요. 마감이 지난 공지는 not_relevant가 아니라 "
     "본문 근거로만 판단하세요. 판정 이유는 프로필을 인용하지 말고 공지의 대상과 내용만 reason에 적으세요. 대상을 쓸 때 '타 학과', '다른 학과'처럼 누구 기준인지 헷갈리는 말을 쓰지 말고 공지가 말한 대상 그대로 ('모든 학과 1~4학년 학생', '학과 무관')을 쓰세요. reason은 결론부터 쓴 "

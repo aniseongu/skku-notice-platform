@@ -26,6 +26,8 @@ export interface Draft {
   university3pInternshipDone: boolean | null;
   boards: string[];
   keywords: string[];
+  /** 참여 중이라고 알린 사업(미래차 부트캠프 등). */
+  joinedPrograms: string[];
   /** 사용자가 게시판을 직접 바꿨으면 전공을 고쳐도 추천으로 덮어쓰지 않는다. */
   boardsTouched: boolean;
 }
@@ -44,6 +46,7 @@ export function initialDraft(profile: UserProfile, subscriptions: string[], keyw
     university3pInternshipDone: profile.university3pInternshipDone,
     boards: subscribed ? [...subscriptions] : boardsForPrograms(profile.programs),
     keywords: [...keywords],
+    joinedPrograms: [...(profile.joinedPrograms ?? [])],
     boardsTouched: subscribed,
   };
 }
@@ -89,6 +92,16 @@ export function canContinue(step: Step, draft: Draft, doubleAnswer: DoubleAnswer
     case 'boards': return true;
     case 'notify': return true;
   }
+}
+
+/** 필수 답이 있는 단계. 뒤 단계에 있는 사이에 새 필수 항목이 생겨도 이 순서대로 되돌아가게 한다. */
+export const REQUIRED_STEPS: readonly Step[] = ['primary', 'double', 'status', 'internship'];
+export const STEP_LABEL: Readonly<Partial<Record<Step, string>>> = { primary: '주전공', double: '복수전공', status: '학교 정보', internship: '인턴십' };
+
+/** step보다 앞 단계 중 필수 답이 비어 있는 첫 단계. 없으면 null. 있으면 이 단계에서는 넘어가지 않고 그 단계로 돌아가게 한다. */
+export function earlierMissing(step: Step, draft: Draft, doubleAnswer: DoubleAnswer = null): Step | null {
+  const limit = STEPS.indexOf(step);
+  return REQUIRED_STEPS.find((name) => STEPS.indexOf(name) < limit && !canContinue(name, draft, doubleAnswer)) ?? null;
 }
 
 export const stepIndex = (step: Step): number => STEPS.indexOf(step);

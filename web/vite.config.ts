@@ -12,7 +12,8 @@ export default defineConfig({
   plugins: [
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // prompt: 새 서비스 워커는 설치만 하고 기다린다. 이용 중에 화면이 저절로 바뀌지 않게 사용자가 누를 때(또는 앱을 닫았다 열 때) 적용한다.
+      registerType: 'prompt',
       injectRegister: null,
       includeAssets: ['favicon.svg', 'icon.svg', 'apple-touch-icon*.png', 'icon-48*.png', 'icons/sprite.svg'],
       manifest: {

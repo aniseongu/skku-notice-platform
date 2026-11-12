@@ -92,6 +92,26 @@ test('without only the new done columns, admission year and 3P selection are sti
   assert.equal(loaded.admissionYear, 2023);
   assert.equal(loaded.deptInternshipDone, null);
   await saveProfile(client, 'u', { ...base, admissionYear: 2023, university3pInternshipSelected: true, deptInternshipDone: false, university3pInternshipDone: false });
+  assert.equal(attempts.length, 3);   // 참여 사업 열 포함 → 끝낸 일 열 포함 → 입학 연도 열만
+  assert.ok(attempts[2].includes('admission_year') && !attempts[2].includes('dept_internship_done'));
+});
+
+test('without only the joined_programs column, the done flags are still read and saved, and joined programs are cleaned', async () => {
+  const attempts = [];
+  const row = { programs: [], year: null, semester: null, enrollment_status: null, military_service: null, onboarded_at: null, interests: '', wants: '', avoids: '', admission_year: 2023, university_3p_internship_selected: true, dept_internship_done: true, university_3p_internship_done: false, joined_programs: ['futurecar', 'evil', 'ase', 'ase'] };
+  const missing = { code: '42703', message: 'column user_profiles.joined_programs does not exist' };
+  const client = { from: () => ({
+    select: (columns) => ({ eq: () => ({ maybeSingle: async () => columns.includes('joined_programs') && !columns.includes('x') && client.old ? { data: null, error: missing } : { data: row, error: null } }) }),
+    upsert: async (value) => { attempts.push(value); return { error: 'joined_programs' in value && client.old ? missing : null }; },
+  }) };
+  const loaded = await loadProfile(client, 'u');
+  assert.deepEqual(loaded.joinedPrograms, ['futurecar', 'ase']);   // 모르는 id와 중복은 버린다
+  client.old = true;
+  const older = await loadProfile(client, 'u');
+  assert.equal(older.deptInternshipDone, true);
+  assert.deepEqual(older.joinedPrograms, ['futurecar', 'ase']);
+  await saveProfile(client, 'u', { ...base, admissionYear: 2023, deptInternshipDone: true, university3pInternshipDone: false, joinedPrograms: ['futurecar', 'evil'] });
   assert.equal(attempts.length, 2);
-  assert.ok(attempts[1].includes('admission_year') && !attempts[1].includes('dept_internship_done'));
+  assert.deepEqual(attempts[0].joined_programs, ['futurecar']);
+  assert.ok(!('joined_programs' in attempts[1]) && attempts[1].dept_internship_done === true);
 });

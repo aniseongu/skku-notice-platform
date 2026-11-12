@@ -4,7 +4,7 @@ import test from 'node:test';
 import { BOARD_CATALOG, COLLEGE_BOARD, DEFAULT_BOARD, DEPARTMENT_BOARD, boardsForPrograms } from '../src/skku-boards.ts';
 import { COLLEGES, validProgram } from '../src/skku-programs.ts';
 import { EMPTY_PROFILE } from '../src/profile.ts';
-import { KEYWORD_SUGGESTIONS, canContinue, filterDepartments, initialDraft, nextStep, previousStep, toggleValue, withPrograms } from '../src/onboarding-flow.ts';
+import { KEYWORD_SUGGESTIONS, canContinue, earlierMissing, filterDepartments, initialDraft, nextStep, previousStep, toggleValue, withPrograms } from '../src/onboarding-flow.ts';
 
 const sw = { college: '소프트웨어융합대학', department: '소프트웨어학과' };
 const biz = { college: '경영대학', department: '경영학과' };
@@ -34,6 +34,17 @@ test('반도체 학과 전공이면 학과 단위로 추천된다', () => {
     assert.ok(boardsForPrograms([program]).includes('ase-notice'), program.department);
   }
   assert.ok(!boardsForPrograms([{ college: '공과대학', department: '기계공학부' }]).includes('ase-notice'));
+});
+
+test('앞 단계에 필수 답이 비면 뒤 단계에서 그 단계로 돌아가게 한다', () => {
+  const ok = { programs: [{ college: '경영대학', department: '경영학과' }], year: 3, enrollmentStatus: '재학', militaryService: null, admissionYear: null,
+    university3pInternshipSelected: false, deptInternshipDone: null, university3pInternshipDone: null, boards: [], keywords: [], joinedPrograms: [], boardsTouched: false };
+  assert.equal(earlierMissing('boards', ok, 'no'), null);
+  assert.equal(earlierMissing('boards', { ...ok, year: null }, 'no'), 'status');   // 학년이 비었다
+  assert.equal(earlierMissing('notify', { ...ok, programs: [] }, 'no'), 'primary');   // 가장 앞의 빈 단계부터
+  assert.equal(earlierMissing('internship', { ...ok, year: null }, 'no'), 'status');
+  assert.equal(earlierMissing('status', { ...ok, year: null }, 'no'), null);   // 자기 단계는 다음 단추가 막는다
+  assert.equal(earlierMissing('ai', { ...ok, university3pInternshipSelected: null }, 'no'), 'internship');
 });
 
 test('board catalog only points at known boards and valid college/department pairs', () => {

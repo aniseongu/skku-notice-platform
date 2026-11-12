@@ -1,5 +1,6 @@
 // 앱 화면. 상태와 동작은 AppController가 맡고, 이 파일은 구독해서 그리기만 한다.
 // 그림자 DOM을 쓰지 않아 전역 토큰과 글꼴을 그대로 받는다. 학교 글자는 React가 자동으로 이스케이프한다.
+import { UpdateBar } from './update-bar';
 import { aiConnectModel } from './ai-connect';
 import { visibleTracks } from './graduation-assessment';
 import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
@@ -176,6 +177,7 @@ export function NoticeShell({ app }: { app: AppController }) {
       {TABS.map((t) => <button type="button" key={t.id} className="flex min-h-[44px] min-w-[44px] flex-1 flex-col items-center justify-center gap-[2px] border-0 bg-transparent text-[13px] leading-[18px] font-medium text-ink-2 aria-[current=page]:font-bold aria-[current=page]:text-accent" aria-current={app.view === t.id ? 'page' : 'false'}
         onClick={() => app.setView(t.id)}><Icon name={t.icon} /><span>{t.label}</span></button>)}
     </nav>
+    <UpdateBar />
     <div className="toast fixed bottom-[calc(var(--tabbar-h)+16px+env(safe-area-inset-bottom))] left-1/2 min-[1080px]:top-[11px] min-[1080px]:right-[272px] min-[1080px]:px-[12px] min-[1080px]:py-[10px] min-[1080px]:bottom-auto min-[1080px]:left-auto min-[1080px]:[transform:none] z-[4] w-max max-w-[calc(100%-32px)] [transform:translateX(-50%)] rounded-md bg-ink px-[16px] py-[12px] text-[14px] text-bg [box-shadow:var(--shadow-pop)]" role="status" hidden={!app.toast}>{app.toast}{app.toastLink ? <div className="toast-actions flex items-center justify-between gap-[12px]">
       <a className={`${TOAST_ACTION} underline`} href={app.toastLink} target={app.toastLink.startsWith('?') ? '_self' : '_blank'} rel="noopener noreferrer">{app.toastLinkLabel}</a>
       <button type="button" className={`${TOAST_ACTION} min-w-[44px] justify-center border-0 bg-transparent px-[4px] py-0`} onClick={() => { app.toast = ''; app.toastLink = null; }}>닫기</button></div> : null}</div>
