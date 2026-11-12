@@ -19,6 +19,7 @@ export function LoginScreen({ app }: { app: AppController }) {
   const busy = app.authBusy;
   // 휴대폰에서만 "앱으로 설치하기"를 보인다. 주 행동은 Google 단추 하나이고 설치는 그 아래 조용한 보조 행동이다.
   const mode = installMode(navigator.userAgent, isStandalone(), !!app.install);
+  // 가운데 알림 예시는 실제 알림(src/skku_notice/push_collection.py compose_message)과 같은 모양이다: 제목은 공지 제목, 첫 줄은 이유와 마감 한 문장, 마지막 줄은 게시판.
   // 토스 첫 화면 구성(TDS Top: 위 그림, 28px 제목, 17px 설명, 아래 고정 단추 하나)을 따른다. 가운데에는 이 앱이 하는 일을 알림 예시 하나로 보여 준다.
   return <div className="flex flex-col min-h-dvh bg-bg">
     <div className="flex flex-1 flex-col w-full px-[20px] py-0 min-[720px]:my-auto min-[720px]:flex-none min-[720px]:max-w-[420px] min-[720px]:self-center min-[720px]:px-0 min-[720px]:py-[48px]">
@@ -33,8 +34,9 @@ export function LoginScreen({ app }: { app: AppController }) {
               <span className="font-semibold text-ink">{APP_NAME}</span>
               <span className="ml-auto text-ink-2">지금</span>
             </div>
-            <div id="login-note-text"><p className="m-0 mt-[8px] text-[15px] leading-[22px] font-semibold text-ink">[소프트웨어학과] 겨울방학 인턴 모집 안내</p>
-            <p className="m-0 mt-[2px] text-[14px] leading-[20px] text-ink-2">관심 키워드 인턴, <span className="whitespace-nowrap">12월 5일까지</span> 신청해요</p></div>
+            <div id="login-note-text"><p className="m-0 mt-[8px] text-[15px] leading-[22px] font-semibold text-ink">겨울방학 소프트웨어 인턴 모집 안내</p>
+            <p className="m-0 mt-[2px] text-[14px] leading-[20px] text-ink-2">관심 키워드 인턴, <span className="whitespace-nowrap">12월 5일(토) 마감이에요</span></p>
+            <p className="m-0 text-[14px] leading-[20px] text-ink-3">소프트웨어학과 공지</p></div>
           </div>
         </div>
         <div className="pt-[32px]">

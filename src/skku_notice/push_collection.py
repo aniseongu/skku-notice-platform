@@ -110,35 +110,40 @@ def _deadline_label(value: str | None) -> str | None:
         local = datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(KST)
     except ValueError:
         return None
-    label = f"마감 {local.month}월 {local.day}일({'월화수목금토일'[local.weekday()]})"
+    label = f"{local.month}월 {local.day}일({'월화수목금토일'[local.weekday()]})"
     if (local.hour, local.minute) != (23, 59):
         label += f" {local:%H:%M}"
-    return label
+    return f"{label} 마감이에요"
 
 
 def compose_message(candidate: dict) -> tuple[str, str]:
     """Notification text, reviewed against the Toss writing rules (2026-11-12, user request).
 
-    A phone shows the title and only the first body line until the user expands it, so the title is the
-    notice title alone (the board in brackets used to push it out of the visible line) and the body starts
-    with the most useful line: what changed, interest keywords, the AI reason, then the deadline. The board
-    name closes the body, which replaces the old "새 공지" that said nothing. The original service used
-    "[board] title" and "새 공지"; this difference is intentional and recorded in MIGRATION_MATRIX.
+    A phone shows the title and only the first body line until the user expands it. The title is the notice
+    title alone (a board in brackets pushed it out of the visible line). The first body line is one short
+    sentence with why it matters and the deadline ("관심 키워드 인턴, 12월 5일(토) 마감이에요"),
+    the same shape as the example on the login screen (web/src/login-screen.tsx), so what we show
+    before sign-in is what arrives. The AI reason follows, and the board name closes the body
+    instead of the old "새 공지".
+    The original service used "[board] title" and "새 공지"; the difference is recorded in MIGRATION_MATRIX.
     """
-    changed = candidate.get("kind") == "changed"
     board = candidate.get("source_name") or candidate["notice_id"].split("/")[0]
+    deadline = _deadline_label(candidate.get("deadline"))
     lines = []
-    if changed:
+    if candidate.get("kind") == "changed":
         what = "제목" if candidate.get("change_kind") == "제목" else "본문"
         lines.append(f"학교가 {what}을 고쳤어요")
+        if deadline:
+            lines.append(deadline)
     else:
-        if candidate.get("matched_words"):
-            lines.append(f"관심 {', '.join(candidate['matched_words'])}")
+        words = candidate.get("matched_words")
+        keyword = f"관심 키워드 {', '.join(words)}" if words else None
+        if keyword:
+            lines.append(f"{keyword}, {deadline}" if deadline else keyword)
         if candidate.get("ai_reason"):
             lines.append(candidate["ai_reason"])
-    deadline = _deadline_label(candidate.get("deadline"))
-    if deadline:
-        lines.append(deadline)
+        if deadline and not keyword:
+            lines.append(deadline)
     lines.append(board)
     return candidate["title"], "\n".join(lines)
 
