@@ -287,12 +287,12 @@ export function Onboarding({ app }: { app: AppController }) {
       </div>
       {moreSources.length && moreOpen ? <div id="more-boards" ref={moreRef}><MoreBoards sources={moreSources} on={draft.boards} render={boardSwitch} /></div> : null}
       <h2>기타 게시판</h2>
-      <p className="card-note m-0 text-[14px] text-ink-2">필요한 것만 켜요</p>
+      <p className="card-note m-0 text-[14px] text-ink-2">필요한 게시판만 켜요</p>
       <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label="기타 게시판">
         {[...new Set(OTHER_BOARDS.map((board) => board.group))]
           .sort((a, b) => Number(OTHER_BOARDS.some((board) => board.group === b && recommended.includes(board.id))) - Number(OTHER_BOARDS.some((board) => board.group === a && recommended.includes(board.id))))   // 추천이 든 묶음을 위로
-          .map((group, index) => <div key={group} role="group" aria-labelledby={`other-${index}`} className="[&>h3+button]:border-t-0">
-            <h3 id={`other-${index}`} className="m-0 pt-[20px] pb-[2px] text-[13px] font-semibold leading-[20px] text-ink-2 min-[720px]:pt-[24px]">{group}</h3>
+          .map((group, index) => <div key={group} role="group" aria-labelledby={`other-${index}`} className="border-t border-line first:border-t-0 [&>h3+button]:border-t-0">
+            <h3 id={`other-${index}`} className="m-0 pt-[14px] pb-[2px] text-[13px] font-semibold leading-[20px] text-ink-2 min-[720px]:pt-[16px]">{group}</h3>
             {OTHER_BOARDS.filter((board) => board.group === group).sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id))).map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
                   checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
           </div>)}
