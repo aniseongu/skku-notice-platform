@@ -66,6 +66,7 @@ const withApp = (page: import('@playwright/test').Page, patch: Record<string, un
   const app = document.querySelector('notice-app') as unknown as AppHandle;
   const w = window as unknown as { calls: unknown[][] };
   w.calls = [];
+  if ('authUserId' in values && !('profileStatus' in values)) app.profileStatus = 'unavailable';   // 프로필을 읽는 중이면 불러오는 화면이 나오므로, 시험은 따로 정하지 않으면 읽지 못한 상태로 둔다
   for (const [key, value] of Object.entries(values)) {
     app[key] = typeof value === 'string' && value.startsWith('fn:')
       ? (...args: unknown[]) => { w.calls.push([value.slice(3), ...args]); return Promise.resolve(true); }
@@ -955,7 +956,7 @@ test('left board list shows only chosen boards, falls back to boards with notice
   // 로그인해서 구독했으면 구독한 게시판만 나온다(처음 설정을 마쳤다면 전공에 맞춰 추천된 것).
   await page.evaluate(() => {
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
-    app.authUserId = 'account-a'; app.subscriptions = ['korean-notice', 'biz-notice']; app.subscriptionsLoading = false;
+    app.authUserId = 'account-a'; app.profileStatus = 'unavailable'; app.subscriptions = ['korean-notice', 'biz-notice']; app.subscriptionsLoading = false;
   });
   list = await labels();
   expect(list).toEqual(['모든 게시판', '경영대학', '국어국문학과', '게시판 더 고르기']);
@@ -1930,4 +1931,36 @@ test('a new version while in use only shows a bar; nothing changes until the use
   await bar.getByRole('button', { name: '나중에' }).click();
   await expect(bar).toBeHidden();
   expect(await page.evaluate(() => (window as unknown as { __kept?: number }).__kept)).toBe(1);
+});
+
+test('an account that has not finished first-run setup goes straight to setup without showing the list', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.authUserId = 'account-a'; app.profileStatus = 'loading';
+  });
+  await expect(page.getByText('불러오고 있어요.')).toBeVisible();
+  await expect(page.locator('notice-rows-screen a.row')).toHaveCount(0);
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
+    app.profileStatus = 'ready';
+  });
+  await expect(page.getByRole('heading', { name: '주전공이 어디예요?' })).toBeVisible();
+});
+
+test('an account remembered as finished keeps the list visible while the profile loads', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => {
+    localStorage.setItem('platform:onboarded:account-a', '1');
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.authUserId = 'account-a'; app.profileStatus = 'loading';
+  });
+  await expect(page.getByText('성대 공지').first()).toBeAttached();   // 구독이 없는 계정은 행이 없으므로 목록 화면의 탭이 남는지 본다
+  await expect(page.getByText('불러오고 있어요.')).toHaveCount(0);
+  // 다른 계정의 표시는 이 계정의 것이 아니다.
+  await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).authUserId = 'account-b'; });
+  await expect(page.getByText('불러오고 있어요.')).toBeVisible();
 });

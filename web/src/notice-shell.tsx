@@ -68,6 +68,7 @@ export function NoticeShell({ app }: { app: AppController }) {
 
   if (!app.authReady) return <LoginStatus text="로그인 상태를 확인하고 있어요." />;
   if (app.gated) return <LoginScreen app={app} />;
+  if (app.awaitingProfile()) return <LoginStatus text="불러오고 있어요." />;
   const filtered = app.filtered();
   const counts = Object.fromEntries(TABS.map((t) => [t.id, t.id === 'saved'
     ? app.filtered(app.savedNotices()).length : app.byTab(filtered, t.id).length]));

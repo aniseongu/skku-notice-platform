@@ -28,6 +28,7 @@ import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfi
 import type { Draft } from './onboarding-flow';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
 import { localKey, setLocalOwner } from './local-scope.ts';
+import { isRememberedOnboarded, rememberOnboarded } from './onboarded-flag.ts';
 import type { Subscription } from '@supabase/supabase-js';
 import { dropDuplicates, groupMates } from './dup-notices';
 import { orderNotices, type Sort } from './notice-order';
@@ -791,6 +792,7 @@ export class AppController extends Reactive {
       const row = await loadProfile(authClient, userId);
       if (epoch !== this.subscriptionsEpoch) return;
       this.profile = row ?? EMPTY_PROFILE;
+      rememberOnboarded(userId, !!this.profile.onboardedAt);   // 완료로 기억했는데 서버가 아니라고 하면 지운다
       this.profileStatus = 'ready';
     } catch {
       // 테이블이 아직 없거나 읽지 못하면 온보딩을 띄우지 않는다(설정에서는 그대로 쓸 수 있다).
@@ -803,6 +805,11 @@ export class AppController extends Reactive {
     if (!this.authUserId) return false;
     if (this.onboardingOpen) return true;
     return this.profileStatus === 'ready' && !this.profile.onboardedAt && !this.onboardingDismissed;
+  }
+
+  /** 로그인했지만 프로필을 아직 모르고 첫 설정을 마친 계정으로도 기억하지 않으면, 목록 대신 불러오는 화면을 보인다. */
+  awaitingProfile(): boolean {
+    return !!this.authUserId && (this.profileStatus === 'idle' || this.profileStatus === 'loading') && !isRememberedOnboarded(this.authUserId);
   }
 
   closeOnboarding() { this.onboardingOpen = false; this.onboardingError = ''; }
@@ -827,7 +834,7 @@ export class AppController extends Reactive {
       if (epoch !== this.subscriptionsEpoch || !(await sessionIs(client, userId))) throw new Error('계정이 바뀌었어요');
       await storeProfile(client, userId, next);
       if (epoch !== this.subscriptionsEpoch) return false;
-      this.profile = next; this.closeOnboarding();
+      this.profile = next; rememberOnboarded(userId, true); this.closeOnboarding();
       return true;
     } catch {
       if (epoch === this.subscriptionsEpoch) this.onboardingError = '저장하지 못했어요. 다시 시도해 주세요.';
