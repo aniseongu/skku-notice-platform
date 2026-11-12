@@ -225,15 +225,16 @@ export function Onboarding({ app }: { app: AppController }) {
         <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label="더 많은 게시판">{moreSources.map(boardSwitch)}</div>
       </details> : null}
       <h2>기타 게시판</h2>
-      <div className="grid gap-[16px]" role="group" aria-label="기타 게시판">
-        {[...new Set(OTHER_BOARDS.map((board) => board.group))].map((group) => <div key={group}>
-          <h3 className="m-0 mb-[4px] text-[14px] font-semibold leading-[20px] text-ink-2">{group}</h3>
-          <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label={group}>
+      {OTHER_BOARDS.some((board) => recommended.includes(board.id)) ? <p className="card-note m-0 text-[14px] text-ink-2">내 전공에 맞는 게시판은 켜 뒀어요</p> : null}
+      <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label="기타 게시판">
+        {[...new Set(OTHER_BOARDS.map((board) => board.group))]
+          .sort((a, b) => Number(OTHER_BOARDS.some((board) => board.group === b && recommended.includes(board.id))) - Number(OTHER_BOARDS.some((board) => board.group === a && recommended.includes(board.id))))   // 추천이 든 묶음을 위로
+          .map((group, index) => <div key={group} role="group" aria-labelledby={`other-${index}`}>
+            <h3 id={`other-${index}`} className="m-0 pt-[16px] pb-[2px] text-[13px] font-semibold leading-[20px] text-ink-2 min-[720px]:pt-[20px]">{group}</h3>
             {OTHER_BOARDS.filter((board) => board.group === group).sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id))).map((board) =>
-              <SwitchRow key={board.id} label={nameOf(board.id)} description={recommended.includes(board.id) ? `내 전공 추천 · ${board.help}` : board.help}
+              <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
                 checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
-          </div>
-        </div>)}
+          </div>)}
       </div>
       <h2>관심 키워드</h2>
       <p className="card-note m-0 text-[14px] text-ink-2">고르지 않으면 모든 공지를 받아요</p>

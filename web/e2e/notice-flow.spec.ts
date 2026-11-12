@@ -388,6 +388,29 @@ test('first-run setup: choices only, department list follows the college, double
   await dialog.getByRole('button', { name: '장학' }).click();
   // 기타 게시판도 같은 화면 아래에 있다. 부트캠프 게시판을 고를 수 있고, 건너뛰어도 된다.
   await expect(dialog.getByRole('group', { name: '기타 게시판' })).toBeVisible();
+  // 행 전체가 눌리는 영역이다: 스위치가 아니라 이름 글자, 설명 글자, 행의 왼쪽 끝을 눌러도 켜지고 꺼진다. 높이는 44px 이상이다.
+  const etc = dialog.getByRole('group', { name: '기타 게시판' });
+  const fab = etc.getByRole('switch', { name: /^지능형팹테크융합전공 공지/ });
+  await etc.scrollIntoViewIfNeeded();
+  const row = fab.locator('xpath=ancestor::*[contains(@class,"setting") or contains(@class,"switch-row")][1]');
+  const box = (await fab.boundingBox())!;
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  await expect(fab).toHaveAttribute('aria-checked', 'false');
+  await etc.getByText('지능형팹테크융합전공 공지', { exact: true }).click();
+  await expect(fab).toHaveAttribute('aria-checked', 'true');
+  await etc.getByText('반도체 공정과 팹 교육, 학위 안내', { exact: true }).click();
+  await expect(fab).toHaveAttribute('aria-checked', 'false');
+  await page.mouse.click(box.x + 4, box.y + box.height / 2);
+  await expect(fab).toHaveAttribute('aria-checked', 'true');
+  await fab.press('Space');   // 키보드로도 같은 스위치가 바뀐다
+  await expect(fab).toHaveAttribute('aria-checked', 'false');
+  void row;
+  // 스크롤: 맨 아래까지 내렸을 때 마지막 키워드 칩이 "다음" 단추에 가려지지 않는다.
+  const lastChip = dialog.getByRole('button', { name: '등록금' });
+  await lastChip.scrollIntoViewIfNeeded();
+  const chipBox = (await lastChip.boundingBox())!;
+  const next = (await dialog.getByRole('button', { name: '다음' }).boundingBox())!;
+  expect(chipBox.y + chipBox.height).toBeLessThanOrEqual(next.y);
   await expect(dialog.getByRole('group', { name: '사업단' }).getByRole('switch', { name: /^AI중심대학사업단 공지/ })).toHaveAttribute('aria-checked', 'true');   // 소프트웨어융합대학 전공 추천은 켜져 있다
   await expect(dialog.getByRole('group', { name: '융합·연계전공' }).getByRole('switch', { name: /^차세대반도체공학연계전공 공지/ })).toHaveAttribute('aria-checked', 'false');
   await expect(dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ })).toHaveAttribute('aria-checked', 'false');
