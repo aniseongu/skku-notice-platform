@@ -274,7 +274,7 @@ export function Onboarding({ app }: { app: AppController }) {
     body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]">
       <h2>게시판</h2>
       {/* 설명은 구역 제목 아래 한 줄, 화면에 한 번만(제목 아래 부제와 기타 게시판 설명에서 같은 말을 되풀이하지 않는다). */}
-      {draft.programs.length ? <p className="card-note m-0 text-[14px] text-ink-2">내 전공 게시판은 미리 켜 뒀어요</p> : null}
+      {draft.programs.length ? <p className="card-note m-0 text-[14px] text-ink-2">내 전공에 맞는 게시판은 미리 켜 뒀어요</p> : null}
       <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label="게시판">
         {mainSources.filter((source) => shownBoards.has(source.id) || inlineRest).map(boardSwitch)}
         {/* "더 보기"는 같은 카드의 마지막 줄이다. 카드 밖에 따로 떠 있으면 구역 제목처럼 읽힌다(독립 평가). 펼친 목록은 카드 바로 아래에 둔다. */}
@@ -287,6 +287,7 @@ export function Onboarding({ app }: { app: AppController }) {
       </div>
       {moreSources.length && moreOpen ? <div id="more-boards" ref={moreRef}><MoreBoards sources={moreSources} on={draft.boards} render={boardSwitch} /></div> : null}
       <h2>기타 게시판</h2>
+      <p className="card-note m-0 text-[14px] text-ink-2">필요한 것만 켜 주세요</p>
       <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label="기타 게시판">
         {[...new Set(OTHER_BOARDS.map((board) => board.group))]
           .sort((a, b) => Number(OTHER_BOARDS.some((board) => board.group === b && recommended.includes(board.id))) - Number(OTHER_BOARDS.some((board) => board.group === a && recommended.includes(board.id))))   // 추천이 든 묶음을 위로
