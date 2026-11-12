@@ -38,7 +38,7 @@ export function ProgramPicker({ onPick, current, listClass = '', lead = true }: 
   useEffect(() => { document.querySelector('.onb-main')?.scrollTo({ top: 0 }); listRef.current?.scrollTo({ top: 0 }); }, [college]);
   const GROUP = 'onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]';
   // 검색 칸은 처음부터 보이고, 모든 단과대의 학과를 한 번에 찾는다. 단과대를 먼저 고르지 않아도 된다.
-  const search = <input type="search" className="onb-search min-h-[44px] rounded-md border border-line bg-surface px-[12px] py-0" aria-label="학과 검색" placeholder="학과 이름으로 찾기" autoComplete="off"
+  const search = <input type="search" className="onb-search min-h-[44px] rounded-md border border-line bg-surface px-[12px] py-0 text-ink placeholder:text-ink-3" aria-label="학과 검색" placeholder="학과 이름으로 찾기" autoComplete="off"
     value={query} onChange={(event) => setQuery(event.currentTarget.value)} />;
   if (searching) {
     const results = COLLEGES.flatMap((item) => {
@@ -111,7 +111,7 @@ function MoreBoards<T extends { id: string; name: string }>({ sources, on, rende
   // 몇 개뿐이면 검색 칸과 단과대 격자 없이 바로 스위치를 보인다(찾을 필요가 없는 길이).
   if (sources.length <= FEW_BOARDS) return <div className={list} role="group" aria-label="더 많은 게시판">{sources.map(render)}</div>;
   return <div className="grid gap-[8px] pt-[4px]">
-    <input type="search" className="min-h-[44px] rounded-md border border-line bg-surface px-[12px] py-0" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off"
+    <input type="search" className="min-h-[44px] rounded-md border border-line bg-surface px-[12px] py-0 text-ink placeholder:text-ink-3" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off"
       value={query} onChange={(event) => setQuery(event.currentTarget.value)} />
     {needle
       ? found.length
@@ -287,7 +287,7 @@ export function Onboarding({ app }: { app: AppController }) {
       </div>
       {moreSources.length && moreOpen ? <div id="more-boards" ref={moreRef}><MoreBoards sources={moreSources} on={draft.boards} render={boardSwitch} /></div> : null}
       <h2>기타 게시판</h2>
-      <p className="card-note m-0 text-[14px] text-ink-2">필요한 것만 켜 주세요</p>
+      <p className="card-note m-0 text-[14px] text-ink-2">필요한 것만 켜요</p>
       <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label="기타 게시판">
         {[...new Set(OTHER_BOARDS.map((board) => board.group))]
           .sort((a, b) => Number(OTHER_BOARDS.some((board) => board.group === b && recommended.includes(board.id))) - Number(OTHER_BOARDS.some((board) => board.group === a && recommended.includes(board.id))))   // 추천이 든 묶음을 위로
@@ -298,7 +298,7 @@ export function Onboarding({ app }: { app: AppController }) {
           </div>)}
       </div>
       <h2>관심 키워드</h2>
-      <p className="card-note m-0 text-[14px] text-ink-2">고르지 않아도 돼요. 그러면 모든 공지를 받아요</p>
+      <p className="card-note m-0 text-[14px] text-ink-2">고르지 않으면 켠 게시판의 공지를 모두 받아요</p>
       <ChipGroup label="관심 키워드" options={keywordOptions} selected={draft.keywords} onToggle={(word) => setDraft({ ...draft, keywords: toggleValue(draft.keywords, word) })} />
       {app.onboardingError ? <p className="error-text text-[14px] text-danger" role="alert">{app.onboardingError}</p> : null}
     </div>;
