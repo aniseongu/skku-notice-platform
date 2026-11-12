@@ -11,7 +11,7 @@ import { BOARD_CATALOG, boardsForPrograms, OTHER_BOARDS } from './skku-boards';
 import { JOINED_PROGRAMS } from './joined-programs';
 import {
   KEYWORD_SUGGESTIONS, STEPS, STEP_LABEL, canContinue, earlierMissing, filterDepartments, initialDraft, missingHint, nextStep, previousStep,
-  stepIndex, toggleValue, withPrograms, type Draft, type DoubleAnswer, type Step,
+  resumeStep, savedBefore, stepIndex, toggleValue, withPrograms, type Draft, type DoubleAnswer, type Step,
 } from './onboarding-flow';
 import { APP_NAME } from './brand';
 import { BackToGroups, Card, ChipGroup, ChoiceList, GroupGrid, Segmented, SwitchRow } from './ui';
@@ -83,11 +83,12 @@ export function ProgramPicker({ onPick, current, listClass = '', lead = true }: 
 
 export function Onboarding({ app }: { app: AppController }) {
   useSyncExternalStore(app.subscribe, app.getVersion);
-  const [step, setStep] = useState<Step>('primary');
   const [draft, setDraft] = useState<Draft>(() => initialDraft(app.profile, app.subscriptions, app.keywords));
+  // 저장까지 하고 AI 키 단계에서 나간 사람은 답한 질문을 다시 거치지 않고 AI 키 단계부터 잇는다.
+  const [step, setStep] = useState<Step>(() => resumeStep(app.profile, draft));
   const [addingDouble, setAddingDouble] = useState(false);
   const [pendingDouble, setPendingDouble] = useState<Program | null>(null);
-  const [doubleAnswer, setDoubleAnswer] = useState<DoubleAnswer>(() => (draft.programs.length > 1 ? 'yes' : app.profile.onboardedAt ? 'no' : null));
+  const [doubleAnswer, setDoubleAnswer] = useState<DoubleAnswer>(() => (draft.programs.length > 1 ? 'yes' : app.profile.onboardedAt || savedBefore(app.profile) ? 'no' : null));
   const [changingPrimary, setChangingPrimary] = useState(() => app.profile.programs.length === 0);
   const [saved, setSaved] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -121,6 +122,8 @@ export function Onboarding({ app }: { app: AppController }) {
   const back = () => {
     if (addingDouble) { cancelDouble(); return; }
     if (step === 'primary' && !changingPrimary) { setChangingPrimary(true); return; }
+    // 앞으로 갈 때 알림이 이미 켜져 있어 건너뛴 단계는 뒤로 갈 때도 건너뛴다.
+    if (step === 'ai' && app.pushStatus !== 'off') { go('boards'); return; }
     go(previousStep(step));
   };
   const sources = app.sources.filter((source) => !source.external);

@@ -104,6 +104,19 @@ export function earlierMissing(step: Step, draft: Draft, doubleAnswer: DoubleAns
   return REQUIRED_STEPS.find((name) => STEPS.indexOf(name) < limit && !canContinue(name, draft, doubleAnswer)) ?? null;
 }
 
+/** 앞서 첫 설정을 저장까지 했는지(게시판 단계에서 프로필이 저장된다). 저장한 재학 상태가 있으면 앞 단계 답을 모두 했다는 뜻이다. */
+export function savedBefore(profile: Pick<UserProfile, 'programs' | 'enrollmentStatus'>): boolean {
+  return profile.programs.length > 0 && profile.enrollmentStatus !== null;
+}
+
+/** 다시 열었을 때 시작할 단계. 저장까지 하고 AI 키 단계에서 나갔다면 이미 답한 질문을 다시 묻지 않고 AI 키 단계부터 잇는다.
+ * 그 사이 새 필수 질문이 생겨 답이 비어 있으면 처음부터 묻는다(그 단계로 돌아가는 일은 earlierMissing이 맡는다). */
+export function resumeStep(profile: Pick<UserProfile, 'programs' | 'enrollmentStatus'>, draft: Draft): Step {
+  if (!savedBefore(profile)) return 'primary';
+  const answer: DoubleAnswer = draft.programs.length > 1 ? 'yes' : 'no';
+  return REQUIRED_STEPS.every((name) => canContinue(name, draft, answer)) ? 'ai' : 'primary';
+}
+
 export const stepIndex = (step: Step): number => STEPS.indexOf(step);
 export const previousStep = (step: Step): Step | null => STEPS[stepIndex(step) - 1] ?? null;
 export const nextStep = (step: Step): Step | null => STEPS[stepIndex(step) + 1] ?? null;

@@ -471,6 +471,24 @@ test('first-run setup requires one AI key at the end and records completion only
   await expect(dialog).toHaveCount(0);
 });
 
+test('reopening a setup that was saved but left at the AI key step resumes at that step instead of asking everything again', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  // 게시판 단계에서 저장까지 했고(전공·학년·재학·3품) 키를 연결하기 전에 나갔다. 다시 열면 프로필을 읽은 뒤 첫 설정이 뜬다.
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.authUserId = 'account-a'; app.pushStatus = 'on'; app.byokOn = true; app.byokLoading = false; app.byokStatus = null; app.aiKeys = [];
+    app.profile = { programs: [{ college: '경영대학', department: '경영학과' }], year: 3, semester: null, enrollmentStatus: '재학', militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: true, deptInternshipDone: null, university3pInternshipDone: false };
+    app.profileStatus = 'ready';
+  });
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: 'AI를 연결해 주세요' })).toBeVisible();   // 클릭 0번으로 남은 단계
+  await expect(dialog.getByRole('button', { name: '끝내기' })).toBeDisabled();
+  // 뒤로 가면 앞에서 한 답이 그대로 있다(복수전공 '없어요'를 다시 고르지 않아도 된다).
+  await dialog.getByRole('button', { name: '이전 단계' }).click();
+  await expect(dialog.getByRole('heading', { name: '어떤 공지를 받을까요?' })).toBeVisible();
+});
+
 test('first-run setup never finishes without a key, even when the key service is unreachable (no exception)', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
