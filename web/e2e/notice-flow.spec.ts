@@ -1593,6 +1593,25 @@ test('changing a list condition (filter check, sort) closes the open detail pane
   await expect(title).toBeHidden();
 });
 
+test('reloading after the pane was closed by a list change does not open the first notice by itself', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '상세 칸은 넓은 화면에서만 옆에 열려 있다');
+  await page.goto('/?api=sample/api/v1');
+  const rows = page.locator('notice-rows-screen a.row');
+  const title = page.locator('.detail-pane notice-detail-screen .detail-title');
+  await rows.nth(1).click();
+  await expect(title).toBeVisible();
+  await page.getByRole('button', { name: /정렬:/ }).click();
+  await page.locator('.sort-option').nth(1).click();
+  await expect(title).toBeHidden();
+  await page.reload();
+  await expect(rows.first()).toBeVisible();
+  await expect(title).toBeHidden();
+  await rows.nth(1).click();   // 직접 누르면 열린다
+  await expect(title).toBeVisible();
+  await page.reload();   // 보던 공지가 있으면 새로고침해도 그대로 열려 있다
+  await expect(title).toBeVisible();
+});
+
 test('selection mode survives a reload with the same ticks, and the detail pane stays closed', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   await expect(page.locator('notice-rows-screen a.row').first()).toBeVisible();

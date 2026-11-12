@@ -329,7 +329,9 @@ export class AppController extends Reactive {
   isWide = wide.matches;
   theme: Theme = (['light', 'dark'].includes(remember('theme') ?? '') ? remember('theme') : 'auto') as Theme;
   // 넓은 화면의 오른쪽 상세 칸을 열어 둘지(닫으면 목록이 넓어진다). 기억한다.
-  detailOpen = remember('detail') !== '0' && savedSelection() === null;   // 선택하던 중이면 상세 칸이 저절로 열리지 않게 닫아 둔다
+  // 새로고침 때는 보던 공지가 있을 때만 상세 칸을 연다. 목록 조건을 바꿔 닫은 상태는 저장하지 않으므로(listChanged), 보던 공지가 없는데
+  // 저장된 "열어 둠"만 보고 열면 첫 공지가 저절로 열려 읽은 글처럼 보인다. 선택하던 중(선택 모드)이어도 열지 않는다.
+  detailOpen = remember('detail') !== '0' && savedSelection() === null && this.selectedId !== null;
   // 휴대폰에서 앱 안 상세 화면으로 연 글. 뒤로 가기(history)로 닫는다.
   openedId: string | null = null;
   shortcutsOpen = false;
