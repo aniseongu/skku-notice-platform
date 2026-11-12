@@ -119,7 +119,7 @@ export function NoticeShell({ app }: { app: AppController }) {
         {reading ? <ReadingView app={app} notice={reading} /> : <>
           <div className="navigation-head contents">
             <header className={`${TOPBAR} ${settings ? TOPBAR_SETTINGS : TOPBAR_FEED}`}>
-              {settings ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft narrow-only back -ml-[12px] min-[720px]:hidden!" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} onClick={app.backSettings}><Icon name="back" /></button> : null}
+              {settings ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover narrow-only back -ml-[12px] min-[720px]:hidden!" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} onClick={app.backSettings}><Icon name="back" /></button> : null}
               {settings ? null : <Brand className="brand-mark narrow-only min-[720px]:hidden! mr-[8px] h-[36px] w-[36px] flex-none text-accent" />}
               <div className={TOPBAR_TEXT}>
                 <h1 className={`${TOPBAR_H1} ${settings ? '' : 'max-[719px]:text-[21px] max-[719px]:leading-[28px] max-[719px]:font-extrabold'}`}>{title}</h1>
@@ -130,13 +130,13 @@ export function NoticeShell({ app }: { app: AppController }) {
                   <input type="search" placeholder="공지 찾기" autoComplete="off" aria-label="공지 검색" aria-keyshortcuts="/" value={app.query}
                     onChange={(event) => { app.query = event.currentTarget.value; app.selectedReads = []; app.listChanged(); }} />
                   {app.query ? null : <Kbd keys={['/']} className="ml-auto" />}</label>
-                {app.detailOpen || !selected ? null : <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft wide-only max-[719px]:hidden min-[720px]:flex" aria-label="상세 칸 열기" title="상세 칸 열기"
+                {app.detailOpen || !selected ? null : <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover wide-only max-[719px]:hidden min-[720px]:flex" aria-label="상세 칸 열기" title="상세 칸 열기"
                   onClick={() => app.setDetail(true)}><Icon name="panel" /></button>}
-                <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft" aria-label="공지 다시 가져오기" title="공지 다시 가져오기 (R)" aria-keyshortcuts="r"
+                <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover" aria-label="공지 다시 가져오기" title="공지 다시 가져오기 (R)" aria-keyshortcuts="r"
                   disabled={app.loading} onClick={() => { void app.collectNow(); }}><Icon name="refresh" /></button>
               </>}
-              {settings ? null : <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft narrow-only min-[720px]:hidden!" aria-label="설정" onClick={app.openSettingsHome}><GearIcon /></button>}
-              {settings ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft wide-only min-[720px]:-mr-[11px] max-[719px]:hidden min-[720px]:flex" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} title={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 (Esc)' : '설정 닫기 (Esc)'}
+              {settings ? null : <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover narrow-only min-[720px]:hidden!" aria-label="설정" onClick={app.openSettingsHome}><GearIcon /></button>}
+              {settings ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover wide-only min-[720px]:-mr-[11px] max-[719px]:hidden min-[720px]:flex" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} title={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 (Esc)' : '설정 닫기 (Esc)'}
                 aria-keyshortcuts="Escape" onClick={app.backSettings}><Icon name="close" /></button> : null}
             </header>
           </div>
@@ -162,12 +162,12 @@ export function NoticeShell({ app }: { app: AppController }) {
 
       <aside className={`detail-pane hidden min-[720px]:min-h-0 min-[720px]:overflow-y-auto min-[1080px]:bg-bg ${oneColumn ? '' : 'min-[1080px]:block'}`} aria-label="공지 상세">
         <div className="pane-head detail-head min-[720px]:flex min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:items-center min-[720px]:gap-[8px] min-[720px]:border-b min-[720px]:border-line min-[1080px]:justify-between min-[1080px]:pr-[32px] min-[1080px]:pl-[20px] min-[1080px]:[&_:is(.save-button,.share-button)]:size-[36px] [@media(pointer:coarse)]:min-[1080px]:[&_:is(.save-button,.share-button)]:size-[44px] min-[1080px]:[&_:is(.save-button,.share-button)]:rounded-md min-[1080px]:[&_.solid-button]:min-h-[36px] min-[1080px]:[&_.solid-button]:px-[14px] min-[1080px]:[&_.solid-button]:text-[14px] min-[1080px]:[&_.ghost-button]:min-h-[36px] min-[1080px]:[&_.ghost-button]:px-[14px] min-[1080px]:[&_.ghost-button]:text-[14px]">
-          {selected ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft" aria-label="상세 칸 닫기" title="상세 칸 닫기 (Esc)" aria-keyshortcuts="Escape"
+          {selected ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover" aria-label="상세 칸 닫기" title="상세 칸 닫기 (Esc)" aria-keyshortcuts="Escape"
             onClick={() => app.setDetail(false)}><Icon name="close" /></button> : null}
           {selected ? <div className="detail-actions min-[1080px]:flex min-[1080px]:gap-[8px]">
             <SaveButton app={app} notice={selected} />
             <ShareButton app={app} notice={selected} />
-            <a className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" href={safeUrl(selected.url)} target="_blank" rel="noopener" aria-keyshortcuts="Enter">원문 열기<Kbd keys={['Enter']} className="ml-[8px]" onSolid /></a></div> : null}
+            <a className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" href={safeUrl(selected.url)} target="_blank" rel="noopener" aria-keyshortcuts="Enter">원문 열기<Kbd keys={['Enter']} className="ml-[8px]" onSolid /></a></div> : null}
         </div>
         {selected ? <Detail app={app} notice={selected} /> : <p className="detail-note detail-empty m-0 grid min-h-[60%] place-items-center px-[32px] py-[24px] text-[14px] leading-[19px] text-ink-3">공지를 고르면 여기에 보여요</p>}
       </aside>
@@ -187,7 +187,7 @@ export function NoticeShell({ app }: { app: AppController }) {
 }
 
 const SKELETON_BAR = 'block h-[14px] rounded-sm bg-sunken';
-const TOAST_ACTION = 'inline-flex min-h-[44px] items-center text-inherit [font:inherit]';
+const TOAST_ACTION = '[@media(hover:hover)]:hover:opacity-80 active:opacity-80 inline-flex min-h-[44px] items-center text-inherit [font:inherit]';
 const boardChoices = (app: AppController) => [{ id: 'all', label: app.tab() === 'intern' ? '모든 사이트' : '모든 게시판' },
   ...app.tabSources().map((s) => ({ id: s.id, label: boardName(s, s.id) }))];
 
@@ -236,7 +236,7 @@ const UPDATED = 'updated text-[13px] leading-[18px] tabular-nums min-[720px]:tex
 
 // 사이드바(PC 전용) 항목. 현재 항목은 aria-current=page로 표시한다.
 const SIDE_ITEM = 'flex items-center justify-between gap-[8px] min-h-[40px] px-[12px] py-0 border-0 rounded-sm text-[15px] font-medium text-left select-none [-webkit-user-select:none] [@media(pointer:coarse)]:min-h-[44px]';
-const SIDE_ITEM_IDLE = 'bg-transparent hover:bg-hover-soft';
+const SIDE_ITEM_IDLE = 'bg-transparent [@media(hover:hover)]:hover:bg-hover active:bg-hover';
 const SIDE_ITEM_CURRENT = 'bg-sunken text-ink font-semibold [&_.i]:text-accent';
 
 function SideItem({ label, count, active, onClick, shortcut, ariaLabel, icon }: {
@@ -251,7 +251,7 @@ function SideItem({ label, count, active, onClick, shortcut, ariaLabel, icon }: 
 function SideGroup({ app, id, title, count, children }: { app: AppController; id: string; title: string; count?: number; children: ReactNode }) {
   const open = !app.collapsed.includes(id);
   return <>
-    <button type="button" className="side-head mx-[12px] mt-[20px] mb-[4px] flex w-[calc(100%_-_24px)] cursor-pointer items-center justify-between border-0 bg-transparent px-0 py-[4px] text-left text-[13px] leading-[18px] font-semibold text-ink-2 [&:hover]:text-ink" aria-expanded={open} aria-controls={`side-${id}`} onClick={() => {
+    <button type="button" className="side-head mx-[12px] mt-[20px] mb-[4px] flex w-[calc(100%_-_24px)] cursor-pointer items-center justify-between border-0 bg-transparent px-0 py-[4px] text-left text-[13px] leading-[18px] font-semibold text-ink-2 [&:hover]:text-ink rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover" aria-expanded={open} aria-controls={`side-${id}`} onClick={() => {
       app.collapsed = open ? [...app.collapsed, id] : app.collapsed.filter((x) => x !== id);
       remember('side-collapsed', JSON.stringify(app.collapsed));
     }}><span>{title}{!open && count ? <span className="side-count ml-[6px] font-medium text-ink-3">{count}</span> : null}</span><span className={`side-chevron h-[8px] w-[8px] border-r-[1.5px] border-b-[1.5px] border-current ${open ? '[transform:rotate(45deg)_translateY(-2px)]' : '[transform:rotate(-45deg)]'}`} aria-hidden="true" /></button>
@@ -274,7 +274,7 @@ function UpdatedLine({ app, count }: { app: AppController; count?: number }) {
 
 const Empty = ({ title, body, action, onAction }: { title: string; body: string; action?: string; onAction?: () => void }) =>
   <div className="empty flex flex-col items-center gap-[4px] px-[24px] py-[64px] text-center text-ink-3 [&_.i]:mb-[8px] [&_.i]:size-[36px] [&_.i]:[stroke-width:1.5]"><Icon name="ginkgo" /><strong className="text-[16px] leading-[23px] text-ink-2">{title}</strong><p className="m-0 mb-[12px] text-[14px]">{body}</p>
-    {action ? <button type="button" className="ghost-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={onAction}>{action}</button> : null}</div>;
+    {action ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={onAction}>{action}</button> : null}</div>;
 
 function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
   if (app.loading && !app.notices.length) {
@@ -356,10 +356,10 @@ function ViewFilters({ app }: { app: AppController }) {
 </label>
       <button type="button" className={`${SELECT_BTN} order-2 ml-auto min-[720px]:ml-0 border-0 bg-transparent px-[4px]! font-medium text-ink-2 min-[720px]:order-3 min-[720px]:ml-[4px] min-[720px]:min-h-[44px]!`} onClick={() => app.closeSelection()}><Icon name="close" />선택 끝내기</button>
       <div className={`order-3 flex gap-[8px] min-[720px]:gap-[4px] min-[720px]:order-2 min-[720px]:ml-auto ${count ? '' : 'max-[719px]:hidden'} max-[719px]:fixed max-[719px]:inset-x-0 max-[719px]:bottom-0 max-[719px]:pb-[calc(16px+env(safe-area-inset-bottom))] max-[719px]:z-[3] max-[719px]:bg-[var(--glass)] max-[719px]:backdrop-blur-[20px] max-[719px]:backdrop-saturate-[1.6] max-[719px]:border-t max-[719px]:border-line max-[719px]:px-[var(--gutter)] max-[719px]:pt-[8px] min-[720px]:order-2 min-[720px]:ml-auto`}>
-        <button type="button" className={`${SELECT_BTN} solid-button border-0 bg-accent py-0 font-semibold text-on-accent no-underline select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 min-[720px]:disabled:border-0 min-[720px]:min-h-[44px] min-[720px]:min-w-[44px] min-[720px]:rounded-[var(--r-md)] min-[720px]:border-0 min-[720px]:bg-transparent min-[720px]:px-[8px] min-[720px]:text-[14px] min-[720px]:font-medium min-[720px]:text-ink-2 min-[720px]:disabled:text-ink-3 disabled:opacity-80 max-[719px]:flex-1`} disabled={!selectedUnread}
+        <button type="button" className={`${SELECT_BTN} solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] border-0 bg-accent py-0 font-semibold text-on-accent no-underline select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 min-[720px]:disabled:border-0 min-[720px]:min-h-[44px] min-[720px]:min-w-[44px] min-[720px]:rounded-[var(--r-md)] min-[720px]:border-0 min-[720px]:bg-transparent min-[720px]:px-[8px] min-[720px]:text-[14px] min-[720px]:font-medium min-[720px]:text-ink-2 min-[720px]:disabled:text-ink-3 disabled:opacity-80 max-[719px]:flex-1`} disabled={!selectedUnread}
           aria-label={`선택한 읽지 않은 공지 ${selectedUnread}개 읽음으로 표시`}
           onClick={() => app.markSelectedRead(true)}><Icon name="mail-open" />읽음으로 표시</button>
-        <button type="button" className={`${SELECT_BTN} ghost-button border border-line bg-surface py-0 font-semibold text-ink no-underline select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 min-[720px]:min-h-[44px] min-[720px]:min-w-[44px] min-[720px]:rounded-[var(--r-md)] min-[720px]:border-0 min-[720px]:bg-transparent min-[720px]:px-[8px] min-[720px]:text-[14px] min-[720px]:font-medium min-[720px]:text-ink-2 min-[720px]:disabled:text-ink-3 disabled:opacity-80 max-[719px]:flex-1`} disabled={!selectedRead}
+        <button type="button" className={`${SELECT_BTN} ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover border border-line bg-surface py-0 font-semibold text-ink no-underline select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 min-[720px]:min-h-[44px] min-[720px]:min-w-[44px] min-[720px]:rounded-[var(--r-md)] min-[720px]:border-0 min-[720px]:bg-transparent min-[720px]:px-[8px] min-[720px]:text-[14px] min-[720px]:font-medium min-[720px]:text-ink-2 min-[720px]:disabled:text-ink-3 disabled:opacity-80 max-[719px]:flex-1`} disabled={!selectedRead}
           aria-label={`선택한 읽은 공지 ${selectedRead}개 읽지 않음으로 표시`}
           onClick={() => app.markSelectedRead(false)}><Icon name="mail" />읽지 않음으로 표시</button>
       </div>
@@ -391,13 +391,13 @@ function ViewFilters({ app }: { app: AppController }) {
 
 const VIEW_ROW = 'flex flex-wrap items-center gap-[8px] px-[var(--gutter)] min-[720px]:px-[24px] min-[720px]:pt-[4px] min-[720px]:pb-0';
 const VIEW_ACTIONS = 'view-actions ml-auto flex items-center gap-[4px] max-[359px]:gap-0';
-const VIEW_TOGGLE = 'view-toggle group inline-flex min-h-[44px] items-center gap-[8px] border-0 bg-transparent py-0 pr-[8px] pl-0 text-[14px] font-medium text-ink-2 aria-pressed:font-semibold aria-pressed:text-ink';
+const VIEW_TOGGLE = 'view-toggle rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover group inline-flex min-h-[44px] items-center gap-[8px] border-0 bg-transparent py-0 pr-[8px] pl-0 text-[14px] font-medium text-ink-2 aria-pressed:font-semibold aria-pressed:text-ink';
 // 체크 표시(::after의 마스크)는 base.css의 .check-mark가 맡는다.
 const FILTER_CHECK = 'filter-check check-mark relative size-[18px] flex-none rounded-sm border-[1.5px] border-ink-3 group-aria-pressed:border-ink group-aria-pressed:bg-ink';
 const MENU_TRIGGER = 'board-trigger group inline-flex min-h-[44px] items-center justify-end gap-[7px] border-0 bg-transparent py-0 pr-0 pl-[12px] text-[14px] whitespace-nowrap text-ink-2';
 const MENU_CHEVRON = 'board-chevron size-[7px] border-r-[1.5px] border-b-[1.5px] border-current [transform:translateY(-2px)_rotate(45deg)] group-aria-expanded:[transform:translateY(2px)_rotate(225deg)]';
 const MENU_OPTIONS = 'board-options absolute top-[calc(100%+4px)] right-0 z-[4] rounded-md border border-line bg-surface p-[4px] [box-shadow:var(--shadow-pop)]';
-const MENU_OPTION = 'board-option flex min-h-[44px] w-full items-center justify-between gap-[12px] rounded-sm border-0 bg-transparent px-[12px] py-0 text-left text-[14px] font-medium whitespace-nowrap text-ink-2 [&:hover]:bg-sunken focus-visible:bg-sunken aria-pressed:bg-sunken aria-pressed:font-semibold aria-pressed:text-ink';
+const MENU_OPTION = 'board-option flex min-h-[44px] w-full items-center justify-between gap-[12px] rounded-sm border-0 bg-transparent px-[12px] py-0 text-left text-[14px] font-medium whitespace-nowrap text-ink-2 [@media(hover:hover)]:hover:bg-hover active:bg-hover focus-visible:bg-sunken aria-pressed:bg-sunken aria-pressed:font-semibold aria-pressed:text-ink';
 const MENU_CHECK = 'board-check mr-[3px] h-[12px] w-[7px] border-r-[1.5px] border-b-[1.5px] border-current [transform:rotate(45deg)]';
 
 // 위아래·Home·End로 메뉴 항목 사이를 옮긴다.
@@ -463,13 +463,13 @@ function BoardSelect({ app }: { app: AppController }) {
 
 /** 공유 단추: 휴대폰은 기기의 공유 창(카카오톡·메시지 등), 공유 창이 없는 PC 브라우저는 링크 복사 */
 function ShareButton({ app, notice }: { app: AppController; notice: Notice }) {
-  return <button type="button" className="icon-button share-button grid place-items-center flex-none size-[44px] rounded-md border border-line bg-surface text-ink active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft"
+  return <button type="button" className="icon-button share-button grid place-items-center flex-none size-[44px] rounded-md border border-line bg-surface text-ink active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover"
     aria-label="공유하기" title="공유하기" onClick={() => { void app.share(notice); }}><Icon name={app.linkCopied ? 'check' : 'share'} /></button>;
 }
 
 function SaveButton({ app, notice }: { app: AppController; notice: Notice }) {
   const saved = app.isSaved(notice);
-  return <button type="button" className="icon-button save-button grid place-items-center flex-none size-[44px] rounded-md border border-line bg-surface text-ink active:bg-sunken aria-pressed:bg-transparent aria-pressed:text-accent disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft" aria-pressed={saved}
+  return <button type="button" className="icon-button save-button grid place-items-center flex-none size-[44px] rounded-md border border-line bg-surface text-ink active:bg-sunken aria-pressed:bg-transparent aria-pressed:text-accent disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover" aria-pressed={saved}
     aria-label={saved ? '저장 지우기' : '저장하기'} title={saved ? '저장 지우기 (S)' : '저장하기 (S)'} aria-keyshortcuts="s"
     onClick={() => app.toggleSave(notice)}><Icon name={saved ? 'bookmark-on' : 'bookmark'} /></button>;
 }
@@ -500,14 +500,14 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
 function ReadingView({ app, notice }: { app: AppController; notice: Notice }) {
   return <Fragment>
     <header className={TOPBAR}>
-      <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft back -ml-[12px]" aria-label="목록으로" onClick={() => history.back()}><Icon name="back" /></button>
+      <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover back -ml-[12px]" aria-label="목록으로" onClick={() => history.back()}><Icon name="back" /></button>
       <div className={TOPBAR_TEXT}><h1 className={TOPBAR_H1}>공지</h1></div>
     </header>
     <div className="reading px-[var(--gutter)] pt-[16px] pb-[calc(96px+env(safe-area-inset-bottom))]"><Detail app={app} notice={notice} /></div>
     <div className="read-actions glass fixed inset-x-0 bottom-0 z-[3] flex gap-[8px] border-t border-line px-[var(--gutter)] pt-[12px] pb-[calc(12px+env(safe-area-inset-bottom))] [&>*]:flex-1 [&>:is(.save-button,.share-button)]:flex-none">
       <SaveButton app={app} notice={notice} />
       <ShareButton app={app} notice={notice} />
-      <a className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" href={safeUrl(notice.url)} target="_blank" rel="noopener">원문 열기</a>
+      <a className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" href={safeUrl(notice.url)} target="_blank" rel="noopener">원문 열기</a>
     </div>
   </Fragment>;
 }
@@ -520,7 +520,7 @@ function ShortcutsDialog({ app }: { app: AppController }) {
     onClick={(event) => { if (event.target === event.currentTarget) event.currentTarget.close(); }}>
     <div className="dialog-head -mr-[8px] flex h-[56px] items-center justify-between">
       <h2 id="shortcuts-title" className="text-[17px] font-bold">단축키</h2>
-      <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft" aria-label="닫기" onClick={(event) => event.currentTarget.closest('dialog')?.close()}><Icon name="close" /></button>
+      <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover" aria-label="닫기" onClick={(event) => event.currentTarget.closest('dialog')?.close()}><Icon name="close" /></button>
     </div>
     {SHORTCUTS.map((section) => <section className="shortcut-group" key={section.group}>
       <h3 className="mx-0 mt-[12px] mb-[4px] text-[12px] leading-[16px] font-semibold text-ink-3">{section.group}</h3>

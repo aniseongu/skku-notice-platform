@@ -27,7 +27,7 @@ export function Segmented<T extends string | number>({ label, options, value, on
   label: string; options: readonly { value: T; label: string }[]; value: T | null; onChange: (next: T) => void; columns?: number;
 }) {
   return <div className="seg flex flex-wrap gap-[8px] data-[columns=3]:grid data-[columns=3]:grid-cols-[repeat(3,minmax(0,1fr))]" data-columns={columns} role="group" aria-label={label}>
-    {options.map((option) => <button type="button" className={`min-h-[44px] flex-[1_1_4.5rem] rounded-md border px-[12px] py-0 ${value === option.value ? 'border-ink bg-ink font-bold text-bg' : 'border-line bg-surface font-medium text-ink'}`} key={String(option.value)} aria-pressed={value === option.value}
+    {options.map((option) => <button type="button" className={`min-h-[44px] flex-[1_1_4.5rem] rounded-md border px-[12px] py-0 ${value === option.value ? 'border-ink bg-ink font-bold text-bg' : 'border-line bg-surface font-medium text-ink [@media(hover:hover)]:hover:bg-hover active:bg-hover'}`} key={String(option.value)} aria-pressed={value === option.value}
       onClick={() => onChange(option.value)}>{option.label}</button>)}
   </div>;
 }

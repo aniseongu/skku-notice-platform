@@ -73,7 +73,7 @@ export function GraduationNotes({ model }: { model: GraduationModel }) {
     <p className="m-0">공고에 적힌 근무 기간과 시간으로 대략 판단해요. 실제 인정 여부는 학교와 학과에 확인해 주세요{hasP3 || hasDept
       // 글자는 문장 끝에 붙고, 눌리는 영역은 위아래 여백으로 44px를 채운다(줄 높이는 그대로).
       ? <button type="button" aria-expanded={open} aria-controls="grad-criteria" onClick={() => setOpen((value) => !value)}
-          className="ml-[6px] inline cursor-pointer border-0 bg-transparent p-0 py-[13px] -my-[13px] text-[12px] leading-[18px] font-medium text-ink-3 underline underline-offset-2">판정 근거 {open ? '접기' : '보기'}</button>
+          className="ml-[6px] inline cursor-pointer border-0 bg-transparent p-0 py-[13px] -my-[13px] text-[12px] leading-[18px] font-medium text-ink-3 underline underline-offset-2 [@media(hover:hover)]:hover:text-ink active:text-ink">판정 근거 {open ? '접기' : '보기'}</button>
       : null}</p>
     {open ? <div id="grad-criteria" className="mt-[8px]">
       {readFacts(ready.facts) ? <p className="m-0">공고에서 읽은 내용: {readFacts(ready.facts)}</p> : null}

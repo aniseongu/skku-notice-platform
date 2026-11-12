@@ -472,6 +472,36 @@ test('first-run setup requires one AI key at the end and records completion only
   await expect(dialog).toHaveCount(0);
 });
 
+test('pressable elements share one hover response: settings switch row and first-run tile and chip change color on mouse hover', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '마우스 올림은 넓은 화면에서만 본다');
+  const hoverChanges = async (target: import('@playwright/test').Locator) => {
+    await target.waitFor();
+    const bg = () => target.evaluate((el) => getComputedStyle(el).backgroundColor);
+    await page.mouse.move(0, 0);
+    await expect.poll(bg).toBe(await bg());
+    const before = await bg();
+    await target.hover();
+    await expect.poll(bg).not.toBe(before);
+  };
+  await settingsAt(page, '&section=notifications');
+  await withApp(page, { authUserId: 'account-a', subscriptions: ['skku-notice01'], toggleSubscription: 'fn:toggle' });
+  await hoverChanges(page.locator('platform-settings-screen').getByRole('switch').first());
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
+    app.profileStatus = 'ready'; app.authUserId = 'account-a'; app.pushStatus = 'on'; app.byokOn = true; app.byokLoading = false; app.byokStatus = null; app.aiKeys = [];
+  });
+  const dialog = page.getByRole('dialog');
+  await hoverChanges(dialog.getByRole('group', { name: '단과대 선택' }).getByRole('button').first());
+  await dialog.getByRole('group', { name: '단과대 선택' }).getByRole('button', { name: '경영대학', exact: true }).click();
+  await dialog.getByRole('radio', { name: '경영학과', exact: true }).click();
+  await dialog.getByRole('button', { name: '다음' }).click();
+  await dialog.getByRole('radio', { name: '없어요', exact: true }).click();
+  await hoverChanges(dialog.getByRole('button', { name: '3학년' }));
+});
+
 test('college tiles in first-run setup change color on mouse hover like other choices', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '마우스 올림은 넓은 화면에서만 본다');
   await page.goto('/?api=sample/api/v1');
