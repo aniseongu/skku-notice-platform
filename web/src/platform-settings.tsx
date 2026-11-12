@@ -2,6 +2,7 @@
 // 스위치는 바로 반영되는 설정에만 쓰고(role="switch"), 켜짐·꺼짐을 글자로도 알린다(색에만 의존하지 않는다).
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { MANUAL_INSTALL_HINT } from './install-hint';
 import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
 import { AiRows, StepGuide } from './ai-connect';
 import type { AiKeyStatus, AiPreferences, AiProvider } from './ai-providers';
@@ -41,7 +42,8 @@ export interface SettingsModel {
   canInstall: boolean;
   sendFeedback: (kind: FeedbackKind, body: string, email: string) => Promise<FeedbackResult>;
   /** iOS Safari: 설치 창이 없어 홈 화면 추가 방법만 알려 준다. */
-  iosInstall?: boolean;
+  /** 설치 창이 없는 브라우저(iOS Safari, 삼성인터넷)에서 홈 화면 추가 방법을 알려 준다. */
+  manualInstall?: 'ios' | 'samsung' | null;
   install: () => void;
   showShortcuts: () => void;
   // 게시판
@@ -215,7 +217,7 @@ function Overview({ model }: { model: SettingsModel }) {
         <button type="button" className="ghost-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.install}>앱으로 설치하기</button>
       </Setting> : null}
       {/* 로그인 뒤에도 설치는 팝업이나 배너로 다시 묻지 않고, 설정의 "화면"에서 원할 때 찾게 한다. 설치한 앱으로 열면 두 줄 모두 보이지 않는다. */}
-      {model.iosInstall && !model.canInstall ? <Setting name="앱 설치" help="공유 버튼에서 ‘홈 화면에 추가’를 고르면 앱처럼 쓸 수 있어요" className="min-[720px]:hidden" /> : null}
+      {model.manualInstall && !model.canInstall ? <Setting name="앱 설치" help={`${MANUAL_INSTALL_HINT[model.manualInstall].lead}${MANUAL_INSTALL_HINT[model.manualInstall].action}${MANUAL_INSTALL_HINT[model.manualInstall].tail}`} className="min-[720px]:hidden" /> : null}
       <Setting name="단축키" help="키보드로 빠르게 이동해요" className="kbd-only">
         <button type="button" className="ghost-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" aria-keyshortcuts="?" onClick={model.showShortcuts}>단축키 보기</button>
       </Setting>

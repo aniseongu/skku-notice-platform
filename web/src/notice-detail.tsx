@@ -20,6 +20,8 @@ export interface NoticeDetailModel {
   interests: string[];
   ai: { verdict: Verdict; reason: string } | null;
   rule: string | null;
+  /** 내 AI가 아직 이 공지를 보지 않았다(목록 줄과 같은 조건). 제목 아래에 "AI가 확인하고 있어요"를 적는다. */
+  pending?: boolean;
   notified: boolean;
   retry: () => void;
   /** 소프트웨어학과 원전공이 인턴 공고를 열었을 때만 있다. */
@@ -88,12 +90,12 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
   const passed = notice.deadline ? deadlinePassed(notice.deadline) : false;
   const urgent = !!notice.deadline && !passed && daysLeft(notice.deadline, model.today) <= 3;
   // 인턴십 충족 표시는 아래 "인턴십 요건 확인" 한 곳에서만 말한다(제목 아래와 구역에서 같은 말을 두 번 하지 않는다). 목록 줄에는 구역이 없어 그대로 둔다.
-  const hasReason = interests.length > 0 || !!ai || !!model.rule;
+  const hasReason = interests.length > 0 || !!ai || !!model.rule || !!model.pending;
   return <div className="detail min-[1080px]:px-[32px] min-[1080px]:py-[24px]">
     <p className="meta flex min-w-0 flex-wrap gap-[6px] mb-[6px] text-[13px] leading-[18px] font-medium text-ink-3"><span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{model.source}</span>{notice.category ? <span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{notice.category}</span> : null}</p>
     <h2 className="detail-title text-[20px] leading-[28px] font-bold tracking-[-0.02em]" title={title}>{title}</h2>
     {notice.title_ko ? <p className="detail-original mt-[4px] text-[13px] leading-[19px] text-ink-3" lang="en">{cleanTitle(notice.title)}</p> : null}
-    {hasReason ? <p className="detail-reason mt-[10px] text-[14px] leading-[21px] text-ink-2"><Reason interests={interests} ai={ai} rule={model.rule} /></p> : null}
+    {hasReason ? <p className="detail-reason mt-[10px] text-[14px] leading-[21px] text-ink-2"><Reason interests={interests} ai={ai} rule={model.rule} pending={model.pending} /></p> : null}
     {notice.deadline ? <p className="detail-deadline mt-[6px] text-[14px] leading-[21px] font-semibold tabular-nums">{notice.deadline_kind ?? '마감'} {deadlineDetail(notice.deadline)} <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''} ml-[6px] text-[14px] leading-[18px] tabular-nums ${passed ? 'font-medium' : 'font-bold'} ${urgent ? 'text-danger' : passed ? 'text-ink-3' : ''}`}>{deadlineText(notice.deadline, model.today)}</span></p> : null}
     {notice.changed_at ? <p className="detail-change mt-[4px] text-[13px] leading-[19px] text-ink-2">{koreanDate(notice.changed_at.slice(0, 10))}에 원문 {notice.change_kind === '제목' ? '제목이' : '본문이'} 바뀌었어요</p> : null}
     {summary ? <section className={`${DETAIL_SECTION} summary`} aria-labelledby="sec-summary"><h3 id="sec-summary" className={SECTION_TITLE}>요약</h3>{summary.split('\n').filter(Boolean).map((line, index) => <p className={SUMMARY_P} key={index}>{line}</p>)}</section>

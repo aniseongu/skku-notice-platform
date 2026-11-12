@@ -591,6 +591,10 @@ test('a notice waiting for its turn says so on its own row while an AI key exist
   await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).byokStatus = null; });
   await expect(reason(ids[2])).toContainText('해당');                    // 판정이 있으면 그 라벨
   await expect(reason(ids[2])).not.toContainText('확인하고 있어요');
+  // 공지는 판정을 기다리지 않고 바로 열린다. 상세의 제목 아래에도 목록과 같은 상태를 적는다.
+  await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).byokStatus = { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 }; });
+  await page.locator(`notice-rows-screen a.row[data-id="${ids[0]}"]`).click();
+  await expect(page.locator('notice-detail-screen .detail-reason')).toContainText('AI가 확인하고 있어요');
 });
 
 test('leaving settings returns to the list with the detail pane closed, whichever way you leave', async ({ page }) => {

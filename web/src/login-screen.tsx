@@ -1,6 +1,6 @@
 // 로그인 전용 화면. 로그인하기 전에는 앱의 어떤 부분도 보이지 않고 이 화면만 뜬다.
 import { APP_NAME } from './brand';
-import { installMode, isStandalone } from './install-hint';
+import { installMode, isStandalone, MANUAL_INSTALL_HINT } from './install-hint';
 import type { AppController } from './app-controller';
 
 // 출처: https://developers.google.com/identity/branding-guidelines
@@ -46,8 +46,8 @@ export function LoginScreen({ app }: { app: AppController }) {
         {/* 설치 안내는 Google 단추 위에 둔다. 아래 묶음이 화면 바닥에 붙어 있어 이 칸이 생기거나 사라져도 Google 단추 자리는 움직이지 않는다. 눌리는 곳이지만 Google 단추보다 가볍게(테두리 없는 옅은 면) 그린다. */}
         {mode === 'prompt' ? <button type="button" className="mb-[12px] flex h-[52px] w-full items-center justify-center gap-[8px] rounded-md border border-line bg-sunken text-[15px] font-semibold text-ink active:bg-line min-[720px]:hidden" onClick={() => { void app.runInstall(); }}>
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14" /></svg>앱으로 설치하기</button> : null}
-        {/* iOS Safari에는 설치 창이 없어서 누르는 단추가 아니라 방법만 조용히 알려 준다(면과 테두리를 주지 않아 눌리는 곳처럼 보이지 않게). */}
-        {mode === 'ios' ? <p className="m-0 mb-[12px] text-center text-[14px] leading-[21px] text-ink-2 min-[720px]:hidden">공유 버튼에서 <b className="font-semibold text-ink">‘홈 화면에 추가’</b>를 고르면<br />앱처럼 쓸 수 있어요</p> : null}
+        {/* iOS Safari와 삼성인터넷에는 설치 창이 없어서 누르는 단추가 아니라 방법만 조용히 알려 준다(면과 테두리를 주지 않아 눌리는 곳처럼 보이지 않게). */}
+        {mode === 'ios' || mode === 'samsung' ? <p className="install-hint m-0 mb-[12px] text-center text-[14px] leading-[21px] text-ink-2 break-keep text-balance min-[720px]:hidden">{MANUAL_INSTALL_HINT[mode].lead}<b className="font-semibold text-ink">{MANUAL_INSTALL_HINT[mode].action}</b>{MANUAL_INSTALL_HINT[mode].tail}</p> : null}
         <button type="button" className="flex items-center justify-center gap-[10px] w-full h-[56px] border border-[light-dark(#747775,#8E918F)] rounded-md bg-[light-dark(#FFFFFF,#131314)] text-[light-dark(#1F1F1F,#E3E3E3)] text-[17px] font-semibold [&:active:not(:disabled)]:bg-[light-dark(#F2F2F2,#1E1F20)] disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2" disabled={busy} aria-busy={busy} onClick={() => { void app.signIn(); }}>
           {busy ? null : <GoogleG />}
           <span>{busy ? 'Google로 이동하고 있어요' : 'Google로 계속하기'}</span>
