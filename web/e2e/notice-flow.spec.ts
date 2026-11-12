@@ -416,8 +416,8 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ })).toHaveAttribute('aria-checked', 'false');
   await dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ }).click();
   // 게시판을 켠 줄 바로 아래에서 참여 여부를 고른다(꺼 둔 게시판에는 묻지 않는다).
-  await expect(dialog.getByRole('switch', { name: /^참여 중이에요/ })).toHaveCount(2);   // 미래차 부트캠프와 AI중심대학사업단(추천으로 켜짐)
-  await dialog.getByRole('group', { name: '부트캠프' }).getByRole('switch', { name: /^참여 중이에요/ }).click();
+  await expect(dialog.getByRole('switch', { name: / 참여 중이에요/ })).toHaveCount(2);   // 미래차 부트캠프와 AI중심대학사업단(추천으로 켜짐)
+  await dialog.getByRole('group', { name: '부트캠프' }).getByRole('switch', { name: /^미래차 부트캠프 참여 중이에요/ }).click();
   await dialog.getByRole('button', { name: '다음' }).click();
   const saved = (await calls(page)).find((call) => call[0] === 'finish')![1] as Record<string, unknown>;
   expect(saved).toMatchObject({
