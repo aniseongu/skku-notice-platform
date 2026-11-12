@@ -7,7 +7,7 @@ import { Choice, ext, Guide, Setting, SecretRow, type SettingsModel } from './pl
 type Byok = NonNullable<SettingsModel['byok']>;
 type Id = 'groq' | 'gemini';
 /** 처음 보는 사람에게 권하는 순서. 연결 상태가 바뀌어도 자리는 그대로 둔다. */
-const ORDER: readonly Id[] = ['groq', 'gemini'];
+const ORDER: readonly Id[] = ['gemini', 'groq'];
 const NAME: Record<Id, string> = { groq: 'Groq', gemini: 'Gemini' };
 const BLURB: Record<Id, string> = {
   groq: '빠르게 답해요',
@@ -46,7 +46,7 @@ export function StepGuide({ label, sub, steps, note }: { label: string; sub: str
 
 function SharedGuide() {
   return <StepGuide label="키는 어디서 받나요?" sub="두 곳 모두 무료로 만들 수 있어요" note="키는 암호화해서 서버에만 보관해요"
-    steps={[<>{lnk(GUIDE.groq.url, 'Groq')}, {lnk(GUIDE.gemini.url, 'Gemini')} 중 한 곳에서 로그인해요</>,
+    steps={[<>{lnk(GUIDE.gemini.url, 'Gemini')}, {lnk(GUIDE.groq.url, 'Groq')} 중 한 곳에서 로그인해요</>,
       '"키 만들기"를 눌러요', '키를 복사해요. 한 번만 보여요', '받은 키를 해당 업체 칸에 붙여 넣고 "연결하기"를 눌러요']} />;
 }
 
