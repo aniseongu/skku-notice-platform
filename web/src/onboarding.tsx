@@ -277,7 +277,7 @@ export function Onboarding({ app }: { app: AppController }) {
         {/* "더 보기"는 같은 카드의 마지막 줄이다. 카드 밖에 따로 떠 있으면 구역 제목처럼 읽힌다(독립 평가). 펼친 목록은 카드 바로 아래에 둔다. */}
         {moreSources.length ? <button type="button" aria-expanded={moreOpen} aria-controls="more-boards" onClick={() => setMoreOpen(!moreOpen)}
           className="flex min-h-[52px] w-full items-center justify-between gap-[12px] border-0 border-t border-line bg-transparent px-0 text-left text-[15px] font-semibold text-ink [.box>&:first-child]:border-t-0">
-          {moreOpen ? '게시판 접기' : `게시판 ${moreSources.length}개 더 보기`}
+          {moreOpen ? '게시판 접기' : `학과·단과대 게시판 ${moreSources.length}개 더 보기`}
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`text-ink-3 transition-transform ${moreOpen ? 'rotate-180' : ''}`}><path d="M6 9l6 6 6-6" /></svg>
         </button> : null}
         {orderedSources.length === 0 ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2" role="status">게시판 목록을 불러오지 못했어요. 잠시 뒤 설정에서 다시 골라 주세요.</p> : null}
@@ -288,13 +288,13 @@ export function Onboarding({ app }: { app: AppController }) {
         {[...new Set(OTHER_BOARDS.map((board) => board.group))]
           .sort((a, b) => Number(OTHER_BOARDS.some((board) => board.group === b && recommended.includes(board.id))) - Number(OTHER_BOARDS.some((board) => board.group === a && recommended.includes(board.id))))   // 추천이 든 묶음을 위로
           .map((group, index) => <div key={group} role="group" aria-labelledby={`other-${index}`} className="[&>h3+button]:border-t-0">
-            <h3 id={`other-${index}`} className="m-0 pt-[16px] pb-[2px] text-[13px] font-semibold leading-[20px] text-ink-2 min-[720px]:pt-[20px]">{group}</h3>
+            <h3 id={`other-${index}`} className="m-0 pt-[16px] pb-[2px] text-[13px] font-medium leading-[20px] text-ink-3 min-[720px]:pt-[20px]">{group}</h3>
             {OTHER_BOARDS.filter((board) => board.group === group).sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id))).map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
                   checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
           </div>)}
       </div>
       <h2>관심 키워드</h2>
-      <p className="card-note m-0 text-[14px] text-ink-2">고르지 않으면 모든 공지를 받아요</p>
+      <p className="card-note m-0 text-[14px] text-ink-2">선택이에요. 고르지 않으면 모든 공지를 받아요</p>
       <ChipGroup label="관심 키워드" options={keywordOptions} selected={draft.keywords} onToggle={(word) => setDraft({ ...draft, keywords: toggleValue(draft.keywords, word) })} />
       {app.onboardingError ? <p className="error-text text-[14px] text-danger" role="alert">{app.onboardingError}</p> : null}
     </div>;
@@ -359,7 +359,7 @@ export function Onboarding({ app }: { app: AppController }) {
         {lead ? <p className="onb-lead m-0 text-ink-2">{lead}</p> : null}
         {body}
       </div>
-      {foot ? <div className="onb-foot sticky bottom-0 z-[2] bg-bg pt-[12px] [&_.solid-button]:w-full [&_.ghost-button]:w-full [&_.solid-button:disabled]:border-line [&_.solid-button:disabled]:bg-sunken [&_.solid-button:disabled]:text-ink-2 [&_.solid-button:disabled]:opacity-100"><div className="onb-foot-inner mx-auto grid w-[min(100%,36rem)] gap-[8px] px-[16px] pt-0 pb-[calc(12px+env(safe-area-inset-bottom))]">
+      {foot ? <div className="onb-foot sticky bottom-0 z-[2] border-t border-line bg-bg pt-[12px] [&_.solid-button]:w-full [&_.ghost-button]:w-full [&_.solid-button:disabled]:border-line [&_.solid-button:disabled]:bg-sunken [&_.solid-button:disabled]:text-ink-2 [&_.solid-button:disabled]:opacity-100"><div className="onb-foot-inner mx-auto grid w-[min(100%,36rem)] gap-[8px] px-[16px] pt-0 pb-[calc(12px+env(safe-area-inset-bottom))]">
         {blocked ? <>
           <p className="m-0 text-center text-[14px] text-ink-2" role="alert"><span className="font-semibold text-ink">필수 선택이 남았어요</span><br /><span>{STEP_LABEL[blocked]}에서 골라 주세요</span></p>
           <button type="button" className="solid-button inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none]" onClick={() => go(blocked)}>{STEP_LABEL[blocked]}(으)로 돌아가기</button>
