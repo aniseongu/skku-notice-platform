@@ -508,12 +508,12 @@ test('first-run "more boards" works like settings: search or pick a college, tog
   await dialog.getByRole('switch', { name: '국어국문학과 공지' }).click();
   await expect(dialog.getByRole('switch', { name: '국어국문학과 공지' })).toBeChecked();
   await dialog.getByRole('button', { name: '다른 단과대 고르기' }).click();
-  await expect(grid.getByRole('button', { name: /문과대학/ })).toContainText('1개 켬');   // 묶음을 닫아도 무엇을 켰는지 보인다
+  await expect(grid.getByRole('button', { name: /문과대학/ })).toContainText('1개 켜짐');   // 묶음을 닫아도 무엇을 켰는지 보인다
   // 검색하면 단과대를 거치지 않고 바로 켠다.
   await dialog.getByRole('searchbox', { name: '게시판 검색' }).fill('영어');
   await dialog.getByRole('switch', { name: '영어영문학과 공지' }).click();
   await dialog.getByRole('searchbox', { name: '게시판 검색' }).fill('');
-  await expect(grid.getByRole('button', { name: /문과대학/ })).toContainText('2개 켬');
+  await expect(grid.getByRole('button', { name: /문과대학/ })).toContainText('2개 켜짐');
 });
 
 test('first-run boards: when only a few boards are left they sit in the list without a "more" fold', async ({ page }) => {

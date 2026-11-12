@@ -101,7 +101,7 @@ function MoreBoards<T extends { id: string; name: string }>({ sources, on, rende
   const names = [...groups.keys()].sort((a, b) => rank(a) - rank(b));
   // 켠 개수는 위 목록에서 이미 켜 둔 내 전공 게시판까지 센다(단과대 칸만 보고도 무엇을 받는지 알게).
   const countOn = (name: string) => (order.includes(name) ? on.filter((id) => boardCollege(id) === name).length : (groups.get(name) ?? []).filter((source) => on.includes(source.id)).length);
-  const notes = Object.fromEntries(names.map((name) => [name, countOn(name)]).filter(([, count]) => count).map(([name, count]) => [name, `${count}개 켬`]));
+  const notes = Object.fromEntries(names.map((name) => [name, countOn(name)]).filter(([, count]) => count).map(([name, count]) => [name, `${count}개 켜짐`]));
   const needle = query.replace(/\s+/g, '').toLowerCase();
   const found = needle ? sources.filter((source) => source.name.replace(/\s+/g, '').toLowerCase().includes(needle)) : [];
   // 묶음이 하나뿐이면 고를 것이 없으니 격자와 "다른 단과대 고르기" 없이 바로 그 묶음을 보인다.
@@ -291,7 +291,7 @@ export function Onboarding({ app }: { app: AppController }) {
         {[...new Set(OTHER_BOARDS.map((board) => board.group))]
           .sort((a, b) => Number(OTHER_BOARDS.some((board) => board.group === b && recommended.includes(board.id))) - Number(OTHER_BOARDS.some((board) => board.group === a && recommended.includes(board.id))))   // 추천이 든 묶음을 위로
           .map((group, index) => <div key={group} role="group" aria-labelledby={`other-${index}`} className="[&>h3+button]:border-t-0">
-            <h3 id={`other-${index}`} className="m-0 pt-[16px] pb-[2px] text-[13px] font-medium leading-[20px] text-ink-3 min-[720px]:pt-[20px]">{group}</h3>
+            <h3 id={`other-${index}`} className="m-0 pt-[16px] pb-[2px] text-[13px] font-medium leading-[20px] text-ink-2 min-[720px]:pt-[20px]">{group}</h3>
             {OTHER_BOARDS.filter((board) => board.group === group).sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id))).map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
                   checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
           </div>)}

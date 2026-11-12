@@ -84,7 +84,7 @@ export function Avatar({ src, size = 48 }: { src?: string | null; size?: number 
 export function GroupGrid({ label, names, onPick, notes }: { label: string; names: readonly string[]; onPick: (name: string) => void; notes?: Readonly<Record<string, string>> }) {
   return <div role="group" aria-label={label} className="grid grid-cols-2 gap-2">
     {names.map((name) => <button key={name} type="button" onClick={() => onPick(name)}
-      className="flex min-h-[48px] items-center justify-between gap-1 rounded-md border border-line bg-surface px-3 text-left text-[14px] font-medium text-ink break-keep [&:last-child:nth-child(odd)]:col-span-2">
+      className="flex min-h-[56px] items-center justify-between gap-1 rounded-md border border-line bg-surface px-3 text-left text-[14px] font-medium text-ink break-keep [&:last-child:nth-child(odd)]:col-span-2">
       <span className="flex flex-col py-[6px]"><span>{name}</span>{notes?.[name] ? <span className="text-[13px] font-semibold leading-[18px] text-accent">{notes[name]}</span> : null}</span><span className={`choice-chevron ${CHEVRON_RIGHT}`} aria-hidden="true" /></button>)}
   </div>;
 }
