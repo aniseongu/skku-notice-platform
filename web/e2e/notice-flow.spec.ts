@@ -464,7 +464,8 @@ test('first-run setup requires one AI key at the end and records completion only
   await expect(dialog.getByRole('heading', { name: 'AI를 연결해 주세요' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: '나중에 할게요' })).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: '끝내기' })).toBeDisabled();
-  await expect(dialog.getByText('키를 연결하면 끝낼 수 있어요')).toBeVisible();
+  await expect(dialog.getByText('필수 선택이에요')).toBeVisible();
+  await expect(dialog.getByText('키를 하나 연결해 주세요')).toBeVisible();
   await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).byokStatus = { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 }; });
   await expect(dialog.getByRole('button', { name: '끝내기' })).toBeEnabled();
   await dialog.getByRole('button', { name: '끝내기' }).click();

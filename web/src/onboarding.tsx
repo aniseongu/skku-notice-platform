@@ -26,6 +26,10 @@ const SERVICE = MILITARY.map((value) => ({ value, label: value }));
 
 /** 전공 고르기: 대학을 먼저 고르고 그 대학의 학과를 고른다(주전공, 복수전공 모두). 대학 줄은 학과 목록으로 들어가는 이동 줄이고, 학과는 고르기만 한다(확정은 호출한 쪽이 한다).
  * 학과 목록 맨 위에 고른 단과대와 "다른 단과대 고르기"를 둬서, 되돌아갈 때 긴 목록 아래까지 내려가지 않는다. */
+function RequiredHint({ text }: { text: string }) {
+  return <p className="m-0 text-center text-[14px] text-ink-2" role="status"><span className="font-semibold text-ink">필수 선택이에요</span><br /><span>{text}</span></p>;
+}
+
 export function ProgramPicker({ onPick, current, listClass = '', lead = true }: {
   onPick: (program: Program) => void; current?: Program | null; listClass?: string; lead?: boolean;
 }) {
@@ -306,13 +310,12 @@ export function Onboarding({ app }: { app: AppController }) {
       {app.onboardingBusy ? '저장하고 있어요' : app.onboardingError ? '다시 시도하기' : '다음'}</button>;
   } else if (step === 'ai') {
     title = 'AI를 연결해 주세요';
-    lead = '최소 1개 이상 연결해야 해요';
     const connected = !!app.byokStatus || app.aiKeys.length > 0;
     body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]"><div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0 min-[720px]:[&_.setting]:grid-cols-[minmax(0,1fr)] min-[720px]:[&_.setting]:gap-[8px]"><AiRows byok={aiConnectModel(app)} /></div>
       {app.byokOn ? null : <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold whitespace-nowrap self-start" onClick={() => { void app.recheckByok(); }}>다시 확인하기</button>}
       {app.onboardingError ? <p className="error-text text-[14px] text-danger" role="alert">{app.onboardingError}</p> : null}</div>;
     foot = <>
-      {connected ? null : <p className="m-0 text-center text-[14px] text-ink-2" role="status">키를 연결하면 끝낼 수 있어요</p>}
+      {connected ? null : <RequiredHint text="키를 하나 연결해 주세요" />}
       <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!connected || app.onboardingBusy || app.byokBusy || app.aiBusy} onClick={finishWithKey}>
         {app.onboardingBusy ? '저장하고 있어요' : '끝내기'}</button>
     </>;
@@ -369,7 +372,7 @@ export function Onboarding({ app }: { app: AppController }) {
           <p className="m-0 text-center text-[14px] text-ink-2" role="alert"><span className="font-semibold text-ink">필수 선택이 남았어요</span><br /><span>{STEP_LABEL[blocked]}에서 골라 주세요</span></p>
           <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none]" onClick={() => go(blocked)}>{STEP_LABEL[blocked]}(으)로 돌아가기</button>
         </> : <>
-          {missingHint(step, draft, doubleAnswer) && !addingDouble ? <p className="m-0 text-center text-[14px] text-ink-2" role="status"><span className="font-semibold text-ink">필수 선택이에요</span><br /><span>{missingHint(step, draft, doubleAnswer)}</span></p> : null}
+          {missingHint(step, draft, doubleAnswer) && !addingDouble ? <RequiredHint text={missingHint(step, draft, doubleAnswer)} /> : null}
           {foot}
         </>}</div></div> : null}
     </div>
