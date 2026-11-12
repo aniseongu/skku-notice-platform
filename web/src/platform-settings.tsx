@@ -1,7 +1,7 @@
 // 설정 화면. 구조와 문구는 원본(첫 쪽 → 하위 쪽)을 따르고, 계정·게시판·내 정보는 다중 사용자 구조에 맞췄다.
 // 스위치는 바로 반영되는 설정에만 쓰고(role="switch"), 켜짐·꺼짐을 글자로도 알린다(색에만 의존하지 않는다).
 import { createRoot, type Root } from 'react-dom/client';
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { MANUAL_INSTALL_HINT } from './install-hint';
 import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
 import { AiRows, StepGuide } from './ai-connect';
@@ -11,7 +11,7 @@ import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, vali
 import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR, PROFILE_TEXT_LIMIT, type ProfileTextField, type UserProfile } from './profile';
 import { COLLEGES, MAX_PROGRAMS, programKey, programLabel, type Program } from './skku-programs';
 import { ProgramPicker } from './onboarding';
-import { BOARD_CATALOG, COLLEGE_BOARD, DEPARTMENT_BOARD, OTHER_BOARDS } from './skku-boards';
+import { BOARD_CATALOG, OTHER_BOARDS, boardCollege } from './skku-boards';
 // 순서 바꾸기는 dnd-kit(MIT)을 쓴다: 손잡이로 끌기(마우스·터치)와 키보드(Space로 집고 방향키로 옮기고 Space로 놓기), 낭독기 안내가 들어 있다.
 import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
@@ -258,12 +258,6 @@ const permissionText = (status: SettingsModel['pushStatus']) =>
 function BoardGroups({ model }: { model: SettingsModel }) {
   const [group, setGroup] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const collegeOf = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const [college, id] of Object.entries(COLLEGE_BOARD)) map.set(id, college);
-    for (const [key, id] of Object.entries(DEPARTMENT_BOARD)) if (!map.has(id)) map.set(id, key.split('/')[0]);
-    return map;
-  }, []);
   const known = new Set(BOARD_CATALOG.map((board) => board.id));
   // 기타 게시판은 "기타 · 사업단", "기타 · 부트캠프"처럼 묶는다(첫 설정의 기타 게시판 소제목과 같다).
   const otherGroup = new Map(OTHER_BOARDS.map((board) => [board.id, `기타 · ${board.group}`]));
@@ -271,7 +265,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   const others = model.sources.filter((source) => !model.subscriptions.includes(source.id));
   const groups = new Map<string, typeof others>();
   for (const source of others) {
-    const name = otherGroup.get(source.id) ?? collegeOf.get(source.id) ?? (known.has(source.id) ? '기타' : '학교 공통');
+    const name = otherGroup.get(source.id) ?? boardCollege(source.id) ?? (known.has(source.id) ? '기타' : '학교 공통');
     groups.set(name, [...(groups.get(name) ?? []), source]);
   }
   // 단과대는 학교의 단과대학 순서로, 그 뒤에 학교 공통·부트캠프 같은 묶음을 둔다.

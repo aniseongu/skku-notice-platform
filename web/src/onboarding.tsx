@@ -7,7 +7,7 @@ import type { AppController } from './app-controller';
 import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR } from './profile';
 import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
 import { COLLEGES, MAX_PROGRAMS, findCollege, programKey, programLabel, type Program } from './skku-programs';
-import { BOARD_CATALOG, boardsForPrograms, OTHER_BOARDS } from './skku-boards';
+import { BOARD_CATALOG, boardCollege, boardsForPrograms, OTHER_BOARDS } from './skku-boards';
 import { JOINED_PROGRAMS } from './joined-programs';
 import {
   KEYWORD_SUGGESTIONS, STEPS, STEP_LABEL, canContinue, earlierMissing, filterDepartments, initialDraft, missingHint, nextStep, previousStep,
@@ -78,6 +78,41 @@ export function ProgramPicker({ onPick, current, listClass = '', lead = true }: 
         : <ChoiceList label={`${found.name} 학과 선택`} selected={current?.college === found.name ? current.department : null}
           items={found.departments.map((name) => ({ id: name, label: name }))} onSelect={(name) => onPick({ college: found.name, department: name })} />}
     </div>
+  </div>;
+}
+
+/** 첫 설정의 "게시판 더 보기": 설정의 게시판 더 보기와 같은 방식이다. 검색 칸과 단과대 격자를 먼저 보이고, 단과대를 누르면 그 단과대의 게시판 스위치가 나온다.
+ * 58개를 한 줄씩 늘어놓으면 찾기 어렵고 스크롤이 길다(토스 기준: 긴 목록은 검색 + 묶음). 격자에는 단과대마다 켠 게시판 수를 적는다. */
+function MoreBoards<T extends { id: string; name: string }>({ sources, on, render }: { sources: readonly T[]; on: readonly string[]; render: (source: T) => React.ReactNode }) {
+  const [group, setGroup] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const known = new Set(BOARD_CATALOG.map((board) => board.id));
+  const groups = new Map<string, T[]>();
+  for (const source of sources) {
+    const name = boardCollege(source.id) ?? (known.has(source.id) ? '기타' : '학교 공통');
+    groups.set(name, [...(groups.get(name) ?? []), source]);
+  }
+  const order = COLLEGES.map((college) => college.name);
+  const rank = (name: string) => (order.includes(name) ? order.indexOf(name) : 100 + Number(name === '학교 공통'));
+  const names = [...groups.keys()].sort((a, b) => rank(a) - rank(b));
+  const notes = Object.fromEntries(names.map((name) => [name, (groups.get(name) ?? []).filter((source) => on.includes(source.id)).length]).filter(([, count]) => count).map(([name, count]) => [name, `${count}개 켬`]));
+  const needle = query.replace(/\s+/g, '').toLowerCase();
+  const found = needle ? sources.filter((source) => source.name.replace(/\s+/g, '').toLowerCase().includes(needle)) : [];
+  const current = group && groups.has(group) ? group : null;
+  const list = 'box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0';
+  return <div className="grid gap-[8px] pt-[4px]">
+    <input type="search" className="min-h-[44px] rounded-md border border-line bg-surface px-[12px] py-0" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off"
+      value={query} onChange={(event) => setQuery(event.currentTarget.value)} />
+    {needle
+      ? found.length
+        ? <div className={list} role="group" aria-label="검색 결과">{found.map(render)}</div>
+        : <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2" role="status">'{query}'에 맞는 게시판이 없어요. 다른 단어로 찾아보세요.</p>
+      : current
+        ? <>
+          <BackToGroups current={current} noun={order.includes(current) ? '단과대' : '묶음'} onBack={() => setGroup(null)} />
+          <div className={list} role="group" aria-label={`${current} 게시판`}>{(groups.get(current) ?? []).map(render)}</div>
+        </>
+        : <GroupGrid label="단과대 선택" names={names} notes={notes} onPick={setGroup} />}
   </div>;
 }
 
@@ -228,7 +263,7 @@ export function Onboarding({ app }: { app: AppController }) {
       {moreSources.length ? <details className="group">
         <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between text-[14px] text-ink-2 [&::-webkit-details-marker]:hidden">게시판 더 보기 ({moreSources.length}개)
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-ink-3 transition-transform group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg></summary>
-        <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label="더 많은 게시판">{moreSources.map(boardSwitch)}</div>
+        <MoreBoards sources={moreSources} on={draft.boards} render={boardSwitch} />
       </details> : null}
       <h2>기타 게시판</h2>
       {OTHER_BOARDS.some((board) => recommended.includes(board.id)) ? <p className="card-note m-0 text-[14px] text-ink-2">내 전공에 맞는 게시판은 켜 뒀어요</p> : null}
@@ -242,10 +277,11 @@ export function Onboarding({ app }: { app: AppController }) {
                 return <div key={board.id}>
                   <SwitchRow label={nameOf(board.id)} description={board.help}
                     checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />
-                  {/* 게시판을 켠 줄 바로 아래에서 참여 여부를 정한다(참여 학생만 신청하는 공지를 AI가 가릴 때 쓴다). */}
+                  {/* 게시판을 켠 줄 바로 아래에서 참여 여부를 정한다(참여 학생만 신청하는 공지를 AI가 가릴 때 쓴다).
+                      왼쪽 세로줄로 들여 묶지 않는다(사용자 지시). shadcn/ui Field처럼 같은 묶음의 한 줄로 두고, 이름만 읽어도 무엇에 대한 것인지 알게 사업 이름을 붙인다. */}
                   {joined && draft.boards.includes(board.id)
-                    ? <div className="ml-[12px] border-l-2 border-line pl-[12px]"><SwitchRow label={joined.ask} description="참여 학생만 신청하는 공지를 알려 드려요"
-                      checked={draft.joinedPrograms.includes(joined.id)} onChange={() => setDraft({ ...draft, joinedPrograms: toggleValue(draft.joinedPrograms, joined.id) })} /></div> : null}
+                    ? <SwitchRow label={`${joined.label} ${joined.ask}`} description="참여 학생만 신청하는 공지를 알려 드려요"
+                      checked={draft.joinedPrograms.includes(joined.id)} onChange={() => setDraft({ ...draft, joinedPrograms: toggleValue(draft.joinedPrograms, joined.id) })} /> : null}
                 </div>;
               })}
           </div>)}

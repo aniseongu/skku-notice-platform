@@ -471,6 +471,46 @@ test('first-run setup requires one AI key at the end and records completion only
   await expect(dialog).toHaveCount(0);
 });
 
+test('first-run "more boards" works like settings: search or pick a college, toggle in place, and the grid shows how many are on', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
+    app.profileStatus = 'ready'; app.authUserId = 'account-a'; app.pushStatus = 'on'; app.byokOn = true; app.byokLoading = false; app.byokStatus = null; app.aiKeys = [];
+    app.sources = [
+      { id: 'skku-notice01', name: '성균관대 공지' }, { id: 'biz-notice', name: '경영대학 공지' }, { id: 'bus-notice', name: '경영학과 공지' },
+      { id: 'liberalarts-notice', name: '문과대학 공지' }, { id: 'korean-notice', name: '국어국문학과 공지' }, { id: 'english-notice', name: '영어영문학과 공지' },
+    ];
+  });
+  const dialog = page.getByRole('dialog');
+  const next = () => dialog.getByRole('button', { name: '다음' }).click();
+  await dialog.getByRole('button', { name: '경영대학', exact: true }).click();
+  await dialog.getByRole('radio', { name: '경영학과', exact: true }).click();
+  await next();
+  await dialog.getByRole('radio', { name: '없어요', exact: true }).click();
+  await dialog.getByRole('button', { name: '3학년' }).click();
+  await next();
+  await dialog.getByRole('button', { name: '채웠어요' }).click();
+  await next();
+  await expect(dialog.getByRole('heading', { name: '어떤 공지를 받을까요?' })).toBeVisible();
+  await dialog.getByText('게시판 더 보기').click();
+  // 한 줄씩 늘어놓은 목록이 아니라 검색 칸과 단과대 격자가 먼저 보인다.
+  const grid = dialog.getByRole('group', { name: '단과대 선택' });
+  await expect(dialog.getByRole('searchbox', { name: '게시판 검색' })).toBeVisible();
+  await expect(grid.getByRole('button')).toHaveText(['문과대학']);   // 켜 둔 경영대학 게시판은 위 목록에 있고, 남은 것만 묶는다
+  await grid.getByRole('button', { name: '문과대학' }).click();
+  await dialog.getByRole('switch', { name: '국어국문학과 공지' }).click();
+  await expect(dialog.getByRole('switch', { name: '국어국문학과 공지' })).toBeChecked();
+  await dialog.getByRole('button', { name: '다른 단과대 고르기' }).click();
+  await expect(grid.getByRole('button', { name: /문과대학/ })).toContainText('1개 켬');   // 묶음을 닫아도 무엇을 켰는지 보인다
+  // 검색하면 단과대를 거치지 않고 바로 켠다.
+  await dialog.getByRole('searchbox', { name: '게시판 검색' }).fill('영어');
+  await dialog.getByRole('switch', { name: '영어영문학과 공지' }).click();
+  await dialog.getByRole('searchbox', { name: '게시판 검색' }).fill('');
+  await expect(grid.getByRole('button', { name: /문과대학/ })).toContainText('2개 켬');
+});
+
 test('reopening a setup that was saved but left at the AI key step resumes at that step instead of asking everything again', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();

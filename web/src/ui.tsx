@@ -79,12 +79,13 @@ export function Avatar({ src, size = 48 }: { src?: string | null; size?: number 
   </span>;
 }
 
-/** 대학(묶음) 고르기: 2열 격자다. 17개를 한 줄씩 늘어놓으면 스크롤해야 해서 한 화면에 들어오게 하고, 홀수 마지막 칸은 전체 폭으로 둔다. 전공 고르기와 게시판 추가가 같이 쓴다. */
-export function GroupGrid({ label, names, onPick }: { label: string; names: readonly string[]; onPick: (name: string) => void }) {
+/** 단과대(묶음) 고르기: 2열 격자다. 17개를 한 줄씩 늘어놓으면 스크롤해야 해서 한 화면에 들어오게 하고, 홀수 마지막 칸은 전체 폭으로 둔다. 전공 고르기와 게시판 추가가 같이 쓴다. */
+/** notes가 있으면 이름 아래에 상태를 한 줄로 적는다(예: 첫 설정에서 그 단과대의 켠 게시판 수). 묶음을 닫아도 무엇을 켰는지 보인다. */
+export function GroupGrid({ label, names, onPick, notes }: { label: string; names: readonly string[]; onPick: (name: string) => void; notes?: Readonly<Record<string, string>> }) {
   return <div role="group" aria-label={label} className="grid grid-cols-2 gap-2">
     {names.map((name) => <button key={name} type="button" onClick={() => onPick(name)}
       className="flex min-h-[48px] items-center justify-between gap-1 rounded-md border border-line bg-surface px-3 text-left text-[14px] font-medium text-ink break-keep [&:last-child:nth-child(odd)]:col-span-2">
-      <span>{name}</span><span className={`choice-chevron ${CHEVRON_RIGHT}`} aria-hidden="true" /></button>)}
+      <span className="flex flex-col py-[6px]"><span>{name}</span>{notes?.[name] ? <span className="text-[13px] font-semibold leading-[18px] text-accent">{notes[name]}</span> : null}</span><span className={`choice-chevron ${CHEVRON_RIGHT}`} aria-hidden="true" /></button>)}
   </div>;
 }
 

@@ -156,3 +156,11 @@ export function boardsForPrograms(programs: readonly Program[]): string[] {
   }
   return ids;
 }
+
+/** 게시판이 속한 단과대(단과대 게시판이면 그 단과대, 학과 게시판이면 학과의 단과대). 없으면 null.
+ * 첫 설정과 설정의 "게시판 더 보기"가 같은 묶음으로 보이도록 둘 다 이 함수를 쓴다. */
+export function boardCollege(id: string): string | null {
+  for (const [college, board] of Object.entries(COLLEGE_BOARD)) if (board === id) return college;
+  for (const [key, board] of Object.entries(DEPARTMENT_BOARD)) if (board === id) return key.split('/')[0];
+  return null;
+}
