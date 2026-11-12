@@ -10,6 +10,8 @@ export const IMAGE_MISSING_CLASS = 'image-missing block mb-[12px] px-[14px] py-[
 export const CHECKBOX = 'check-mark relative m-0 size-[18px] flex-none cursor-pointer appearance-none rounded-sm border-[1.5px] border-ink-3 bg-transparent [transition:background-color_.12s,border-color_.12s] checked:border-ink checked:bg-ink indeterminate:border-ink indeterminate:bg-ink';
 
 /** 오른쪽 화살표(›) */
+/** 왼쪽 꺾쇠(되돌아가기). CHEVRON_RIGHT와 같은 크기와 굵기다. */
+export const CHEVRON_LEFT = 'size-[8px] flex-none ml-[4px] border-b-[1.5px] border-l-[1.5px] border-ink-3 [transform:rotate(45deg)]';
 export const CHEVRON_RIGHT = 'size-[8px] flex-none mr-[4px] border-t-[1.5px] border-r-[1.5px] border-ink-3 [transform:rotate(45deg)]';
 /** 가로로 넘기는 칩 묶음(휴대폰 목록 위, 설정의 관심 키워드). 설정 줄 안에서는 줄바꿈하고 바깥 여백을 없앤다. */
 export const CHIPS = 'chips mt-[4px] mb-0 mx-[calc(-1*var(--gutter))] flex gap-[8px] overflow-x-auto px-[var(--gutter)] py-[4px] [scrollbar-width:none] select-none [-webkit-user-select:none] [.setting-control_&]:m-0 [.setting-control_&]:flex-wrap [.setting-control_&]:overflow-visible [.setting-control_&]:p-0';
