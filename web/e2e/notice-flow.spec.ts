@@ -472,6 +472,23 @@ test('first-run setup requires one AI key at the end and records completion only
   await expect(dialog).toHaveCount(0);
 });
 
+test('college tiles in first-run setup change color on mouse hover like other choices', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '마우스 올림은 넓은 화면에서만 본다');
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
+    app.profileStatus = 'ready'; app.authUserId = 'account-a'; app.pushStatus = 'on'; app.byokOn = true; app.byokLoading = false; app.byokStatus = null; app.aiKeys = [];
+  });
+  const tile = page.getByRole('dialog').getByRole('group', { name: '단과대 선택' }).getByRole('button').first();
+  await tile.waitFor();
+  const bg = () => tile.evaluate((el) => getComputedStyle(el).backgroundColor);
+  const before = await bg();
+  await tile.hover();
+  await expect.poll(bg).not.toBe(before);
+});
+
 test('first-run "more boards" works like settings: search or pick a college, toggle in place, and the grid shows how many are on', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
