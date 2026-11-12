@@ -88,8 +88,8 @@ export function GroupGrid({ label, names, onPick }: { label: string; names: read
   </div>;
 }
 
-/** 고른 묶음(대학)을 위에 보이고 눌러서 다른 묶음으로 돌아간다. 긴 목록 아래까지 내려가지 않고 같은 자리에서 되돌아간다. */
-export function BackToGroups({ current, noun = '대학', onBack }: { current: string; noun?: string; onBack: () => void }) {
+/** 고른 묶음(단과대)을 위에 보이고 눌러서 다른 묶음으로 돌아간다. 긴 목록 아래까지 내려가지 않고 같은 자리에서 되돌아간다. */
+export function BackToGroups({ current, noun = '단과대', onBack }: { current: string; noun?: string; onBack: () => void }) {
   return <button type="button" aria-label={`다른 ${noun} 고르기`} onClick={onBack}
     className="flex min-h-[48px] w-full items-center justify-between gap-2 rounded-md border border-line bg-surface px-3 text-left text-[15px] font-semibold text-ink">
     <span className="flex items-center gap-2"><span className="choice-chevron rotate-180" aria-hidden="true" />{current}</span>

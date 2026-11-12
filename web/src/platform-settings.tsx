@@ -253,8 +253,8 @@ const permissionText = (status: SettingsModel['pushStatus']) =>
       : Notification.permission === 'granted' ? '허용' : Notification.permission === 'denied' ? '차단' : '아직 선택하지 않음';
 
 /** 받지 않는 게시판 고르기. 받는 게시판은 위의 순서 목록에서 끄고 옮긴다. */
-/** 게시판 추가(접힌 "게시판 더 보기"를 누르면 열린다): 전공 고르기와 같은 방식이다. 대학(묶음)을 2열 격자로 먼저 고르고, 그 묶음의 게시판을 눌러 바로 추가한다.
- * 검색하면 대학을 거치지 않고 이름이 맞는 게시판이 바로 나온다. 추가하면 위 "받을 게시판"에 들어가고 이 목록에서는 빠진다. */
+/** 게시판 추가(접힌 "게시판 더 보기"를 누르면 열린다): 전공 고르기와 같은 방식이다. 단과대(와 기타 묶음)를 2열 격자로 먼저 고르고, 그 묶음의 게시판을 눌러 바로 추가한다.
+ * 검색하면 단과대를 거치지 않고 이름이 맞는 게시판이 바로 나온다. 추가하면 위 "받을 게시판"에 들어가고 이 목록에서는 빠진다. */
 function BoardGroups({ model }: { model: SettingsModel }) {
   const [group, setGroup] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -274,7 +274,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
     const name = otherGroup.get(source.id) ?? collegeOf.get(source.id) ?? (known.has(source.id) ? '기타' : '학교 공통');
     groups.set(name, [...(groups.get(name) ?? []), source]);
   }
-  // 대학은 학교의 단과대학 순서로, 그 뒤에 학교 공통·부트캠프 같은 묶음을 둔다.
+  // 단과대는 학교의 단과대학 순서로, 그 뒤에 학교 공통·부트캠프 같은 묶음을 둔다.
   const collegeOrder = COLLEGES.map((college) => college.name);
   const names = [...groups.keys()].sort((a, b) => {
     const rank = (name: string) => (collegeOrder.includes(name) ? collegeOrder.indexOf(name) : 100 + [...otherGroup.values()].indexOf(name) + (otherGroup.size ? 0 : 0));
@@ -283,7 +283,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   const needle = query.replace(/\s+/g, '').toLowerCase();
   const found = needle ? others.filter((source) => source.label.replace(/\s+/g, '').toLowerCase().includes(needle)) : [];
   const busy = model.loading;
-  const current = group && groups.has(group) ? group : null;   // 묶음의 게시판을 모두 추가했으면 대학 고르기로 돌아간다
+  const current = group && groups.has(group) ? group : null;   // 묶음의 게시판을 모두 추가했으면 단과대 고르기로 돌아간다
   const row = (source: (typeof others)[number]) => <button key={source.id} type="button" className={CHOICE} disabled={busy} aria-label={`${source.label} 추가`} onClick={() => model.toggle(source.id, true)}>
     <span>{source.label}</span><span className="text-[14px] font-semibold text-accent" aria-hidden="true">추가</span></button>;
   if (others.length === 0) return <p className="field-note text-[14px] leading-[20px] text-ink-2">모든 게시판을 받고 있어요</p>;
@@ -291,7 +291,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   return <details className="connection-manual group board-more-list mt-[8px] border-t border-line [&>.input]:mb-[8px] [&>.input]:w-full" open={mine.length === 0}>
     <summary className={SUMMARY}>게시판 더 보기 ({others.length}개){chevron('M6 9l6 6 6-6', CHEVRON)}</summary>
     <div className="flex flex-col gap-3 pt-3">
-      <input className="input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink text-[15px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px]" type="search" aria-label="게시판 검색" placeholder="학과나 대학 이름으로 찾기" autoComplete="off" value={query}
+      <input className="input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink text-[15px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px]" type="search" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off" value={query}
         onChange={(event) => setQuery(event.currentTarget.value)} />
       {needle
         ? found.length
@@ -299,10 +299,10 @@ function BoardGroups({ model }: { model: SettingsModel }) {
           : <p className="field-note text-[14px] leading-[20px] text-ink-2" role="status">'{query}'에 맞는 게시판이 없어요. 다른 단어로 찾아보세요.</p>
         : current
           ? <>
-            <BackToGroups current={current} onBack={() => setGroup(null)} />
+            <BackToGroups current={current} noun={collegeOrder.includes(current) ? '단과대' : '묶음'} onBack={() => setGroup(null)} />
             <div className="choice-list grid overflow-hidden rounded-lg bg-surface" role="group" aria-label={`${current} 게시판`}>{(groups.get(current) ?? []).map(row)}</div>
           </>
-          : <GroupGrid label="대학 선택" names={names} onPick={setGroup} />}
+          : <GroupGrid label="단과대와 기타 묶음 선택" names={names} onPick={setGroup} />}
     </div>
   </details>;
 }

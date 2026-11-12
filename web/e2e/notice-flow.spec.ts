@@ -155,23 +155,23 @@ test('board subscriptions: my boards are switches, and more boards are added col
   await expect(mine).toHaveCount(1);
   await expect(mine.first()).toHaveAttribute('aria-checked', 'true');
   await mine.first().click();
-  // 접힌 줄을 누르면 전공 고르기와 같은 대학 격자가 펼쳐진다(스위치 목록이 아니다).
-  await expect(screen.getByRole('group', { name: '대학 선택' })).toBeHidden();
+  // 접힌 줄을 누르면 전공 고르기와 같은 단과대 격자가 펼쳐진다(스위치 목록이 아니다).
+  await expect(screen.getByRole('group', { name: '단과대와 기타 묶음 선택' })).toBeHidden();
   await screen.locator('details.board-more-list > summary').click();
-  const colleges = screen.getByRole('group', { name: '대학 선택' }).getByRole('button');
+  const colleges = screen.getByRole('group', { name: '단과대와 기타 묶음 선택' }).getByRole('button');
   await expect(colleges.first()).toBeVisible();
   expect(await colleges.count()).toBeGreaterThanOrEqual(1);   // 샘플 데이터는 묶음이 적다
-  // 검색하면 대학을 거치지 않고 이름이 맞는 게시판이 바로 나온다.
+  // 검색하면 단과대를 거치지 않고 이름이 맞는 게시판이 바로 나온다.
   const search = screen.getByRole('searchbox', { name: '게시판 검색' });
   await search.fill('없는게시판이름');
   await expect(screen.getByText("'없는게시판이름'에 맞는 게시판이 없어요")).toBeVisible();
   await search.fill('');
-  // 대학을 고르면 그 대학의 게시판이 나오고, 맨 위의 "다른 대학 고르기"로 같은 자리에서 돌아간다.
+  // 단과대를 고르면 그 단과대의 게시판이 나오고, 맨 위의 "다른 단과대 고르기"로 같은 자리에서 돌아간다.
   const name = (await colleges.first().innerText()).trim();
   await colleges.first().click();
   await expect(screen.getByRole('group', { name: `${name} 게시판` })).toBeVisible();
-  await screen.getByRole('button', { name: '다른 대학 고르기' }).click();
-  await expect(screen.getByRole('group', { name: '대학 선택' })).toBeVisible();
+  await screen.getByRole('button', { name: '다른 단과대 고르기' }).click();
+  await expect(screen.getByRole('group', { name: '단과대와 기타 묶음 선택' })).toBeVisible();
   await colleges.first().click();
   await screen.getByRole('group', { name: `${name} 게시판` }).getByRole('button').first().click();
   const recorded = await calls(page);
@@ -200,7 +200,7 @@ test('profile page edits year and status in place and can reopen the first-run s
   await expect(screen.getByRole('radio', { name: '3학년' })).toHaveAttribute('aria-checked', 'true');
   await screen.getByRole('radio', { name: '4학년' }).click();
   await screen.getByRole('radio', { name: '휴학' }).click();
-  // 전공은 첫 설정으로 돌아가지 않고 이 자리에서 바꾼다: 바꾸기 → 대학 → 학과를 누르면 바로 저장하고, 복수전공은 그대로 둔다.
+  // 전공은 첫 설정으로 돌아가지 않고 이 자리에서 바꾼다: 바꾸기 → 단과대 → 학과를 누르면 바로 저장하고, 복수전공은 그대로 둔다.
   await expect(screen.getByRole('button', { name: '전공과 게시판 다시 고르기' })).toHaveCount(0);
   await screen.getByRole('button', { name: '바꾸기' }).click();
   await screen.getByRole('button', { name: '문과대학', exact: true }).click();
@@ -326,22 +326,22 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('heading', { name: '주전공이 어디예요?' })).toBeVisible();
   await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
   const barWidth1 = (await dialog.getByRole('progressbar').boundingBox())!.width;
-  // 대학 → 학과: 고른 대학의 학과만 보인다.
+  // 단과대 → 학과: 고른 단과대의 학과만 보인다.
   await dialog.getByRole('button', { name: '소프트웨어융합대학', exact: true }).click();
   // 질문 제목이 접히지 않고 보여야 한다(전역 h1 규칙이 제목 높이를 0으로 만들던 결함의 재발 방지).
   const title = dialog.getByRole('heading', { name: '주전공이 어디예요?' });
   expect((await title.boundingBox())!.height).toBeGreaterThan(20);
   await expect(dialog.getByRole('radio', { name: '소프트웨어학과', exact: true })).toBeVisible();
   await expect(dialog.getByRole('radio', { name: '국어국문학과', exact: true })).toHaveCount(0);
-  await dialog.getByRole('button', { name: '다른 대학 고르기' }).click();
+  await dialog.getByRole('button', { name: '다른 단과대 고르기' }).click();
   await dialog.getByRole('button', { name: '문과대학', exact: true }).click();
   await expect(dialog.getByRole('searchbox', { name: '학과 검색' })).toBeVisible();
   await dialog.getByRole('searchbox', { name: '학과 검색' }).fill('철학');
   await expect(dialog.getByRole('radio', { name: /^철학과/ })).toBeVisible();
   await expect(dialog.getByRole('radio', { name: '사학과', exact: true })).toHaveCount(0);
   await dialog.getByRole('searchbox', { name: '학과 검색' }).fill('');
-  await dialog.getByRole('button', { name: '다른 대학 고르기' }).click();
-  // 검색 칸은 대학을 고르기 전부터 보이고, 모든 대학의 학과를 한 번에 찾는다(대학 이름이 옆에 붙는다).
+  await dialog.getByRole('button', { name: '다른 단과대 고르기' }).click();
+  // 검색 칸은 단과대를 고르기 전부터 보이고, 모든 단과대의 학과를 한 번에 찾는다(단과대 이름이 옆에 붙는다).
   await expect(dialog.getByRole('searchbox', { name: '학과 검색' })).toBeVisible();
   await dialog.getByRole('searchbox', { name: '학과 검색' }).fill('소프트웨어학과');
   await expect(dialog.getByRole('radio', { name: /^소프트웨어학과.*소프트웨어융합대학/ })).toBeVisible();
@@ -957,12 +957,12 @@ test('core settings tasks finish within their click budget and in the expected o
   expect((await calls(page))[0]).toEqual(['saveProfile', expect.objectContaining({ year: 3 })]);
   await page.goBack();
   await hub();
-  // 5) 게시판 하나 더 받기: 알림 → 게시판 더 보기 → 대학 → 게시판 = 4클릭(전공 고르기와 같은 흐름). 검색하면 대학을 건너뛴다.
+  // 5) 게시판 하나 더 받기: 알림 → 게시판 더 보기 → 단과대 → 게시판 = 4클릭(전공 고르기와 같은 흐름). 검색하면 단과대를 건너뛴다.
   await withApp(page, {});
   log.length = 0;
   await click('알림', screen.getByRole('link', { name: /알림/ }).first());
   await click('게시판 더 보기', screen.locator('details.board-more-list > summary'));
-  await click('대학', screen.getByRole('group', { name: '대학 선택' }).getByRole('button').first());
+  await click('단과대', screen.getByRole('group', { name: '단과대와 기타 묶음 선택' }).getByRole('button').first());
   await click('게시판 추가', screen.locator('.choice-list[aria-label$=" 게시판"] button').first());
   expect(log.length).toBe(4);
   expect((await calls(page)).some((call) => call[0] === 'toggle' && call[2] === true)).toBe(true);

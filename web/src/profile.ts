@@ -95,7 +95,7 @@ export function validateProfile(profile: UserProfile): void {
   const inRange = (value: number | null, low: number, high: number) => value === null || (Number.isInteger(value) && value >= low && value <= high);
   const keys = profile.programs.map(programKey);
   if (profile.programs.length > MAX_PROGRAMS || new Set(keys).size !== keys.length || !profile.programs.every(validProgram)) {
-    throw new Error('대학과 학과를 확인해 주세요.');
+    throw new Error('단과대와 학과를 확인해 주세요.');
   }
   if (profile.admissionYear !== null && !(Number.isInteger(profile.admissionYear) && profile.admissionYear >= 2000 && profile.admissionYear <= 2100)) throw new Error('입학 연도를 확인해 주세요.');
   if (!inRange(profile.year, 1, 6) || !inRange(profile.semester, 1, 2)) throw new Error('학년과 학기를 확인해 주세요.');

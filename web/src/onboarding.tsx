@@ -26,7 +26,7 @@ const DEPT_DONE = [{ value: 'yes', label: '마쳤어요' }, { value: 'no', label
 const SERVICE = MILITARY.map((value) => ({ value, label: value }));
 
 /** 전공 고르기: 대학을 먼저 고르고 그 대학의 학과를 고른다(주전공, 복수전공 모두). 대학 줄은 학과 목록으로 들어가는 이동 줄이고, 학과는 고르기만 한다(확정은 호출한 쪽이 한다).
- * 학과 목록 맨 위에 고른 대학과 "다른 대학 고르기"를 둬서, 되돌아갈 때 긴 목록 아래까지 내려가지 않는다. */
+ * 학과 목록 맨 위에 고른 단과대와 "다른 단과대 고르기"를 둬서, 되돌아갈 때 긴 목록 아래까지 내려가지 않는다. */
 export function ProgramPicker({ onPick, current, listClass = '', lead = true }: {
   onPick: (program: Program) => void; current?: Program | null; listClass?: string; lead?: boolean;
 }) {
@@ -38,7 +38,7 @@ export function ProgramPicker({ onPick, current, listClass = '', lead = true }: 
   // 대학 목록에서 아래쪽 항목을 눌러 스크롤된 채로 학과 목록이 열려 제목이 가려지지 않게, 목록이 바뀌면 맨 위로 되돌린다.
   useEffect(() => { document.querySelector('.onb-main')?.scrollTo({ top: 0 }); listRef.current?.scrollTo({ top: 0 }); }, [college]);
   const GROUP = 'onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]';
-  // 검색 칸은 처음부터 보이고, 모든 대학의 학과를 한 번에 찾는다. 대학을 먼저 고르지 않아도 된다.
+  // 검색 칸은 처음부터 보이고, 모든 단과대의 학과를 한 번에 찾는다. 단과대를 먼저 고르지 않아도 된다.
   const search = <input type="search" className="onb-search min-h-[44px] rounded-md border border-line bg-surface px-[12px] py-0" aria-label="학과 검색" placeholder="학과 이름으로 찾기" autoComplete="off"
     value={query} onChange={(event) => setQuery(event.currentTarget.value)} />;
   if (searching) {
@@ -62,7 +62,7 @@ export function ProgramPicker({ onPick, current, listClass = '', lead = true }: 
     return <div className={GROUP}>
       {search}
       <div ref={listRef} className={listClass}>
-        <GroupGrid label="대학 선택" names={COLLEGES.map((item) => item.name)} onPick={(name) => { setCollege(name); setQuery(''); }} />
+        <GroupGrid label="단과대 선택" names={COLLEGES.map((item) => item.name)} onPick={(name) => { setCollege(name); setQuery(''); }} />
       </div>
     </div>;
   }
