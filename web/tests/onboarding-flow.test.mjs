@@ -30,7 +30,10 @@ test('소프트웨어융합대학 전공이면 AI중심대학사업단이 추천
 test('반도체 학과 전공이면 학과 단위로 추천된다', () => {
   const rec = boardsForPrograms([{ college: '정보통신대학', department: '반도체시스템공학과' }]);
   assert.ok(rec.includes('fabtech-notice') && rec.includes('ase-notice') && !rec.includes('aiuniv-notice'));
-  assert.ok(!boardsForPrograms([{ college: '정보통신대학', department: '전자전기공학부' }]).includes('ase-notice'));
+  for (const program of [{ college: '정보통신대학', department: '전자전기공학부' }, { college: '공과대학', department: '화학공학부' }, { college: '공과대학', department: '신소재공학부' }]) {
+    assert.ok(boardsForPrograms([program]).includes('ase-notice'), program.department);
+  }
+  assert.ok(!boardsForPrograms([{ college: '공과대학', department: '기계공학부' }]).includes('ase-notice'));
 });
 
 test('board catalog only points at known boards and valid college/department pairs', () => {

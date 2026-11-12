@@ -73,8 +73,8 @@ export interface OtherBoard { id: string; name: string; group: string; help: str
 export const OTHER_BOARDS: readonly OtherBoard[] = [
   { id: 'futurecar-notice', name: '미래차 부트캠프 공지', group: '부트캠프', help: '수강 모집과 행사 안내', recommendFor: [] },
   { id: 'aiuniv-notice', name: 'AI중심대학사업단 공지', group: '사업단', help: 'AI 교육·챌린지 안내', recommendFor: ['소프트웨어융합대학'] },
-  { id: 'fabtech-notice', name: '지능형팹테크융합전공 공지', group: '융합·연계전공', help: '반도체 공정·팹 교육과 학위 안내', recommendFor: ['정보통신대학/반도체시스템공학과', '정보통신대학/반도체융합공학과'] },
-  { id: 'ase-notice', name: '차세대반도체공학연계전공 공지', group: '융합·연계전공', help: '차세대 반도체 교육과 인턴 안내', recommendFor: ['정보통신대학/반도체시스템공학과', '정보통신대학/반도체융합공학과'] },
+  { id: 'fabtech-notice', name: '지능형팹테크융합전공 공지', group: '융합·연계전공', help: '반도체 공정·팹 교육과 학위 안내', recommendFor: ['정보통신대학/반도체시스템공학과', '정보통신대학/반도체융합공학과', '정보통신대학/전자전기공학부', '공과대학/화학공학부', '공과대학/신소재공학부'] },
+  { id: 'ase-notice', name: '차세대반도체공학연계전공 공지', group: '융합·연계전공', help: '차세대 반도체 교육과 인턴 안내', recommendFor: ['정보통신대학/반도체시스템공학과', '정보통신대학/반도체융합공학과', '정보통신대학/전자전기공학부', '공과대학/화학공학부', '공과대학/신소재공학부'] },
 ];
 
 export const COLLEGE_BOARD: Readonly<Record<string, string>> = {
