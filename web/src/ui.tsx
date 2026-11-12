@@ -15,7 +15,7 @@ export function SwitchRow({ checked, onChange, label, description, badge, disabl
   checked: boolean; onChange: (next: boolean) => void; label: string; description?: string; badge?: string; disabled?: boolean;
 }) {
   return <button type="button" role="switch" className={SWITCH_ROW} aria-checked={checked} disabled={disabled} onClick={() => onChange(!checked)}>
-    <span className="switch-text grid gap-[2px]"><span className="switch-label inline-flex items-center gap-[8px] text-[15px] font-semibold">{label}{badge ? <>{" "}<span className={BADGE}>{badge}</span></> : null}</span>
+    <span className="switch-text grid gap-[2px]"><span className="switch-label inline-flex items-center gap-[8px] text-[15px] font-medium">{label}{badge ? <>{" "}<span className={BADGE}>{badge}</span></> : null}</span>
       {description ? <span className="switch-note text-[13px] text-ink-3">{description}</span> : null}</span>
     <span className={SWITCH} aria-hidden="true" />
   </button>;
@@ -92,7 +92,7 @@ export function GroupGrid({ label, names, onPick, notes }: { label: string; name
 /** 고른 묶음(단과대)을 위에 보이고 눌러서 다른 묶음으로 돌아간다. 긴 목록 아래까지 내려가지 않고 같은 자리에서 되돌아간다. */
 export function BackToGroups({ current, noun = '단과대', onBack }: { current: string; noun?: string; onBack: () => void }) {
   return <button type="button" aria-label={`다른 ${noun} 고르기`} onClick={onBack}
-    className="flex min-h-[48px] w-full items-center justify-between gap-2 rounded-md border border-line bg-surface px-3 text-left text-[15px] font-semibold text-ink">
+    className="flex min-h-[48px] w-full items-center justify-between gap-2 rounded-md border-0 bg-sunken px-3 text-left text-[15px] font-semibold text-ink">
     <span className="flex items-center gap-[10px]"><span className={`choice-chevron ${CHEVRON_LEFT}`} aria-hidden="true" />{current}</span>
     <span className="text-[14px] font-normal text-ink-2">다른 {noun} 고르기</span>
   </button>;

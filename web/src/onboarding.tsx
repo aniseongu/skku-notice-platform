@@ -99,7 +99,9 @@ function MoreBoards<T extends { id: string; name: string }>({ sources, on, rende
   const order = COLLEGES.map((college) => college.name);
   const rank = (name: string) => (order.includes(name) ? order.indexOf(name) : 100 + Number(name === '학교 공통'));
   const names = [...groups.keys()].sort((a, b) => rank(a) - rank(b));
-  const notes = Object.fromEntries(names.map((name) => [name, (groups.get(name) ?? []).filter((source) => on.includes(source.id)).length]).filter(([, count]) => count).map(([name, count]) => [name, `${count}개 켬`]));
+  // 켠 개수는 위 목록에서 이미 켜 둔 내 전공 게시판까지 센다(단과대 칸만 보고도 무엇을 받는지 알게).
+  const countOn = (name: string) => (order.includes(name) ? on.filter((id) => boardCollege(id) === name).length : (groups.get(name) ?? []).filter((source) => on.includes(source.id)).length);
+  const notes = Object.fromEntries(names.map((name) => [name, countOn(name)]).filter(([, count]) => count).map(([name, count]) => [name, `${count}개 켬`]));
   const needle = query.replace(/\s+/g, '').toLowerCase();
   const found = needle ? sources.filter((source) => source.name.replace(/\s+/g, '').toLowerCase().includes(needle)) : [];
   // 묶음이 하나뿐이면 고를 것이 없으니 격자와 "다른 단과대 고르기" 없이 바로 그 묶음을 보인다.
@@ -135,6 +137,7 @@ export function Onboarding({ app }: { app: AppController }) {
   const [changingPrimary, setChangingPrimary] = useState(() => app.profile.programs.length === 0);
   const [saved, setSaved] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   // "더 보기"를 펼치면 펼친 목록의 첫 부분(검색 칸)이 화면 안에 들어오게 한다.
   useEffect(() => { if (moreOpen) moreRef.current?.firstElementChild?.scrollIntoView({ block: 'nearest' }); }, [moreOpen]);
@@ -276,7 +279,7 @@ export function Onboarding({ app }: { app: AppController }) {
         {mainSources.filter((source) => shownBoards.has(source.id) || inlineRest).map(boardSwitch)}
         {/* "더 보기"는 같은 카드의 마지막 줄이다. 카드 밖에 따로 떠 있으면 구역 제목처럼 읽힌다(독립 평가). 펼친 목록은 카드 바로 아래에 둔다. */}
         {moreSources.length ? <button type="button" aria-expanded={moreOpen} aria-controls="more-boards" onClick={() => setMoreOpen(!moreOpen)}
-          className="flex min-h-[52px] w-full items-center justify-between gap-[12px] border-0 border-t border-line bg-transparent px-0 text-left text-[15px] font-semibold text-ink [.box>&:first-child]:border-t-0">
+          className="flex min-h-[52px] w-full items-center justify-between gap-[12px] border-0 border-t border-line bg-transparent px-0 text-left text-[15px] font-semibold text-ink-2 [.box>&:first-child]:border-t-0">
           {moreOpen ? '게시판 접기' : `학과·단과대 게시판 ${moreSources.length}개 더 보기`}
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`text-ink-3 transition-transform ${moreOpen ? 'rotate-180' : ''}`}><path d="M6 9l6 6 6-6" /></svg>
         </button> : null}
@@ -294,7 +297,7 @@ export function Onboarding({ app }: { app: AppController }) {
           </div>)}
       </div>
       <h2>관심 키워드</h2>
-      <p className="card-note m-0 text-[14px] text-ink-2">선택이에요. 고르지 않으면 모든 공지를 받아요</p>
+      <p className="card-note m-0 text-[14px] text-ink-2">고르지 않아도 돼요. 그러면 모든 공지를 받아요</p>
       <ChipGroup label="관심 키워드" options={keywordOptions} selected={draft.keywords} onToggle={(word) => setDraft({ ...draft, keywords: toggleValue(draft.keywords, word) })} />
       {app.onboardingError ? <p className="error-text text-[14px] text-danger" role="alert">{app.onboardingError}</p> : null}
     </div>;
@@ -340,8 +343,9 @@ export function Onboarding({ app }: { app: AppController }) {
       <ol className="onb-steplist m-0 grid list-none gap-[14px] p-0">{STEP_LABELS.map((label, i) =>
         <li className="flex items-center gap-[12px] text-[15px] text-ink-3 data-[state=current]:font-bold data-[state=current]:text-ink data-[state=done]:text-ink-2 data-[state=current]:[&_.num]:border-accent data-[state=current]:[&_.num]:bg-accent data-[state=current]:[&_.num]:text-on-accent data-[state=done]:[&_.num]:border-accent data-[state=done]:[&_.num]:text-accent" key={label} data-state={i < index ? 'done' : i === index ? 'current' : 'todo'}><span className="num inline-grid size-[28px] flex-none place-items-center rounded-[50%] border-[1.5px] border-line bg-surface text-[13px] font-bold">{i < index ? '✓' : i + 1}</span>{label}</li>)}</ol>
     </aside>
-    <div className="onb-main flex min-h-0 flex-col overflow-y-auto [overscroll-behavior:contain]" ref={bodyRef}>
-      <div className="onb-top sticky top-0 z-[2] bg-bg pt-[env(safe-area-inset-top)] [&_.icon-button]:m-0 [&_.icon-button]:size-[44px]">
+    <div className="onb-main flex min-h-0 flex-col overflow-y-auto [overscroll-behavior:contain]" ref={bodyRef} onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 0)}>
+      {/* 내리면 위쪽 바에도 아래 단추 줄처럼 경계선을 둔다(줄이 바 밑에서 잘려 보이지 않게). */}
+      <div className={`onb-top sticky top-0 z-[2] border-b bg-bg pt-[env(safe-area-inset-top)] [&_.icon-button]:m-0 [&_.icon-button]:size-[44px] ${scrolled ? 'border-line' : 'border-transparent'}`}>
         <div className="onb-top-inner mx-auto grid w-[min(100%,36rem)] grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-x-[12px] pt-[8px] pr-[12px] pb-[4px] pl-[4px] min-[900px]:pt-[16px]">
           {showBack
             ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-sunken disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:min-[720px]:[&:hover:not(:disabled)]:bg-hover-soft" aria-label="이전 단계" onClick={back}><svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href="icons/sprite.svg#back" /></svg></button>
