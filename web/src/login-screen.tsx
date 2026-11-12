@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 // 로그인 전용 화면. 로그인하기 전에는 앱의 어떤 부분도 보이지 않고 이 화면만 뜬다.
 import { APP_NAME } from './brand';
 import { installMode, isStandalone, MANUAL_INSTALL_HINT } from './install-hint';
@@ -11,8 +12,12 @@ const GoogleG = () => <svg className="flex-none w-[20px] h-[20px]" width="18" he
   <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
 </svg>;
 
-export function LoginStatus({ text }: { text: string }) {
-  return <div className="flex flex-col min-h-dvh bg-bg items-center justify-center"><p role="status" className="m-0 text-[14px] leading-[20px] text-ink-2">{text}</p></div>;
+/** 기다리는 화면. 로그인 확인과 내 정보 불러오기가 같은 문구, 같은 자리라 이어서 기다려도 화면이 한 번만 보인다.
+ * 0.3초 안에 끝나는 기다림은 문구를 그리지 않는다(잠깐 번쩍이지 않게, 토스 기준). */
+export function LoginStatus({ text = '불러오고 있어요.' }: { text?: string }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => { const timer = window.setTimeout(() => setShown(true), 300); return () => window.clearTimeout(timer); }, []);
+  return <div className="flex flex-col min-h-dvh bg-bg items-center justify-center"><p role="status" className={`m-0 text-[14px] leading-[20px] text-ink-2 ${shown ? '' : 'invisible'}`}>{text}</p></div>;
 }
 
 export function LoginScreen({ app }: { app: AppController }) {
