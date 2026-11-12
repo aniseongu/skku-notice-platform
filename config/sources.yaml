@@ -402,4 +402,10 @@ sources:
     url: https://ssbat.skku.edu/ssbat/notice.do
     on_demand: true
 
+  - id: aiuniv-notice
+    name: AI중심대학사업단 공지
+    kind: skku-cms
+    url: https://aiuniv.skku.edu/aiuniv/notice.do
+    on_demand: true
+
 # END catalog

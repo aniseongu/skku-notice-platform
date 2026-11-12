@@ -261,7 +261,8 @@ function BoardGroups({ model }: { model: SettingsModel }) {
     return map;
   }, []);
   const known = new Set(BOARD_CATALOG.map((board) => board.id));
-  const otherGroup = new Map(OTHER_BOARDS.map((board) => [board.id, board.group]));
+  // 한 대학에 추천되는 게시판은 그 대학 묶음에 둔다(학교 사람이 대학 안에서 찾는다). 나머지는 자기 묶음(부트캠프).
+  const otherGroup = new Map(OTHER_BOARDS.map((board) => [board.id, board.recommendFor[0] ?? board.group]));
   const mine = model.sources.filter((source) => model.subscriptions.includes(source.id));
   const others = model.sources.filter((source) => !model.subscriptions.includes(source.id));
   const groups = new Map<string, typeof others>();

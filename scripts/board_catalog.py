@@ -75,6 +75,7 @@ BOARDS: list[tuple[str, str, str]] = [
     ("aicon-notice", "응용AI융합학부 공지", "https://aicon.skku.edu/aicon/notice.do"),
     ("energy-notice", "에너지학과 공지", "https://energy.skku.edu/energy/notice.do"),
     ("ssbat-notice", "배터리학과 공지", "https://ssbat.skku.edu/ssbat/notice.do"),
+    ("aiuniv-notice", "AI중심대학사업단 공지", "https://aiuniv.skku.edu/aiuniv/notice.do"),
 ]
 
 # 단과대학 이름 -> 게시판 id (이미 있는 sw-notice 포함)
@@ -112,11 +113,13 @@ DEPARTMENT_BOARD = {
     "스포츠과학대학/스포츠과학과": "sports-notice", "경제대학/경제학과": "ecostat-notice",
 }
 
-# 전공과 상관없이 누구나 고를 수 있는 게시판(온보딩의 "기타 게시판" 단계). (id, 묶음, 설명)
+# 전공과 상관없이 누구나 고를 수 있는 게시판(온보딩의 "기타 게시판" 단계). (id, 묶음, 설명, 추천 대학)
+# 추천 대학에 속한 전공이면 게시판 추천에 자동으로 들어간다(켜진 채로 시작). 비워 두면 누구에게도 추천하지 않는다.
 # 부트캠프 모집 안내(청년도약·첨단산업 인재양성)는 성균관대 공지 전체 게시판에도 올라온다. 아래는 사업단이 따로 올리는 게시판이다.
 # 디스플레이 부트캠프 사업단은 공개 공지 게시판을 찾지 못했고, 인공지능·반도체 사업단은 주소가 확인되지 않아 넣지 않았다.
-OTHER_BOARDS: list[tuple[str, str, str]] = [
-    ("futurecar-notice", "부트캠프", "수강 모집과 행사 안내"),
+OTHER_BOARDS: list[tuple[str, str, str, tuple[str, ...]]] = [
+    ("futurecar-notice", "부트캠프", "수강 모집과 행사 안내", ()),
+    ("aiuniv-notice", "사업단", "AI 교육·챌린지·장학 안내", ("소프트웨어융합대학",)),
 ]
 
 # 이미 운영 중인 기본 게시판(모든 사용자에게 추천). sources.yaml의 앞쪽 4개는 이 스크립트가 건드리지 않는다.
@@ -125,6 +128,8 @@ EXISTING = {
     "skku-notice01": "성균관대 공지", "cse-notice": "소프트웨어학과 공지", "sw-notice": "소프트웨어융합대학 공지",
     "futurecar-notice": "미래차 부트캠프 공지",
 }
+
+BOARD_NAMES = {**EXISTING, **{i: n for i, n, _ in BOARDS}}
 
 BEGIN, END = "# BEGIN catalog", "# END catalog"
 
@@ -137,7 +142,7 @@ def check() -> None:
     assert len(set(urls)) == len(urls), "duplicate board url"
     assert all(url.startswith("https://") and ".skku.edu/" in url for url in urls), "unexpected host"
     known = set(ids) | set(EXISTING)
-    assert all(i in known for i, _, _ in OTHER_BOARDS), "unknown other board"
+    assert all(i in known for i, _, _, _ in OTHER_BOARDS), "unknown other board"
     for target in [*COLLEGE_BOARD.values(), *DEPARTMENT_BOARD.values()]:
         assert target in known, f"unknown board {target}"
 
@@ -166,9 +171,9 @@ def typescript() -> str:
         "];",
         "",
         "/** 전공과 상관없이 고르는 게시판(부트캠프 등). */",
-        "export interface OtherBoard { id: string; group: string; help: string }",
+        "export interface OtherBoard { id: string; name: string; group: string; help: string; recommendFor: readonly string[] }",
         "export const OTHER_BOARDS: readonly OtherBoard[] = [",
-        *[f"  {{ id: '{i}', group: '{g}', help: '{h}' }}," for i, g, h in OTHER_BOARDS],
+        *[f"  {{ id: '{i}', name: '{BOARD_NAMES[i]}', group: '{g}', help: '{h}', recommendFor: [{', '.join(repr(c) for c in cs)}] }}," for i, g, h, cs in OTHER_BOARDS],
         "];",
         "",
         "export const COLLEGE_BOARD: Readonly<Record<string, string>> = {",
@@ -186,6 +191,7 @@ def typescript() -> str:
         "    const department = program.department ? DEPARTMENT_BOARD[`${program.college}/${program.department}`] : undefined;",
         "    const college = COLLEGE_BOARD[program.college];",
         "    for (const id of [department, college]) if (id && !ids.includes(id)) ids.push(id);",
+        "    for (const other of OTHER_BOARDS) if (other.recommendFor.includes(program.college) && !ids.includes(other.id)) ids.push(other.id);",
         "  }",
         "  return ids;",
         "}",

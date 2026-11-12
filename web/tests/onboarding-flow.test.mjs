@@ -11,14 +11,20 @@ const biz = { college: '경영대학', department: '경영학과' };
 
 test('recommended boards: school-wide first, then department and college boards of every major without repeats', () => {
   assert.deepEqual(boardsForPrograms([]), [DEFAULT_BOARD]);
-  assert.deepEqual(boardsForPrograms([sw]), ['skku-notice01', 'cse-notice', 'sw-notice']);
-  assert.deepEqual(boardsForPrograms([sw, biz]), ['skku-notice01', 'cse-notice', 'sw-notice', 'bus-notice', 'biz-notice']);
+  assert.deepEqual(boardsForPrograms([sw]), ['skku-notice01', 'cse-notice', 'sw-notice', 'aiuniv-notice']);
+  assert.deepEqual(boardsForPrograms([sw, biz]), ['skku-notice01', 'cse-notice', 'sw-notice', 'aiuniv-notice', 'bus-notice', 'biz-notice']);
   assert.deepEqual(boardsForPrograms([sw, { college: '소프트웨어융합대학', department: '인공지능학과' }]),
-    ['skku-notice01', 'cse-notice', 'sw-notice', 'ai-notice']);
+    ['skku-notice01', 'cse-notice', 'sw-notice', 'aiuniv-notice', 'ai-notice']);
   // 학과 게시판이 없는 학과는 단과대학 게시판만, 둘 다 없는 곳은 성균관대 공지만 추천한다.
   assert.deepEqual(boardsForPrograms([{ college: '문과대학', department: '문헌정보학과' }]), ['skku-notice01', 'lis-notice', 'liberalarts-notice']);
   assert.deepEqual(boardsForPrograms([{ college: '의과대학', department: '의학과' }]), ['skku-notice01']);
   assert.deepEqual(boardsForPrograms([{ college: '학부대학', department: null }]), ['skku-notice01']);
+});
+
+test('소프트웨어융합대학 전공이면 AI중심대학사업단이 추천에 들어가고 다른 대학은 아니다', () => {
+  assert.ok(boardsForPrograms([{ college: '소프트웨어융합대학', department: '소프트웨어학과' }]).includes('aiuniv-notice'));
+  assert.ok(boardsForPrograms([{ college: '공과대학', department: '기계공학부' }, { college: '소프트웨어융합대학', department: null }]).includes('aiuniv-notice'));
+  assert.ok(!boardsForPrograms([{ college: '공과대학', department: '기계공학부' }]).includes('aiuniv-notice'));
 });
 
 test('board catalog only points at known boards and valid college/department pairs', () => {

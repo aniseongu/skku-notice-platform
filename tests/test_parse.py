@@ -78,3 +78,11 @@ def test_view_board_id_row_without_a_valid_item_id_is_rejected():
     )
     with pytest.raises(ParseError):
         parse_list(html, "art-notice", "https://art.skku.edu/art/notice.do")
+
+
+def test_aiuniv_notice_board_2026_11_12() -> None:
+    url = "https://aiuniv.skku.edu/aiuniv/notice.do"
+    html = Path("tests/fixtures/aiuniv_notice_list_2026-11-12.html").read_text(encoding="utf-8")
+    notices = parse_list(html, "aiuniv-notice", url)
+    assert len(notices) == 10
+    assert all(notice.url.startswith(f"{url}?mode=view&articleNo=") for notice in notices)
