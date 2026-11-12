@@ -89,10 +89,11 @@ export function GroupGrid({ label, names, onPick, notes }: { label: string; name
   </div>;
 }
 
-/** 고른 묶음(단과대)을 위에 보이고 눌러서 다른 묶음으로 돌아간다. 오른쪽에 같은 말을 또 쓰지 않고, 낭독용 이름(aria-label)에만 "다른 ○○ 고르기"를 둔다. */
+/** 바탕이 이미 옅은 면(bg-sunken)이라 마우스를 올리면 한 단계 진한 면(bg-line)으로 바뀐다(다른 선택지처럼 올리면 진해진다).
+ * 고른 묶음(단과대)을 위에 보이고 눌러서 다른 묶음으로 돌아간다. 오른쪽에 같은 말을 또 쓰지 않고, 낭독용 이름(aria-label)에만 "다른 ○○ 고르기"를 둔다. */
 export function BackToGroups({ current, noun = '단과대', onBack }: { current: string; noun?: string; onBack: () => void }) {
   return <button type="button" aria-label={`${current}, 다른 ${noun} 고르기`} onClick={onBack}
-    className="flex min-h-[48px] w-full items-center justify-start gap-2 rounded-md border-0 bg-sunken px-3 text-left text-[15px] font-semibold text-ink [@media(hover:hover)]:hover:bg-hover active:bg-hover">
+    className="flex min-h-[48px] w-full items-center justify-start gap-2 rounded-md border-0 bg-sunken px-3 text-left text-[15px] font-semibold text-ink [@media(hover:hover)]:hover:bg-line active:bg-line">
     <span className="flex items-center gap-[10px]"><span className={`choice-chevron ${CHEVRON_LEFT_STRONG}`} aria-hidden="true" />{current}</span>
   </button>;
 }
