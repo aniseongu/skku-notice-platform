@@ -30,14 +30,9 @@ RUN_BUDGET_SECONDS = 330.0
 # 사용자가 직접 적은 관심 분야 설명도 보내되 길이와 문자를 제한한다.
 PROFILE_COLUMNS = (
     "programs", "year", "semester", "enrolled_semester", "enrollment_status", "military_service",
-    "interests", "wants", "avoids", "joined_programs",
+    "interests", "wants", "avoids",
 )
-# 웹 web/src/joined-programs.ts의 id·이름과 같게 둔다. 모르는 id는 보내지 않는다.
-JOINED_PROGRAM_LABELS = {
-    "futurecar": "미래차 부트캠프", "ai-bootcamp": "인공지능 부트캠프",
-    "display-bootcamp": "디스플레이 부트캠프", "aiuniv": "AI중심대학사업단",
-    "fabtech": "지능형팹테크융합전공", "ase": "차세대반도체공학연계전공",
-}
+# 참여 사업(joined_programs)은 묻지도 보내지도 않는다(사용자 지시 2026-11-12: 참여 여부는 중요하지 않다).
 PROFILE_TEXT_LIMIT = 300
 _CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 
@@ -63,10 +58,6 @@ def build_judge_profile(row: dict) -> dict:
     for key in ("year", "semester", "enrolled_semester", "enrollment_status", "military_service"):
         if row.get(key) is not None:
             profile[key] = row[key]
-    ids = row.get("joined_programs") or []
-    joined = [JOINED_PROGRAM_LABELS[i] for i in ids if isinstance(i, str) and i in JOINED_PROGRAM_LABELS]
-    if joined:
-        profile["joined_programs"] = joined
     for key, name in (("interests", "interests"), ("wants", "wants"), ("avoids", "does_not_want")):
         text = _clean_text(row.get(key))
         if text:

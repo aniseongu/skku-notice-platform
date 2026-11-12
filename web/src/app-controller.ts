@@ -73,7 +73,7 @@ export function settingsSectionFromUrl(): string | null {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'keys';
   const section = params.get('section');
-  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile', 'programs', 'feedback'].includes(section) ? section : null;
+  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile', 'feedback'].includes(section) ? section : null;
 }
 
 /** 설정 머리의 부제. 쪽마다 그 쪽에서 하는 일을 말한다. */
@@ -84,7 +84,6 @@ export function settingsSubtitle(): string {
     case 'keywords': return '관심 있는 공지를 골라 봐요';
     case 'calendar': return '저장한 공지의 마감을 구글 캘린더에 넣어요';
     case 'profile': return '내 정보와 AI에게 알려 줄 내용을 적어요';
-    case 'programs': return '참여 중인 사업을 알려 주세요';
     case 'keys': return 'AI 키를 관리해요';
     case 'feedback': return '궁금한 점이나 바라는 점을 남겨 주세요';
     default: return '알림과 연결을 정해요';
@@ -94,7 +93,7 @@ export function settingsSubtitle(): string {
 export function settingsTitle(): string {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return '연결 키';
-  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정', programs: '참여 사업', feedback: '문의하기' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
+  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정', feedback: '문의하기' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
 }
 
 export interface InstallPrompt extends Event { prompt(): Promise<void> }
@@ -850,7 +849,6 @@ export class AppController extends Reactive {
       admissionYear: isSoftwareOriginal({ programs: draft.programs }) ? draft.admissionYear : this.profile.admissionYear,
       university3pInternshipSelected: draft.university3pInternshipSelected,
       university3pInternshipDone: draft.university3pInternshipDone,
-      joinedPrograms: draft.joinedPrograms,
       deptInternshipDone: isSoftwareOriginal({ programs: draft.programs }) ? draft.deptInternshipDone : this.profile.deptInternshipDone,
       onboardedAt: this.profile.onboardedAt ?? (final ? new Date().toISOString() : null),
     };

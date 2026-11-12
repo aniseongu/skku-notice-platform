@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { parseJoinedPrograms } from './joined-programs.ts';
 import { MAX_PROGRAMS, programKey, validProgram, type Program } from './skku-programs.ts';
 
 export interface UserProfile {
@@ -21,8 +20,6 @@ export interface UserProfile {
   interests: string;
   wants: string;
   avoids: string;
-  /** 참여 중이라고 알린 사업(미래차 부트캠프 등) id. 참여 학생만 신청하는 공지를 판정할 때 쓴다. */
-  joinedPrograms: string[];
 }
 
 export const PROFILE_TEXT_LIMIT = 300;
@@ -33,16 +30,15 @@ export const MILITARY = ['복무 전', '복무 완료', '해당 없음'] as cons
 export const EMPTY_PROFILE: UserProfile = {
   programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null,
   admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null,
-  interests: '', wants: '', avoids: '', joinedPrograms: [],
+  interests: '', wants: '', avoids: '',
 };
 
 const COLUMNS = 'programs,year,semester,enrollment_status,military_service,onboarded_at,interests,wants,avoids';
 const EXTRA_COLUMNS = ',admission_year,university_3p_internship_selected';
 const DONE_COLUMNS = ',dept_internship_done,university_3p_internship_done';
-const JOINED_COLUMNS = ',joined_programs';
 /** 새 열이 아직 없는 환경(마이그레이션 전)이면 예전 열만으로 다시 시도한다. */
 const missingColumn = (error: { code?: string; message?: string } | null) =>
-  !!error && (error.code === '42703' || error.code === 'PGRST204' || /admission_year|university_3p_internship_selected|dept_internship_done|university_3p_internship_done|joined_programs/.test(error.message ?? ''));
+  !!error && (error.code === '42703' || error.code === 'PGRST204' || /admission_year|university_3p_internship_selected|dept_internship_done|university_3p_internship_done/.test(error.message ?? ''));
 
 export const ADMISSION_YEARS = Array.from({ length: 10 }, (_, i) => 2026 - i); // 2026 ~ 2017
 export const OLD_ADMISSION_YEAR = 2016;  // "2016학번 이전"을 하나로 묶는다
@@ -51,7 +47,7 @@ export const OLD_ADMISSION_YEAR = 2016;  // "2016학번 이전"을 하나로 묶
 export async function loadProfile(client: SupabaseClient, userId: string): Promise<UserProfile | null> {
   // 새 열이 없는 환경이면 가장 새로운 열부터 하나씩 빼며 다시 읽는다(있는 열은 그대로 읽는다).
   let data_: unknown = null, error: { code?: string; message?: string } | null = null;
-  for (const columns of [COLUMNS + EXTRA_COLUMNS + DONE_COLUMNS + JOINED_COLUMNS, COLUMNS + EXTRA_COLUMNS + DONE_COLUMNS, COLUMNS + EXTRA_COLUMNS, COLUMNS]) {
+  for (const columns of [COLUMNS + EXTRA_COLUMNS + DONE_COLUMNS, COLUMNS + EXTRA_COLUMNS, COLUMNS]) {
     ({ data: data_, error } = await client.from('user_profiles').select(columns).eq('user_id', userId).maybeSingle());
     if (!missingColumn(error)) break;
   }
@@ -67,7 +63,6 @@ export async function loadProfile(client: SupabaseClient, userId: string): Promi
     deptInternshipDone: typeof data.dept_internship_done === 'boolean' ? data.dept_internship_done : null,
     university3pInternshipDone: typeof data.university_3p_internship_done === 'boolean' ? data.university_3p_internship_done : null,
     interests: cleanText(data.interests), wants: cleanText(data.wants), avoids: cleanText(data.avoids),
-    joinedPrograms: parseJoinedPrograms(data.joined_programs),
   };
 }
 
@@ -117,8 +112,7 @@ export async function saveProfile(client: SupabaseClient, userId: string, profil
   const extra = { admission_year: profile.admissionYear, university_3p_internship_selected: profile.university3pInternshipSelected };
   const done = { dept_internship_done: profile.deptInternshipDone, university_3p_internship_done: profile.university3pInternshipDone };
   let error: { code?: string; message?: string } | null = null;
-  const joined = { joined_programs: parseJoinedPrograms(profile.joinedPrograms) };
-  for (const values of [{ ...row, ...extra, ...done, ...joined }, { ...row, ...extra, ...done }, { ...row, ...extra }, row]) {
+  for (const values of [{ ...row, ...extra, ...done }, { ...row, ...extra }, row]) {
     ({ error } = await client.from('user_profiles').upsert(values, { onConflict: 'user_id' }));
     if (!missingColumn(error)) break;
   }

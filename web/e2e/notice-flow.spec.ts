@@ -415,9 +415,8 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('group', { name: '융합·연계전공' }).getByRole('switch', { name: /^차세대반도체공학연계전공 공지/ })).toHaveAttribute('aria-checked', 'false');
   await expect(dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ })).toHaveAttribute('aria-checked', 'false');
   await dialog.getByRole('switch', { name: /수강 모집과 행사 안내/ }).click();
-  // 게시판을 켠 줄 바로 아래에서 참여 여부를 고른다(꺼 둔 게시판에는 묻지 않는다).
-  await expect(dialog.getByRole('switch', { name: / 참여 중이에요/ })).toHaveCount(2);   // 미래차 부트캠프와 AI중심대학사업단(추천으로 켜짐)
-  await dialog.getByRole('group', { name: '부트캠프' }).getByRole('switch', { name: /^미래차 부트캠프 참여 중이에요/ }).click();
+  // 참여 여부는 묻지 않는다(사용자 지시 2026-11-12).
+  await expect(dialog.getByRole('switch', { name: /참여 중이에요|하고 있어요/ })).toHaveCount(0);
   await dialog.getByRole('button', { name: '다음' }).click();
   const saved = (await calls(page)).find((call) => call[0] === 'finish')![1] as Record<string, unknown>;
   expect(saved).toMatchObject({
@@ -425,7 +424,7 @@ test('first-run setup: choices only, department list follows the college, double
     year: 3, enrollmentStatus: '재학', keywords: ['장학'],
   });
   expect(saved.boards).toEqual(expect.arrayContaining(['skku-notice01', 'cse-notice', 'futurecar-notice', 'aiuniv-notice']));
-  expect(saved.joinedPrograms).toEqual(['futurecar']);
+  expect(saved).not.toHaveProperty('joinedPrograms');
   // 알림은 나중에 해도 된다.
   await expect(dialog.getByRole('heading', { name: '알림을 켜 둘까요?' })).toBeFocused();
   await dialog.getByRole('button', { name: '나중에 할게요' }).click();
@@ -481,6 +480,8 @@ test('first-run "more boards" works like settings: search or pick a college, tog
     app.sources = [
       { id: 'skku-notice01', name: '성균관대 공지' }, { id: 'biz-notice', name: '경영대학 공지' }, { id: 'bus-notice', name: '경영학과 공지' },
       { id: 'liberalarts-notice', name: '문과대학 공지' }, { id: 'korean-notice', name: '국어국문학과 공지' }, { id: 'english-notice', name: '영어영문학과 공지' },
+      { id: 'french-notice', name: '프랑스어문학과 공지' }, { id: 'chinese-notice', name: '중어중문학과 공지' }, { id: 'german-notice', name: '독어독문학과 공지' },
+      { id: 'russian-notice', name: '러시아어문학과 공지' }, { id: 'sscience-notice', name: '사회과학대학 공지' }, { id: 'ecostat-notice', name: '경제대학 공지' },
     ];
   });
   const dialog = page.getByRole('dialog');
@@ -498,7 +499,9 @@ test('first-run "more boards" works like settings: search or pick a college, tog
   // 한 줄씩 늘어놓은 목록이 아니라 검색 칸과 단과대 격자가 먼저 보인다.
   const grid = dialog.getByRole('group', { name: '단과대 선택' });
   await expect(dialog.getByRole('searchbox', { name: '게시판 검색' })).toBeVisible();
-  await expect(grid.getByRole('button')).toHaveText(['문과대학']);   // 켜 둔 경영대학 게시판은 위 목록에 있고, 남은 것만 묶는다
+  await expect(grid.getByRole('button')).toHaveText(['문과대학', '사회과학대학', '경제대학']);   // 켜 둔 경영대학 게시판은 위 목록에 있고, 남은 것만 묶는다
+  // 고른 전공의 단과대·학과 게시판은 켜진 채로 위 목록에 있다.
+  for (const name of ['성균관대 공지', '경영대학 공지', '경영학과 공지']) await expect(dialog.getByRole('group', { name: '게시판', exact: true }).getByRole('switch', { name })).toBeChecked();
   await grid.getByRole('button', { name: '문과대학' }).click();
   await dialog.getByRole('switch', { name: '국어국문학과 공지' }).click();
   await expect(dialog.getByRole('switch', { name: '국어국문학과 공지' })).toBeChecked();
@@ -509,6 +512,32 @@ test('first-run "more boards" works like settings: search or pick a college, tog
   await dialog.getByRole('switch', { name: '영어영문학과 공지' }).click();
   await dialog.getByRole('searchbox', { name: '게시판 검색' }).fill('');
   await expect(grid.getByRole('button', { name: /문과대학/ })).toContainText('2개 켬');
+});
+
+test('first-run boards: when only a few boards are left they sit in the list without a "more" fold', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
+    app.profileStatus = 'ready'; app.authUserId = 'account-a'; app.pushStatus = 'on'; app.byokOn = true; app.byokLoading = false; app.byokStatus = null; app.aiKeys = [];
+    app.subscriptions = ['skku-notice01']; app.subscriptionsLoading = false;   // 이미 받는 게시판이 있는 계정도 전공 게시판이 켜진다
+    app.sources = [{ id: 'skku-notice01', name: '성균관대 공지' }, { id: 'biz-notice', name: '경영대학 공지' }, { id: 'bus-notice', name: '경영학과 공지' }, { id: 'liberalarts-notice', name: '문과대학 공지' }];
+  });
+  const dialog = page.getByRole('dialog');
+  const next = () => dialog.getByRole('button', { name: '다음' }).click();
+  await dialog.getByRole('button', { name: '경영대학', exact: true }).click();
+  await dialog.getByRole('radio', { name: '경영학과', exact: true }).click();
+  await next();
+  await dialog.getByRole('radio', { name: '없어요', exact: true }).click();
+  await dialog.getByRole('button', { name: '3학년' }).click();
+  await next();
+  await dialog.getByRole('button', { name: '채웠어요' }).click();
+  await next();
+  const boards = dialog.getByRole('group', { name: '게시판', exact: true });
+  for (const name of ['성균관대 공지', '경영대학 공지', '경영학과 공지']) await expect(boards.getByRole('switch', { name })).toBeChecked();
+  await expect(boards.getByRole('switch', { name: '문과대학 공지' })).not.toBeChecked();   // 하나 남은 게시판은 접지 않고 바로 보인다
+  await expect(dialog.getByText('게시판 더 보기')).toHaveCount(0);
 });
 
 test('reopening a setup that was saved but left at the AI key step resumes at that step instead of asking everything again', async ({ page }) => {
@@ -717,20 +746,13 @@ test('settings home puts the daily settings first and groups iCampus and Google 
   expect(heads).toEqual(['내 설정', '계정', '화면', '기타']);
   const mine = screen.getByRole('region', { name: '내 설정' }), etc = screen.getByRole('region', { name: '기타' });
   expect(await mine.getByRole('link').allInnerTexts().then((list) => list.map((text) => text.split('\n')[0]))).toEqual(['알림', '관심 키워드']);
-  expect(await etc.getByRole('link').allInnerTexts().then((list) => list.map((text) => text.split('\n')[0]))).toEqual(['참여 사업', '아이캠퍼스', '구글 캘린더']);
+  expect(await etc.getByRole('link').allInnerTexts().then((list) => list.map((text) => text.split('\n')[0]))).toEqual(['아이캠퍼스', '구글 캘린더']);
   const y = async (loc: import('@playwright/test').Locator) => (await loc.boundingBox())!.y;
   expect(await y(etc)).toBeGreaterThan(await y(mine));
   expect(await y(etc)).toBeGreaterThan(await y(screen.getByRole('region', { name: '계정' })));
   // 기타 안의 항목도 한 번 눌러 자기 페이지로 간다.
   await etc.getByRole('link', { name: /아이캠퍼스/ }).click();
   await expect(page).toHaveURL(/section=canvas/);
-  // 참여 사업은 홈에서는 한 줄로 닫혀 있고, 눌러 들어가면 묶음별 스위치가 나온다(기본은 모두 꺼짐).
-  await page.goBack();
-  await screen.getByRole('region', { name: '기타' }).getByRole('link', { name: /참여 사업/ }).click();
-  await expect(page).toHaveURL(/section=programs/);
-  await expect(screen.getByRole('switch', { name: /^미래차 부트캠프/ })).toHaveAttribute('aria-checked', 'false');
-  for (const group of ['부트캠프', '사업단', '융합·연계전공']) await expect(screen.getByRole('heading', { name: group })).toBeVisible();
-  expect((await screen.getByRole('switch', { name: /^차세대반도체공학연계전공/ }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
 });
 
 test('settings opened straight from the side menu shortcut closes with one X instead of showing the settings home', async ({ page }, testInfo) => {

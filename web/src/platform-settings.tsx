@@ -18,7 +18,6 @@ import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifi
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
-import { JOINED_PROGRAMS } from './joined-programs';
 import { FEEDBACK_KINDS, FEEDBACK_LIMIT, feedbackProblem, type FeedbackKind, type FeedbackResult } from './feedback';
 import { BADGE, CHEVRON_RIGHT, CHOICE, SWITCH, SWITCH_ONLY } from './cls';
 import { aiKeysLead, connectedAiKeys } from './ai-keys';
@@ -224,7 +223,6 @@ function Overview({ model }: { model: SettingsModel }) {
     </Section>
     {/* 자주 쓰지 않는 연결은 "기타"로 묶어 아래에 둔다(알림과 관심 키워드가 위쪽 "내 설정"에 남는다). */}
     <Section id="s-etc" title="기타">
-      <SettingsLink model={model} label="참여 사업" help="부트캠프, 사업단, 융합·연계전공을 하는지 알려 줘요" section="programs" />
       <SettingsLink model={model} label="아이캠퍼스" help="과제 마감과 하루 요약 알림" section="canvas" />
       <SettingsLink model={model} label="구글 캘린더" help={model.calendar?.id ? '저장한 공지의 마감을 캘린더에 넣고 있어요' : '저장한 공지의 마감을 구글 캘린더에 넣어요'} section="calendar" />
     </Section>
@@ -703,30 +701,6 @@ function ProgramEditor({ programs, ready, onChange }: { programs: Program[]; rea
   </>;
 }
 
-/** 참여 중인 사업. 기본은 설정 홈의 한 줄이고, 눌러 들어오면 사업마다 스위치가 있다. 켜면 바로 저장한다. */
-function Programs({ model }: { model: SettingsModel }) {
-  const wrap = 'settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]';
-  if (!model.userId) return <div className={wrap}><Back model={model} /><Section id="s-programs" title="참여 사업"><LoginNote model={model} what="참여 사업" /></Section></div>;
-  const { profile } = model;
-  const ready = model.profileStatus === 'ready';
-  const toggle = (id: string) => model.saveProfile({ ...profile, joinedPrograms: (profile.joinedPrograms ?? []).includes(id) ? (profile.joinedPrograms ?? []).filter((item) => item !== id) : [...(profile.joinedPrograms ?? []), id] });
-  return <div className={wrap}>
-    <Back model={model} />
-    <Section id="s-programs" title="참여 중인 사업">
-      <p className="m-0 mb-[8px] text-[14px] leading-[20px] text-ink-2">참여 학생만 신청하는 공지를 AI가 더 정확히 가려 줘요</p>
-      {[...new Set(JOINED_PROGRAMS.map((program) => program.group))].map((group, index) => <div key={group} role="group" aria-labelledby={`joined-${index}`}>
-        <h3 id={`joined-${index}`} className="m-0 pt-[16px] pb-[4px] text-[13px] font-semibold leading-[20px] text-ink-2">{group}</h3>
-        <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0">
-          {JOINED_PROGRAMS.filter((program) => program.group === group).map((program) => <SwitchRow key={program.id} label={program.label} description={program.ask}
-            checked={(profile.joinedPrograms ?? []).includes(program.id)} disabled={!ready} onChange={() => toggle(program.id)} />)}
-        </div>
-      </div>)}
-    </Section>
-    {model.profileMessage ? <p className="field-note ok text-[14px] leading-[20px] text-accent" role="status">{model.profileMessage}</p> : null}
-    {model.profileError ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.profileError}</p> : null}
-  </div>;
-}
-
 function Profile({ model }: { model: SettingsModel }) {
   const { profile } = model;
   const save = (patch: Partial<UserProfile>) => model.saveProfile({ ...profile, ...patch });
@@ -946,7 +920,6 @@ export function PlatformSettings({ model }: { model: SettingsModel }) {
     case 'keywords': return <Keywords model={model} />;
     case 'calendar': return <CalendarPage model={model} />;
     case 'profile': return <Profile model={model} />;
-    case 'programs': return <Programs model={model} />;
     case 'keys': return <Keys model={model} />;
     case 'feedback': return <Feedback model={model} />;
     default: return <Overview model={model} />;

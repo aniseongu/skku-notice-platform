@@ -26,8 +26,6 @@ export interface Draft {
   university3pInternshipDone: boolean | null;
   boards: string[];
   keywords: string[];
-  /** 참여 중이라고 알린 사업(미래차 부트캠프 등). */
-  joinedPrograms: string[];
   /** 사용자가 게시판을 직접 바꿨으면 전공을 고쳐도 추천으로 덮어쓰지 않는다. */
   boardsTouched: boolean;
 }
@@ -46,15 +44,18 @@ export function initialDraft(profile: UserProfile, subscriptions: string[], keyw
     university3pInternshipDone: profile.university3pInternshipDone,
     boards: subscribed ? [...subscriptions] : boardsForPrograms(profile.programs),
     keywords: [...keywords],
-    joinedPrograms: [...(profile.joinedPrograms ?? [])],
     boardsTouched: subscribed,
   };
 }
 
-/** 전공이 바뀌면 추천 게시판을 다시 맞춘다. 직접 고른 게시판은 건드리지 않는다. */
+/** 전공이 바뀌면 추천 게시판을 다시 맞춘다. 고른 전공의 단과대·학과 게시판은 늘 켠다(사용자 지시 2026-11-12).
+ * 게시판을 직접 바꿨거나 이미 받는 게시판이 있으면 그 선택은 두고, 새 전공 때문에 새로 추천된 게시판만 더 켠다. */
 export function withPrograms(draft: Draft, programs: Program[]): Draft {
   const unique = programs.filter((program, index) => programs.findIndex((other) => programKey(other) === programKey(program)) === index).slice(0, MAX_PROGRAMS);
-  return { ...draft, programs: unique, boards: draft.boardsTouched ? draft.boards : boardsForPrograms(unique) };
+  if (!draft.boardsTouched) return { ...draft, programs: unique, boards: boardsForPrograms(unique) };
+  const before = new Set(boardsForPrograms(draft.programs));
+  const added = boardsForPrograms(unique).filter((id) => !before.has(id) && !draft.boards.includes(id));
+  return { ...draft, programs: unique, boards: [...draft.boards, ...added] };
 }
 
 export function toggleValue(list: readonly string[], value: string): string[] {

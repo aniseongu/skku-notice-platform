@@ -372,7 +372,6 @@ def test_overloaded_model_falls_back_to_another_model_only_for_overload():
     assert seen == ["gemini-3.1-flash-lite"] and client.error_code == 403
 
 
-def test_joined_programs_are_sent_as_labels_and_unknown_ids_are_dropped() -> None:
-    profile = judge.build_judge_profile({"joined_programs": ["futurecar", "evil-id", 7, "ase"]})
-    assert profile == {"joined_programs": ["미래차 부트캠프", "차세대반도체공학연계전공"]}
-    assert judge.build_judge_profile({"joined_programs": []}) == {}
+def test_joined_programs_are_never_sent() -> None:
+    assert judge.build_judge_profile({"joined_programs": ["futurecar", "ase"]}) == {}
+    assert "joined_programs" not in judge.PROFILE_COLUMNS

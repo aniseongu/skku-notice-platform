@@ -38,7 +38,7 @@ test('반도체 학과 전공이면 학과 단위로 추천된다', () => {
 
 test('앞 단계에 필수 답이 비면 뒤 단계에서 그 단계로 돌아가게 한다', () => {
   const ok = { programs: [{ college: '경영대학', department: '경영학과' }], year: 3, enrollmentStatus: '재학', militaryService: null, admissionYear: null,
-    university3pInternshipSelected: false, deptInternshipDone: null, university3pInternshipDone: null, boards: [], keywords: [], joinedPrograms: [], boardsTouched: false };
+    university3pInternshipSelected: false, deptInternshipDone: null, university3pInternshipDone: null, boards: [], keywords: [], boardsTouched: false };
   assert.equal(earlierMissing('boards', ok, 'no'), null);
   assert.equal(earlierMissing('boards', { ...ok, year: null }, 'no'), 'status');   // 학년이 비었다
   assert.equal(earlierMissing('notify', { ...ok, programs: [] }, 'no'), 'primary');   // 가장 앞의 빈 단계부터
@@ -87,8 +87,12 @@ test('changing majors updates recommendations unless the boards were chosen by h
   const next = withPrograms(draft, [sw, biz, sw]);
   assert.deepEqual(next.programs, [sw, biz]);
   assert.deepEqual(next.boards, boardsForPrograms([sw, biz]));
+  // 직접 고른 게시판은 두되, 새로 고른 전공의 단과대·학과 게시판은 켠다(이미 받는 게시판이 있는 계정도 같다).
   const hand = withPrograms({ ...next, boards: ['skku-notice01'], boardsTouched: true }, [biz]);
-  assert.deepEqual(hand.boards, ['skku-notice01']);
+  assert.deepEqual(hand.boards, ['skku-notice01']);   // 경영학과는 이미 추천돼 있던 전공이라 사용자가 끈 것을 다시 켜지 않는다
+  const subscribed = initialDraft(EMPTY_PROFILE, ['skku-notice01'], []);
+  assert.equal(subscribed.boardsTouched, true);
+  assert.deepEqual(withPrograms(subscribed, [sw]).boards, ['skku-notice01', 'cse-notice', 'sw-notice', 'aiuniv-notice']);
   const five = ['국어국문학과', '영어영문학과', '사학과', '철학과', '문헌정보학과'].map((department) => ({ college: '문과대학', department }));
   assert.equal(withPrograms(draft, five).programs.length, 4);
 });

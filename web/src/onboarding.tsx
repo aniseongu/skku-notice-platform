@@ -8,7 +8,6 @@ import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR } from './pro
 import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
 import { COLLEGES, MAX_PROGRAMS, findCollege, programKey, programLabel, type Program } from './skku-programs';
 import { BOARD_CATALOG, boardCollege, boardsForPrograms, OTHER_BOARDS } from './skku-boards';
-import { JOINED_PROGRAMS } from './joined-programs';
 import {
   KEYWORD_SUGGESTIONS, STEPS, STEP_LABEL, canContinue, earlierMissing, filterDepartments, initialDraft, missingHint, nextStep, previousStep,
   resumeStep, savedBefore, stepIndex, toggleValue, withPrograms, type Draft, type DoubleAnswer, type Step,
@@ -83,6 +82,11 @@ export function ProgramPicker({ onPick, current, listClass = '', lead = true }: 
 
 /** 첫 설정의 "게시판 더 보기": 설정의 게시판 더 보기와 같은 방식이다. 검색 칸과 단과대 격자를 먼저 보이고, 단과대를 누르면 그 단과대의 게시판 스위치가 나온다.
  * 58개를 한 줄씩 늘어놓으면 찾기 어렵고 스크롤이 길다(토스 기준: 긴 목록은 검색 + 묶음). 격자에는 단과대마다 켠 게시판 수를 적는다. */
+/** 남은 게시판이 이 수 이하면 "더 보기" 없이 위 목록에 바로 둔다. */
+const INLINE_REST = 3;
+/** 펼친 "더 보기"가 이 수 이하면 검색·단과대 격자 없이 스위치만 보인다(한 화면에 들어오는 길이). */
+const FEW_BOARDS = 8;
+
 function MoreBoards<T extends { id: string; name: string }>({ sources, on, render }: { sources: readonly T[]; on: readonly string[]; render: (source: T) => React.ReactNode }) {
   const [group, setGroup] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -98,8 +102,12 @@ function MoreBoards<T extends { id: string; name: string }>({ sources, on, rende
   const notes = Object.fromEntries(names.map((name) => [name, (groups.get(name) ?? []).filter((source) => on.includes(source.id)).length]).filter(([, count]) => count).map(([name, count]) => [name, `${count}개 켬`]));
   const needle = query.replace(/\s+/g, '').toLowerCase();
   const found = needle ? sources.filter((source) => source.name.replace(/\s+/g, '').toLowerCase().includes(needle)) : [];
-  const current = group && groups.has(group) ? group : null;
+  // 묶음이 하나뿐이면 고를 것이 없으니 격자와 "다른 단과대 고르기" 없이 바로 그 묶음을 보인다.
+  const only = names.length === 1 ? names[0] : null;
+  const current = only ?? (group && groups.has(group) ? group : null);
   const list = 'box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0';
+  // 몇 개뿐이면 검색 칸과 단과대 격자 없이 바로 스위치를 보인다(찾을 필요가 없는 길이).
+  if (sources.length <= FEW_BOARDS) return <div className={list} role="group" aria-label="더 많은 게시판">{sources.map(render)}</div>;
   return <div className="grid gap-[8px] pt-[4px]">
     <input type="search" className="min-h-[44px] rounded-md border border-line bg-surface px-[12px] py-0" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off"
       value={query} onChange={(event) => setQuery(event.currentTarget.value)} />
@@ -109,7 +117,7 @@ function MoreBoards<T extends { id: string; name: string }>({ sources, on, rende
         : <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2" role="status">'{query}'에 맞는 게시판이 없어요. 다른 단어로 찾아보세요.</p>
       : current
         ? <>
-          <BackToGroups current={current} noun={order.includes(current) ? '단과대' : '묶음'} onBack={() => setGroup(null)} />
+          {only ? null : <BackToGroups current={current} noun={order.includes(current) ? '단과대' : '묶음'} onBack={() => setGroup(null)} />}
           <div className={list} role="group" aria-label={`${current} 게시판`}>{(groups.get(current) ?? []).map(render)}</div>
         </>
         : <GroupGrid label="단과대 선택" names={names} notes={notes} onPick={setGroup} />}
@@ -169,7 +177,10 @@ export function Onboarding({ app }: { app: AppController }) {
   const [initialBoards] = useState(() => draft.boards);
   const mainSources = orderedSources.filter((source) => !OTHER_BOARDS.some((board) => board.id === source.id));
   const shownBoards = new Set([...recommended, ...initialBoards]);
-  const moreSources = mainSources.filter((source) => !shownBoards.has(source.id));
+  // 남은 게시판이 몇 개뿐이면 "더 보기"로 접지 않고 위 목록에 꺼진 채로 바로 둔다(한 번 더 누르게 하지 않는다).
+  const restSources = mainSources.filter((source) => !shownBoards.has(source.id));
+  const inlineRest = restSources.length <= INLINE_REST;
+  const moreSources = inlineRest ? [] : restSources;
   const boardSwitch = (source: (typeof mainSources)[number]) => <SwitchRow key={source.id} label={source.name}
     checked={draft.boards.includes(source.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, source.id), boardsTouched: true })} />;
   const keywordOptions = [...KEYWORD_SUGGESTIONS, ...draft.keywords.filter((word) => !(KEYWORD_SUGGESTIONS as readonly string[]).includes(word))];
@@ -257,11 +268,11 @@ export function Onboarding({ app }: { app: AppController }) {
     body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]">
       <h2>게시판</h2>
       <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0" role="group" aria-label="게시판">
-        {mainSources.filter((source) => shownBoards.has(source.id)).map(boardSwitch)}
+        {mainSources.filter((source) => shownBoards.has(source.id) || inlineRest).map(boardSwitch)}
         {orderedSources.length === 0 ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2" role="status">게시판 목록을 불러오지 못했어요. 잠시 뒤 설정에서 다시 골라 주세요.</p> : null}
       </div>
       {moreSources.length ? <details className="group">
-        <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between text-[14px] text-ink-2 [&::-webkit-details-marker]:hidden">게시판 더 보기 ({moreSources.length}개)
+        <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between rounded-md text-[14px] text-ink-2 focus-visible:outline-offset-[-2px] [&::-webkit-details-marker]:hidden">게시판 더 보기 ({moreSources.length}개)
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-ink-3 transition-transform group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg></summary>
         <MoreBoards sources={moreSources} on={draft.boards} render={boardSwitch} />
       </details> : null}
@@ -272,18 +283,8 @@ export function Onboarding({ app }: { app: AppController }) {
           .sort((a, b) => Number(OTHER_BOARDS.some((board) => board.group === b && recommended.includes(board.id))) - Number(OTHER_BOARDS.some((board) => board.group === a && recommended.includes(board.id))))   // 추천이 든 묶음을 위로
           .map((group, index) => <div key={group} role="group" aria-labelledby={`other-${index}`}>
             <h3 id={`other-${index}`} className="m-0 pt-[16px] pb-[2px] text-[13px] font-semibold leading-[20px] text-ink-2 min-[720px]:pt-[20px]">{group}</h3>
-            {OTHER_BOARDS.filter((board) => board.group === group).sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id))).map((board) => {
-                const joined = JOINED_PROGRAMS.find((program) => program.boardId === board.id);
-                return <div key={board.id}>
-                  <SwitchRow label={nameOf(board.id)} description={board.help}
-                    checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />
-                  {/* 게시판을 켠 줄 바로 아래에서 참여 여부를 정한다(참여 학생만 신청하는 공지를 AI가 가릴 때 쓴다).
-                      왼쪽 세로줄로 들여 묶지 않는다(사용자 지시). shadcn/ui Field처럼 같은 묶음의 한 줄로 두고, 이름만 읽어도 무엇에 대한 것인지 알게 사업 이름을 붙인다. */}
-                  {joined && draft.boards.includes(board.id)
-                    ? <SwitchRow label={`${joined.label} ${joined.ask}`} description="참여 학생만 신청하는 공지를 알려 드려요"
-                      checked={draft.joinedPrograms.includes(joined.id)} onChange={() => setDraft({ ...draft, joinedPrograms: toggleValue(draft.joinedPrograms, joined.id) })} /> : null}
-                </div>;
-              })}
+            {OTHER_BOARDS.filter((board) => board.group === group).sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id))).map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
+                  checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
           </div>)}
       </div>
       <h2>관심 키워드</h2>
