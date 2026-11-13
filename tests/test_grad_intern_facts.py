@@ -511,6 +511,12 @@ def test_multi_department_listing_with_it_team_is_mixed_it():
     assert extracted.facts.task_category == "mixed_it"
     assert all(gf.quote_in_text(e["quote"], f"[에어퍼스트] 동계 각 부문 인턴 채용공고\n{MULTI_DEPT_BODY}") for e in extracted.evidence)
     assert _work(extracted).result == "pass"
+    assert "여러 직무 중 ‘전산팀’ 직무가 소프트웨어 업무 분야로 보여요" in _work(extracted).note
+
+
+def test_it_department_names_are_sw_related_roles():
+    from skku_notice.grad_intern_rules import related_roles
+    assert related_roles(("전산팀", "기타 IT업무지원", "Software Engineer", "인사총무부")) == ("전산팀", "기타 IT업무지원", "Software Engineer")
 
 
 def test_ai_non_software_is_overridden_by_it_department():
@@ -577,3 +583,35 @@ def test_ui_ux_designer_is_not_non_software():
     assert gf.static_task_category("[예시] 인턴", "[담당업무] UI 디자인 및 화면 제작 업무입니다 [자격요건] 자유")[0] == "application_embedded"
     # 순수 디자인은 여전히 비SW
     assert gf.static_task_category("[예시] 패키지 인턴", "[담당업무] 패키지 디자인 및 제작 업무입니다 [자격요건] 자유")[0] == "non_software"
+
+
+def test_title_role_takes_the_job_name_out_of_the_title():
+    assert gf.title_role("[팀스파르타] 교육 운영기획 매니저 채용연계형 인턴 (AI·IT 부트캠프)") == "교육 운영기획 매니저"
+    assert gf.title_role("[에코마케팅] 마케팅 영상 크리에이터 채용") == "마케팅 영상 크리에이터"
+    assert gf.title_role("[카카오페이] [어시스턴트] 언론 PR/커뮤니케이션 업무 지원") == "언론 PR/커뮤니케이션 업무 지원"
+    assert gf.title_role("[에어퍼스트] 2027년 동계 각 부문 인턴 채용공고") == ""
+    assert gf.title_role("2027 롯데그룹 외국인 유학생 채용연계형 Winter Internship") == ""
+    assert gf.title_role("[삼성] 인턴 모집") == ""
+
+
+def test_build_facts_uses_the_title_job_name_only_without_ai_or_quotes():
+    title = "[팀스파르타] 교육 운영기획 매니저 채용연계형 인턴 (AI·IT 부트캠프)"
+    assert gf.build_facts(title, "자유롭게 지원하세요", None).facts.roles == ("교육 운영기획 매니저",)
+
+
+def test_work_check_names_the_job_only_when_sw_related():
+    from skku_notice.grad_intern_rules import InternFacts
+
+    def note(roles, category="non_software", **over):
+        facts = InternFacts(task_category=category, roles=roles, **over)
+        return next(c for c in assess_department(PROFILE, facts).checks if c.rule_id == "DEPT-WORK")
+
+    # SW와 관련 없는 공고는 일반 문구(사용자 지시: 관련 없으면 이름을 적지 않아도 된다)
+    assert note(("교육 운영기획 매니저",)).note == "공고의 담당 업무가 IT·SW와 거리가 있어요"
+    # SW 관련 공고는 어떤 직무가 관련 있는지 적는다(직무 이름에 IT 말이 없어도)
+    assert note(("커머스 플랫폼 운영 매니저", "광고 운영"), "application_embedded").note.startswith("여러 직무 중 ‘커머스 플랫폼 운영 매니저’ 직무가")
+    assert note(("Growth Hacker",), "data_ai").note == "‘Growth Hacker’ 직무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)"
+    assert note((), "data_ai").note.startswith("공고의 담당 업무가 학과가 정한 SW 업무 분야로")
+    unknown = note(("교육 운영기획 매니저",), sw_work_in_judgment=True)
+    assert unknown.result == "unknown" and unknown.note.startswith("‘교육 운영기획 매니저’는 SW 직무가 아니지만")
+    assert note((), sw_work_in_judgment=True).note.startswith("직무 이름은 SW가 아니지만")

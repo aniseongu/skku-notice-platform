@@ -263,6 +263,32 @@ TITLE_ORG = re.compile(r"^\s*[\[(【]([^\])】]{2,20})[\])】]")
 TITLE_GENERIC = re.compile(r"인턴|채용|모집|공고|신입|경력|수시|상시")
 
 
+_TITLE_LEAD = re.compile(r"^\s*(?:[\[【][^\]】]*[\]】]\s*)+")
+_TITLE_PAREN_TAIL = re.compile(r"\s*[(（][^()（）]*[)）]\s*$")
+_TITLE_TAIL_WORDS = re.compile(r"\s*(?:채용\s*연계형|채용\s*전환형|체험형|전환형|인턴십|인턴|채용|모집|공고|신입)\s*$")
+_TITLE_NOT_ROLE = re.compile(r"20\d\d\s*년?|동계|하계|하반기|상반기|각\s*부문|전\s*부문|신규|수시|상시|경력|공개|및|[\s·,/&~-]|" + r"Winter|Summer|Internship|Intern", re.I)
+
+
+def title_role(title: str) -> str:
+    """제목에서 직무 이름만 뽑는다. "[회사] 교육 운영기획 매니저 채용연계형 인턴 (부트캠프)" -> "교육 운영기획 매니저". 못 뽑으면 빈 문자열."""
+    text = _TITLE_LEAD.sub("", str(title or ""), count=1).strip()
+    for _ in range(6):
+        new = _TITLE_PAREN_TAIL.sub("", text).strip()
+        new = _TITLE_TAIL_WORDS.sub("", new).strip(" ·,/:-~")
+        if new == text:
+            break
+        text = new
+    role = clean_role(text)
+    if len(role) < 2 or len(text) > 24:
+        return ""
+    if not _TITLE_NOT_ROLE.sub("", role) or not _TITLE_NOT_ROLE.sub("", text) or TITLE_GENERIC.fullmatch(role):
+        return ""
+    org = TITLE_ORG.match(title or "")
+    if org and role == org.group(1).strip():
+        return ""
+    return role if role in (title or "") else ""
+
+
 def lacks_key_facts(title: str, body: str) -> bool:
     """본문만으로 회사 이름, 근무 기간, 하는 일 중 하나라도 알 수 없으면 True. 이때는 그림 글자(OCR)를 읽어 본다."""
     text = f"{title}\n{body}"
@@ -663,8 +689,12 @@ def build_facts(title: str, body: str, ai: dict | None, judgment: tuple[str | No
         values["corporate_status_verified"] = False
 
     # 직무 이름: AI가 읽은 것(공고 글에 실제로 있는 것만)이 먼저, 없으면 정규식이 찾은 근거 문장에서.
-    role_quotes = [e["quote"] for e in evidence if e.get("field") == "tasks" and e.get("source") != "judgment"]
+    # 근거가 긴 문장이면 직무 이름이 아니다(24자로 잘려 "매니저는출석·과제 결과와 수강"처럼 된다). 그때는 제목의 직무명을 쓴다.
+    role_quotes = [e["quote"] for e in evidence if e.get("field") == "tasks" and e.get("source") != "judgment"
+                   and len(str(e.get("quote") or "").strip()) <= 20]
     roles = tuple(dict.fromkeys(r for r in (clean_role(x) for x in (tasks or role_quotes)) if r))[:5]
+    if not roles and (from_title := title_role(title)):
+        roles = (from_title,)  # AI 직무도 정규식 근거도 없으면 제목의 직무명을 쓴다(제목은 원문이다)
     facts = InternFacts(
         organization_type=values.get("organization_type", "unknown"),
         corporate_status_verified=bool(values.get("corporate_status_verified", False)),
