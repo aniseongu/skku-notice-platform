@@ -35,7 +35,8 @@ const ROW_LAYOUT_SELECTING = ROW_LAYOUT.replace('min-[720px]:grid-cols-[120px_mi
 const DESKTOP_AREAS = 'min-[720px]:[grid-template-areas:"meta_title_dday"_"meta_reason_dday"]';
 const DESKTOP_AREAS_NO_REASON = 'min-[720px]:[grid-template-areas:"meta_title_dday"]';
 
-const META = '[grid-area:meta] flex min-w-0 flex-wrap gap-[6px] text-[13px] leading-[18px] font-medium text-ink-3 min-[720px]:flex-col min-[720px]:flex-nowrap min-[720px]:gap-0 min-[720px]:pt-[2px]';
+// 메타(게시판·분류)는 보조 정보라 Regular(400)·연한 색(토스 목록 규칙). 읽은 공지 제목(400)보다 굵으면 위계가 뒤집힌다.
+const META = '[grid-area:meta] flex min-w-0 flex-wrap gap-[6px] text-[13px] leading-[18px] font-normal text-ink-3 min-[720px]:flex-col min-[720px]:flex-nowrap min-[720px]:gap-0 min-[720px]:pt-[2px]';
 const META_SPAN = 'min-w-0 max-w-full [overflow-wrap:anywhere] min-[720px]:overflow-hidden min-[720px]:text-ellipsis min-[720px]:whitespace-nowrap';
 
 function NoticeRows({ model }: { model: NoticeRowsModel }) {
