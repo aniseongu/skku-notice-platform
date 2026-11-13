@@ -6,7 +6,7 @@ const LEAF = 'M118.6 196.5C119.0 196.3 120.5 194.7 122.0 193.0C129.4 184.3 143.2
 export function Spinner({ size = 22, className = '' }: { size?: number; className?: string }) {
   return <svg className={`flex-none text-accent ${className}`} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <g className="origin-center animate-spin motion-reduce:animate-none [animation-duration:1.1s]" strokeWidth="1.5">
-      <path d="M12 1.6a10.4 10.4 0 1 1-10.4 10.4" /><path d="M0.1 14.5 1.6 12l1.7 2.5" />
+      <path d="M18.04 4.80A9.4 9.4 0 1 1 8.03 3.48" /><path d="M4.71 2.72L8.03 3.48L6.48 6.51" />
     </g>
     <g transform="translate(12 12) scale(0.082) translate(-159.5 -162)" strokeWidth="9.8">
       <path d={LEAF} fill="currentColor" fillOpacity="0.2" /><path d={RING} />
