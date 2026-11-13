@@ -1496,7 +1496,13 @@ export class AppController extends Reactive {
       const translated = this.myTranslations.get(notice.id);
       return withMyDeadline(translated ? { ...notice, title_ko: translated.title } : notice, this.myDeadlines.get(notice.id) ?? null);
     });
-    return this.tab() === 'saved' ? this.filtered(decorate(this.savedNotices())) : this.byTab(this.filtered(decorate(this.notices)), this.tab());
+    if (this.tab() === 'saved') {
+      // 같은 공지의 사본을 따로 저장해 두었어도 한 번만 보여 준다(저장한 목록 안에서만 거르므로 하나만 저장한 공지는 그대로다)
+      const saved = this.filtered(decorate(this.savedNotices()));
+      const firstSeen = new Set(dropDuplicates(saved).map((n) => n.id));
+      return saved.filter((n) => firstSeen.has(n.id) || n.id === this.selectedId || n.id === this.openedId);
+    }
+    return this.byTab(this.filtered(decorate(this.notices)), this.tab());
   }
 
   setView(view: View) {
