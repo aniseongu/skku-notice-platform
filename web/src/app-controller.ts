@@ -498,6 +498,10 @@ export class AppController extends Reactive {
     } finally {
       this.loading = false;
     }
+    // 현장실습이 모두 마감돼 메뉴에서 사라졌는데 그 보기에 있으면 성대 공지로 옮긴다.
+    if (!this.failed && this.tab() === 'coop' && !this.hasCoop()) {
+      if (this.view === 'settings') this.listTab = 'all'; else this.setView('all');
+    }
   }
 
   async signIn() {
@@ -1553,6 +1557,12 @@ export class AppController extends Reactive {
   }
 
   tab(): Tab { return this.view === 'settings' ? this.listTab : this.view; }
+
+  /** 접수 중인 현장실습이 하나라도 있는지. 기한이 지난 공지는 refresh()에서 이미 빠져 있다. */
+  hasCoop(): boolean { return this.notices.some((notice) => this.kindOf(notice) === 'coop'); }
+
+  /** 메뉴에 보일 탭. 현장실습은 모두 마감되면 메뉴에서 숨긴다(사용자 결정 2026-11-13). 단축키 번호는 TABS 순서 그대로다. */
+  shownTabs(): typeof TABS { return TABS.filter((t) => t.id !== 'coop' || this.hasCoop()); }
   visible(): Notice[] {
     const decorate = (items: Notice[]) => this.decorated(items);
     if (this.tab() === 'saved') {
@@ -1813,7 +1823,7 @@ export class AppController extends Reactive {
       '/': () => qs<HTMLInputElement>('.search input')?.focus(),
       j: () => move(1), ArrowDown: () => move(1), k: () => move(-1), ArrowUp: () => move(-1),
       Enter: () => { const notice = list[index]; if (notice) { this.markRead(notice); window.open(safeUrl(notice.url), '_blank', 'noopener'); } },
-      r: () => this.collectNow(), 1: () => this.setView('all'), 2: () => this.setView('intern'), 3: () => this.setView('coop'), 4: () => this.setView('saved'),
+      r: () => this.collectNow(), 1: () => this.setView('all'), 2: () => this.setView('intern'), 3: () => { if (this.hasCoop()) this.setView('coop'); }, 4: () => this.setView('saved'),
       s: () => { const notice = list[index]; if (notice) this.toggleSave(notice); },
     };
     const action = actions[event.key];

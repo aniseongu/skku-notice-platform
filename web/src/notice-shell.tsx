@@ -97,8 +97,8 @@ export function NoticeShell({ app }: { app: AppController }) {
       <aside className="sidebar hidden border-r border-line bg-mica px-[12px] pt-0 pb-[12px] min-[720px]:flex min-[720px]:min-h-0 min-[720px]:flex-col min-[720px]:overflow-y-auto" aria-label="탐색">
         <div className="pane-head brand min-[720px]:-mx-[12px] min-[720px]:mt-0 min-[720px]:mb-[12px] min-[720px]:flex min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:items-center min-[720px]:gap-[8px] min-[720px]:border-b min-[720px]:border-line min-[720px]:px-[24px] min-[720px]:text-[17px] min-[720px]:font-bold min-[720px]:tracking-[-0.02em] min-[720px]:[&_.brand-mark]:text-accent min-[720px]:[&_.brand-mark]:size-[32px]"><Brand />{APP_NAME}</div>
         <nav className="side-group flex flex-col gap-[1px]" aria-label="보기">
-          {TABS.map((t, index) => <SideItem key={t.id} label={t.label} count={counts[t.id]} active={app.tab() === t.id}
-            onClick={() => app.setView(t.id)} shortcut={String(index + 1)} icon={t.icon} />)}
+          {app.shownTabs().map((t) => <SideItem key={t.id} label={t.label} count={counts[t.id]} active={app.tab() === t.id}
+            onClick={() => app.setView(t.id)} shortcut={String(TABS.indexOf(t) + 1)} icon={t.icon} />)}
         </nav>
         <SideGroup app={app} id="keywords" title="관심 키워드" count={keywordTotals.total}>
           {app.keywords.map((word) => <SideItem key={word} label={word} count={keywordTotals.counts[word]}
@@ -176,7 +176,7 @@ export function NoticeShell({ app }: { app: AppController }) {
     </div>
 
     <nav className="tabbar glass fixed inset-x-0 bottom-0 z-[3] flex h-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] select-none border-t border-line pb-[env(safe-area-inset-bottom)] [-webkit-user-select:none] min-[720px]:hidden!" aria-label="보기" hidden={settings || Boolean(reading) || app.selecting} inert={onboarding}>
-      {TABS.map((t) => <button type="button" key={t.id} className="flex min-h-[44px] min-w-[44px] flex-1 flex-col items-center justify-center gap-[2px] border-0 bg-transparent text-[13px] leading-[18px] font-semibold text-ink-2 aria-[current=page]:font-bold aria-[current=page]:text-accent" aria-current={app.view === t.id ? 'page' : 'false'}
+      {app.shownTabs().map((t) => <button type="button" key={t.id} className="flex min-h-[44px] min-w-[44px] flex-1 flex-col items-center justify-center gap-[2px] border-0 bg-transparent text-[13px] leading-[18px] font-semibold text-ink-2 aria-[current=page]:font-bold aria-[current=page]:text-accent" aria-current={app.view === t.id ? 'page' : 'false'}
         onClick={() => app.setView(t.id)}><Icon name={t.icon} /><span>{t.label}</span></button>)}
     </nav>
     <UpdateBar />

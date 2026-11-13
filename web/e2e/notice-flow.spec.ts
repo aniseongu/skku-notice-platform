@@ -2025,3 +2025,20 @@ test('switching to or from the 현장실습 tab closes an open detail, and key 3
   await page.goto('/?api=sample/api/v1');
   await expect(page.locator('notice-rows-screen a.row').first()).toContainText('예시재단');
 });
+
+test('when every 현장실습 posting has closed, the menu hides it and a remembered coop view falls back to 성대 공지', async ({ page }) => {
+  await page.route('**/notices.json', async (route) => {
+    const res = await route.fetch();
+    const data = await res.json();
+    data.notices = data.notices.filter((n: { source_id: string }) => n.source_id !== 'skku-coop');
+    await route.fulfill({ response: res, json: data });
+  });
+  await page.goto('/?api=sample/api/v1&tab=coop');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await expect(page).toHaveURL(/tab=all/);
+  await expect(page.getByRole('button', { name: /^현장실습/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^인턴 공고/ }).first()).toBeVisible();
+  // 단축키 3은 숨은 메뉴로 가지 않는다.
+  await page.keyboard.press('3');
+  await expect(page).toHaveURL(/tab=all/);
+});
