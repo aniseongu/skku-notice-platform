@@ -10,7 +10,7 @@ const Dot = ({ show }: { show: boolean }) => (show ? <span aria-hidden className
 const FADED: Record<string, string> = {
   // 라이트는 95%만 섞는다(읽은 줄 면 위에서도 4.5:1을 지키려고). 읽은 글은 줄 면과 굵기로 구분된다. 다크는 82%.
   'text-accent': 'text-[light-dark(color-mix(in_oklch,var(--accent)_95%,var(--surface)),color-mix(in_oklch,var(--accent)_82%,var(--surface)))]',
-  'text-soon': 'text-[color-mix(in_oklch,var(--soon)_82%,var(--surface))]',
+  'text-soon': 'text-[light-dark(color-mix(in_oklch,var(--soon)_95%,var(--surface)),color-mix(in_oklch,var(--soon)_82%,var(--surface)))]',
   'text-ink-2': 'text-ink-2',
   'text-ink-3': 'text-ink-3',
 };
