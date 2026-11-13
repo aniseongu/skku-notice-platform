@@ -268,7 +268,7 @@ TITLE_GENERIC = re.compile(r"인턴|채용|모집|공고|신입|경력|수시|�
 
 _TITLE_LEAD = re.compile(r"^\s*(?:[\[【][^\]】]*[\]】]\s*)+")
 _TITLE_PAREN_TAIL = re.compile(r"\s*[(（][^()（）]*[)）]\s*$")
-_TITLE_TAIL_WORDS = re.compile(r"\s*(?:채용\s*연계형|채용\s*전환형|체험형|전환형|인턴십|인턴|채용|모집|공고|신입)\s*$")
+_TITLE_TAIL_WORDS = re.compile(r"\s*(?:채용\s*연계형|채용\s*전환형|체험형|전환형|인턴십|인턴|채용|모집|공고|신입|정규직|계약직)\s*$")
 _TITLE_NOT_ROLE = re.compile(r"20\d\d\s*년?|동계|하계|하반기|상반기|각\s*부문|전\s*부문|신규|수시|상시|경력|공개|및|[\s·,/&~-]|" + r"Winter|Summer|Internship|Intern", re.I)
 
 
@@ -609,6 +609,24 @@ SW_TASK_MAX = 26
 _ANY_LABEL = re.compile(r"^[^:：]{1,12}[:：]\s*")
 
 
+# 토스 문구 기준으로 다듬는다(2026-11-13 사용자 지시): 도구 이름만 있는 구절, 사람·부서 이름, 문장 조각은 업무가 아니다.
+_TOOLS_ONLY = re.compile(r"^[A-Za-z0-9+#.\-/·,\s]+(?:\s*등)?$")
+_PERSON_OR_TEAM = re.compile(r"(?:담당자|팀|부서|님|실|센터|본부)$")
+_SENTENCE_INSIDE = re.compile(r"[가-힣](?:해|하여|하며|하고|해서|되어|되며)\s")
+_LEAD_PURPOSE = re.compile(r"^\S+[을를의에]\s+(?:위한|통한|대한)\s+")
+
+
+def _tidy(part: str) -> str | None:
+    part = _LEAD_PURPOSE.sub("", part.strip())
+    part = re.sub(r"\s*\([A-Za-z0-9+#.,/·\s]+(?:\s*등)?\)\s*", " ", part).strip()  # "(Python,Bash 등)" 같은 도구 목록은 뺀다
+    part = re.sub(r"\s*등(?=[가-힣])", " 등 ", part).strip()  # "등데이터" → "등 데이터"
+    part = re.sub(r"\s*(?:업무|직무)$", "", part).strip()  # 문구가 "‘…’ 업무가"라서 끝의 "업무"는 뗀다
+    if (len(part) < 2 or _TOOLS_ONLY.match(part) or _PERSON_OR_TEAM.search(part) or _SENTENCE_INSIDE.search(part)
+            or FRAGMENT_END.search(part) or " 등 " in part):
+        return None
+    return part
+
+
 def _phrase_around(line: str, match: re.Match) -> str | None:
     """줄에서 SW 낱말이 든 마디를 고른다. 깔끔한 마디가 없으면 None(그 줄은 건너뛴다)."""
     line = _PHRASE_LABEL.sub("", _PHRASE_BULLET.sub("", line)).strip().rstrip(".")
@@ -621,7 +639,9 @@ def _phrase_around(line: str, match: re.Match) -> str | None:
         part = part.strip(" ·,/:-").rstrip(".")
         if (word in part and 2 <= len(part) <= SW_TASK_MAX and not FRAGMENT_END.search(part)
                 and part.count("(") == part.count(")") and not part.endswith(("니다", "어요", "해요", "요"))):
-            return part
+            tidy = _tidy(part)
+            if tidy and word in tidy:
+                return tidy
     return None
 
 
@@ -649,6 +669,7 @@ def sw_task_phrase(title: str, body: str, category: str) -> str | None:
         return single
     # 본문에 없으면 제목의 직무명(회사 이름을 뗀 것)에 SW 낱말이 있을 때만 쓴다.
     role = title_role(title)
+    role = _tidy(role) if role else None
     return role if role and any(p.search(role) for p in patterns) else None
 
 

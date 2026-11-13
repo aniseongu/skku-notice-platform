@@ -669,3 +669,15 @@ def test_pass_note_names_the_sw_duty_and_judgment_only_is_not_a_pass():
     extracted = gf.build_facts("[예시] 인턴", "[담당업무]\n• 시장 데이터 분석을 통한 비즈니스 기회 발굴\n", None)
     assert extracted.facts.sw_task == "시장 데이터 분석을 통한 비즈니스 기회 발굴" and "데이터 분석" not in extracted.facts.roles
     assert gf.facts_from_dict(extracted.as_dict()).sw_task == extracted.facts.sw_task
+
+
+def test_sw_task_phrase_reads_like_a_duty_not_a_tool_list_or_team():
+    # 토스 문구 기준: 도구 목록·사람·부서·문장 조각은 업무 이름이 아니고, 끝의 "업무"는 문구와 겹치니 뗀다
+    assert gf._tidy("Python-SQL·Power BI 등데이터") is None
+    assert gf._tidy("Python, JavaScript") is None
+    assert gf._tidy("하드웨어, 펌웨어 담당자") is None
+    assert gf._tidy("ML과 LLM 기술을 활용해 상품") is None
+    assert gf._tidy("알고리즘 개발 및 시스템 문제 해결 업무") == "알고리즘 개발 및 시스템 문제 해결"
+    assert gf._tidy("지원을 위한 데이터 분석 업무 지원") == "데이터 분석 업무 지원"
+    assert gf._tidy("스크립트(Python,Bash 등)업무 자동화") == "스크립트 업무 자동화"
+    assert gf.title_role("[카카오뱅크] DevOps 엔지니어링팀 정규직 전환형 인턴 채용") == "DevOps 엔지니어링팀"
