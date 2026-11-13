@@ -260,8 +260,13 @@ function SideGroup({ app, id, title, count, children }: { app: AppController; id
   </>;
 }
 
-// 이 줄은 목록이 언제 기준인지만 말한다. 판정 중인 공지는 그 줄 안에서 "AI가 확인하고 있어요"로 알리고, 내부 처리 건수는 여기에 적지 않는다.
+// 목록이 언제 기준인지 한 줄, AI 판정을 기다리느라 목록에서 뺀 공지가 있으면 그 수를 바로 아래 한 줄로 알린다.
 function UpdatedLine({ app, count }: { app: AppController; count?: number }) {
+  const waiting = app.waitingCount();
+  return <><UpdatedTime app={app} count={count} />{waiting ? <p className={`${UPDATED} waiting text-ink-3`} role="status">AI가 공지 {waiting}개를 확인하고 있어요</p> : null}</>;
+}
+
+function UpdatedTime({ app, count }: { app: AppController; count?: number }) {
   if (app.loading && !app.generatedAt) return <p className={`${UPDATED} text-ink-3`}>공지를 불러오고 있어요</p>;
   if (!app.generatedAt) return <p className={`${UPDATED} text-ink-3`}>받은 시각을 알 수 없어요</p>;
   const stale = Date.now() - Date.parse(app.generatedAt) > STALE_MS;
@@ -287,7 +292,10 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
   }
   if (!list.length) {
     const picker = app.tab() === 'all' && app.noBoards() ? null : <div className="group-head empty-head mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-end min-[720px]:m-0 min-[720px]:min-h-0 min-[720px]:px-[24px] min-[720px]:py-[6px]"><span></span><BoardSelect app={app} /></div>;
+    const waiting = app.waitingCount();
     const note = (() => {
+      // 보여 줄 공지가 모두 AI 확인을 기다리는 중이면 빈 목록 문구 대신 그 사실을 말한다.
+      if (waiting > 0 && !app.query && !app.keyword) return <Empty title={`AI가 공지 ${waiting}개를 확인하고 있어요`} body="확인이 끝나면 여기에 보여 드려요" />;
       // 받을 게시판을 아직 안 골랐으면 첫 설정으로, 이미 마친 사람은 게시판 고르기로 이어 준다.
       if (app.tab() === 'all' && app.noBoards()) {
         return app.profile.onboardedAt

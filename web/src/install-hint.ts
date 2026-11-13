@@ -6,8 +6,10 @@ export type InstallMode = 'prompt' | 'ios' | 'samsung' | 'none';
 
 /** 설치 창이 없는 브라우저에서 보여 줄 방법 한 줄. 버튼이 아니라 안내다. */
 export const MANUAL_INSTALL_HINT: Record<'ios' | 'samsung', { lead: string; action: string; tail: string }> = {
-  ios: { lead: '공유 버튼에서 ', action: '‘홈 화면에 추가’', tail: '를 고르면 앱처럼 쓸 수 있어요' },
-  samsung: { lead: '오른쪽 아래 메뉴(≡)에서 ', action: '‘현재 페이지 추가 → 홈 화면’', tail: '을 고르면 앱처럼 쓸 수 있어요' },
+  // iOS 26 Safari 기본(작은) 배치는 공유 버튼이 ⋯ 안에 있다. 위·아래 배치는 공유 버튼이 바로 보인다(2026-11-13 확인).
+  ios: { lead: '공유 버튼(안 보이면 ⋯)에서 ', action: '‘홈 화면에 추가’', tail: '를 누르면 앱처럼 쓸 수 있어요' },
+  // 삼성 안내: 메뉴(≡) → 현재 페이지 추가 → 홈 화면. 메뉴 이름은 따로 따옴표로 묶어 한 항목으로 읽히지 않게 한다.
+  samsung: { lead: '오른쪽 아래 메뉴(≡)에서 ', action: '‘현재 페이지 추가’ → ‘홈 화면’', tail: '을 누르면 앱처럼 쓸 수 있어요' },
 };
 
 export function installMode(userAgent: string, standalone: boolean, hasPrompt: boolean): InstallMode {

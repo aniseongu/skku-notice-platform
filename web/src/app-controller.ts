@@ -608,9 +608,10 @@ export class AppController extends Reactive {
 
   /** AI 키가 있는 사용자의 공지가 판정 차례를 기다리는 중인지. 서버가 키를 쓰는 대기 범위와 같다:
    * 외부 인턴 공고는 처음 본 지 14일 안이고 마감 전, 학교 공지는 마감이 남았거나 마감이 없고 30일 안.
-   * 새로 가입해 밀린 공지가 많아도 차례를 기다리는 줄이 비어 보이지 않게 목록에 "AI가 확인하고 있어요"를 보여 준다.
-   * 범위 밖(오래됐거나 마감된 공지)에는 거짓으로 약속하지 않아 아무것도 보이지 않는다. */
+   * 이런 공지는 판정이 끝날 때까지 목록(성대 공지·인턴 탭)에서 빼고, 목록 위에 몇 개를 확인하는 중인지 한 줄로 알린다(waitingCount).
+   * AI를 꺼 두었거나 키가 없으면, 범위 밖(오래됐거나 마감된 공지)이면 거짓이라 모두 그대로 보인다. */
   judgePending(notice: Notice): boolean {
+    if (!this.aiPrefs.aiEnabled) return false;
     if (!this.authUserId || !(this.byokStatus && !this.byokStatus.disabled) && !this.aiKeys.some((key) => !key.disabled)) return false;
     if (this.judgement(notice) || !notice.first_seen) return false;
     const now = Date.now(), day = 24 * 3600 * 1000;
@@ -620,7 +621,15 @@ export class AppController extends Reactive {
     return notice.deadline ? open : age >= 0 && age < 30 * day;
   }
 
-  /** 목록에서 판정 차례를 기다리는 공지 수(진행 상황을 한 줄로 알린다). */
+  /** 지금 보는 탭에서 판정을 기다리느라 목록에서 뺀 공지 수. 열어 둔 글은 목록에 남으므로 세지 않는다. */
+  waitingCount(): number {
+    const tab = this.tab();
+    if (tab === 'saved') return 0;
+    return this.scopeTab(this.filtered(this.decorated(this.notices)), tab).filter((n) => this.isWaiting(n)).length;
+  }
+
+  private isWaiting(n: Notice): boolean { return n.id !== this.selectedId && n.id !== this.openedId && this.judgePending(n); }
+
 
   /** 내 판정과 관심 키워드를 다시 읽는다. 로그인할 때와 공지를 새로 불러올 때 부른다. */
   async refreshMine(userId: string, epoch: number): Promise<void> {
@@ -1472,6 +1481,11 @@ export class AppController extends Reactive {
 
   byTab(list: Notice[], tab: Tab): Notice[] {
     if (tab === 'saved') return list;
+    // AI 판정을 기다리는 공지는 끝날 때까지 목록에 두지 않는다(열어 둔 글은 남긴다).
+    return this.scopeTab(list, tab).filter((n) => !this.isWaiting(n));
+  }
+
+  private scopeTab(list: Notice[], tab: Tab): Notice[] {
     const external = tab === 'intern';
     // 출처: https://freshrss.github.io/FreshRSS/en/users/10_filter.html (읽음 상태 필터)
     // 읽고 있는 글은 상세를 닫거나 다른 글로 옮길 때까지 남긴다.
@@ -1490,12 +1504,16 @@ export class AppController extends Reactive {
 
   sortFor(tab: Tab): Sort { return tab === 'saved' ? this.savedSort : tab === 'intern' ? this.internSort : this.sort; }
 
-  tab(): Tab { return this.view === 'settings' ? this.listTab : this.view; }
-  visible(): Notice[] {
-    const decorate = (items: Notice[]) => items.map((notice) => {
+  private decorated(items: Notice[]): Notice[] {
+    return items.map((notice) => {
       const translated = this.myTranslations.get(notice.id);
       return withMyDeadline(translated ? { ...notice, title_ko: translated.title } : notice, this.myDeadlines.get(notice.id) ?? null);
     });
+  }
+
+  tab(): Tab { return this.view === 'settings' ? this.listTab : this.view; }
+  visible(): Notice[] {
+    const decorate = (items: Notice[]) => this.decorated(items);
     if (this.tab() === 'saved') {
       // 같은 공지의 사본을 따로 저장해 두었어도 한 번만 보여 준다(저장한 목록 안에서만 거르므로 하나만 저장한 공지는 그대로다)
       const saved = this.filtered(decorate(this.savedNotices()));

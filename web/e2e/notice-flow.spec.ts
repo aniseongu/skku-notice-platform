@@ -700,7 +700,7 @@ test('first-run setup cannot be skipped: no skip button, Escape does nothing; se
   await expect(page.getByText('주전공을 골라 주세요')).toHaveCount(0);
 });
 
-test('a notice waiting for its turn says so on its own row while an AI key exists, and the list header never counts them', async ({ page }) => {
+test('a notice waiting for AI judgment is hidden from the list and counted in one line, until it is judged or AI is off', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   const rows = page.locator('notice-rows-screen a.row');
   await rows.first().waitFor();
@@ -714,25 +714,31 @@ test('a notice waiting for its turn says so on its own row while an AI key exist
       if (notice.id === list[1]) { notice.first_seen = hours(24 * 40); notice.deadline = null; }   // 30일이 지난 마감 없는 학교 공지: 대기 범위 밖
     }
     app.authUserId = 'account-a'; app.profileStatus = 'ready'; app.onboardingDismissed = true; app.subscriptions = ['skku-notice01']; app.subscriptionsLoading = false;
-    app.byokStatus = null; app.aiKeys = []; app.generatedAt = new Date().toISOString();   // 샘플 데이터의 받은 시각이 오래돼 지연 문구가 나오지 않게 한다
+    app.byokStatus = null; app.aiKeys = []; app.generatedAt = new Date().toISOString();
     app.myJudgments = new Map([[list[2], { verdict: 'relevant', reason: '지원할 수 있어요', model: 'm', deadline: null, deadlineKind: null }]]);
     app.notices = [...app.notices];
   }, ids);
-  const reason = (id: string) => page.locator(`notice-rows-screen a.row[data-id="${id}"] .reason`);
-  // 키가 없으면 판정을 약속할 수 없으니 아무 말도 하지 않는다.
-  await expect(reason(ids[0])).toHaveCount(0);
-  await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).byokStatus = { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 }; });
-  await expect(reason(ids[0])).toContainText('AI가 확인하고 있어요');   // 방금 수집됐고 판정 전
-  await expect(reason(ids[1])).toHaveCount(0);                          // 대기 범위 밖이면 거짓으로 약속하지 않는다
-  // 진행 상황은 그 공지의 줄에서만 말한다. 목록 위 한 줄은 언제 기준인지만 말하고 내부 처리 건수는 적지 않는다.
-  await expect(page.locator('p.updated').first()).not.toContainText('AI 확인 중');
-  await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).byokStatus = null; });
-  await expect(reason(ids[2])).toContainText('해당');                    // 판정이 있으면 그 라벨
-  await expect(reason(ids[2])).not.toContainText('확인하고 있어요');
-  // 공지는 판정을 기다리지 않고 바로 열린다. 상세의 제목 아래에도 목록과 같은 상태를 적는다.
-  await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).byokStatus = { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 }; });
-  await page.locator(`notice-rows-screen a.row[data-id="${ids[0]}"]`).click();
-  await expect(page.locator('notice-detail-screen .detail-reason')).toContainText('AI가 확인하고 있어요');
+  const row = (id: string) => page.locator(`notice-rows-screen a.row[data-id="${id}"]`);
+  const set = (patch: string) => page.evaluate((code) => { const app = document.querySelector('notice-app') as unknown as Record<string, unknown>; new Function('app', code)(app); }, patch);
+  // 키가 없으면 판정을 기다리지 않으니 모두 보이고 안내 줄도 없다.
+  await expect(row(ids[0])).toHaveCount(1);
+  await expect(page.locator('p.waiting')).toHaveCount(0);
+  // 키가 있으면 판정 전인 공지만 목록에서 빠지고 한 줄로 알린다. 범위 밖 공지와 판정된 공지는 그대로다.
+  await set("app.byokStatus = { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 };");
+  await expect(row(ids[0])).toHaveCount(0);
+  await expect(row(ids[1])).toHaveCount(1);
+  await expect(row(ids[2])).toHaveCount(1);
+  await expect(page.locator('p.waiting')).toContainText(/AI가 공지 \d+개를 확인하고 있어요/);
+  // 판정이 생기면 보이고 안내 줄에서 빠진다.
+  await set(`app.myJudgments = new Map([...app.myJudgments, ['${ids[0]}', { verdict: 'relevant', reason: '지원할 수 있어요', model: 'm', deadline: null, deadlineKind: null }]]);`);
+  await expect(row(ids[0])).toHaveCount(1);
+  await expect(row(ids[0]).locator('.reason')).not.toContainText('확인하고 있어요');
+  // AI를 끄면 판정 전인 공지도 모두 보인다.
+  await set(`app.myJudgments = new Map([['${ids[2]}', { verdict: 'relevant', reason: '지원할 수 있어요', model: 'm', deadline: null, deadlineKind: null }]]);`);
+  await expect(row(ids[0])).toHaveCount(0);
+  await set('app.aiPrefs = { aiEnabled: false };');
+  await expect(row(ids[0])).toHaveCount(1);
+  await expect(page.locator('p.waiting')).toHaveCount(0);
 });
 
 test('leaving settings returns to the list with the detail pane closed, whichever way you leave', async ({ page }) => {
@@ -1554,6 +1560,7 @@ test('software original major is asked for the admission year and the internship
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
     const track = (status: string, label: string, note: string, result: string) => ({ status, label, checks: [{ ruleId: 'X', result, note }], unknowns: [], afterCompletion: [], notes: [] });
     app.subscriptions = ['skku-notice01'];   // 받을 게시판을 고른 사람(안 고르면 목록이 비어 있다)
+    app.aiPrefs = { aiEnabled: false };   // 판정을 기다리는 공지는 목록에서 빠지므로 이 시험은 AI를 꺼 둔다
     app.profile = { ...(app.profile as object), programs: [{ college: '소프트웨어융합대학', department: '소프트웨어학과' }], deptInternshipDone: false, university3pInternshipDone: false, university3pInternshipSelected: true };
     app.showsGraduation = () => true;
     app.graduationFor = () => ({ state: 'ready', aiStatus: 'no_key', department: track('NEEDS_REVIEW', '학과 확인 필요', '담당 업무가 SW와 맞는지 확인하지 못했어요', 'unknown'), university3p: track('NOT_ELIGIBLE', '3품 기준에 못 미쳐요', '최대 240시간이라 280시간에 못 미쳐요', 'fail'), facts: { organizationName: null, workMode: 'unknown', startDate: null, endDate: null, hours: null, taskCategory: 'unknown', missing: ['담당 업무'] } });
