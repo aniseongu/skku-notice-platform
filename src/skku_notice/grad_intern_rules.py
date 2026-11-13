@@ -175,8 +175,17 @@ def clean_role(text: str) -> str:
     return value[:24]
 
 
+# "시스템", "플랫폼"처럼 뜻이 넓은 말만 있는 직무는 설비·공정·건설 같은 말과 함께 나오면 IT 직무가 아니다
+# ("ASU설비 운영(운전,설비 운영 시스템)"). 개발·전산·IT·데이터처럼 분명한 말이 있으면 그대로 IT 직무로 본다.
+STRONG_IT_ROLE = re.compile(
+    r"UI\s*/?\s*UX|웹\s*디자인|전산|IT\s*업무|개발|프로그래|소프트웨어|\bSW\b|\bIT\b|데이터|\bAI\b|인공지능|클라우드|정보\s*보안|\bQA\b"
+    r"|engineer|developer|software|back-?end|front-?end|full-?stack|devops|\bdba\b|scientist|programmer|백엔드|프론트|풀스택|엔지니어", re.I)
+NON_IT_ROLE = re.compile(r"설비|공정|플랜트|건설|시공|전기|기계|생산|물류|운전")
+
+
 def related_roles(roles: tuple[str, ...]) -> tuple[str, ...]:
-    return tuple(role for role in roles if IT_ROLE_NAME.search(role))
+    return tuple(role for role in roles
+                 if IT_ROLE_NAME.search(role) and (STRONG_IT_ROLE.search(role) or not NON_IT_ROLE.search(role)))
 
 
 def _role_names(roles: tuple[str, ...]) -> str:

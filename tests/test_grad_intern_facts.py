@@ -634,3 +634,11 @@ def test_long_task_list_without_end_mark_is_still_read():
     extracted = gf.build_facts(title, body, None)
     assert extracted.facts.roles == ()
     assert _work(extracted).note == "공고의 담당 업무가 IT·SW와 거리가 있어요"
+
+
+def test_equipment_role_with_system_word_is_not_an_it_role():
+    from skku_notice.grad_intern_rules import related_roles
+    roles = ("ASU설비 운영(운전,설비 운영 시스템)", "기타 업무보조", "기타 IT업무지원", "챗봇 구현개발참여")
+    assert related_roles(roles) == ("기타 IT업무지원", "챗봇 구현개발참여")
+    assert related_roles(("설비 제어 SW 개발",)) == ("설비 제어 SW 개발",)  # 분명한 개발 말이 있으면 IT 직무
+    assert related_roles(("ERP 시스템 운영",)) == ("ERP 시스템 운영",)
