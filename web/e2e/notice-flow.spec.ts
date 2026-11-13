@@ -728,7 +728,7 @@ test('a notice waiting for AI judgment is hidden from the list and counted in on
   await expect(row(ids[0])).toHaveCount(0);
   await expect(row(ids[1])).toHaveCount(1);
   await expect(row(ids[2])).toHaveCount(1);
-  await expect(page.locator('p.waiting')).toContainText(/AI가 공지 \d+개를 확인하고 있어요/);
+  await expect(page.locator('p.waiting')).toContainText(/AI 확인 대기 \d+건은 아직 안 보여요/);
   // 판정이 생기면 보이고 안내 줄에서 빠진다.
   await set(`app.myJudgments = new Map([...app.myJudgments, ['${ids[0]}', { verdict: 'relevant', reason: '지원할 수 있어요', model: 'm', deadline: null, deadlineKind: null }]]);`);
   await expect(row(ids[0])).toHaveCount(1);
