@@ -640,7 +640,8 @@ export class AppController extends Reactive {
     return this.scopeTab(this.filtered(this.decorated(this.notices)), tab).filter((n) => this.isWaiting(n)).length;
   }
 
-  private isWaiting(n: Notice): boolean { return n.id !== this.selectedId && n.id !== this.openedId && this.judgePending(n); }
+  // 현장실습은 신청 기간마다 수백 건이 한꺼번에 들어와 판정이 하루쯤 걸리므로 기다리는 동안에도 목록에 둔다(줄에 "AI가 확인하고 있어요").
+  private isWaiting(n: Notice): boolean { return n.id !== this.selectedId && n.id !== this.openedId && this.kindOf(n) !== 'coop' && this.judgePending(n); }
 
 
   /** 내 판정과 관심 키워드를 다시 읽는다. 로그인할 때와 공지를 새로 불러올 때 부른다. */
