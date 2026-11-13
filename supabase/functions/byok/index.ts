@@ -109,7 +109,7 @@ Deno.serve((req) => handle(req, {
     type Key = { table: 'user_byok_keys' | 'user_ai_keys'; provider: 'gemini' | 'groq'; ciphertext: string; model: string | null; used_on: string | null; used_today: number };
     const keys: Key[] = [
       ...(legacy && !legacy.disabled_at ? [{ table: 'user_byok_keys' as const, provider: 'gemini' as const, ...legacy }] : []),
-      ...((rows ?? []) as Key[]).filter((row) => row.provider === 'gemini' || row.provider === 'groq').map((row) => ({ ...row, table: 'user_ai_keys' as const })),
+      ...((rows ?? []) as Omit<Key, 'table'>[]).filter((row) => row.provider === 'gemini' || row.provider === 'groq').map((row) => ({ ...row, table: 'user_ai_keys' as const })),
     ];
     if (!keys.length) throw new SummaryError('no_key');
     const usedOf = (key: Key) => (key.used_on === today ? key.used_today : 0);
