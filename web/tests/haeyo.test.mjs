@@ -14,6 +14,7 @@ test('formal endings in summaries become haeyo like the server', () => {
     ['공지를 참고하시기 바랍니다.', '공지를 참고해 주세요.'],
     ['링크를 받습니다.\n포럼이 열립니다', '링크를 받아요.\n포럼이 열려요'],
     ['이미 해요체예요.', '이미 해요체예요.'],
+    ['대상이 아닙니다. 확인이 어렵습니다. 학교가 멉니다. 조건이 다릅니다.', '대상이 아니에요. 확인이 어려워요. 학교가 멀어요. 조건이 달라요.'],
   ];
   for (const [input, expected] of cases) assert.equal(haeyo(input), expected, input);
 });

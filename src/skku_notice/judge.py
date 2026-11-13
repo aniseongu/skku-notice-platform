@@ -107,6 +107,8 @@ def _haeyo_word(before: str, stem: str, ending: str) -> str | None:
 
 
 _PLEASE = re.compile(r"(\S+?)하시기\s*바랍니다(?=[.!?\s]|$)")
+_IRREGULAR = re.compile(r"(아닙니다|어렵습니다|멉니다|다릅니다)(?=[.!?\s]|$)")
+_IRREGULAR_HAEYO = {"아닙니다": "아니에요", "어렵습니다": "어려워요", "멉니다": "멀어요", "다릅니다": "달라요"}
 
 
 def haeyo(text: str | None) -> str | None:
@@ -114,6 +116,7 @@ def haeyo(text: str | None) -> str | None:
     if not isinstance(text, str):
         return text
     text = _PLEASE.sub(r"\1해 주세요", text)  # "참고하시기 바랍니다" → "참고해 주세요"
+    text = _IRREGULAR.sub(lambda match: _IRREGULAR_HAEYO[match.group()], text)
 
     def swap(match: re.Match) -> str:
         start = match.start()

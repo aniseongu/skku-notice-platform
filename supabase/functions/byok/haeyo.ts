@@ -3,7 +3,8 @@ const VOWEL_HAEYO: Record<number, number> = { 0: 0, 4: 4, 8: 9, 13: 14, 20: 6, 1
 const syllable = (ch: string) => { const c = ch.charCodeAt(0) - 0xac00; return [Math.floor(c / 588), Math.floor((c % 588) / 28), c % 28]; };
 const hasBatchim = (ch: string) => (/[가-힣]/.test(ch) ? syllable(ch)[2] !== 0 : '013678'.includes(ch) || /[A-Za-z]/.test(ch));
 export function haeyo(text: string): string {
-  return text.replace(/(\S+?)하시기\s*바랍니다(?=[.!?\s]|$)/g, '$1해 주세요').replace(/([가-힣])(습니다|니다)(?=[.!?\s]|$)/g, (all, stem: string, ending: string, offset: number, whole: string) => {
+  const irregular: Record<string, string> = { '아닙니다': '아니에요', '어렵습니다': '어려워요', '멉니다': '멀어요', '다릅니다': '달라요' };
+  return text.replace(/(\S+?)하시기\s*바랍니다(?=[.!?\s]|$)/g, '$1해 주세요').replace(/(아닙니다|어렵습니다|멉니다|다릅니다)(?=[.!?\s]|$)/g, (word) => irregular[word]).replace(/([가-힣])(습니다|니다)(?=[.!?\s]|$)/g, (all, stem: string, ending: string, offset: number, whole: string) => {
     const [cho, jung, jong] = syllable(stem);
     if (ending === '습니다') return jong === 0 ? all : stem + ((jung === 0 || jung === 8) && jong !== 20 ? '아요' : '어요');
     if (jong !== 17) return all;

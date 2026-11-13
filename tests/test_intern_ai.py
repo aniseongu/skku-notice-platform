@@ -119,5 +119,6 @@ def test_formal_endings_become_haeyo_before_saving():
     assert haeyo("신청 안내입니다.") == "신청 안내예요." and haeyo("참고하시기 바랍니다.") == "참고해 주세요."
     assert haeyo("합격자를 발표했습니다.") == "합격자를 발표했어요." and haeyo("링크를 받습니다.") == "링크를 받아요."
     assert haeyo("이미 해요체예요.") == "이미 해요체예요."
+    assert haeyo("대상이 아닙니다. 확인이 어렵습니다. 학교가 멉니다. 조건이 다릅니다.") == "대상이 아니에요. 확인이 어려워요. 학교가 멀어요. 조건이 달라요."
     assert clean_reason("소프트웨어 관련 역량을 활용할 수 있는 직무입니다.") == "소프트웨어 관련 역량을 활용할 수 있는 직무예요."
     assert intern_ai.clean_summary("기관이 개발자를 모집합니다.") == "기관이 개발자를 모집해요."
