@@ -9,7 +9,9 @@
     --text: light-dark(oklch(0.24 0.012 var(--h)), oklch(0.94 0.005 var(--h)));
     --text-2: light-dark(oklch(0.45 0.014 var(--h)), oklch(0.78 0.01 var(--h)));
     --text-3: light-dark(oklch(0.5 0.012 var(--h)), oklch(0.72 0.01 var(--h)));
-    --accent: light-dark(oklch(0.4 0.075 var(--h)), oklch(0.8 0.1 var(--h)));
+    /* 라이트 강조색(2026-11-13 사용자 지적): 진녹색 0.4는 본문 검정과 구별이 안 됐다(대비 1.85:1). 토스처럼 본문보다 밝고 채도 높은
+       한 가지 강조색을 단추 면과 강조 글씨에 같이 쓴다. #0b7643: 흰 면 5.6:1, 배경 5.2:1, 그 위 흰 글자 5.5:1(모두 AA), 본문과 2.9:1. */
+    --accent: light-dark(oklch(0.5 0.12 155), oklch(0.8 0.1 var(--h)));
     --on-accent: light-dark(oklch(0.99 0.005 var(--h)), oklch(0.2 0.03 var(--h)));
     --danger: light-dark(oklch(0.55 0.19 25), oklch(0.74 0.15 25));
     /* 위험 단추 면: 어두운 화면에서 글자색 --danger(밝은 살구)를 면으로 쓰면 가장 튀어서, 면은 두 모드 모두 흰 글자가 읽히는 진한 빨강으로 둔다. */

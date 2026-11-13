@@ -8,7 +8,8 @@ const LABEL = 'mr-[6px]';
 const Dot = ({ show }: { show: boolean }) => (show ? <span aria-hidden className="mr-[6px] text-ink-3">·</span> : null);
 // 읽은 글: 색은 그대로 두고 바탕 쪽으로 18%만 옅게 섞는다. Tailwind는 완성된 클래스 이름만 찾으므로 문자열을 이어 붙이지 않는다.
 const FADED: Record<string, string> = {
-  'text-accent': 'text-[color-mix(in_oklch,var(--accent)_82%,var(--surface))]',
+  // 라이트는 95%만 섞는다(읽은 줄 면 위에서도 4.5:1을 지키려고). 읽은 글은 줄 면과 굵기로 구분된다. 다크는 82%.
+  'text-accent': 'text-[light-dark(color-mix(in_oklch,var(--accent)_95%,var(--surface)),color-mix(in_oklch,var(--accent)_82%,var(--surface)))]',
   'text-soon': 'text-[color-mix(in_oklch,var(--soon)_82%,var(--surface))]',
   'text-ink-2': 'text-ink-2',
   'text-ink-3': 'text-ink-3',

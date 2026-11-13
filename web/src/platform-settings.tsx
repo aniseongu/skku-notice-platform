@@ -631,19 +631,19 @@ function CalendarPage({ model }: { model: SettingsModel }) {
   return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Back model={model} />
     <Section id="s-calendar" title="저장한 공지의 마감">
-      <Setting name="구글 캘린더" help={'마감이 남은 저장 공지를 "성대 공지" 캘린더에 넣어요'}>
+      <Setting name="성대 공지 캘린더" help="마감이 남은 저장 공지를 넣어요">
         {/* 연결 상태는 단추가 아니라 칩으로 보이고(키·토큰 줄과 같은 모양), 누르는 것은 단추로만 둔다. */}
-        {connected
-          ? <div className="flex flex-wrap items-center gap-2 min-[720px]:justify-end">
-            <span role="status" className={`inline-flex min-h-[32px] items-center justify-center rounded-pill bg-sunken px-3 text-[14px] font-medium ${auto.active ? 'text-accent' : 'text-danger'}`}>{auto.active ? '연결됨' : '다시 연결 필요'}</span>
-            <span className="flex shrink-0 gap-2">
-              {auto.active
-                ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 text-ink" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '반영하는 중' : '지금 반영하기'}</button>
-                : <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2" disabled={calendar.busy} onClick={calendar.connect}>다시 연결하기</button>}
-              <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 text-danger" disabled={calendar.busy} onClick={calendar.disconnect}>연결 끊기</button>
-            </span>
-          </div>
-          : <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2 self-start min-[720px]:self-end" aria-label="구글 캘린더에 연결하기" disabled={calendar.busy} onClick={calendar.connect}>연결하기</button>}
+        <div className="flex flex-wrap items-center gap-2 min-[720px]:justify-end">
+          <span role="status" className={`inline-flex min-h-[32px] min-w-[128px] items-center justify-center rounded-pill bg-sunken px-3 text-[14px] font-medium ${connected ? (auto.active ? 'text-accent' : 'text-danger') : 'text-ink-2'}`}>{connected ? (auto.active ? '연결됨' : '다시 연결 필요') : '연결 안 됨'}</span>
+          <span className="flex shrink-0 gap-1">
+            {!connected
+              ? <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-3 py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2" aria-label="구글 캘린더에 연결하기" disabled={calendar.busy} onClick={calendar.connect}>연결하기</button>
+              : auto.active
+                ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 key-action min-h-[44px] px-3 py-0 text-ink" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '반영하는 중' : '지금 반영하기'}</button>
+                : <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-3 py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2" disabled={calendar.busy} onClick={calendar.connect}>다시 연결하기</button>}
+            {connected ? <button type="button" className="[@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex min-h-[44px] items-center justify-center rounded-md border-0 bg-transparent px-3 py-0 text-[15px] font-semibold text-danger whitespace-nowrap select-none disabled:text-ink-3 disabled:opacity-60" disabled={calendar.busy} onClick={calendar.disconnect}>연결 끊기</button> : null}
+          </span>
+        </div>
         {connected && auto.active ? <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0">30분마다 자동으로 반영해요{syncedAt ? ` · 마지막 ${syncedAt}` : ''}</p> : null}
         {connected && !auto.active ? <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0">{auto.error ?? '자동으로 반영하려면 다시 연결해 주세요'}</p> : null}
         {calendar.message ? <p className="field-note ok text-[14px] leading-[20px] text-accent m-0" role="status">{calendar.message}</p> : null}
@@ -659,9 +659,9 @@ function CalendarPage({ model }: { model: SettingsModel }) {
     </Section>
     <Section id="s-calendar-help" title="알아 두세요">
       <div className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch"><ul className="rule-list m-0 grid gap-[4px] pl-[18px] text-[13px] leading-[19px] text-ink-2">
-        <li>이 앱이 만든 "성대 공지" 캘린더만 다뤄요. 내 다른 캘린더는 읽지 못해요</li>
-        <li>구글이 주는 열쇠는 암호화해 보관하고, 연결을 끊거나 계정을 지우면 지워요</li>
-        <li>연결을 끊어도 "성대 공지" 캘린더는 남아요. 필요 없으면 구글 캘린더에서 지워 주세요</li>
+        <li>이 앱이 만든 캘린더만 다뤄요. 내 다른 캘린더는 읽지 못해요</li>
+        <li>연결 정보는 암호화해 보관하고, 끊으면 지워요</li>
+        <li>끊어도 캘린더는 남아요. 구글 캘린더에서 지울 수 있어요</li>
       </ul></div>
     </Section>
   </div>;
