@@ -91,7 +91,7 @@ def run(store, net, gemini=None):
 
         return SimpleNamespace(models=Models())
 
-    return judge.run_judging(store, MASTER, NOW, gemini_factory, provider_factory=net.factory), gemini_models
+    return judge.run_judging(store, MASTER, NOW, gemini_factory, sleep=lambda _: None, provider_factory=net.factory), gemini_models
 
 
 def test_user_with_only_a_groq_key_is_judged_with_groq_and_nothing_else():
@@ -265,7 +265,8 @@ def test_a_too_large_batch_is_split_in_halves_so_a_groq_only_user_still_gets_jud
     net = SizeLimitedNet({})
     counts, _ = run(store, net)
     assert counts["judged"] == 4 and sorted(j["notice_id"] for j in store.saved) == ["s/1", "s/2", "s/3", "s/4"]
-    assert net.hosts().count(GROQ) == 7   # 4건(거절) → 2건(거절) → 1건·1건(성공) → 2건(거절) → 1건·1건(성공)
+    # Groq만 있으면 2건씩 보낸다: 2건(거절) → 1건·1건(성공), 2건(거절) → 1건·1건(성공)
+    assert net.hosts().count(GROQ) == 6
     assert "disabled_at" not in store.ai_updates[-1][2] and store.ai_updates[-1][2]["last_error"] is None  # 키는 멀쩡하다
 
 
@@ -283,3 +284,12 @@ def test_a_413_from_groq_hands_the_same_batch_to_the_users_gemini_key_without_re
     counts, gem = run(store, net)
     # 덜 쓴 Groq가 먼저 거절해도(413) 같은 묶음을 Gemini가 받는다. 나누지 않고 한 번에 끝난다.
     assert counts["judged"] == 1 and net.hosts() == [GROQ] and gem.calls == 1   # 모의 Gemini는 s/1 하나만 답한다
+
+
+def test_a_groq_only_user_is_judged_two_at_a_time_to_stay_under_the_free_tokens_per_minute():
+    # Groq 무료 분당 토큰 한도(gpt-oss-20b 8,000) 때문에 6건을 한 번에 보내지 않고 2건씩 보낸다(묶음 사이는 1분 쉰다).
+    store = AiStore(extra={"u1": [ai_row("u1", "groq", GROQ_KEY, "openai/gpt-oss-20b")]})
+    store._school = _school(4)
+    net = Net({})
+    run(store, net)
+    assert net.hosts().count(GROQ) >= 2 and judge.GROQ_BATCH == 2

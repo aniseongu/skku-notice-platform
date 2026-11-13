@@ -22,6 +22,10 @@ from skku_notice.ai_models import supports_strict_schema
 BASE_URL = {"groq": "https://api.groq.com/openai/v1"}
 TIMEOUT_SECONDS = 60.0
 MAX_OUTPUT_TOKENS = 8192
+# Groq 무료 키는 모델마다 분당 토큰 한도(gpt-oss-20b 8,000)가 있고, 요청 크기(입력 + 응답 상한)가 이보다 크면 413으로 거절한다
+# (console.groq.com/docs/rate-limits, 커뮤니티 413 사례의 "Requested"). 판정 묶음(2건, 이유 + 세 줄 요약)과 낮춘 추론까지 3,000이면 넉넉하다.
+# 긴 답이 필요한 호출(번역)은 config.max_output_tokens로 따로 정한다.
+GROQ_DEFAULT_OUTPUT_TOKENS = 3000
 
 
 class ProviderError(Exception):
@@ -110,7 +114,7 @@ class _Models:
         body: dict = {"model": model, "messages": messages, "temperature": getattr(config, "temperature", 0) or 0}
         # 출처: https://console.groq.com/docs/reasoning
         # 추론 토큰도 답 길이 한도에 들어가서, 추론이 길면 내용이 빈 채로 finish_reason이 length로 끝난다. 추론을 낮춘다.
-        body["max_completion_tokens"] = MAX_OUTPUT_TOKENS
+        body["max_completion_tokens"] = min(MAX_OUTPUT_TOKENS, getattr(config, "max_output_tokens", None) or GROQ_DEFAULT_OUTPUT_TOKENS)
         if model.startswith("openai/gpt-oss"):
             body["reasoning_effort"] = "low"
             body["include_reasoning"] = False

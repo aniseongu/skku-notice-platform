@@ -27,6 +27,10 @@ MAX_USERS_PER_RUN = 20
 ROUNDS_PER_PHASE = 4
 PACE_SECONDS = 5.0
 RUN_BUDGET_SECONDS = 330.0
+# Groq 무료 키만 있는 사용자: 분당 토큰 한도(gpt-oss-20b 8,000) 안에 들게 2건씩, 본문은 2,000자까지 보내고
+# 다음 묶음은 1분 창이 지난 뒤 보낸다. 6건을 한꺼번에 보내면 413(요청이 큼) 뒤
+# 429(분당 한도)로 이어졌다(2026-11-13 로그).
+GROQ_BATCH, GROQ_BODY_CHARS, GROQ_GAP_SECONDS = 2, 2000, 61.0
 # 원본은 학년·학기·재학 상태·병역 5개만 Gemini에 보냈다.
 # 사용자가 직접 적은 관심 분야 설명도 보내되 길이와 문자를 제한한다.
 PROFILE_COLUMNS = (
@@ -344,7 +348,20 @@ def run_judging(
                     sleep(PACE_SECONDS)
                 calls += 1
                 items = [{"id": p["notice_id"], "title": p["title"], "body": p["body"]} for p in batch]
-                found = judge_split(judge, items, ai.primary_model, profile, client)
+                only_groq = all(c.provider == "groq" for c in ai.candidates)
+                if only_groq:
+                    items = [{**item, "body": (item["body"] or "")[:GROQ_BODY_CHARS]} for item in items]
+                size = GROQ_BATCH if only_groq else len(items) or 1
+                chunks = [items[i:i + size] for i in range(0, len(items), size)]
+                found = {}
+                for number, chunk in enumerate(chunks):
+                    if number:
+                        if clock() - started + GROQ_GAP_SECONDS > RUN_BUDGET_SECONDS:
+                            break   # 남은 글은 판정이 저장되지 않아 다음 실행에서 이어진다
+                        sleep(GROQ_GAP_SECONDS)
+                    found.update(judge_split(judge, chunk, ai.primary_model, profile, client))
+                    if client.failed:
+                        break
                 ai.settle(store, now, counts)
                 if client.failed:
                     break

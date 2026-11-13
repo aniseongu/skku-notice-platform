@@ -150,7 +150,7 @@ def test_reasoning_is_kept_low_and_uses_the_groq_length_parameter():
 
     client_for("groq", handler).models.generate_content(model="openai/gpt-oss-20b", contents="x", config=types.GenerateContentConfig(response_schema=SCHEMA))
     groq = seen["api.groq.com"]
-    assert groq["reasoning_effort"] == "low" and groq["include_reasoning"] is False and groq["max_completion_tokens"] >= 4096
+    assert groq["reasoning_effort"] == "low" and groq["include_reasoning"] is False and groq["max_completion_tokens"] >= 3000  # 낮춘 추론 + 2건 답. 분당 8,000 한도 안에 들게 8192보다 작게
     assert "max_tokens" not in groq
 
 
