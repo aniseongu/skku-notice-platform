@@ -436,3 +436,57 @@ def test_ml_data_labeling_roles_count_as_data_ai():
     # '딥러닝'이라는 말이 없어도 라벨링·품질 검증만으로 같은 분야가 된다
     assert gf.static_task_category("[㈜가나] 인턴 모집", "주요 업무\n- 데이터 라벨링 작업을 수행해요.\n- 학습 데이터의 품질 검증과 개선을 맡아요.")[0] == "data_ai"
     assert gf.static_task_category("[㈜가나] 인턴 모집", "주요 업무\n- 제품 포장 라벨 부착과 재고 정리를 해요. 사무 보조 업무예요.")[0] == "non_software"
+
+
+EN_OCR = (
+    "Global Internship\nProgram 2026\nWorking\nhours: Mon-Fri 9:00 AM - 6:00 PM\n"
+    "Internship period: June 29 - August 21, 2026 (8 weeks)\nPosition: Backend Developer (Python, Spring)\n"
+    "Application deadline: December 5, 2026\nCompany: Acme Robotics"
+)
+
+
+def test_english_ocr_poster_period_hours_and_mode_are_read():
+    found = gf.static_facts("Global Internship Program 2026", EN_OCR)
+    assert (found["start_date"], found["end_date"]) == (date(2026, 6, 29), date(2026, 8, 21))
+    assert found["work_mode"] == "full_time"
+    assert found["organization_name"] == "Acme Robotics"
+    assert any(e["field"] == "period" and gf.quote_in_text(e["quote"], EN_OCR) for e in found["evidence"])
+
+
+def test_english_period_without_end_month_numeric_dates_and_label_variants():
+    a = gf.static_facts("Intern", "Duration: Jun 1 - 30, 2026")
+    assert (a["start_date"], a["end_date"]) == (date(2026, 6, 1), date(2026, 6, 30))
+    b = gf.static_facts("Intern", "Internship period: 2026.06.01 - 2026.08.31")
+    assert (b["start_date"], b["end_date"]) == (date(2026, 6, 1), date(2026, 8, 31))
+    c = gf.static_facts("Intern", "Period: June 1 – Aug 31, 2026")
+    assert (c["start_date"], c["end_date"]) == (date(2026, 6, 1), date(2026, 8, 31))
+    d = gf.static_facts("Intern", "Period: Dec 15 - Feb 20, 2027")
+    assert (d["start_date"], d["end_date"]) == (date(2026, 12, 15), date(2027, 2, 20))
+
+
+def test_english_durations_hours_and_total():
+    assert gf.static_facts("Intern", "Duration: 3 months")["duration_months"] == 3
+    assert gf.static_facts("Intern", "A 6-month internship program")["duration_months"] == 6
+    assert gf.static_facts("Intern", "Internship duration: 8 weeks")["duration_days"] == 56
+    hrs = gf.static_facts("Intern", "Schedule: 40 hours per week\n8 hours/day")
+    assert hrs["work_mode"] == "full_time" and hrs["daily_hours"] == 8 and hrs["days_per_week"] == 5
+    assert gf.static_facts("Intern", "Work 20 hrs/week")["work_mode"] == "part_time"
+    assert gf.static_facts("Intern", "Total 280 hours of work")["explicitly_stated_hours"] == 280
+    assert gf.static_facts("Intern", "Hours: 9AM-6PM weekdays")["work_mode"] == "full_time"
+    assert gf.static_facts("Intern", "Part-time, 2 weeks before the deadline apply")["work_mode"] == "part_time"
+
+
+def test_english_deadline_weeks_and_unrelated_numbers_are_not_durations():
+    found = gf.static_facts("Intern", "Apply within 2 weeks. Position: Developer")
+    assert "duration_days" not in found and "start_date" not in found
+
+
+def test_mixed_korean_english_text_still_reads_korean_period():
+    found = gf.static_facts("[Acme] 인턴 모집", "Global Internship\n근무기간: 2026.12.21 ~ 2027.02.28\nWorking hours: Mon-Fri 9AM-6PM")
+    assert (found["start_date"], found["end_date"]) == (date(2026, 12, 21), date(2027, 2, 28))
+    assert found["work_mode"] == "full_time"
+
+
+def test_quote_in_text_tolerates_ocr_line_breaks_and_gemini_prompt_demands_original_language_quotes():
+    assert gf.quote_in_text("Working hours: Mon-Fri", "Working\nhours:  Mon-Fri 9AM")
+    assert "원문의 언어 그대로" in gf.SYSTEM and "영어" in gf.SYSTEM

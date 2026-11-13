@@ -12,7 +12,7 @@ from google.genai import types
 from skku_notice.eligibility import ELIGIBILITY_RULE
 from skku_notice.fetch import ImageData
 from skku_notice.gemini_client import gemini_client
-from skku_notice.judge import Judgment, clean_reason
+from skku_notice.judge import FALLBACK_REASON, LANGUAGE_RULE, Judgment, clean_reason, has_hangul
 
 BATCH = 6
 SCHEMA = {
@@ -114,7 +114,7 @@ def judge_internships(
         client = client or gemini_client(api_key)
         response = client.models.generate_content(
             model=model, contents=contents,
-            config=types.GenerateContentConfig(system_instruction=SYSTEM, temperature=0,
+            config=types.GenerateContentConfig(system_instruction=SYSTEM + LANGUAGE_RULE, temperature=0,
                                                response_mime_type="application/json", response_schema=SCHEMA),
         )
         replies = json.loads(response.text)["items"]
@@ -138,6 +138,8 @@ def judge_internships(
             continue
         clean = clean_reason(reason)
         if clean:
+            if not has_hangul(clean):
+                clean = FALLBACK_REASON
             safe_verdict, safe_reason = preference_safe_decision(verdict, clean)
             judgments[key] = Judgment(safe_verdict, safe_reason, model)
     return judgments

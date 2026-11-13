@@ -16,7 +16,7 @@ from google.genai import types
 from skku_notice.deadline import KST
 from skku_notice.eligibility import ELIGIBILITY_RULE
 from skku_notice.gemini_client import gemini_client
-from skku_notice.judge import Judgment, clean_reason
+from skku_notice.judge import FALLBACK_REASON, LANGUAGE_RULE, Judgment, clean_reason, has_hangul
 
 BATCH = 6
 SCHEMA = {
@@ -87,7 +87,7 @@ def judge_school_notices(
             model=model,
             contents=contents,
             config=types.GenerateContentConfig(
-                system_instruction=SYSTEM, temperature=0,
+                system_instruction=SYSTEM + LANGUAGE_RULE, temperature=0,
                 response_mime_type="application/json", response_schema=SCHEMA,
             ),
         )
@@ -111,6 +111,8 @@ def judge_school_notices(
             continue
         clean = clean_reason(reason)
         if clean:
+            if not has_hangul(clean):  # 영어 공지에 영어로 답한 이유는 저장하지 않고 한국어 안내로 바꾼다(다시 판정하지 않는다)
+                clean = FALLBACK_REASON
             summary = reply.get("summary")
             lines = (
                 [
@@ -121,6 +123,8 @@ def judge_school_notices(
                 else []
             )
             text = "\n".join(line for line in lines if line)[:300] or None
+            if text and not has_hangul(text):  # 한글이 하나도 없는 요약은 영어 그대로라 저장하지 않는다
+                text = None
             kind = reply.get("deadline_kind")
             at = _valid_deadline(reply.get("deadline_at"), kind) if kind in {"마감", "일정"} else None
             judgments[key] = Judgment(

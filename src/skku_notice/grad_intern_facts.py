@@ -104,6 +104,97 @@ NON_COMPANY_NAME = re.compile(r"대학교|대학원|대학|연구실|학과|센�
 CREDIT = re.compile(r"(\d(?:\.\d)?)\s*학점")
 
 
+# 영어 공고(또는 영어 포스터를 OCR한 글). OCR은 한 줄을 단어 사이에서 여러 줄로 쪼개므로("Working\nhours") \s가 줄바꿈을 넘게 두되
+# 이름표와 값 사이 거리는 제한한다. 한국어 패턴은 건드리지 않고 별도 패턴으로 더한다.
+_MONTH_NAMES = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
+_MON = r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+PERIOD_EN = re.compile(
+    r"(?i:(?:internship|working|work|training|program(?:me)?|intern)?\s{0,3}(?:period|duration|dates?|term)|duration)\s{0,5}[:：]?\s{0,5}"
+    r"(?:(?i:approx(?:imately)?\.?|about)\s{0,3})?(?:\d{1,2}\s{0,2}(?i:months?|weeks?)\s{0,3})?[(\[]?\s{0,5}"
+    r"(?i:(?P<sm>" + _MON + r"))\.?\s{0,3}(?P<sd>\d{1,2})(?:st|nd|rd|th)?\s{0,3}(?:,?\s{0,3}(?P<sy>20\d{2}))?"
+    r"\s{0,5}(?:[-–—~∼]|(?i:to|through|until))\s{0,5}"
+    r"(?:(?i:(?P<em>" + _MON + r"))\.?\s{0,3})?(?P<ed>\d{1,2})(?:st|nd|rd|th)?\s{0,3}(?:,?\s{0,3}(?P<ey>20\d{2}))?"
+)
+# "Internship period: 2026.06.01 - 2026.08.31"처럼 영어 이름표 뒤에 숫자 날짜가 오는 모양
+PERIOD_EN_NUMERIC = re.compile(
+    r"(?i:(?:internship|working|work|training|program(?:me)?|intern)?\s{0,3}(?:period|duration|dates?|term)|duration)\s{0,5}[:：]?\s{0,5}"
+    r"(?:\d{1,2}\s{0,2}(?i:months?|weeks?)\s{0,3})?[(\[]?\s{0,5}"
+    + _YEAR.format(p="sy") + r"\s{0,5}[.\-/]\s{0,5}(?P<sm>\d{1,2})\s{0,5}[.\-/]\s{0,5}(?P<sd>\d{1,2})"
+    r"\s{0,5}(?:[~\-–—∼]|(?i:to|through|until))\s{0,5}"
+    r"(?:" + _YEAR.format(p="ey") + r"\s{0,5}[.\-/]\s{0,5})?(?P<em>\d{1,2})\s{0,5}[.\-/]\s{0,5}(?P<ed>\d{1,2})"
+)
+MONTHS_EN = re.compile(
+    r"(?i:(?:duration|period|internship|program(?:me)?|term|lasts?|for)[^\n]{0,20}?\b(\d{1,2})[\s-]{0,3}months?\b"
+    r"|\b(\d{1,2})[\s-]{0,3}months?(?:[\s-]{1,3}(?:long\s+)?)(?:internship|program(?:me)?|period|term|placement))")
+WEEKS_EN = re.compile(
+    r"(?i:(?:duration|period|internship|program(?:me)?|term|lasts?|for)[^\n]{0,20}?\b(\d{1,2})[\s-]{0,3}weeks?\b"
+    r"|\b(\d{1,2})[\s-]{0,3}weeks?(?:[\s-]{1,3}(?:long\s+)?)(?:internship|program(?:me)?|period|term|placement))")
+WEEK_HOURS_EN = re.compile(r"(?i)\b(\d{1,2})\s{0,2}(?:hours?|hrs?\.?)\s{0,2}(?:/|per|a|each)\s{0,2}(?:week|wk)\b")
+DAY_HOURS_EN = re.compile(r"(?i)\b(\d{1,2})\s{0,2}(?:hours?|hrs?\.?)\s{0,2}(?:/|per|a|each)\s{0,2}day\b")
+DAYS_PER_WEEK_EN = re.compile(r"(?i)\b([1-7])\s{0,2}days?\s{0,2}(?:/|per|a|each)\s{0,2}(?:week|wk)\b")
+MON_FRI = re.compile(r"(?i)\bmon(?:day)?\s{0,3}(?:[-–—~∼]|to|through)\s{0,3}fri(?:day)?\b")
+TOTAL_HOURS_EN = re.compile(r"(?i)\btotal(?:\s+of)?\s{0,3}(\d{2,4})\s{0,2}(?:hours?|hrs?\.?)\b")
+# 12시간제 근무시간: "9:00 AM - 6:00 PM", "9AM-6PM"
+CLOCK_12 = re.compile(r"(?i)\b(\d{1,2})(?::(\d{2}))?\s{0,2}(a\.?m\.?|p\.?m\.?)\s{0,3}(?:[-–—~∼]|to)\s{0,3}(\d{1,2})(?::(\d{2}))?\s{0,2}(a\.?m\.?|p\.?m\.?)")
+ORG_LABEL_EN = re.compile(r"(?i:(?:company|organi[sz]ation|employer)(?:\s+name)?)\s{0,2}[:：]\s{0,3}([^\n,;/|]{2,30})")
+
+
+def _hits(patterns, text: str) -> list[tuple[int, re.Match]]:
+    """여러 패턴(한국어·영어)의 숫자 일치를 (값, 일치) 목록으로 모은다. 값은 각 일치의 첫 번째로 채워진 그룹이다."""
+    out = []
+    for pattern in patterns:
+        for m in pattern.finditer(text):
+            value = next((g for g in m.groups() if g), None)
+            if value is not None:
+                out.append((int(value), m))
+    return out
+
+
+def _clock_minutes(text: str) -> tuple[int, re.Match] | None:
+    """하루 근무시간(분)과 일치. 24시간제(09:00~18:00)를 먼저 보고 없으면 12시간제(9:00 AM - 6:00 PM)."""
+    clock = CLOCK.search(text)
+    if clock:
+        return (int(clock.group(3)) * 60 + int(clock.group(4))) - (int(clock.group(1)) * 60 + int(clock.group(2))), clock
+    c12 = CLOCK_12.search(text)
+    if not c12:
+        return None
+
+    def minutes(h, m, ap):
+        hour = int(h) % 12 + (12 if ap.lower().startswith("p") else 0)
+        return hour * 60 + int(m or 0)
+
+    start, end = minutes(c12.group(1), c12.group(2), c12.group(3)), minutes(c12.group(4), c12.group(5), c12.group(6))
+    return (end - start, c12) if 0 < end - start <= 16 * 60 else None
+
+
+def en_period_dates(match: re.Match) -> tuple[date, date] | None:
+    """PERIOD_EN / PERIOD_EN_NUMERIC 일치에서 (시작, 끝). 연도가 한쪽에만 있으면 다른 쪽에 물려주고, 끝이 더 이르면 시작을 전년으로 본다."""
+    g = match.groupdict()
+
+    def month(value):
+        if value is None:
+            return None
+        return _MONTH_NAMES.get(value[:3].lower()) if not value.isdigit() else int(value)
+
+    def year_of(prefix):
+        if g.get(prefix + "4") or g.get(prefix + "2"):
+            return int(g.get(prefix + "4") or 2000 + int(g[prefix + "2"]))
+        return int(g[prefix + "y"]) if g.get(prefix + "y") else None
+
+    sy, ey = (year_of("sy"), year_of("ey")) if "sy4" in g else (int(g["sy"]) if g.get("sy") else None, int(g["ey"]) if g.get("ey") else None)
+    sm, em = month(g["sm"]), month(g["em"]) or month(g["sm"])
+    if not sm or not em or (sy is None and ey is None):
+        return None
+    ey, sy = ey or sy, sy or ey
+    start = _iso(str(sy), str(sm), g["sd"])
+    end = _iso(str(ey), str(em), g["ed"])
+    if start and end and end < start and g.get("sy") is None and "sy4" not in g:
+        start = _iso(str(sy - 1), str(sm), g["sd"])
+    if start and end and end >= start and (end - start).days <= 366:
+        return start, end
+    return None
+
+
 def _squash(text: str) -> str:
     return re.sub(r"\s+", "", unicodedata.normalize("NFKC", text or ""))
 
@@ -272,28 +363,40 @@ def static_facts(title: str, body: str) -> dict:
         found["evidence"].append({"field": "work_mode", "quote": part.group(0)})
     period = PERIOD.search(text)
     dates = period_dates(period) if period else None
+    if not dates:  # 한국어 기간이 없으면 영어 이름표 기간
+        for pattern in (PERIOD_EN, PERIOD_EN_NUMERIC):
+            for candidate in pattern.finditer(text):
+                if (en := en_period_dates(candidate)):
+                    period, dates = candidate, en
+                    break
+            if dates:
+                break
     if period and dates:
         found["start_date"], found["end_date"] = dates
         found["evidence"].append({"field": "period", "quote": period.group(0)})
     if "start_date" not in found:
-        month_hits = {int(next(g for g in m.groups() if g)) for m in MONTHS.finditer(text)}
+        month_found = _hits((MONTHS, MONTHS_EN), text)
+        month_hits = {n for n, _ in month_found}
         if len(month_hits) == 1 and 1 <= (months := month_hits.pop()) <= 24:
             found["duration_months"] = months
             found.setdefault("duration_days", months * 30)
-            found["evidence"].append({"field": "period", "quote": MONTHS.search(text).group(0)})
+            found["evidence"].append({"field": "period", "quote": month_found[0][1].group(0)})
     if "start_date" not in found and "duration_days" not in found:
-        week_hits = {int(m.group(1) or m.group(2)) for m in WEEKS.finditer(text)}
+        week_found = _hits((WEEKS, WEEKS_EN), text)
+        week_hits = {n for n, _ in week_found}
         if len(week_hits) == 1 and 1 <= (weeks := week_hits.pop()) <= 52:
             found["duration_days"] = weeks * 7
-            found["evidence"].append({"field": "period", "quote": WEEKS.search(text).group(0)})
+            found["evidence"].append({"field": "period", "quote": week_found[0][1].group(0)})
         day_hits = {int(m.group(1) or m.group(2)) for m in WORK_DAYS.finditer(text)}
         if len(day_hits) == 1 and 5 <= (workdays := day_hits.pop()) <= 365:
             found["duration_days"] = workdays * 7 // 5  # 근무일수는 평일 기준이라 달력 일수로 바꾼다
             found["evidence"].append({"field": "period", "quote": WORK_DAYS.search(text).group(0)})
     # 하루 근무시간과 주당 일수는 각각 한 값으로 모일 때만 읽는다(여러 값이면 어느 것인지 몰라서 비운다).
-    per_day = {int(m.group(1)) for m in DAY_HOURS.finditer(text) if 1 <= int(m.group(1)) <= 12}
-    per_week = {int(m.group(1)) for m in DAYS_PER_WEEK.finditer(text)}
-    week_hours = {int(m.group(1)) for m in WEEK_HOURS.finditer(text)}
+    per_day = {n for n, _ in _hits((DAY_HOURS, DAY_HOURS_EN), text) if 1 <= n <= 12}
+    per_week = {n for n, _ in _hits((DAYS_PER_WEEK, DAYS_PER_WEEK_EN), text)}
+    if MON_FRI.search(text):
+        per_week.add(5)
+    week_hours = {n for n, _ in _hits((WEEK_HOURS, WEEK_HOURS_EN), text)}
     if len(per_day) == 1 and not per_week and len(week_hours) == 1:
         daily, weekly = next(iter(per_day)), next(iter(week_hours))
         if daily and weekly % daily == 0 and 1 <= weekly // daily <= 7:
@@ -301,28 +404,32 @@ def static_facts(title: str, body: str) -> dict:
     if len(per_day) == 1 and len(per_week) == 1:
         found["daily_hours"], found["days_per_week"] = per_day.pop(), per_week.pop()
         found["evidence"].append({"field": "hours", "quote": f"1일 {found['daily_hours']}시간, 주 {found['days_per_week']}일"})
-    hours = {int(m.group(1)) for m in TOTAL_HOURS.finditer(text)}
+    total_found = _hits((TOTAL_HOURS, TOTAL_HOURS_EN), text)
+    hours = {n for n, _ in total_found}
     if len(hours) == 1:
         found["explicitly_stated_hours"] = hours.pop()
-        match = TOTAL_HOURS.search(text)
-        found["evidence"].append({"field": "hours", "quote": match.group(0)})
+        found["evidence"].append({"field": "hours", "quote": total_found[0][1].group(0)})
     if "work_mode" not in found and not PART_TIME.search(text):
-        clock = CLOCK.search(text)
-        day_hours = DAY_HOURS.search(text)
-        span = ((int(clock.group(3)) * 60 + int(clock.group(4))) - (int(clock.group(1)) * 60 + int(clock.group(2)))) / 60 if clock else 0
-        long_day = span >= 7 or (day_hours is not None and int(day_hours.group(1)) >= 7)
-        if WEEK5.search(text) and (long_day or not clock):
+        clock_info = _clock_minutes(text)
+        clock = clock_info[1] if clock_info else None
+        day_hours = (_hits((DAY_HOURS, DAY_HOURS_EN), text) or [None])[0]
+        span = clock_info[0] / 60 if clock_info else 0
+        long_day = span >= 7 or (day_hours is not None and day_hours[0] >= 7)
+        week5 = WEEK5.search(text) or MON_FRI.search(text) or next((m for _, m in _hits((DAYS_PER_WEEK_EN,), text) if m.group(1) == "5"), None)
+        if week5 and (long_day or not clock):
             found["work_mode"] = "full_time"
-            found["evidence"].append({"field": "work_mode", "quote": (WEEK5.search(text) or clock).group(0)})
+            found["evidence"].append({"field": "work_mode", "quote": (week5 or clock).group(0)})
     if "work_mode" not in found:
-        week_hours = WEEK_HOURS.search(text)
+        wh = _hits((WEEK_HOURS, WEEK_HOURS_EN), text)
+        week_hours = wh[0][1] if wh else None
+        week_hours_n = wh[0][0] if wh else None
         low_days = WEEK_DAYS_LOW.search(text)
         if PART_TIME.search(text):
             pass  # 이미 위에서 시간제 말이 있으면 정하지 않았다
-        elif week_hours and int(week_hours.group(1)) >= 35:
+        elif week_hours and week_hours_n >= 35:
             found["work_mode"] = "full_time"
             found["evidence"].append({"field": "work_mode", "quote": week_hours.group(0)})
-        elif week_hours and int(week_hours.group(1)) <= 30:
+        elif week_hours and week_hours_n <= 30:
             found["work_mode"] = "part_time"
             found["evidence"].append({"field": "work_mode", "quote": week_hours.group(0)})
         elif low_days:
@@ -332,10 +439,10 @@ def static_facts(title: str, body: str) -> dict:
             found["work_mode"] = "full_time"
             found["evidence"].append({"field": "work_mode", "quote": FULL_DAY.search(text).group(0)})
         else:
-            clock = CLOCK.search(text)
-            if clock and ((int(clock.group(3)) * 60 + int(clock.group(4))) - (int(clock.group(1)) * 60 + int(clock.group(2)))) >= 7 * 60:
-                found["work_mode"] = "full_time"  # 09:00~18:00처럼 하루 7시간 이상 적힌 근무시간
-                found["evidence"].append({"field": "work_mode", "quote": clock.group(0)})
+            clock_info = _clock_minutes(text)
+            if clock_info and clock_info[0] >= 7 * 60:
+                found["work_mode"] = "full_time"  # 09:00~18:00, 9:00 AM - 6:00 PM처럼 하루 7시간 이상 적힌 근무시간
+                found["evidence"].append({"field": "work_mode", "quote": clock_info[1].group(0)})
     category = static_task_category(title, body)
     if category:
         found["task_category"], quote = category
@@ -343,7 +450,7 @@ def static_facts(title: str, body: str) -> dict:
     bracket = TITLE_ORG.match(title or "")
     if bracket and not TITLE_GENERIC.search(bracket.group(1)) and len(bracket.group(1).strip()) >= 2:
         found["organization_name"] = bracket.group(1).strip()[:40]  # "[IBK기업은행] ..."처럼 제목에 적힌 이름이 가장 확실하다
-    for pattern in () if "organization_name" in found else (ORG_LABEL, ORG_LEGAL, ORG_SENTENCE, ORG_POSTER, ORG_YEAR_LINE):
+    for pattern in () if "organization_name" in found else (ORG_LABEL, ORG_LABEL_EN, ORG_LEGAL, ORG_SENTENCE, ORG_POSTER, ORG_YEAR_LINE):
         match = pattern.search(text)
         name = next((g for g in (match.groups() if match else ()) if g), "").strip(" .-:：")
         if name and len(name) >= 2:
@@ -394,6 +501,9 @@ SYSTEM = (
     "섞여 있을 수 있고 모두 근거로 쓸 수 있습니다. 그림 글자의 깨진 글자(예: '위고무을융를')는 무시하고 뜻이 분명한 줄만 쓰세요. "
     "회사 이름은 \"○○에서 ~를 모집합니다\" 같은 문장의 ○○이고, 법인 표기((주) 등)가 없어도 회사 이름이면 됩니다. "
     + EXAMPLE
+    + " 공고 본문이나 그림에서 읽은 글은 영어일 수 있고, 그림 글자(OCR)는 한 줄이 여러 줄로 쪼개져 있을 수 있습니다(예: \"Working\\nhours\"). "
+    "영어 글에서도 같은 항목을 읽으세요. 근거 문장(evidence의 quote)은 번역하지 말고 원문의 언어 그대로 옮기세요: 번역한 문장은 원문에서 "
+    "찾을 수 없어 버려집니다. 시간은 24시간제로 바꿔 판단하되 quote는 원문 그대로입니다(예: \"9:00 AM - 6:00 PM\")."
 )
 
 FIELD_OF = {"organization": ("organization_type",), "work_mode": ("work_mode",), "period": ("start_date", "end_date"),

@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Batch Gemini relevance judgments; failures leave rule matching in charge."""
 
 import json
@@ -46,6 +47,21 @@ def clean_reason(reason: str) -> str:
     """판정 이유에서 제어 문자와, 프롬프트의 어미 예시를 그대로 따라 붙인 꼬리("~돼요")를 지운다."""
     text = "".join(c for c in reason if unicodedata.category(c) not in {"Cc", "Cf"}).strip()
     return _ENDING_ECHO.sub("", text).strip()[:120]
+
+# 공지나 그림 글자가 영어여도 사용자에게 보이는 reason과 summary는 한국어 해요체로 쓰게 하는 문장이다.
+# SYSTEM 본문에 넣지 않고 호출할 때 덧붙인다: intern_ai.intern_fingerprint가 SYSTEM을 해시에 넣으므로 SYSTEM을 고치면 저장된
+# 모든 판정의 지문이 바뀌어 전부 다시 판정(토큰 낭비)하게 된다. 이 문장은 일부러 지문에 넣지 않는다. 새 판정부터 적용된다.
+LANGUAGE_RULE = (
+    " 공지 제목, 본문, 이미지에서 읽은 글이 영어나 다른 외국어여도 reason과 summary는 항상 한국어 해요체로 쓰세요. "
+    "summary는 내용을 한국어로 요약한 것이지 본문 전체의 번역이 아닙니다. 고유명사와 직무명은 원문 표기를 그대로 써도 됩니다."
+)
+FALLBACK_REASON = "공지 내용을 원문에서 확인해 주세요"
+_HANGUL = re.compile(r"[가-힣ㄱ-ㅎㅏ-ㅣ]")
+
+
+def has_hangul(text: object) -> bool:
+    return isinstance(text, str) and bool(_HANGUL.search(text))
+
 
 @dataclass(frozen=True)
 class Judgment:
