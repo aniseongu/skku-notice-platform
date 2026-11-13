@@ -57,8 +57,9 @@ SYSTEM = (
 # 학교 공지처럼 외부 공고(인턴·현장실습)에도 요약을 만든다(사용자 지시 2026-11-13). SYSTEM에 넣지 않고 호출할 때 덧붙인다
 # (LANGUAGE_RULE과 같은 이유: SYSTEM은 판정 기준이고, 요약 지시를 바꿔도 판정 기준이 바뀐 것처럼 다루지 않게).
 SUMMARY_RULE = (
-    " summary는 해요체 1~3문장으로, 각 문장을 줄바꿈으로 구분하세요. 어느 기관이 어떤 일을 할 사람을 뽑는지, 근무·실습 기간, "
-    "지원 마감과 방법 위주로 쓰고 공고에 없는 내용을 더하지 마세요. 본문이 비어 있으면 제목에서 알 수 있는 것만 쓰세요."
+    " summary는 해요체 세 문장(세 줄)으로, 각 문장을 줄바꿈으로 구분하세요. 첫 줄은 어느 기관이 어떤 직무를 뽑고 무슨 일을 하는지, "
+    "둘째 줄은 지원 자격과 근무·실습 기간·조건(급여, 근무지 등), 셋째 줄은 마감과 지원 방법을 쓰세요. 한 줄은 70자 안팎으로 내용이 "
+    "드러나게 쓰고, 공고에 없는 내용은 지어내지 마세요. 본문이 비어 있으면 제목에서 알 수 있는 것만 쓰세요."
 )
 
 
@@ -67,7 +68,7 @@ def clean_summary(summary: object) -> str | None:
     if not isinstance(summary, str):
         return None
     lines = ["".join(c for c in line if unicodedata.category(c) not in {"Cc", "Cf"}).strip() for line in summary.splitlines()]
-    text = "\n".join(line for line in lines if line)[:300] or None
+    text = "\n".join(line for line in lines if line)[:400] or None  # 저장 칸 상한 400자
     return text if text and has_hangul(text) else None
 
 

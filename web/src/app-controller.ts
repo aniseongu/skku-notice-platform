@@ -1956,7 +1956,9 @@ export class AppController extends Reactive {
   private autoSummaries = new Set<string>();
   autoSummary(notice: Notice): void {
     if (this.summaries.get(notice.id) !== null || this.autoSummaries.has(notice.id)) return;   // 아직 불러오는 중이거나 이미 있다
-    if (!this.authUserId || !this.byokStatus || this.byokStatus.disabled || this.summarizing) return;
+    // 예전 Gemini 키나 업체별 키(Gemini·Groq) 중 하나라도 켜져 있으면 만든다(Groq 키만 있는 계정도 요약, 2026-11-13).
+    const hasKey = (!!this.byokStatus && !this.byokStatus.disabled) || this.aiKeys.some((key) => !key.disabled);
+    if (!this.authUserId || !hasKey || this.summarizing) return;
     this.autoSummaries.add(notice.id);
     setTimeout(() => { void this.makeSummary(notice); }, 0);
   }
