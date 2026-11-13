@@ -267,7 +267,7 @@ function SideGroup({ app, id, title, count, children }: { app: AppController; id
 // 목록 기준 시각과 AI 확인 상태를 함께 보여 주고 공간이 부족하면 줄을 바꾼다.
 function UpdatedLine({ app, count }: { app: AppController; count?: number }) {
   const waiting = app.waitingCount();
-  return <div className="flex flex-wrap items-baseline gap-x-[8px]"><UpdatedTime app={app} count={count} />{waiting ? <p className={`${UPDATED} waiting text-ink-3`} role="status">AI 확인 대기 {waiting}건은 아직 안 보여요</p> : null}</div>;
+  return <div className={`flex flex-wrap items-baseline gap-x-[2px] ${waiting ? 'max-[719px]:[&_.updated]:text-[12px]' : ''}`}><UpdatedTime app={app} count={count} />{waiting ? <p className={`${UPDATED} waiting text-ink-3`} role="status"><span aria-hidden="true" className="mr-[2px]">·</span>AI 확인 전 {waiting}건<span className="visually-hidden">의 공지는 아직 목록에 보이지 않아요</span></p> : null}</div>;
 }
 
 function UpdatedTime({ app, count }: { app: AppController; count?: number }) {
