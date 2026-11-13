@@ -15,10 +15,10 @@ const GoogleG = () => <svg className="flex-none w-[20px] h-[20px]" width="18" he
 
 /** 기다리는 화면. 로그인 확인과 내 정보 불러오기가 같은 문구, 같은 자리라 이어서 기다려도 화면이 한 번만 보인다.
  * 0.3초 안에 끝나는 기다림은 문구를 그리지 않는다(잠깐 번쩍이지 않게, 토스 기준). */
-export function LoginStatus({ text = '불러오고 있어요.' }: { text?: string }) {
+export function LoginStatus({ text = '불러오고 있어요' }: { text?: string }) {
   const [shown, setShown] = useState(false);
   useEffect(() => { const timer = window.setTimeout(() => setShown(true), 300); return () => window.clearTimeout(timer); }, []);
-  return <div className="flex flex-col min-h-dvh bg-bg items-center justify-center"><div role="status" className={`flex flex-col items-center gap-[12px] min-[720px]:gap-[20px] ${shown ? '' : 'invisible'}`}><Spinner size={56} className="min-[720px]:size-[120px]" /><p className="m-0 text-[15px] leading-[22px] text-ink-2 min-[720px]:text-[17px] min-[720px]:leading-[26px]">{text}</p></div></div>;
+  return <div className="flex flex-col min-h-dvh bg-bg items-center justify-center pb-[10dvh]"><div role="status" className={`flex flex-col items-center gap-[12px] min-[720px]:gap-[20px] ${shown ? '' : 'invisible'}`}><Spinner size={56} className="min-[720px]:size-[96px]" /><p className="m-0 text-[15px] leading-[22px] text-ink-2 min-[720px]:text-[17px] min-[720px]:leading-[26px]">{text}</p></div></div>;
 }
 
 export function LoginScreen({ app }: { app: AppController }) {

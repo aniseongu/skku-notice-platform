@@ -1948,7 +1948,7 @@ test('an account that has not finished first-run setup goes straight to setup wi
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
     app.authUserId = 'account-a'; app.profileStatus = 'loading';
   });
-  await expect(page.getByText('불러오고 있어요.')).toBeVisible();
+  await expect(page.getByText('불러오고 있어요', { exact: true })).toBeVisible();
   await expect(page.locator('notice-rows-screen a.row')).toHaveCount(0);
   await page.evaluate(() => {
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
@@ -1967,10 +1967,10 @@ test('an account remembered as finished keeps the list visible while the profile
     app.authUserId = 'account-a'; app.profileStatus = 'loading';
   });
   await expect(page.getByText('성대 공지').first()).toBeAttached();   // 구독이 없는 계정은 행이 없으므로 목록 화면의 탭이 남는지 본다
-  await expect(page.getByText('불러오고 있어요.')).toHaveCount(0);
+  await expect(page.getByText('불러오고 있어요', { exact: true })).toHaveCount(0);
   // 다른 계정의 표시는 이 계정의 것이 아니다.
   await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).authUserId = 'account-b'; });
-  await expect(page.getByText('불러오고 있어요.')).toBeVisible();
+  await expect(page.getByText('불러오고 있어요', { exact: true })).toBeVisible();
 });
 
 test('현장실습 tab shows only field-practice notices, hides expired ones, and opens a sectioned detail', async ({ page }, testInfo) => {
