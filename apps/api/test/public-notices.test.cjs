@@ -5,7 +5,7 @@ const { NestFactory } = require('@nestjs/core');
 const { ValidationPipe } = require('@nestjs/common');
 const { AppModule } = require('../dist/app');
 
-test('public API validates filters and uses only the public Supabase key', async () => {
+test('notice API requires a login token, forwards it, and uses only the publishable key', async () => {
   const app = await NestFactory.create(AppModule, { logger: false });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   await app.listen(0, '127.0.0.1');
@@ -21,24 +21,34 @@ test('public API validates filters and uses only the public Supabase key', async
     requests.push({ url: new URL(url), options });
     return new Response(JSON.stringify([{ id: 'school' }]), { status: 200 });
   };
+  const jwt = 'aaa.bbb.ccc';
+  const auth = { headers: { authorization: `Bearer ${jwt}` } };
   try {
-    let response = await realFetch(`${base}/notices?source=school&limit=5&offset=2`);
+    let response = await realFetch(`${base}/notices?source=school`);
+    assert.equal(response.status, 401);
+    response = await realFetch(`${base}/sources`, { headers: { authorization: 'Bearer not-a-jwt' } });
+    assert.equal(response.status, 401);
+    assert.equal(requests.length, 0);
+    response = await realFetch(`${base}/notices?source=school&limit=5&offset=2`, auth);
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), [{ id: 'school' }]);
     assert.equal(requests[0].url.searchParams.get('source_id'), 'eq.school');
     assert.equal(requests[0].url.searchParams.get('limit'), '5');
     assert.equal(requests[0].options.headers.apikey, 'sb_publishable_test');
+    assert.equal(requests[0].options.headers.Authorization, `Bearer ${jwt}`);
     response = await realFetch(`${base}/ready`);
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { status: 'ok' });
-    response = await realFetch(`${base}/notices?limit=101`);
+    assert.equal(requests[1].url.pathname, '/auth/v1/health');
+    assert.equal(requests[1].options.headers.Authorization, undefined);
+    response = await realFetch(`${base}/notices?limit=101`, auth);
     assert.equal(response.status, 400);
-    response = await realFetch(`${base}/notices?source=school%2Cother`);
+    response = await realFetch(`${base}/notices?source=school%2Cother`, auth);
     assert.equal(response.status, 400);
-    response = await realFetch(`${base}/notices?unexpected=value`);
+    response = await realFetch(`${base}/notices?unexpected=value`, auth);
     assert.equal(response.status, 400);
     process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_secret_never-use';
-    response = await realFetch(`${base}/sources`);
+    response = await realFetch(`${base}/sources`, auth);
     assert.equal(response.status, 503);
     assert.equal(requests.length, 2);
   } finally {
