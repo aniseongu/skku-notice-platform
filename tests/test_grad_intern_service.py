@@ -331,3 +331,19 @@ def test_ai_read_facts_of_an_older_extractor_are_kept_for_a_rules_only_refresh()
         assert counts["grad_rerule"] == expect_rerule and models.calls == 0
         if expect_rerule:
             assert store.saved[0]["extractor_version"] == "facts-8" and store.saved[0]["ruleset_version"] == DEPT_RULESET
+
+
+def test_requeued_row_with_cleared_input_hash_skips_the_cached_shortcut_and_reuses_cached_ai_facts():
+    """requeue_graduation_matching은 input_hash를 비운다. 그러면 '그대로인 판정' 지름길을 타지 않고 다시 판정하며,
+    이 사용자의 AI 사실 캐시가 있으면 AI를 부르지 않고 그것을 쓴다."""
+    class SharedStore(Store):
+        def cached_ai_facts(self, user_id, notice_id, text_hash, version):
+            return {"organization_name": "넷마블네오", "organization_type": "incorporated_company", "evidence": []}
+
+    previous = {"input_hash": None, "ruleset_version": DEPT_RULESET, "extractor_version": EXTRACTOR_VERSION, "ai_status": "used"}
+    models = Models(text="{}")
+    store = SharedStore([request()], key=key_row(), previous=previous)
+    counts = svc.run_graduation(store, MASTER, NOW, client_factory=lambda key: type("C", (), {"models": models})(), sleep=lambda s: None)
+    assert counts["grad_cached"] == 0 and counts["grad_assessed"] == 1 and counts["grad_ai"] == 0 and models.calls == 0
+    assert store.saved[0]["status"] == "READY" and store.saved[0]["input_hash"] == request()["input_hash"]
+    assert store.saved[0]["ai_status"] == "used"
