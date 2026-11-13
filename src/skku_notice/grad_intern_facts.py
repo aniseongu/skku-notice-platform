@@ -269,6 +269,9 @@ _TITLE_TAIL_WORDS = re.compile(r"\s*(?:채용\s*연계형|채용\s*전환형|체
 _TITLE_NOT_ROLE = re.compile(r"20\d\d\s*년?|동계|하계|하반기|상반기|각\s*부문|전\s*부문|신규|수시|상시|경력|공개|및|[\s·,/&~-]|" + r"Winter|Summer|Internship|Intern", re.I)
 
 
+TITLE_ORG_WORD = re.compile(r"은행|그룹|지점|지사|본사|법인|코리아|주식회사|㈜|\(주\)|\b(?:Corp|Inc|Co|Ltd|Bank|Group)\b", re.I)
+
+
 def title_role(title: str) -> str:
     """제목에서 직무 이름만 뽑는다. "[회사] 교육 운영기획 매니저 채용연계형 인턴 (부트캠프)" -> "교육 운영기획 매니저". 못 뽑으면 빈 문자열."""
     text = _TITLE_LEAD.sub("", str(title or ""), count=1).strip()
@@ -285,6 +288,8 @@ def title_role(title: str) -> str:
         return ""
     org = TITLE_ORG.match(title or "")
     if org and role == org.group(1).strip():
+        return ""
+    if TITLE_ORG_WORD.search(role):  # "KEB하나은행 미주지점 UB"처럼 기관 이름이 남으면 직무명이 아니다
         return ""
     return role if role in (title or "") else ""
 
@@ -312,6 +317,7 @@ CLOCK = re.compile(r"(\d{1,2})\s*:\s*(\d{2})\s*[~\-–∼]\s*(\d{1,2})\s*:\s*(\d
 
 # 담당 업무 분야: 공고의 "담당업무"(없으면 제목과 앞부분) 칸에서 말을 찾는다. 소프트웨어 말만 있으면 그 분야, 소프트웨어가 아닌 말만 있으면
 # non_software, 섞여 있으면 정하지 않고 Gemini에 맡긴다(섞인 직무를 코드로 단정하지 않는다).
+TASK_LABEL = re.compile(r"(?:\[?\s*담당\s*업무\s*\]?|모집\s*직무|주요\s*업무|하는\s*일)\s*[:：]?\s*")
 TASK_SECTION = re.compile(r"(?:\[?\s*담당\s*업무\s*\]?|모집\s*직무|주요\s*업무|하는\s*일)\s*[:：]?\s*(.{20,900}?)(?=\n\s*\n\s*\n|\[\s*(?:접수|자격|우대|근무|복리|채용|지원)|자격\s*요건|우대\s*(?:사항|조건)|$)", re.S)
 SW_WORDS: dict[str, re.Pattern[str]] = {
     "application_embedded": re.compile(r"UI\s*/?\s*UX|\bUI\s*(?:디자인|디자이너)|웹\s*디자인|UX\s*리서치|프로덕트\s*디자인|앱\s*디자인|소프트웨어\s*개발|SW\s*개발|프로그래밍|프론트\s*엔드|백\s*엔드|웹\s*개발|앱\s*개발|모바일\s*앱|임베디드|펌웨어|게임\s*개발|클라이언트\s*개발|서버\s*개발|Android|iOS|React|Spring|\bJava\b|Python|C\+\+|JavaScript|TypeScript|Kotlin|Swift|\bSQL\b|코딩|알고리즘|프로그램\s*(?:개발|제작)|(?:앱|웹|서비스|플랫폼|시스템|서버|API|SW|S/W|소프트웨어|게임|AI|데이터)\s*개발|개발자|프로그래머|\bdeveloper\b|software engineer", re.I),
@@ -366,7 +372,12 @@ def static_task_category(title: str, body: str) -> tuple[str, str] | None:
         quote = role.group(0)
         return "non_software", quote.split("\n")[-1].strip(" |\t") or quote.strip()   # 근거 문장은 원문에 있는 한 줄이어야 한다
     match = TASK_SECTION.search(body)
-    scope = match.group(1) if match else f"{title}\n{body[:500]}"
+    if match is None and (label := TASK_LABEL.search(body)):
+        # 담당 업무 목록이 900자를 넘어 끝 표시(빈 줄, 자격요건 등)를 못 찾은 공고: 이름표 뒤 900자를 업무 칸으로 읽는다
+        match = label
+        scope = body[label.end():label.end() + 900]
+    else:
+        scope = match.group(1) if match else f"{title}\n{body[:500]}"
     sw = {name: len(pattern.findall(scope)) for name, pattern in SW_WORDS.items() if pattern.search(scope)}
     non = NON_SW_WORDS.search(SW_DESIGN.sub(" ", scope))
     if sw and not non:
@@ -693,7 +704,12 @@ def build_facts(title: str, body: str, ai: dict | None, judgment: tuple[str | No
     role_quotes = [e["quote"] for e in evidence if e.get("field") == "tasks" and e.get("source") != "judgment"
                    and len(str(e.get("quote") or "").strip()) <= 20]
     roles = tuple(dict.fromkeys(r for r in (clean_role(x) for x in (tasks or role_quotes)) if r))[:5]
-    if not roles and (from_title := title_role(title)):
+    # 비SW 공고는 업무 조각("수업과 실습 일정 조율")보다 제목의 직무명("교육 운영기획 매니저")이 이유로 더 잘 읽힌다
+    # 정규식이 잡은 낱말("재무", "영업")은 직무명이 아니라 비SW 문구에 이름으로 쓰지 않는다(일반 문구가 나온다).
+    if values.get("task_category") == "non_software":
+        from_title = title_role(title)
+        roles = (from_title,) if from_title else tuple(dict.fromkeys(r for r in (clean_role(x) for x in tasks) if r))[:5]
+    elif not roles and (from_title := title_role(title)):
         roles = (from_title,)  # AI 직무도 정규식 근거도 없으면 제목의 직무명을 쓴다(제목은 원문이다)
     facts = InternFacts(
         organization_type=values.get("organization_type", "unknown"),

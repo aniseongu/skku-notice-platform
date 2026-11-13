@@ -607,7 +607,14 @@ def test_work_check_names_the_job_only_when_sw_related():
         return next(c for c in assess_department(PROFILE, facts).checks if c.rule_id == "DEPT-WORK")
 
     # SW와 관련 없는 공고는 일반 문구(사용자 지시: 관련 없으면 이름을 적지 않아도 된다)
-    assert note(("교육 운영기획 매니저",)).note == "공고의 담당 업무가 IT·SW와 거리가 있어요"
+    assert note(("교육 운영기획 매니저",)).note == "‘교육 운영기획 매니저’ 업무는 IT·SW와 거리가 있어요"
+    assert note(("A 담당", "B 담당")).note == "공고의 담당 업무가 IT·SW와 거리가 있어요"
+    assert note(()).note == "공고의 담당 업무가 IT·SW와 거리가 있어요"
+    many = note(("전산팀", "IT 기획", "데이터 분석"), "data_ai").note
+    assert many.startswith("‘전산팀’, ‘IT 기획’ 외 1개 직무가")
+    title = "[팀스파르타] 교육 운영기획 매니저 채용연계형 인턴 (AI·IT 부트캠프)"
+    ai = {"task_category": "non_software", "tasks": ["수업과 실습 일정 조율"], "evidence": [{"field": "tasks", "quote": "수업과 실습 일정 조율"}]}
+    assert gf.build_facts(title, "수업과 실습 일정 조율", ai).facts.roles == ("교육 운영기획 매니저",)
     # SW 관련 공고는 어떤 직무가 관련 있는지 적는다(직무 이름에 IT 말이 없어도)
     assert note(("커머스 플랫폼 운영 매니저", "광고 운영"), "application_embedded").note.startswith("여러 직무 중 ‘커머스 플랫폼 운영 매니저’ 직무가")
     assert note(("Growth Hacker",), "data_ai").note == "‘Growth Hacker’ 직무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)"
@@ -615,3 +622,15 @@ def test_work_check_names_the_job_only_when_sw_related():
     unknown = note(("교육 운영기획 매니저",), sw_work_in_judgment=True)
     assert unknown.result == "unknown" and unknown.note.startswith("‘교육 운영기획 매니저’는 SW 직무가 아니지만")
     assert note((), sw_work_in_judgment=True).note.startswith("직무 이름은 SW가 아니지만")
+
+
+def test_long_task_list_without_end_mark_is_still_read():
+    # 담당 업무 목록이 900자를 넘어 끝 표시를 못 찾아도 이름표 뒤를 업무 칸으로 읽는다(KEB하나은행 미주지점 공고)
+    duty = "• 고객 및 잠재 고객과 상담하여 재무 목표와 필요를 파악하고 맞춤형 금융상품을 추천합니다.\n"
+    body = "회사 소개입니다.\n\n\n\n☑️담당업무\n" + duty * 20 + "• 모든 고객 응대 과정에서 금융 조언을 제공합니다."
+    title = "[KEB Hana New York Financial Corp] [미국인턴] KEB하나은행 미주지점  UB 신입 채용 공고 (2명 충원, 11/19 마감 예정)"
+    assert gf.static_task_category(title, body)[0] == "non_software"
+    assert gf.title_role(title) == ""  # 기관 이름은 직무명이 아니다
+    extracted = gf.build_facts(title, body, None)
+    assert extracted.facts.roles == ()
+    assert _work(extracted).note == "공고의 담당 업무가 IT·SW와 거리가 있어요"

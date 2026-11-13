@@ -180,7 +180,9 @@ def related_roles(roles: tuple[str, ...]) -> tuple[str, ...]:
 
 
 def _role_names(roles: tuple[str, ...]) -> str:
-    return ", ".join(f"‘{role}’" for role in roles[:3])
+    """직무 이름을 앞의 두 개까지만 적고 나머지는 "외 N개"로 줄인다(모든 직무를 늘어놓지 않는다)."""
+    names = ", ".join(f"‘{role}’" for role in roles[:2])
+    return f"{names} 외 {len(roles) - 2}개" if len(roles) > 2 else names
 
 
 def _named(roles: tuple[str, ...], template: str, plain: str) -> str:
@@ -215,6 +217,9 @@ def _work_check(facts: InternFacts) -> Check:
             roles, "{names}{topic} SW 직무가 아니지만 개발·데이터 업무가 섞여 있어 학과 심의에서 확인해야 해요",
             "직무 이름은 SW가 아니지만 개발·데이터 업무가 섞여 있어 학과 심의에서 확인해야 해요"))
     if facts.task_category == "non_software":
+        # 무엇이 SW와 먼지 바로 보이게 직무 이름이 하나로 분명할 때만 적는다(여러 개면 늘어놓지 않고 일반 문구)
+        if len(roles) == 1:
+            return Check("DEPT-WORK", FAIL, f"‘{roles[0]}’ 업무는 IT·SW와 거리가 있어요")
         return Check("DEPT-WORK", FAIL, "공고의 담당 업무가 IT·SW와 거리가 있어요")
     if facts.task_category == "mixed_it":
         names = _role_names(related or roles[:1]) or "‘디지털·IT’"
