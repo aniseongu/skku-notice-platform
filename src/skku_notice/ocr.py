@@ -39,6 +39,70 @@ def _image_tiles(data: bytes) -> Iterator[bytes]:
                 yield buffer.getvalue()
 
 
+LINE_OVERLAP = 0.5  # 세로로 이 비율 이상 겹치면 같은 줄
+LINE_GAP = 3.0  # 같은 줄에서 상자 사이 간격이 글자 높이의 이 배수를 넘으면 다른 칸(단)으로 본다
+
+
+def _bounds(box) -> tuple[float, float, float, float]:
+    xs = [float(point[0]) for point in box]
+    ys = [float(point[1]) for point in box]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def stitch_lines(boxes, texts) -> list[str]:
+    """같은 시각 줄에서 감지기가 단어 사이 간격마다 쪼갠 상자를 한 줄로 잇는다.
+
+    MMOCR의 stitch_boxes_into_lines(Apache-2.0, open-mmlab/mmocr)의 방식을 따른다:
+    세로 겹침 비율이 충분한 이웃 상자를 한 줄로 묶고, 가로 간격이 줄 높이에 비해 크면 잇지 않으며,
+    줄은 위에서 아래로, 줄 안은 왼쪽에서 오른쪽으로 놓는다. 서로 먼 두 단은 따로 둔다.
+    """
+    items = []
+    for box, text in zip(boxes, texts, strict=False):
+        text = str(text).strip()
+        if text:
+            x0, y0, x1, y1 = _bounds(box)
+            items.append((x0, y0, x1, y1, text))
+    items.sort(key=lambda item: item[1] + item[3])
+    rows: list[list[tuple]] = []
+    spans: list[list[float]] = []
+    for item in items:
+        _, y0, _, y1, _ = item
+        for row, span in zip(rows, spans, strict=True):
+            overlap = min(y1, span[1]) - max(y0, span[0])
+            if overlap >= LINE_OVERLAP * min(y1 - y0, span[1] - span[0]) and overlap > 0:
+                row.append(item)
+                span[0], span[1] = min(span[0], y0), max(span[1], y1)
+                break
+        else:
+            rows.append([item])
+            spans.append([y0, y1])
+    lines: list[tuple[float, str]] = []
+    for row in rows:
+        row.sort(key=lambda item: item[0])
+        group = [row[0]]
+        groups = [group]
+        for item in row[1:]:
+            height = max(group[-1][3] - group[-1][1], item[3] - item[1])
+            if item[0] - max(member[2] for member in group) <= LINE_GAP * height:
+                group.append(item)
+            else:
+                group = [item]
+                groups.append(group)
+        for group in groups:
+            top = min(member[1] for member in group)
+            lines.append((top, " ".join(member[4] for member in group)))
+    lines.sort(key=lambda line: line[0])
+    return [text for _, text in lines]
+
+
+def _tile_lines(result) -> list[str]:
+    texts = result.txts or ()
+    boxes = getattr(result, "boxes", None)
+    if boxes is None or len(boxes) != len(texts):
+        return [text.strip() for text in texts if text.strip()]
+    return stitch_lines(boxes, texts)
+
+
 # 2단계 읽기: 감지 기준을 낮추고 영역을 더 넓게 잡는다.
 # 기본 설정이 놓친 "근무시간" 줄이 실제 공고에서 이 설정으로만 읽혔다.
 SENSITIVE = {"Det.box_thresh": 0.4, "Det.unclip_ratio": 2.0}
@@ -71,7 +135,7 @@ def read_images(images: list[bytes], *, sensitive: bool = False) -> str:
         try:
             for tile in _image_tiles(image):
                 result = engine(tile)
-                lines.extend(text.strip() for text in (result.txts or ()) if text.strip())
+                lines.extend(_tile_lines(result))
         except Exception as exc:
             logger.warning("그림 글자 읽기 실패: %s", exc)
     return "\n".join(lines)
