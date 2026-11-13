@@ -120,16 +120,19 @@ def compose_message(candidate: dict) -> tuple[str, str]:
     """Notification text, reviewed against the Toss writing rules (2026-11-12, user request).
 
     A phone shows the title and only the first body line until the user expands it, so the AI reason
-    (why this notice matters to this user) comes first. The title is the notice title alone. The second
-    line is one short sentence with the matched keyword and the deadline
-    ("관심 키워드 인턴, 12월 5일(토) 마감이에요"),
-    and the board name closes the body. This is the same shape as the example on the login screen
-    (web/src/login-screen.tsx): AI reason / keyword and deadline / board, so what we show before
-    sign-in is what arrives. Without an AI reason (no key, AI off, or the 3-hour safety wait) the body is
-    the keyword and deadline line, then the board.
-    The original service used "[board] title" and "새 공지"; the difference is recorded in MIGRATION_MATRIX.
+    (why this notice matters to this user) comes first in the body, then one short sentence with the
+    matched keyword and the deadline ("관심 키워드 인턴, 12월 5일(토) 마감이에요").
+    School board notices carry the board in the title, "[소프트웨어학과] 겨울방학 소프트웨어 인턴 모집 안내"
+    (user request 2026-11-13: the board is visible even when the notification is collapsed; this is
+    also the original service's "[board] title"). School board names all end in " 공지" (catalog rule),
+    which is dropped. External postings already start with "[회사]", so their title stays as it is and
+    the site name closes the body instead. The login screen example (web/src/login-screen.tsx) has the
+    same shape. Without an AI reason (no key, AI off, or the 3-hour safety wait) the body starts with
+    the keyword and deadline line.
     """
     board = candidate.get("source_name") or candidate["notice_id"].split("/")[0]
+    school = board.endswith(" 공지")
+    title = f"[{board.removesuffix(' 공지')}] {candidate['title']}" if school else candidate["title"]
     deadline = _deadline_label(candidate.get("deadline"))
     lines = []
     if candidate.get("kind") == "changed":
@@ -146,8 +149,9 @@ def compose_message(candidate: dict) -> tuple[str, str]:
             lines.append(f"{keyword}, {deadline}" if deadline else keyword)
         elif deadline:
             lines.append(deadline)
-    lines.append(board)
-    return candidate["title"], "\n".join(lines)
+    if not school:
+        lines.append(board)
+    return title, "\n".join(lines)
 
 
 def normalize_subject(subject: str) -> str:

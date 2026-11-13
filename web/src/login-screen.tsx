@@ -39,10 +39,9 @@ export function LoginScreen({ app }: { app: AppController }) {
               <span className="font-semibold text-ink">{APP_NAME}</span>
               <span className="ml-auto text-ink-2">지금</span>
             </div>
-            <div id="login-note-text"><p className="m-0 mt-[8px] text-[15px] leading-[22px] font-semibold text-ink">겨울방학 소프트웨어 인턴 모집 안내</p>
+            <div id="login-note-text"><p className="m-0 mt-[8px] text-[15px] leading-[22px] font-semibold text-ink">[소프트웨어학과] 겨울방학 소프트웨어 인턴 모집 안내</p>
             <p className="m-0 mt-[2px] text-[14px] leading-[20px] font-medium text-ink break-keep">소프트웨어학과 학생이 지원할 수 있는 개발 인턴이에요</p>
-            <p className="m-0 text-[14px] leading-[20px] text-ink-2">관심 키워드 인턴, <span className="whitespace-nowrap">12월 5일(토) 마감이에요</span></p>
-            <p className="m-0 text-[14px] leading-[20px] text-ink-3">소프트웨어학과 공지</p></div>
+            <p className="m-0 text-[14px] leading-[20px] text-ink-2">관심 키워드 인턴, <span className="whitespace-nowrap">12월 5일(토) 마감이에요</span></p></div>
           </div>
         </div>
         <div className="pt-[32px]">
