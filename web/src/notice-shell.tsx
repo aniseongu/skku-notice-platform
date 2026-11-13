@@ -200,7 +200,7 @@ function settingsModel(app: AppController) {
     sendFeedback: (kind: FeedbackKind, body: string, email: string) => app.sendFeedback(kind, body, email),
     section: app.settingsSection, openSection: (section: string | null) => app.openSettingsSection(section),
     theme: app.theme, setTheme: (theme: 'auto' | 'light' | 'dark') => app.setTheme(theme),
-    canInstall: !!app.install && !isStandalone(), manualInstall: ((mode) => (mode === 'ios' || mode === 'samsung' ? mode : null))(installMode(navigator.userAgent, isStandalone(), !!app.install)), install: () => { void app.runInstall(); }, showShortcuts: () => { app.shortcutsOpen = true; },
+    canInstall: !!app.install && !isStandalone(), manualInstall: ((mode) => (mode === 'prompt' || mode === 'none' ? null : mode))(installMode(navigator.userAgent, isStandalone(), !!app.install)), install: () => { void app.runInstall(); }, showShortcuts: () => { app.shortcutsOpen = true; },
     sources: app.sources.filter((source) => !source.external).map((source) => ({ id: source.id, label: boardName(source, source.id) })),
     boardOrder: { boards: applyBoardOrder(app.schoolSources(), app.boardOrder).map((source) => ({ id: source.id, label: boardName(source, source.id) })),
       status: app.authUserId && app.boardOrderAccount ? app.boardOrderStatus : '' as const, move: (ids: string[]) => app.setBoardOrder(ids) },

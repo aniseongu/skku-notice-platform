@@ -91,3 +91,30 @@ test('a deleted event id is restored instead of failing with a conflict', async 
   assert.deepEqual(await syncCalendar('tok', 'cal', desired, fetcher), { added: 1, changed: 0, removed: 0 });
   assert.deepEqual(calls, ['GET', 'POST', 'PUT']);
 });
+
+import { googleReturnDenied, hasCalendarPending, markCalendarPending, takeCalendarPending } from '../src/google-calendar.ts';
+
+const fakeStore = () => { const map = new Map(); return { getItem: (k) => map.get(k) ?? null, setItem: (k, v) => void map.set(k, String(v)), removeItem: (k) => void map.delete(k) }; };
+
+test('pending mark survives a different tab when it is in the shared store, and expires after 10 minutes', () => {
+  const session = fakeStore(), local = fakeStore();
+  markCalendarPending([session, local], 1000);
+  // 돌아온 탭: sessionStorage는 비었고 localStorage에만 남아 있다.
+  assert.equal(takeCalendarPending([fakeStore(), local], 1000 + 60_000), true);
+  assert.equal(takeCalendarPending([fakeStore(), local], 1000 + 61_000), false);   // 한 번만 쓰인다
+  markCalendarPending([local], 1000);
+  assert.equal(takeCalendarPending([local], 1000 + 11 * 60_000), false);           // 오래된 표시는 버린다
+  assert.equal(hasCalendarPending([local]), false);
+});
+
+test('legacy "1" mark still counts, and a missing mark does not', () => {
+  const session = fakeStore(); session.setItem('google-calendar-pending', '1');
+  assert.equal(takeCalendarPending([session]), true);
+  assert.equal(takeCalendarPending([session]), false);
+});
+
+test('google denial is detected from the return url', () => {
+  assert.equal(googleReturnDenied('https://x.dev/?error=access_denied&error_code=provider_denied'), true);
+  assert.equal(googleReturnDenied('https://x.dev/#error=server_error'), true);
+  assert.equal(googleReturnDenied('https://x.dev/?view=settings&section=calendar'), false);
+});

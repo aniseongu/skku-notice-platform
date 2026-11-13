@@ -113,7 +113,7 @@ export async function deleteMyAccount(client: SupabaseClient): Promise<void> {
 /** 구글 갱신 열쇠를 서버에 맡겨 암호화해 보관하게 한다. 서버가 이 열쇠로 캘린더를 자동으로 맞춘다. */
 export async function linkGoogleCalendar(client: SupabaseClient, refreshToken: string): Promise<void> {
   const { error } = await client.functions.invoke('byok', { method: 'POST', body: { action: 'google-calendar-link', refreshToken } });
-  if (error) throw await failure(error, '자동으로 맞추는 설정을 저장하지 못했어요. 잠시 뒤 다시 연결해 주세요.');
+  if (error) throw await failure(error, '자동으로 반영하는 설정을 저장하지 못했어요. 잠시 뒤 다시 연결해 주세요.');
 }
 
 export interface GoogleAutoStatus { active: boolean; error: string | null; lastRunAt: string | null }

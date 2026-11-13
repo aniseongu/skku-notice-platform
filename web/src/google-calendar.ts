@@ -132,3 +132,49 @@ export async function syncCalendar(
   }
   return { added, changed, removed };
 }
+
+// ----- 연결하러 구글에 다녀오는 동안의 표시 -----
+// 휴대폰에서는 구글 허용 화면이 다른 탭이나 다른 창(설치한 앱 -> 브라우저 등)에서 열려, 돌아온 곳의 sessionStorage가 비어 있을 수 있다.
+// 그래서 같은 출처에서 공유되는 localStorage에 시각과 함께 두고, 10분이 지나면 버린다.
+export const PENDING_KEY = 'google-calendar-pending';
+const PENDING_TTL_MS = 10 * 60 * 1000;
+type KV = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+
+export function markCalendarPending(stores: KV[], now = Date.now()): void {
+  for (const store of stores) { try { store.setItem(PENDING_KEY, String(now)); } catch { /* 저장소를 못 쓰는 환경 */ } }
+}
+
+/** 표시가 있으면 지우고 true. 예전 형식('1')이나 시각이 없는 표시는 이 탭(sessionStorage)에서만 믿는다. */
+export function takeCalendarPending(stores: KV[], now = Date.now()): boolean {
+  let found = false;
+  for (const store of stores) {
+    try {
+      const raw = store.getItem(PENDING_KEY);
+      store.removeItem(PENDING_KEY);
+      if (raw === null) continue;
+      const at = Number(raw);
+      if (raw === '1' || (Number.isFinite(at) && now - at >= 0 && now - at < PENDING_TTL_MS)) found = true;
+    } catch { /* 읽지 못하면 없는 것으로 본다 */ }
+  }
+  return found;
+}
+
+export function hasCalendarPending(stores: KV[], now = Date.now()): boolean {
+  for (const store of stores) {
+    try {
+      const raw = store.getItem(PENDING_KEY);
+      const at = Number(raw);
+      if (raw === '1' || (raw !== null && Number.isFinite(at) && now - at >= 0 && now - at < PENDING_TTL_MS)) return true;
+    } catch { /* 없는 것으로 본다 */ }
+  }
+  return false;
+}
+
+/** 구글이 허용을 거절하거나 오류로 돌려보낸 주소인지(주소의 error 값). */
+export function googleReturnDenied(href: string): boolean {
+  try {
+    const url = new URL(href);
+    const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
+    return !!(url.searchParams.get('error') || hash.get('error'));
+  } catch { return false; }
+}

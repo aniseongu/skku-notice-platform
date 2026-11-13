@@ -2,7 +2,7 @@
 // 스위치는 바로 반영되는 설정에만 쓰고(role="switch"), 켜짐·꺼짐을 글자로도 알린다(색에만 의존하지 않는다).
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
-import { MANUAL_INSTALL_HINT } from './install-hint';
+import { MANUAL_INSTALL_HINT, type ManualInstallMode } from './install-hint';
 import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
 import { AiRows, StepGuide } from './ai-connect';
 import type { AiKeyStatus, AiPreferences, AiProvider } from './ai-providers';
@@ -42,7 +42,7 @@ export interface SettingsModel {
   sendFeedback: (kind: FeedbackKind, body: string, email: string) => Promise<FeedbackResult>;
   /** iOS Safari: 설치 창이 없어 홈 화면 추가 방법만 알려 준다. */
   /** 설치 창이 없는 브라우저(iOS Safari, 삼성인터넷)에서 홈 화면 추가 방법을 알려 준다. */
-  manualInstall?: 'ios' | 'samsung' | null;
+  manualInstall?: ManualInstallMode | null;
   install: () => void;
   showShortcuts: () => void;
   // 게시판
@@ -632,18 +632,20 @@ function CalendarPage({ model }: { model: SettingsModel }) {
     <Back model={model} />
     <Section id="s-calendar" title="저장한 공지의 마감">
       <Setting name="구글 캘린더" help={'마감이 남은 저장 공지를 "성대 공지" 캘린더에 넣어요'}>
-        {/* 상태와 단추를 따로 두지 않고 하나로 합친다: 연결 전에는 누르는 "연결하기", 연결되면 누를 수 없는 민트색 "연결됨"으로 바뀐다. */}
+        {/* 연결 상태는 단추가 아니라 칩으로 보이고(키·토큰 줄과 같은 모양), 누르는 것은 단추로만 둔다. */}
         {connected
-          ? <span role="status" className="inline-flex min-h-[44px] items-center gap-[6px] rounded-md bg-accent px-[16px] text-[15px] font-semibold text-on-accent self-start min-[720px]:self-end">
-            <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>연결됨</span>
-          : <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" aria-label="구글 캘린더에 연결하기" disabled={calendar.busy} onClick={calendar.connect}>연결하기</button>}
-        {connected ? <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0">{auto.active ? '30분마다 자동으로 맞춰요' : '자동으로 맞추려면 다시 연결해 주세요'}{calendar.savedCount !== undefined ? ` · 저장한 공지 ${calendar.savedCount}개` : ''}{syncedAt ? ` · 마지막 맞춤 ${syncedAt}` : ''}</p> : null}
-        {connected && !auto.active && auto.error ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">{auto.error}</p> : null}
-        {connected ? <div className="inline-row flex flex-wrap gap-[8px] [&_.input]:min-w-0 [&_.input]:flex-[1_1_200px]">
-          <button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" disabled={calendar.busy} onClick={calendar.disconnect}>연결 끊기</button>
-          {!auto.active ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={calendar.busy} onClick={calendar.connect}>다시 연결하기</button> : null}
-          <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '맞추고 있어요' : '지금 맞추기'}</button>
-        </div> : null}
+          ? <div className="flex flex-wrap items-center gap-2 min-[720px]:justify-end">
+            <span role="status" className={`inline-flex min-h-[32px] items-center justify-center rounded-pill bg-sunken px-3 text-[14px] font-medium ${auto.active ? 'text-accent' : 'text-danger'}`}>{auto.active ? '연결됨' : '다시 연결 필요'}</span>
+            <span className="flex shrink-0 gap-2">
+              {auto.active
+                ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 text-ink" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '반영하는 중' : '지금 반영하기'}</button>
+                : <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2" disabled={calendar.busy} onClick={calendar.connect}>다시 연결하기</button>}
+              <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 text-danger" disabled={calendar.busy} onClick={calendar.disconnect}>연결 끊기</button>
+            </span>
+          </div>
+          : <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2 self-start min-[720px]:self-end" aria-label="구글 캘린더에 연결하기" disabled={calendar.busy} onClick={calendar.connect}>연결하기</button>}
+        {connected && auto.active ? <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0">30분마다 자동으로 반영해요{syncedAt ? ` · 마지막 ${syncedAt}` : ''}</p> : null}
+        {connected && !auto.active ? <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0">{auto.error ?? '자동으로 반영하려면 다시 연결해 주세요'}</p> : null}
         {calendar.message ? <p className="field-note ok text-[14px] leading-[20px] text-accent m-0" role="status">{calendar.message}</p> : null}
         {calendar.error ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">{calendar.error}</p> : null}
       </Setting>

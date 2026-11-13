@@ -17,7 +17,7 @@ import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type S
 import { connectionChain } from './connection-chain';
 import { composeSummaryTime, deleteDevice, loadDevices, loadSummaryTime, saveCanvasMode, saveDeviceName, saveSummaryTime, suggestDeviceName, type CanvasMode, type Device } from './devices';
 import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from './my-notices';
-import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, syncCalendar } from './google-calendar';
+import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, googleReturnDenied, hasCalendarPending, markCalendarPending, syncCalendar, takeCalendarPending } from './google-calendar';
 import { AI_PROVIDERS, DEFAULT_AI_PREFERENCES, loadAiKeyStatuses, loadAiPreferences, registerAiKey, removeAiKey, saveAiPreferences, type AiKeyStatus, type AiPreferences, type AiProvider } from './ai-providers';
 import { sendFeedback, type FeedbackKind, type FeedbackResult } from './feedback';
 import { byokAvailable, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
@@ -373,6 +373,7 @@ export class AppController extends Reactive {
     // 구글 화면에서 취소하고 돌아오면 주소에 오류가 붙는다. 조용히 지운다(오류 문구 없음).
     if (authClient && /[?&#](error|error_description)=/.test(location.search + location.hash)) history.replaceState(history.state, '', cleanReturnUrl());
     if (authClient) {
+      this.checkCalendarReturn();
       this.authSubscription = authClient.auth.onAuthStateChange((_event, session) => {
         const userId = session?.user.id ?? null;
         const loggedIn = !!userId && !this.authUserId && this.authReady;
@@ -415,12 +416,14 @@ export class AppController extends Reactive {
         }
         this.authEmail = session?.user.email ?? null;
         // 구글 로그인 직후에만 접근 토큰이 온다. 캘린더 연결을 누르고 돌아온 경우에만 받아 두고 곧바로 일정을 맞춘다.
+        if (this.calendarDenied && userId) { this.calendarDenied = false; this.calendarError = '구글에서 허용하지 않아 연결하지 못했어요. 다시 연결해 허용해 주세요'; }
         const providerToken = (session as { provider_token?: string | null } | null)?.provider_token;
         const providerRefresh = (session as { provider_refresh_token?: string | null } | null)?.provider_refresh_token;
         if (providerToken && userId && this.takeCalendarPending()) {
           this.rememberGoogleToken(providerToken);
           // 구글이 준 장기 열쇠는 서버에 맡겨 암호화해 보관한다. 그러면 서버가 30분마다 알아서 맞춘다.
           if (providerRefresh) void this.linkGoogleCalendar(providerRefresh);
+          else this.calendarError = '구글이 자동 연결에 쓸 열쇠를 주지 않았어요. 다시 연결해 주세요';
           setTimeout(() => { void this.syncCalendarNow(); }, 0);
         }
         const meta = (session?.user.user_metadata ?? {}) as Record<string, unknown>;
@@ -1075,20 +1078,43 @@ export class AppController extends Reactive {
   }
 
   // ----- 구글 캘린더 -----
+  private calendarDenied = false;
+  private googleTokenMemo: { value: string; at: number } | null = null;
+
   private takeCalendarPending(): boolean {
-    try { const on = sessionStorage.getItem('google-calendar-pending') === '1'; sessionStorage.removeItem('google-calendar-pending'); return on; } catch { return false; }
+    return takeCalendarPending(this.pendingStores());
+  }
+
+  /** 휴대폰은 구글에서 돌아올 때 탭이 달라 sessionStorage가 비므로 localStorage에도 시각과 함께 둔다. */
+  private pendingStores(): Storage[] {
+    const stores: Storage[] = [];
+    try { stores.push(sessionStorage); } catch { /* 못 쓰는 환경 */ }
+    try { stores.push(localStorage); } catch { /* 못 쓰는 환경 */ }
+    return stores;
+  }
+
+  /** 구글에서 허용하지 않고 돌아왔으면 그 사실을 알려 준다(조용히 끝나지 않게). */
+  private checkCalendarReturn(): void {
+    if (!hasCalendarPending(this.pendingStores()) || !googleReturnDenied(location.href)) return;
+    takeCalendarPending(this.pendingStores());
+    this.calendarDenied = true;
   }
 
   private rememberGoogleToken(value: string): void {
+    this.googleTokenMemo = { value, at: Date.now() };   // 저장소를 못 써도 이 탭에서는 바로 맞출 수 있게 메모리에도 둔다
     try { sessionStorage.setItem('google-calendar-token', JSON.stringify({ value, at: Date.now() })); } catch { /* 이 탭의 메모리에는 없으므로 다시 허용을 받는다 */ }
   }
 
   private forgetGoogleToken(): void {
-    try { sessionStorage.removeItem('google-calendar-token'); sessionStorage.removeItem('google-calendar-pending'); } catch { /* 없어도 된다 */ }
+    this.googleTokenMemo = null;
+    try { sessionStorage.removeItem('google-calendar-token'); } catch { /* 없어도 된다 */ }
+    takeCalendarPending(this.pendingStores());
   }
 
   /** 구글 접근 토큰은 1시간 안에 만료돼서 50분까지만 쓴다. 서버에는 보내지 않고 이 탭에만 둔다. */
   private googleToken(): string | null {
+    const memo = this.googleTokenMemo;
+    if (memo && Date.now() - memo.at < 50 * 60 * 1000) return memo.value;
     try {
       const raw = sessionStorage.getItem('google-calendar-token');
       if (!raw) return null;
@@ -1119,7 +1145,7 @@ export class AppController extends Reactive {
       const auto = await loadGoogleAutoStatus(authClient, userId).catch(() => null);
       if (auto && epoch === this.subscriptionsEpoch) this.calendarAuto = auto;
     } catch (error) {
-      if (epoch === this.subscriptionsEpoch) this.calendarError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '자동으로 맞추는 설정을 저장하지 못했어요. 잠시 뒤 다시 연결해 주세요.';
+      if (epoch === this.subscriptionsEpoch) this.calendarError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '자동으로 반영하는 설정을 저장하지 못했어요. 잠시 뒤 다시 연결해 주세요.';
     }
   }
 
@@ -1128,13 +1154,14 @@ export class AppController extends Reactive {
     if (!authClient || !this.authUserId || this.calendarBusy) return;
     this.calendarError = '';
     try {
-      sessionStorage.setItem('google-calendar-pending', '1');
+      markCalendarPending(this.pendingStores());
       const { error } = await authClient.auth.signInWithOAuth({
         provider: 'google',
         options: { scopes: CALENDAR_SCOPE, redirectTo: new URL('./?view=settings&section=calendar', location.href).href, queryParams: { include_granted_scopes: 'true', access_type: 'offline', prompt: 'consent' } },
       });
       if (error) throw error;
     } catch {
+      takeCalendarPending(this.pendingStores());
       this.calendarError = '구글 연결을 시작하지 못했어요. 잠시 뒤 다시 눌러 주세요';
     }
   }
@@ -1144,7 +1171,7 @@ export class AppController extends Reactive {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     if (!authClient || !userId || this.calendarBusy) return;
     const token = this.googleToken();
-    if (!token) { this.calendarMessage = '구글에서 다시 허용하면 바로 맞춰요'; await this.connectCalendar(); return; }
+    if (!token) { this.calendarMessage = '구글에서 다시 허용하면 바로 반영해요'; await this.connectCalendar(); return; }
     this.calendarBusy = true; this.calendarError = ''; this.calendarMessage = '';
     try {
       const notRelevant = new Set(this.saved.filter((item) => this.judgement(item as unknown as Notice)?.ai?.verdict === 'not_relevant').map((item) => item.id));
@@ -1156,10 +1183,10 @@ export class AppController extends Reactive {
       if (error) throw error;
       if (epoch !== this.subscriptionsEpoch) return;
       this.calendarId = calendar; this.calendarSyncedAt = syncedAt;
-      this.calendarMessage = events.size ? `저장한 공지의 마감 ${events.size}개를 캘린더에 맞췄어요` : '마감이 남은 저장 공지가 없어서 넣을 일정이 없어요';
+      this.calendarMessage = events.size ? `마감 ${events.size}개를 캘린더에 반영했어요` : '마감이 남은 저장 공지가 없어요';
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) {
-        this.calendarError = error instanceof GoogleError ? error.message : '캘린더에 맞추지 못했어요. 잠시 뒤 다시 눌러 주세요';
+        this.calendarError = error instanceof GoogleError ? error.message : '캘린더에 반영하지 못했어요. 잠시 뒤 다시 눌러 주세요';
         if (error instanceof GoogleError && /만료|허용/.test(error.message)) this.forgetGoogleToken();
       }
     } finally {
