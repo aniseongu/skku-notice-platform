@@ -1933,7 +1933,7 @@ test('a new version while in use only shows a bar; nothing changes until the use
   await page.evaluate(() => window.dispatchEvent(new Event('vite:preloadError', { cancelable: true })));
   const bar = page.locator('.update-bar');
   await expect(bar).toBeVisible();
-  await expect(bar.getByRole('button', { name: '지금 바꾸기' })).toBeVisible();
+  await expect(bar.getByRole('button', { name: '업데이트' })).toBeVisible();
   expect((await bar.getByRole('button', { name: '나중에' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => (window as unknown as { __kept?: number }).__kept)).toBe(1);   // 다시 열리지 않았다
   await bar.getByRole('button', { name: '나중에' }).click();

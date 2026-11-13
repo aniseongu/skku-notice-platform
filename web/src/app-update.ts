@@ -1,5 +1,5 @@
 // 이용 중에 새 버전이 나와도 화면을 갑자기 바꾸지 않는다. 새 서비스 워커는 설치만 하고 기다리며(registerType: 'prompt'),
-// 사용자가 "지금 바꾸기"를 눌렀을 때만 바꿔 끼운다. 입력 중이던 글(문의, 첫 설정)을 잃지 않게 하려는 것이다.
+// 사용자가 "업데이트"를 눌렀을 때만 바꿔 끼운다. 입력 중이던 글(문의, 첫 설정)을 잃지 않게 하려는 것이다.
 // 출처: https://vite-pwa-org.netlify.app/guide/prompt-for-update.html, https://vite.dev/guide/build#load-error-handling
 type Listener = () => void;
 const listeners = new Set<Listener>();
