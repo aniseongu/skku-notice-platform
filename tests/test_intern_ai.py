@@ -88,3 +88,25 @@ def test_noncomputer_preference_alone_does_not_establish_development_fit():
         "relevant", "소프트웨어 개발 직무이며 전자 전공을 우대해요"
     )
     assert verdict == "relevant"
+
+
+def test_external_postings_get_a_korean_summary_like_school_notices():
+    # 현장실습·인턴 공고도 학교 공지처럼 요약을 저장한다. 영어만 있는 요약은 저장하지 않는다.
+    def generate_content(**kwargs):
+        generate_content.config = kwargs["config"]
+        return SimpleNamespace(text=json.dumps({"items": [
+            {"id": "coop/1", "verdict": "relevant", "reason": "SW 개발 실습이에요",
+             "summary": "한국전자에서 백엔드 개발 실습생을 뽑아요.\n12월 1일까지 톨게이트에서 신청해요."},
+            {"id": "coop/2", "verdict": "maybe", "reason": "직무를 확인해 주세요",
+             "summary": "Hiring backend interns."},
+        ]}, ensure_ascii=False))
+
+    client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    items = [{"id": "coop/1", "title": "현장실습", "body": "본문"},
+             {"id": "coop/2", "title": "Intern", "body": "body"}]
+    result = intern_ai.judge_internships(items, "model", "fake", client=client)
+    expected = "한국전자에서 백엔드 개발 실습생을 뽑아요.\n12월 1일까지 톨게이트에서 신청해요."
+    assert result["coop/1"].summary == expected
+    assert result["coop/2"].summary is None
+    assert "summary는 해요체" in generate_content.config.system_instruction
+    assert "summary" in intern_ai.SCHEMA["properties"]["items"]["items"]["required"]
