@@ -3,7 +3,8 @@ import { authClient } from './auth';
 import { loadPublicBody, loadPublicFeed } from './platform-data';
 
 // external: 외부 인턴 공고(링커리어, 자소설닷컴, D-026). 성대 공지 탭에는 넣지 않는다.
-export interface Source { id: string; name: string; url: string; external?: boolean }
+// coop: 톨게이트 현장실습(학교 로그인이 필요한 공고). external이기도 하며 인턴 공고 탭이 아닌 현장실습 탭에 보인다.
+export interface Source { id: string; name: string; url: string; external?: boolean; coop?: boolean }
 
 export interface Notice {
   id: string;
@@ -15,6 +16,8 @@ export interface Notice {
   posted_on: string;
   pinned: boolean;
   deadline: string | null;
+  // 이 시각이 지나면 어느 목록에서도 보이지 않는다(서버가 나중에 지운다). 없으면 기존 동작.
+  expires_at?: string | null;
   first_seen: string | null;
   // 같은 공지를 여러 게시판에 올렸는지 알아보는 서버의 열쇠(제목, 학교 글은 본문 앞부분 포함). 없으면 합치지 않는다.
   dup_key?: string | null;
@@ -83,7 +86,15 @@ export interface MatchedFile { version: number; generated_at: string; items: Rec
 
 // 개발 서버에서만 ?api=sample/api/v1 로 예시 데이터를 본다. 배포본은 항상 같은 출처의 api/v1만 읽는다
 // (주소 인자로 남의 JSON을 읽게 하면 그 안의 링크로 스크립트를 심을 수 있다).
-const requested = new URLSearchParams(location.search).get('api');
+// 앱이 주소를 바꿔 ?api가 사라져도 새로고침이 같은 예시 데이터를 보도록 개발 서버에서는 세션에 기억한다(배포본에는 없다).
+const devApi = (): string | null => {
+  const fromUrl = new URLSearchParams(location.search).get('api');
+  try {
+    if (fromUrl) sessionStorage.setItem('dev-api', fromUrl);
+    return fromUrl ?? sessionStorage.getItem('dev-api');
+  } catch { return fromUrl; }
+};
+const requested = import.meta.env.DEV ? devApi() : null;
 const API = import.meta.env.DEV && requested && /^[\w-]+(\/[\w-]+)*$/.test(requested) ? requested : 'api/v1';
 
 // 원문 링크는 http, https만 연다. javascript: 같은 주소는 막는다.
@@ -96,14 +107,17 @@ export function safeUrl(url: string): string {
   }
 }
 
+export { noticeKind, isExpired, type NoticeKind } from './notice-scope';
+
 export async function fetchJson<T>(name: string, optional = false): Promise<T | null> {
+  // 로그인 설정이 있으면 공지는 로그인한 사용자의 DB에서만 읽는다. 공개 스냅샷으로 대신하지 않는다.
   if (authClient && !(import.meta.env.DEV && requested)) {
-    try {
-      const match = /^notices\/([\w-]+)\/(\d+)\.json$/.exec(name);
-      const live = name === 'notices.json' ? await loadPublicFeed(authClient)
-        : match ? await loadPublicBody(authClient, match[1], match[2]) : null;
-      if (live) return live as T;
-    } catch { /* 읽기에 실패하면 마지막 공개 스냅샷을 보여 준다. */ }
+    const match = /^notices\/([\w-]+)\/(\d+)\.json$/.exec(name);
+    const live = name === 'notices.json' ? await loadPublicFeed(authClient)
+      : match ? await loadPublicBody(authClient, match[1], match[2]) : null;
+    if (live) return live as T;
+    if (optional) return null;
+    throw new Error(`${name}: 읽지 못했어요`);
   }
   const response = await fetch(`${API}/${name}`, { cache: 'no-cache' });
   if (optional && response.status === 404) return null;

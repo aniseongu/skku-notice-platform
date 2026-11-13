@@ -28,7 +28,7 @@ const SELECT_BTN = 'inline-flex items-center justify-center gap-[6px] [&_.i]:siz
 
 const SHORTCUTS: { group: string; items: [string, string[]][] }[] = [
   { group: '목록', items: [['다음 공지', ['J']], ['이전 공지', ['K']], ['원문 열기', ['Enter']], ['저장하기', ['S']], ['상세 칸 닫기', ['Esc']]] },
-  { group: '이동', items: [['성대 공지', ['1']], ['인턴 공고', ['2']], ['저장', ['3']], ['검색', ['/']]] },
+  { group: '이동', items: [['성대 공지', ['1']], ['인턴 공고', ['2']], ['현장실습', ['3']], ['저장', ['4']], ['검색', ['/']]] },
   { group: '그 밖', items: [['공지 다시 가져오기', ['R']], ['설정 닫기', ['Esc']], ['단축키 보기', ['?']]] },
 ];
 
@@ -75,7 +75,7 @@ export function NoticeShell({ app }: { app: AppController }) {
   const list = app.visible();
   const settings = app.view === 'settings';
   const keywordScope = app.tab() === 'saved' ? app.savedNotices() : app.notices.filter((notice) =>
-    app.isExternal(notice) === (app.tab() === 'intern') && (!notice.deadline || !deadlinePassed(notice.deadline)));
+    app.kindOf(notice) === app.tab() && (!notice.deadline || !deadlinePassed(notice.deadline)));
   const board = app.activeBoard();
   const keywordTotals = keywordCounts(keywordScope.filter((notice) => board === 'all' || notice.source_id === board),
     app.keywords, (notice) => app.interests(notice));
@@ -106,11 +106,12 @@ export function NoticeShell({ app }: { app: AppController }) {
             ariaLabel={`${word}, 공지 ${keywordTotals.counts[word]}개`} />)}
           <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('keywords')}>{app.keywords.length ? '키워드 관리하기' : '키워드 추가하기'}</button>
         </SideGroup>
-        <SideGroup app={app} id="boards" title={app.tab() === 'intern' ? '인턴 공고 사이트' : '게시판'} count={app.tabSources().length}>
+        {/* 현장실습은 출처가 톨게이트 하나뿐이라 고를 게 없다. 한 칸짜리 목록을 보이지 않는다. */}
+        {app.tab() === 'coop' ? null : <SideGroup app={app} id="boards" title={app.tab() === 'intern' ? '인턴 공고 사이트' : '게시판'} count={app.tabSources().length}>
           {boardChoices(app).map((b) => <SideItem key={b.id} label={b.label} count={null} active={app.activeBoard() === b.id}
             onClick={() => { app.setBoard(b.id); if (settings) app.leaveSettings(); }} />)}
           {app.tab() === 'intern' ? null : <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('notifications')}>게시판 더 고르기</button>}
-        </SideGroup>
+        </SideGroup>}
         <div className="side-foot mt-auto flex flex-col gap-[1px] pt-[12px]">
           <SideItem label="설정" count={null} active={settings} onClick={app.openSettingsHome} />
         </div>
@@ -168,7 +169,7 @@ export function NoticeShell({ app }: { app: AppController }) {
           {selected ? <div className="detail-actions min-[1080px]:flex min-[1080px]:gap-[8px]">
             <SaveButton app={app} notice={selected} />
             <ShareButton app={app} notice={selected} />
-            <a className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" href={safeUrl(selected.url)} target="_blank" rel="noopener" aria-keyshortcuts="Enter">원문 열기<Kbd keys={['Enter']} className="ml-[8px]" onSolid /></a></div> : null}
+            <a className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" href={safeUrl(selected.url)} target="_blank" rel="noopener" aria-keyshortcuts="Enter">{openLabel(app, selected)}<Kbd keys={['Enter']} className="ml-[8px]" onSolid /></a></div> : null}
         </div>
         {selected ? <Detail app={app} notice={selected} /> : <p className="detail-note detail-empty m-0 grid min-h-[60%] place-items-center px-[32px] py-[24px] text-[14px] leading-[19px] text-ink-3">공지를 고르면 여기에 보여요</p>}
       </aside>
@@ -186,6 +187,9 @@ export function NoticeShell({ app }: { app: AppController }) {
     {onboarding ? <Onboarding app={app} /> : null}
   </>;
 }
+
+/** 원문 링크 글자. 현장실습은 톨게이트 로그인이 필요한 페이지라서 그 사실이 보이게 한다. */
+const openLabel = (app: AppController, notice: Notice) => app.kindOf(notice) === 'coop' ? '톨게이트에서 신청하기' : '원문 열기';
 
 const SKELETON_BAR = 'block h-[14px] rounded-sm bg-sunken';
 const TOAST_ACTION = '[@media(hover:hover)]:hover:opacity-80 active:opacity-80 inline-flex min-h-[44px] items-center text-inherit [font:inherit]';
@@ -291,7 +295,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
     return <Empty title="목록을 불러오지 못했어요" body="공지 데이터를 연결하는 중이에요. 잠시 뒤 다시 확인해 주세요" action="다시 불러오기" onAction={() => { void app.refresh(); }} />;
   }
   if (!list.length) {
-    const picker = app.tab() === 'all' && app.noBoards() ? null : <div className="group-head empty-head mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-end min-[720px]:m-0 min-[720px]:min-h-0 min-[720px]:px-[24px] min-[720px]:py-[6px]"><span></span><BoardSelect app={app} /></div>;
+    const picker = (app.tab() === 'all' && app.noBoards()) || app.tab() === 'coop' ? null : <div className="group-head empty-head mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-end min-[720px]:m-0 min-[720px]:min-h-0 min-[720px]:px-[24px] min-[720px]:py-[6px]"><span></span><BoardSelect app={app} /></div>;
     const waiting = app.waitingCount();
     const note = (() => {
       // 보여 줄 공지가 모두 AI 확인을 기다리는 중이면 빈 목록 문구 대신 그 사실을 말한다.
@@ -310,6 +314,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
       const [heading, body] = {
         all: ['이 게시판에 공지가 없어요', '다른 게시판을 골라 보세요'],
         intern: ['이 사이트에 공고가 없어요', '다른 사이트를 골라 보세요'],
+        coop: ['지금 신청할 수 있는 현장실습이 없어요', '새 공고가 올라오면 여기에 보여요'],
         saved: ['저장한 공지가 없어요', '공지를 열어 저장하면 여기에 모여요'],
       }[app.tab()];
       return <Empty title={heading} body={body} />;
@@ -333,7 +338,9 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
         const interests = app.shownInterests(notice, grad.length > 0);
         const cached = app.summaries.get(notice.id);
         const rowNotice = withMyDeadline(notice, cached && cached !== 'loading' ? cached : null);
-        return { notice: rowNotice, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
+        // 현장실습 탭에서는 모든 줄의 출처가 탭 이름과 같아 알려 주는 게 없으므로 보이지 않는다(저장 탭에서는 보인다).
+        const source = app.tab() === 'coop' ? '' : boardName(app.sources.find((item) => item.id === notice.source_id), notice.source_id);
+        return { notice: rowNotice, source,
           read: app.isRead(notice), saved: app.isSaved(notice), current: app.isWide && app.detailOpen && app.shownId === notice.id,
           selected: app.selectedReads.includes(notice.id), dim: ai?.verdict === 'not_relevant' && !interests.length,
           interests, ai, rule: app.judgement(notice)?.rule_name ?? null, grad, pending: !ai && !interests.length && !grad.length && app.judgePending(notice) };
@@ -436,8 +443,9 @@ function SortSelect({ app }: { app: AppController }) {
         onClick={() => {
           if (app.view === 'saved') app.savedSort = option.id;
           else if (app.view === 'intern') app.internSort = option.id;
+          else if (app.view === 'coop') app.coopSort = option.id;
           else app.sort = option.id;
-          remember(app.view === 'saved' ? 'saved-sort' : app.view === 'intern' ? 'intern-sort' : 'notice-sort', option.id);
+          remember(app.view === 'saved' ? 'saved-sort' : app.view === 'intern' ? 'intern-sort' : app.view === 'coop' ? 'coop-sort' : 'notice-sort', option.id);
           app.listChanged();
           app.sortMenuOpen = false;
           history.replaceState(null, '', `${location.pathname}?tab=${app.tab()}&sort=${option.id}`);
@@ -448,6 +456,7 @@ function SortSelect({ app }: { app: AppController }) {
 }
 
 function BoardSelect({ app }: { app: AppController }) {
+  if (app.tab() === 'coop') return null;
   const boards = boardChoices(app);
   const current = boards.find((b) => b.id === app.activeBoard())?.label ?? boards[0].label;
   return <div className="board-picker narrow-only relative flex-none min-[720px]:hidden!" onBlur={(event) => {
@@ -498,6 +507,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
     notice: shown, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
     today: todayKst(), body: shownBody, mySummary: mine?.summary ?? null, summarizing: app.summarizing === notice.id, summaryError: app.summaryErrorId === notice.id && !app.summarizing ? app.summaryError : '', makeSummary: () => { void app.makeSummary(notice); }, interests,
     ai: judgement?.ai ?? mine?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
+    coop: app.kindOf(notice) === 'coop',
     pending: !(judgement?.ai ?? mine?.ai) && !interests.length && !hasGrad && app.judgePending(notice),
     retry: () => { app.bodies.delete(notice.id); app.requestUpdate(); },
     grad: gradDetail,
@@ -516,7 +526,7 @@ function ReadingView({ app, notice }: { app: AppController; notice: Notice }) {
     <div className="read-actions glass fixed inset-x-0 bottom-0 z-[3] flex gap-[8px] border-t border-line px-[var(--gutter)] pt-[12px] pb-[calc(12px+env(safe-area-inset-bottom))] [&>*]:flex-1 [&>:is(.save-button,.share-button)]:flex-none">
       <SaveButton app={app} notice={notice} />
       <ShareButton app={app} notice={notice} />
-      <a className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" href={safeUrl(notice.url)} target="_blank" rel="noopener">원문 열기</a>
+      <a className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" href={safeUrl(notice.url)} target="_blank" rel="noopener">{openLabel(app, notice)}</a>
     </div>
   </Fragment>;
 }

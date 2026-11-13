@@ -2,7 +2,7 @@
 // 규칙은 docs/DESIGN.md, docs/design/ux-rules.md, docs/design/platforms.md.
 import {
   type IconName, type Judgement, type MatchedFile, type Notice, type NoticeBody, type NoticesFile, type Source,
-  boardName, cleanTitle, deadlineGroup, deadlinePassed, fetchBody, fetchJson, keywordMatches, postedGroup, safeUrl, todayKst,
+  boardName, cleanTitle, deadlineGroup, deadlinePassed, fetchBody, fetchJson, isExpired, keywordMatches, noticeKind, postedGroup, safeUrl, todayKst,
 } from './data';
 import { type SavedNotice, loadSaved, orderSaved, storeSaved, toggleSaved } from './saved-notices';
 import { initialReadState, isNoticeRead, loadReadState, mergeReadStates, parseReadState, readIds, setReadState, storeReadState } from './read-notices';
@@ -34,12 +34,14 @@ import { dropDuplicates, groupMates } from './dup-notices';
 import { orderNotices, type Sort } from './notice-order';
 import { Reactive, defineReactive } from './reactive';
 
-export type Tab = 'all' | 'intern' | 'saved';
+export type Tab = 'all' | 'intern' | 'coop' | 'saved';
 export type View = Tab | 'settings';
 export const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'all', label: '성대 공지', icon: 'list' },
   // 전체는 성균관대 공지만, 인턴 공고는 링커리어와 자소설닷컴(사용자 결정 2026-11-03, D-026).
   { id: 'intern', label: '인턴 공고', icon: 'briefcase' },
+  // 톨게이트 현장실습(학교 로그인이 필요해 서버 가져오기로 채운다). 인턴 공고 탭에는 섞이지 않는다.
+  { id: 'coop', label: '현장실습', icon: 'user-check' },
   { id: 'saved', label: '저장', icon: 'bookmark' },
 ];
 const GENERIC_INTERN = /^(인턴|인턴십|인턴쉽|intern|internship)$/i;
@@ -130,13 +132,14 @@ export function remember(key: string, value?: string): string | null {
   return value ?? null;
 }
 
-function loadSort(tab: 'all' | 'intern'): Sort {
+function loadSort(tab: 'all' | 'intern' | 'coop'): Sort {
   const params = new URLSearchParams(location.search);
   if (tab === 'all' && params.get('tab') === 'deadline') return 'deadline';
   const requested = params.get('sort');
   if (normalizeTab(params.get('tab') ?? remember('tab')) === tab && (requested === 'latest' || requested === 'deadline')) return requested;
-  const saved = remember(tab === 'intern' ? 'intern-sort' : 'notice-sort');
-  return saved === 'latest' || saved === 'deadline' ? saved : 'latest';
+  const saved = remember(tab === 'intern' ? 'intern-sort' : tab === 'coop' ? 'coop-sort' : 'notice-sort');
+  // 현장실습은 접수마감이 빠른 순이 기본이다(신청 기간이 있는 공고라서).
+  return saved === 'latest' || saved === 'deadline' ? saved : tab === 'coop' ? 'deadline' : 'latest';
 }
 
 function loadBoardOrder(): string[] {
@@ -186,7 +189,7 @@ export class AppController extends Reactive {
     loading: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
     toast: { state: true }, linkCopied: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
-    saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, savedSort: { state: true },
+    saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, coopSort: { state: true }, savedSort: { state: true },
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, authName: { state: true }, authAvatar: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
     aiKeys: { state: true }, aiPrefs: { state: true }, aiBusy: { state: true }, aiError: { state: true },
     byokOn: { state: true }, byokBackfill: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true }, canvasStatus: { state: true }, canvasBusy: { state: true }, canvasError: { state: true },
@@ -295,6 +298,7 @@ export class AppController extends Reactive {
   listTab: Tab = [normalizeTab(new URLSearchParams(location.search).get('tab')), normalizeTab(remember('tab'))].find(isTab) ?? 'all';
   sort: Sort = loadSort('all');
   internSort: Sort = loadSort('intern');
+  coopSort: Sort = loadSort('coop');
   savedSort: Sort = remember('saved-sort') === 'deadline' ? 'deadline' : 'latest';
   unreadOnly = remember('view-unread') === '1';
   selecting = savedSelection() !== null;
@@ -368,6 +372,7 @@ export class AppController extends Reactive {
     if (history.state?.notice) history.replaceState(null, '');
     remember('notice-sort', this.sort);
     remember('intern-sort', this.internSort);
+    remember('coop-sort', this.coopSort);
     applyTheme(this.theme);
     void this.recheckByok();
     // 구글 화면에서 취소하고 돌아오면 주소에 오류가 붙는다. 조용히 지운다(오류 문구 없음).
@@ -465,7 +470,9 @@ export class AppController extends Reactive {
       const notices = await fetchJson<NoticesFile>('notices.json');
       // 뒤늦게 채운 본문도 새 수집 결과와 함께 다시 받는다.
       if (this.generatedAt !== notices!.generated_at) this.bodies.clear();
-      this.notices = notices!.notices;
+      // 기한이 지난 공지는 어느 목록에도 두지 않는다(저장·검색 포함). 서버가 나중에 지운다. 숨기는 곳은 여기 한 곳이다.
+      const bySource = new Map(notices!.sources.map((source) => [source.id, source]));
+      this.notices = notices!.notices.filter((notice) => !isExpired(notice, bySource.get(notice.source_id)));
       this.sources = notices!.sources;
       this.generatedAt = notices!.generated_at;
       if (this.authUserId) void this.refreshMyDeadlines(this.authUserId, this.subscriptionsEpoch);
@@ -601,7 +608,9 @@ export class AppController extends Reactive {
 
   /** 저장한 글. 지금 목록에 있으면 최신 정보로, 밀려났으면 저장할 때 정보로 보여 준다. */
   savedNotices(): Notice[] {
-    return orderSaved(this.saved, this.notices, this.savedSort);
+    // 저장해 둔 사본도 기한이 지났으면 보이지 않는다(서버가 지운 현장실습 포함).
+    const sources = new Map(this.sources.map((source) => [source.id, source]));
+    return orderSaved(this.saved, this.notices, this.savedSort).filter((notice) => !isExpired(notice, sources.get(notice.source_id)));
   }
 
   judgement(notice: Notice): Judgement | undefined {
@@ -1473,8 +1482,10 @@ export class AppController extends Reactive {
    * 구독이 없거나 로그인 전이면 지금 공지가 있는 기본 게시판만 보인다. 전체 게시판 목록의 수십 개 학과 게시판이 한꺼번에 나열되지 않게 한다.
    */
   tabSources(): Source[] {
-    const external = this.tab() === 'intern';
-    return external ? this.sources.filter((s) => Boolean(s.external)) : applyBoardOrder(this.schoolSources(), this.boardOrder);
+    const tab = this.tab();
+    if (tab === 'coop') return this.sources.filter((s) => s.coop === true);
+    if (tab === 'intern') return this.sources.filter((s) => s.external === true && !s.coop);
+    return applyBoardOrder(this.schoolSources(), this.boardOrder);
   }
 
   /** 로그인했고 받을 게시판을 아직 하나도 고르지 않았는지(불러오는 중이거나 불러오지 못한 때는 아니다). 첫 설정을 건너뛴 사람이 여기에 해당한다. */
@@ -1505,6 +1516,8 @@ export class AppController extends Reactive {
   }
 
   isExternal(notice: Notice): boolean { return Boolean(this.sources.find((s) => s.id === notice.source_id)?.external); }
+  /** 공지가 속한 보기: 성대 공지(all), 인턴 공고(intern), 현장실습(coop). */
+  kindOf(notice: Notice): 'all' | 'intern' | 'coop' { return noticeKind(this.sources.find((s) => s.id === notice.source_id)); }
 
   byTab(list: Notice[], tab: Tab): Notice[] {
     if (tab === 'saved') return list;
@@ -1513,11 +1526,11 @@ export class AppController extends Reactive {
   }
 
   private scopeTab(list: Notice[], tab: Tab): Notice[] {
-    const external = tab === 'intern';
+    const external = tab !== 'all';
     // 출처: https://freshrss.github.io/FreshRSS/en/users/10_filter.html (읽음 상태 필터)
     // 읽고 있는 글은 상세를 닫거나 다른 글로 옮길 때까지 남긴다.
     const scoped = list.filter((n) => !n.deadline || !deadlinePassed(n.deadline))
-      .filter((n) => this.isExternal(n) === external)
+      .filter((n) => this.kindOf(n) === tab)
       .filter(() => external || !this.noBoards())
       .filter((n) => external || this.inChosenBoards(n) || n.id === this.selectedId || n.id === this.openedId);
     // 같은 공지가 여러 게시판에 올라오면 가장 먼저 감지된 글만 보여 준다. 읽고 있는 글은 남긴다.
@@ -1529,7 +1542,7 @@ export class AppController extends Reactive {
     return orderNotices(shown, this.sortFor(tab));
   }
 
-  sortFor(tab: Tab): Sort { return tab === 'saved' ? this.savedSort : tab === 'intern' ? this.internSort : this.sort; }
+  sortFor(tab: Tab): Sort { return tab === 'saved' ? this.savedSort : tab === 'intern' ? this.internSort : tab === 'coop' ? this.coopSort : this.sort; }
 
   private decorated(items: Notice[]): Notice[] {
     return items.map((notice) => {
@@ -1669,10 +1682,12 @@ export class AppController extends Reactive {
     if (params.get('tab') === 'deadline') this.sort = 'deadline';
     else if (requested === 'latest' || requested === 'deadline') {
       if (view === 'intern') this.internSort = requested;
+      else if (view === 'coop') this.coopSort = requested;
       else if (view === 'all') this.sort = requested;
     }
     remember('notice-sort', this.sort);
     remember('intern-sort', this.internSort);
+    remember('coop-sort', this.coopSort);
     if (view !== this.view) {
       this.view = view; this.selectedId = null; this.selecting = false; this.selectedReads = [];
       if (view !== 'settings') this.listTab = view;
@@ -1797,7 +1812,7 @@ export class AppController extends Reactive {
       '/': () => qs<HTMLInputElement>('.search input')?.focus(),
       j: () => move(1), ArrowDown: () => move(1), k: () => move(-1), ArrowUp: () => move(-1),
       Enter: () => { const notice = list[index]; if (notice) { this.markRead(notice); window.open(safeUrl(notice.url), '_blank', 'noopener'); } },
-      r: () => this.collectNow(), 1: () => this.setView('all'), 2: () => this.setView('intern'), 3: () => this.setView('saved'),
+      r: () => this.collectNow(), 1: () => this.setView('all'), 2: () => this.setView('intern'), 3: () => this.setView('coop'), 4: () => this.setView('saved'),
       s: () => { const notice = list[index]; if (notice) this.toggleSave(notice); },
     };
     const action = actions[event.key];
@@ -1861,7 +1876,8 @@ export class AppController extends Reactive {
   }
   /** 이 공지에 졸업요건 확인을 보여 줄지: 인턴 공고이고 아직 채우지 않은 요건이 있을 때만. */
   showsGraduation(notice: Notice): boolean {
-    const external = !!this.sources.find((source) => source.id === notice.source_id)?.external;
+    const source = this.sources.find((item) => item.id === notice.source_id);
+    const external = !!source?.external || !!source?.coop;
     return !!authClient && !!this.authUserId && isInternshipNotice(notice, external) && (() => { const v = visibleTracks(this.profile); return v.dept || v.p3; })();
   }
   private autoGraduations = new Set<string>();

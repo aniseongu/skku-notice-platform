@@ -49,6 +49,7 @@ export default defineConfig({
           { name: '성대 공지', url: './?tab=all', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
           { name: '마감순 보기', url: './?tab=all&sort=deadline', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
           { name: '인턴 공고', url: './?tab=intern', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
+          { name: '현장실습', url: './?tab=coop', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
           { name: '저장', url: './?tab=saved', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
         ],
       },
@@ -61,12 +62,6 @@ export default defineConfig({
         // 구글 연결에서 돌아오는 페이지는 주소 뒤에 code가 붙어 미리 저장본과 안 맞는다. 첫 화면으로 바꾸지 않는다.
         navigateFallbackDenylist: [/\/api\//],
         runtimeCaching: [
-          {
-            // 공개 공지만 캐시한다. 인증·개인 JSON과 다른 출처의 응답은 보관하지 않는다.
-            urlPattern: ({ url }) => url.origin === self.location.origin && /\/api\/v1\/notices(?:\.json|\/[\w-]+\/\d+\.json)$/.test(url.pathname),
-            handler: 'NetworkFirst',
-            options: { cacheName: 'public-notices-v1', expiration: { maxEntries: 10 } },
-          },
           {
             // Pretendard 글꼴 조각은 파일 이름이 바뀌지 않으므로 캐시 우선.
             urlPattern: ({ url }) => url.pathname.endsWith('.woff2'),

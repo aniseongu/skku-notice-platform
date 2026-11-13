@@ -1972,3 +1972,56 @@ test('an account remembered as finished keeps the list visible while the profile
   await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).authUserId = 'account-b'; });
   await expect(page.getByText('불러오고 있어요.')).toBeVisible();
 });
+
+test('현장실습 tab shows only field-practice notices, hides expired ones, and opens a sectioned detail', async ({ page }, testInfo) => {
+  await page.goto('/?api=sample/api/v1');
+  const rows = page.locator('notice-rows-screen a.row');
+  await rows.first().waitFor();
+  const mobile = testInfo.project.name === 'mobile';
+  // 성대 공지 탭에는 현장실습이 섞이지 않는다.
+  await expect(page.locator('notice-rows-screen a.row', { hasText: '가상기업' })).toHaveCount(0);
+  await page.getByRole('button', { name: /^현장실습/ }).first().click();
+  await expect(page).toHaveURL(/tab=coop/);
+  // 마감이 지난 것과 expires_at이 지난 것은 보이지 않는다.
+  await expect(rows).toHaveCount(2);
+  await expect(rows.filter({ hasText: '지난기업' })).toHaveCount(0);
+  await expect(rows.filter({ hasText: '만료기업' })).toHaveCount(0);
+  await expect(rows.filter({ hasText: '가상기업' })).toContainText('대기업');
+  await expect(rows.first()).toContainText('예시재단');   // 접수마감이 빠른 순이 기본
+  await expect(page.locator('notice-rows-screen a.row', { hasText: '소프트웨어 공지' })).toHaveCount(0);
+  // 출처가 하나뿐이라 게시판 목록을 두지 않는다.
+  if (!mobile) await expect(page.locator('.sidebar').getByText('게시판', { exact: true })).toHaveCount(0);
+  await rows.filter({ hasText: '가상기업' }).click();
+  const detail = mobile ? '.reading notice-detail-screen' : '.detail-pane notice-detail-screen';
+  await expect(page.locator(`${detail} .detail-title`)).toContainText('가상기업');
+  await expect(page.locator(`${detail} h3`, { hasText: '하는 일' })).toBeVisible();
+  await expect(page.locator(`${detail} h3`, { hasText: '지원 자격' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '톨게이트에서 신청하기' }).first()).toBeVisible();
+  await expect(page.getByText('학교 계정으로 로그인한 뒤').first()).toBeVisible();
+  // 같은 공지 탭의 다른 공지를 학교 공지와 섞지 않는다: 성대 공지로 돌아가면 현장실습은 없다.
+  if (mobile) await page.getByRole('button', { name: '목록으로' }).first().click().catch(() => page.goBack());
+});
+
+test('switching to or from the 현장실습 tab closes an open detail, and key 3 opens the tab', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '상세 칸 열림은 넓은 화면의 동작이다');
+  await page.goto('/?api=sample/api/v1');
+  const rows = page.locator('notice-rows-screen a.row');
+  await rows.first().waitFor();
+  const pane = page.locator('.app');
+  await rows.first().click();
+  await expect(pane).not.toHaveClass(/no-detail/);
+  await page.keyboard.press('3');
+  await expect(page).toHaveURL(/tab=coop/);
+  await expect(pane).toHaveClass(/no-detail/);
+  await expect(rows.first()).toContainText('예시재단');
+  await rows.first().click();
+  await expect(pane).not.toHaveClass(/no-detail/);
+  await page.keyboard.press('4');
+  await expect(pane).toHaveClass(/no-detail/);
+  await page.keyboard.press('1');
+  await expect(page.locator('notice-rows-screen a.row', { hasText: '가상기업' })).toHaveCount(0);
+  // 새로고침해도 마지막 보기(현장실습)를 기억한다.
+  await page.keyboard.press('3');
+  await page.goto('/?api=sample/api/v1');
+  await expect(page.locator('notice-rows-screen a.row').first()).toContainText('예시재단');
+});

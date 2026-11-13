@@ -11,6 +11,13 @@
       "id": "cse-notice",
       "name": "소프트웨어학과 공지",
       "url": "https://cse.skku.edu/cse/notice.do"
+    },
+    {
+      "id": "skku-coop",
+      "name": "현장실습",
+      "url": "https://tollgate.example.test/student/index.do",
+      "external": true,
+      "coop": true
     }
   ],
   "notices": [
@@ -313,6 +320,55 @@
       "pinned": true,
       "deadline": "2026-12-18T23:59:00+09:00",
       "first_seen": "2026-11-02T19:00:00+09:00"
+    },
+    {
+      "id": "skku-coop/9001",
+      "article_no": "9001",
+      "title": "가상기업 · 소프트웨어 개발 실습생",
+      "category": "대기업",
+      "deadline": "2099-12-31T00:00:00+09:00",
+      "source_id": "skku-coop",
+      "url": "https://tollgate.example.test/student/index.do",
+      "posted_on": "2026-11-13",
+      "pinned": false,
+      "first_seen": "2026-11-13T09:00:00+09:00"
+    },
+    {
+      "id": "skku-coop/9002",
+      "article_no": "9002",
+      "title": "예시재단 · 데이터 분석 보조",
+      "category": "공공기관",
+      "deadline": "2099-12-15T00:00:00+09:00",
+      "source_id": "skku-coop",
+      "url": "https://tollgate.example.test/student/index.do",
+      "posted_on": "2026-11-13",
+      "pinned": false,
+      "first_seen": "2026-11-13T09:00:00+09:00"
+    },
+    {
+      "id": "skku-coop/9003",
+      "article_no": "9003",
+      "title": "지난기업 · 마감 지난 실습",
+      "category": "중소기업",
+      "deadline": "2020-01-01T00:00:00+09:00",
+      "source_id": "skku-coop",
+      "url": "https://tollgate.example.test/student/index.do",
+      "posted_on": "2026-11-13",
+      "pinned": false,
+      "first_seen": "2026-11-13T09:00:00+09:00"
+    },
+    {
+      "id": "skku-coop/9004",
+      "article_no": "9004",
+      "title": "만료기업 · 곧 지울 실습",
+      "category": "스타트업",
+      "deadline": "2099-12-31T00:00:00+09:00",
+      "source_id": "skku-coop",
+      "url": "https://tollgate.example.test/student/index.do",
+      "posted_on": "2026-11-13",
+      "pinned": false,
+      "first_seen": "2026-11-13T09:00:00+09:00",
+      "expires_at": "2020-01-01T00:00:00+09:00"
     }
   ]
 }
