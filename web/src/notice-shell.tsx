@@ -17,6 +17,7 @@ import type { UserProfile } from './profile';
 import { Avatar } from './ui';
 import { Onboarding } from './onboarding';
 import { LoginScreen, LoginStatus } from './login-screen';
+import { Spinner } from './spinner';
 import type { CanvasMode } from './devices';
 import { bodyInterests, withMyDeadline } from './notice-view';
 import './platform-settings';
@@ -106,12 +107,12 @@ export function NoticeShell({ app }: { app: AppController }) {
             ariaLabel={`${word}, 공지 ${keywordTotals.counts[word]}개`} />)}
           <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('keywords')}>{app.keywords.length ? '키워드 관리하기' : '키워드 추가하기'}</button>
         </SideGroup>
-        {/* 현장실습은 출처가 톨게이트 하나뿐이라 고를 게 없다. 한 칸짜리 목록을 보이지 않는다. */}
-        {app.tab() === 'coop' ? null : <SideGroup app={app} id="boards" title={app.tab() === 'intern' ? '인턴 공고 사이트' : '게시판'} count={app.tabSources().length}>
-          {boardChoices(app).map((b) => <SideItem key={b.id} label={b.label} count={null} active={app.activeBoard() === b.id}
-            onClick={() => { app.setBoard(b.id); if (settings) app.leaveSettings(); }} />)}
-          {app.tab() === 'intern' ? null : <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('notifications')}>게시판 더 고르기</button>}
-        </SideGroup>}
+        {/* 현장실습은 출처가 톨게이트 하나라 기관 구분(대기업, 중소기업, 스타트업 등)으로 고른다. */}
+        <SideGroup app={app} id="boards" title={app.tab() === 'intern' ? '인턴 공고 사이트' : app.tab() === 'coop' ? '기관 구분' : '게시판'} count={app.tab() === 'coop' ? app.coopKinds().length : app.tabSources().length}>
+          {boardChoices(app).map((b) => <SideItem key={b.id} label={b.label} count={null} active={activeChoice(app) === b.id}
+            onClick={() => { pickChoice(app, b.id); if (settings) app.leaveSettings(); }} />)}
+          {app.tab() === 'intern' || app.tab() === 'coop' ? null : <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('notifications')}>게시판 더 고르기</button>}
+        </SideGroup>
         <div className="side-foot mt-auto flex flex-col gap-[1px] pt-[12px]">
           <SideItem label="설정" count={null} active={settings} onClick={app.openSettingsHome} />
         </div>
@@ -135,7 +136,7 @@ export function NoticeShell({ app }: { app: AppController }) {
                 {app.detailOpen || !selected ? null : <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover wide-only max-[719px]:hidden min-[720px]:flex" aria-label="상세 칸 열기" title="상세 칸 열기"
                   onClick={() => app.setDetail(true)}><Icon name="panel" /></button>}
                 <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover" aria-label="공지 다시 가져오기" title="공지 다시 가져오기 (R)" aria-keyshortcuts="r"
-                  disabled={app.loading} onClick={() => { void app.collectNow(); }}><Icon name="refresh" /></button>
+                  disabled={app.loading} onClick={() => { void app.collectNow(); }}>{app.loading ? <Spinner size={22} /> : <Icon name="refresh" />}</button>
               </>}
               {settings ? null : <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover narrow-only min-[720px]:hidden!" aria-label="설정" onClick={app.openSettingsHome}><GearIcon /></button>}
               {settings ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover wide-only min-[720px]:-mr-[11px] max-[719px]:hidden min-[720px]:flex" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} title={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 (Esc)' : '설정 닫기 (Esc)'}
@@ -193,8 +194,12 @@ const openLabel = (app: AppController, notice: Notice) => app.kindOf(notice) ===
 
 const SKELETON_BAR = 'block h-[14px] rounded-sm bg-sunken';
 const TOAST_ACTION = '[@media(hover:hover)]:hover:opacity-80 active:opacity-80 inline-flex min-h-[44px] items-center text-inherit [font:inherit]';
-const boardChoices = (app: AppController) => [{ id: 'all', label: app.tab() === 'intern' ? '모든 사이트' : '모든 게시판' },
-  ...app.tabSources().map((s) => ({ id: s.id, label: boardName(s, s.id) }))];
+const boardChoices = (app: AppController) => app.tab() === 'coop'
+  ? [{ id: 'all', label: '모든 기관' }, ...app.coopKinds().map((kind) => ({ id: kind, label: kind }))]
+  : [{ id: 'all', label: app.tab() === 'intern' ? '모든 사이트' : '모든 게시판' },
+    ...app.tabSources().map((s) => ({ id: s.id, label: boardName(s, s.id) }))];
+const activeChoice = (app: AppController) => app.tab() === 'coop' ? app.activeCoopKind() : app.activeBoard();
+const pickChoice = (app: AppController, id: string) => app.tab() === 'coop' ? app.setCoopKind(id) : app.setBoard(id);
 
 function settingsModel(app: AppController) {
   return {
@@ -271,7 +276,7 @@ function UpdatedLine({ app, count }: { app: AppController; count?: number }) {
 }
 
 function UpdatedTime({ app, count }: { app: AppController; count?: number }) {
-  if (app.loading && !app.generatedAt) return <p className={`${UPDATED} text-ink-3`}>공지를 불러오고 있어요</p>;
+  if (app.loading && !app.generatedAt) return <p className={`${UPDATED} inline-flex items-center gap-[6px] text-ink-3`}><Spinner size={16} />공지를 불러오고 있어요</p>;
   if (!app.generatedAt) return <p className={`${UPDATED} text-ink-3`}>받은 시각을 알 수 없어요</p>;
   const stale = Date.now() - Date.parse(app.generatedAt) > STALE_MS;
   const time = new Intl.DateTimeFormat('ko-KR', {
@@ -295,7 +300,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
     return <Empty title="목록을 불러오지 못했어요" body="공지 데이터를 연결하는 중이에요. 잠시 뒤 다시 확인해 주세요" action="다시 불러오기" onAction={() => { void app.refresh(); }} />;
   }
   if (!list.length) {
-    const picker = (app.tab() === 'all' && app.noBoards()) || app.tab() === 'coop' ? null : <div className="group-head empty-head mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-end min-[720px]:m-0 min-[720px]:min-h-0 min-[720px]:px-[24px] min-[720px]:py-[6px]"><span></span><BoardSelect app={app} /></div>;
+    const picker = (app.tab() === 'all' && app.noBoards()) ? null : <div className="group-head empty-head mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-end min-[720px]:m-0 min-[720px]:min-h-0 min-[720px]:px-[24px] min-[720px]:py-[6px]"><span></span><BoardSelect app={app} /></div>;
     const waiting = app.waitingCount();
     const note = (() => {
       // 보여 줄 공지가 모두 AI 확인을 기다리는 중이면 빈 목록 문구 대신 그 사실을 말한다.
@@ -456,25 +461,25 @@ function SortSelect({ app }: { app: AppController }) {
 }
 
 function BoardSelect({ app }: { app: AppController }) {
-  if (app.tab() === 'coop') return null;
   const boards = boardChoices(app);
-  const current = boards.find((b) => b.id === app.activeBoard())?.label ?? boards[0].label;
+  const current = boards.find((b) => b.id === activeChoice(app))?.label ?? boards[0].label;
+  const aria = app.tab() === 'coop' ? '기관 구분' : '게시판';
   return <div className="board-picker narrow-only relative flex-none min-[720px]:hidden!" onBlur={(event) => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) app.boardMenuOpen = false;
   }}>
-    <button type="button" className={`${MENU_TRIGGER} font-semibold`} aria-label={`게시판: ${current}`} aria-expanded={app.boardMenuOpen}
+    <button type="button" className={`${MENU_TRIGGER} font-semibold`} aria-label={`${aria}: ${current}`} aria-expanded={app.boardMenuOpen}
       aria-controls="board-options" onClick={() => {
         app.boardMenuOpen = !app.boardMenuOpen;
         if (app.boardMenuOpen) void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.board-option[aria-pressed="true"]')?.focus());
       }}>
       {current}<span className={MENU_CHEVRON} aria-hidden="true" />
     </button>
-    {app.boardMenuOpen ? <div id="board-options" className={`${MENU_OPTIONS} min-w-[max(100%,180px)]`} role="group" aria-label="게시판 선택"
+    {app.boardMenuOpen ? <div id="board-options" className={`${MENU_OPTIONS} min-w-[max(100%,180px)]`} role="group" aria-label={`${aria} 선택`}
       onKeyDown={(event) => moveFocus(event, '.board-option')}>
-      {boards.map((b) => <button type="button" className={`board-option ${MENU_OPTION}`} key={b.id} aria-pressed={app.activeBoard() === b.id}
-        onClick={() => { app.setBoard(b.id); void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.board-picker .board-trigger')?.focus()); }}>
-        <span>{b.label}</span>{app.activeBoard() === b.id ? <span className={MENU_CHECK} aria-hidden="true" /> : null}</button>)}
-      {app.tab() === 'intern' ? null : <button type="button" className={`board-more ${MENU_OPTION}`} onClick={() => app.openSettings('notifications')}><span>게시판 더 고르기</span></button>}
+      {boards.map((b) => <button type="button" className={`board-option ${MENU_OPTION}`} key={b.id} aria-pressed={activeChoice(app) === b.id}
+        onClick={() => { pickChoice(app, b.id); void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.board-picker .board-trigger')?.focus()); }}>
+        <span>{b.label}</span>{activeChoice(app) === b.id ? <span className={MENU_CHECK} aria-hidden="true" /> : null}</button>)}
+      {app.tab() === 'intern' || app.tab() === 'coop' ? null : <button type="button" className={`board-more ${MENU_OPTION}`} onClick={() => app.openSettings('notifications')}><span>게시판 더 고르기</span></button>}
     </div> : null}
   </div>;
 }

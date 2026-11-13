@@ -2002,6 +2002,26 @@ test('현장실습 tab shows only field-practice notices, hides expired ones, an
   if (mobile) await page.getByRole('button', { name: '목록으로' }).first().click().catch(() => page.goBack());
 });
 
+test('현장실습 tab filters by 기관 구분 like a board picker and keeps the choice', async ({ page }, testInfo) => {
+  await page.goto('/?api=sample/api/v1&tab=coop');
+  const rows = page.locator('notice-rows-screen a.row');
+  await expect(rows).toHaveCount(2);
+  const mobile = testInfo.project.name === 'mobile';
+  if (mobile) {
+    await page.getByRole('button', { name: /^기관 구분: / }).click();
+    await page.getByRole('button', { name: '대기업', exact: true }).click();
+  } else {
+    await page.locator('.sidebar').getByRole('button', { name: '대기업', exact: true }).click();
+  }
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('가상기업');
+  await page.reload();
+  await expect(rows).toHaveCount(1);
+  if (mobile) await page.getByRole('button', { name: /^기관 구분: / }).click();
+  await page.getByRole('button', { name: '모든 기관', exact: true }).first().click();
+  await expect(rows).toHaveCount(2);
+});
+
 test('switching to or from the 현장실습 tab closes an open detail, and key 3 opens the tab', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '상세 칸 열림은 넓은 화면의 동작이다');
   await page.goto('/?api=sample/api/v1');

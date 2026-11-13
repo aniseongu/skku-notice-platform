@@ -2,6 +2,7 @@ import { Reason } from './reason';
 import { createRoot, type Root } from 'react-dom/client';
 import { cleanTitle, deadlineDetail, deadlinePassed, deadlineText, daysLeft, koreanDate, safeUrl, type Notice, type NoticeBody, type Verdict } from './data';
 import { useState } from 'react';
+import { Spinner } from './spinner';
 import type { GradPart } from './graduation-assessment';
 import { GraduationNotes, GraduationSection, type GraduationModel } from './graduation-assessment-view';
 import { DETAIL_SECTION, IMAGE_MISSING_CLASS, SECTION_TITLE } from './cls';
@@ -102,7 +103,7 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
       : model.summarizing ? <section className={DETAIL_SECTION} aria-labelledby="sec-summary"><h3 id="sec-summary" className={SECTION_TITLE}>요약</h3><p className={NOTE_FIRST} role="status">요약을 만들고 있어요</p></section>
       : null}
     {model.graduation ? <GraduationSection title={title} model={model.graduation} /> : null}
-    {body === 'loading' ? <p className={NOTE}>본문을 불러오고 있어요</p> : !loaded ? <><p className={NOTE} role="status">본문을 불러오지 못했어요. 다시 불러오거나 원문을 확인해 주세요</p><button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" onClick={model.retry}>본문 다시 불러오기</button></>
+    {body === 'loading' ? <p className={`${NOTE} inline-flex items-center gap-[8px]`} role="status"><Spinner size={18} />본문을 불러오고 있어요</p> : !loaded ? <><p className={NOTE} role="status">본문을 불러오지 못했어요. 다시 불러오거나 원문을 확인해 주세요</p><button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" onClick={model.retry}>본문 다시 불러오기</button></>
       : loaded.translation?.body ? <><section className={`${DETAIL_SECTION} body-text`} aria-label="한국어로 옮긴 본문"><h3 className={SECTION_TITLE}>본문 (한국어로 옮긴 글)</h3><p className={NOTE_BODY}>Gemini 번역이에요. 정확한 내용은 아래 영어 원문을 확인해 주세요</p>{loaded.translation.body.split(/\n+/).filter(Boolean).map((para, index) => <p className={BODY_P} key={index}>{para}</p>)}</section><div className="original-body" lang="en"><Body body={loaded} heading="영어 원문" /></div></> : <Body body={loaded} />}
     {model.coop ? <p className={NOTE}>신청은 톨게이트에 학교 계정으로 로그인한 뒤 할 수 있어요</p> : null}
     {/* 그림에서 읽은 글은 판정에만 쓰고 화면에는 보이지 않는다(틀린 글자가 섞여 있고 그림이 더 정확하다). */}

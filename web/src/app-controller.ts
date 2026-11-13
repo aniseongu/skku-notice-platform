@@ -34,6 +34,7 @@ import { dropDuplicates, groupMates } from './dup-notices';
 import { orderNotices, type Sort } from './notice-order';
 import { Reactive, defineReactive } from './reactive';
 
+const COOP_KIND_ORDER = ['대기업', '중견기업', '중소기업', '스타트업', '기업', '공공기관', '연구기관', '협회/기타'];
 export type Tab = 'all' | 'intern' | 'coop' | 'saved';
 export type View = Tab | 'settings';
 export const TABS: { id: Tab; label: string; icon: IconName }[] = [
@@ -189,7 +190,7 @@ export class AppController extends Reactive {
     loading: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
     toast: { state: true }, linkCopied: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
-    saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, coopSort: { state: true }, savedSort: { state: true },
+    saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, coopSort: { state: true }, coopKind: { state: true }, savedSort: { state: true },
     authReady: { state: true }, authUserId: { state: true }, authEmail: { state: true }, authError: { state: true }, authBusy: { state: true }, authName: { state: true }, authAvatar: { state: true }, pushStatus: { state: true }, pushError: { state: true }, pushRetry: { state: true },
     aiKeys: { state: true }, aiPrefs: { state: true }, aiBusy: { state: true }, aiError: { state: true },
     byokOn: { state: true }, byokBackfill: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true }, canvasStatus: { state: true }, canvasBusy: { state: true }, canvasError: { state: true },
@@ -299,6 +300,8 @@ export class AppController extends Reactive {
   sort: Sort = loadSort('all');
   internSort: Sort = loadSort('intern');
   coopSort: Sort = loadSort('coop');
+  /** 현장실습 기관 구분(대기업, 중소기업, 스타트업 등). 'all'이면 모두. */
+  coopKind = remember('coop-kind') ?? 'all';
   savedSort: Sort = remember('saved-sort') === 'deadline' ? 'deadline' : 'latest';
   unreadOnly = remember('view-unread') === '1';
   selecting = savedSelection() !== null;
@@ -1536,6 +1539,7 @@ export class AppController extends Reactive {
     // 읽고 있는 글은 상세를 닫거나 다른 글로 옮길 때까지 남긴다.
     const scoped = list.filter((n) => !n.deadline || !deadlinePassed(n.deadline))
       .filter((n) => this.kindOf(n) === tab)
+      .filter((n) => tab !== 'coop' || this.activeCoopKind() === 'all' || n.category === this.activeCoopKind())
       .filter(() => external || !this.noBoards())
       .filter((n) => external || this.inChosenBoards(n) || n.id === this.selectedId || n.id === this.openedId);
     // 같은 공지가 여러 게시판에 올라오면 가장 먼저 감지된 글만 보여 준다. 읽고 있는 글은 남긴다.
@@ -1712,6 +1716,18 @@ export class AppController extends Reactive {
   listChanged() {
     this.selectedId = null;
     this.detailOpen = false;
+  }
+
+  /** 지금 접수 중인 현장실습에 있는 기관 구분을 큰 기관부터 차례로. */
+  coopKinds(): string[] {
+    const present = new Set(this.notices.filter((n) => this.kindOf(n) === 'coop' && n.category && (!n.deadline || !deadlinePassed(n.deadline))).map((n) => n.category as string));
+    const order = COOP_KIND_ORDER.filter((kind) => present.has(kind));
+    return [...order, ...[...present].filter((kind) => !order.includes(kind)).sort()];
+  }
+  activeCoopKind(): string { return this.coopKinds().includes(this.coopKind) ? this.coopKind : 'all'; }
+  setCoopKind(kind: string) {
+    this.coopKind = kind; this.boardMenuOpen = false; this.selectedReads = []; remember('coop-kind', kind);
+    this.listChanged();
   }
 
   setBoard(board: string) {

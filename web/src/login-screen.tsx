@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { APP_NAME } from './brand';
 import { installMode, isStandalone, MANUAL_INSTALL_HINT } from './install-hint';
 import type { AppController } from './app-controller';
+import { Spinner } from './spinner';
 
 // 출처: https://developers.google.com/identity/branding-guidelines
 const GoogleG = () => <svg className="flex-none w-[20px] h-[20px]" width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
@@ -17,7 +18,7 @@ const GoogleG = () => <svg className="flex-none w-[20px] h-[20px]" width="18" he
 export function LoginStatus({ text = '불러오고 있어요.' }: { text?: string }) {
   const [shown, setShown] = useState(false);
   useEffect(() => { const timer = window.setTimeout(() => setShown(true), 300); return () => window.clearTimeout(timer); }, []);
-  return <div className="flex flex-col min-h-dvh bg-bg items-center justify-center"><p role="status" className={`m-0 text-[14px] leading-[20px] text-ink-2 ${shown ? '' : 'invisible'}`}>{text}</p></div>;
+  return <div className="flex flex-col min-h-dvh bg-bg items-center justify-center"><div role="status" className={`flex flex-col items-center gap-[12px] ${shown ? '' : 'invisible'}`}><Spinner size={48} /><p className="m-0 text-[14px] leading-[20px] text-ink-2">{text}</p></div></div>;
 }
 
 export function LoginScreen({ app }: { app: AppController }) {
