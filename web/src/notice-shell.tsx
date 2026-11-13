@@ -264,10 +264,10 @@ function SideGroup({ app, id, title, count, children }: { app: AppController; id
   </>;
 }
 
-// 목록이 언제 기준인지 한 줄, AI 판정을 기다리느라 목록에서 뺀 공지가 있으면 그 수를 바로 아래 한 줄로 알린다.
+// 목록 기준 시각과 AI 확인 상태를 함께 보여 주고 공간이 부족하면 줄을 바꾼다.
 function UpdatedLine({ app, count }: { app: AppController; count?: number }) {
   const waiting = app.waitingCount();
-  return <><UpdatedTime app={app} count={count} />{waiting ? <p className={`${UPDATED} waiting text-ink-3`} role="status">AI가 공지 {waiting}개를 확인하고 있어요</p> : null}</>;
+  return <div className="flex flex-wrap items-baseline gap-x-[8px]"><UpdatedTime app={app} count={count} />{waiting ? <p className={`${UPDATED} waiting text-ink-3`} role="status">AI가 공지 {waiting}개를 확인하고 있어요</p> : null}</div>;
 }
 
 function UpdatedTime({ app, count }: { app: AppController; count?: number }) {
