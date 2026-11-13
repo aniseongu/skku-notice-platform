@@ -2015,6 +2015,16 @@ test('현장실습 tab filters by 기관 구분 like a board picker and keeps th
   }
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('가상기업');
+  // 왼쪽 메뉴: 보고 있는 현장실습은 지금 목록 개수(1), 보고 있지 않은 성대 공지는 전체 개수라서 기관 구분을 눌러도 그대로다.
+  if (!mobile) {
+    const menu = page.locator('.sidebar nav[aria-label="보기"]');
+    await expect(menu.locator('button', { hasText: '현장실습' })).toContainText('1');
+    const other = (await menu.locator('button', { hasText: '성대 공지' }).innerText()).replace(/\D/g, '');
+    await page.locator('.sidebar').getByRole('button', { name: '모든 기관', exact: true }).click();
+    await expect(menu.locator('button', { hasText: '현장실습' })).toContainText('2');
+    await expect(menu.locator('button', { hasText: '성대 공지' })).toContainText(other);
+    await page.locator('.sidebar').getByRole('button', { name: '대기업', exact: true }).click();
+  }
   await page.reload();
   await expect(rows).toHaveCount(1);
   if (mobile) await page.getByRole('button', { name: /^기관 구분: / }).click();

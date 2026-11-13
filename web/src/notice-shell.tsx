@@ -70,9 +70,7 @@ export function NoticeShell({ app }: { app: AppController }) {
   if (!app.authReady) return <LoginStatus />;
   if (app.gated) return <LoginScreen app={app} />;
   if (app.awaitingProfile()) return <LoginStatus />;
-  const filtered = app.filtered();
-  const counts = Object.fromEntries(TABS.map((t) => [t.id, t.id === 'saved'
-    ? app.filtered(app.savedNotices()).length : app.byTab(filtered, t.id).length]));
+  const counts = Object.fromEntries(TABS.map((t) => [t.id, app.tabCount(t.id)]));
   const list = app.visible();
   const settings = app.view === 'settings';
   const keywordScope = app.tab() === 'saved' ? app.savedNotices() : app.notices.filter((notice) =>

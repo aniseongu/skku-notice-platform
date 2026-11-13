@@ -702,12 +702,13 @@ export class AppController extends Reactive {
     return this.isExternal(notice) || hasGrad ? all.filter((word) => !GENERIC_INTERN.test(word)) : all;
   }
 
-  filtered(notices = this.notices): Notice[] {
+  /** allBoards가 true이면 고른 게시판과 키워드는 무시하고 검색어만 적용한다(왼쪽 메뉴의 탭 숫자용). */
+  filtered(notices = this.notices, allBoards = false): Notice[] {
     const query = this.query.trim().toLowerCase();
     return notices.filter((n) => {
       const board = this.activeBoard();
-      if (board !== 'all' && n.source_id !== board) return false;
-      if (this.keyword && !this.interests(n).includes(this.keyword)) return false;
+      if (!allBoards && board !== 'all' && n.source_id !== board) return false;
+      if (!allBoards && this.keyword && !this.interests(n).includes(this.keyword)) return false;
       if (!query) return true;
       return `${n.title} ${n.title_ko ?? ''} ${n.category ?? ''} ${this.judgement(n)?.ai?.reason ?? ''}`.toLowerCase().includes(query);
     });
@@ -1529,19 +1530,27 @@ export class AppController extends Reactive {
   /** 공지가 속한 보기: 성대 공지(all), 인턴 공고(intern), 현장실습(coop). */
   kindOf(notice: Notice): 'all' | 'intern' | 'coop' { return noticeKind(this.sources.find((s) => s.id === notice.source_id)); }
 
-  byTab(list: Notice[], tab: Tab): Notice[] {
+  byTab(list: Notice[], tab: Tab, allKinds = false): Notice[] {
     if (tab === 'saved') return list;
     // AI 판정을 기다리는 공지는 끝날 때까지 목록에 두지 않는다(열어 둔 글은 남긴다).
-    return this.scopeTab(list, tab).filter((n) => !this.isWaiting(n));
+    return this.scopeTab(list, tab, allKinds).filter((n) => !this.isWaiting(n));
   }
 
-  private scopeTab(list: Notice[], tab: Tab): Notice[] {
+  /** 왼쪽 메뉴의 탭 숫자. 지금 보고 있는 탭은 고른 게시판·키워드·기관 구분이 걸린 지금 목록의 개수(눈에 보이는 개수),
+   *  보고 있지 않은 탭은 그 탭의 전체(모든 게시판, 현장실습은 모든 기관) 개수다. */
+  tabCount(tab: Tab): number {
+    const current = tab === this.tab();
+    if (tab === 'saved') return this.filtered(this.savedNotices(), !current).length;
+    return this.byTab(this.filtered(this.notices, !current), tab, !current).length;
+  }
+
+  private scopeTab(list: Notice[], tab: Tab, allKinds = false): Notice[] {
     const external = tab !== 'all';
     // 출처: https://freshrss.github.io/FreshRSS/en/users/10_filter.html (읽음 상태 필터)
     // 읽고 있는 글은 상세를 닫거나 다른 글로 옮길 때까지 남긴다.
     const scoped = list.filter((n) => !n.deadline || !deadlinePassed(n.deadline))
       .filter((n) => this.kindOf(n) === tab)
-      .filter((n) => tab !== 'coop' || this.activeCoopKind() === 'all' || coopKindOf(n) === this.activeCoopKind())
+      .filter((n) => allKinds || tab !== 'coop' || this.activeCoopKind() === 'all' || coopKindOf(n) === this.activeCoopKind())
       .filter(() => external || !this.noBoards())
       .filter((n) => external || this.inChosenBoards(n) || n.id === this.selectedId || n.id === this.openedId);
     // 같은 공지가 여러 게시판에 올라오면 가장 먼저 감지된 글만 보여 준다. 읽고 있는 글은 남긴다.
