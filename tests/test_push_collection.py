@@ -97,6 +97,27 @@ def test_message_puts_the_notice_title_first_and_never_says_only_new_notice():
     assert "새 공지" not in worker.compose_message({"notice_id": "school/2", "title": "t"})[1]
 
 
+def test_new_notice_message_puts_the_ai_reason_first():
+    base = {"notice_id": "school/1", "title": "장학 안내", "source_name": "소프트웨어학과 공지"}
+    full = {**base, "ai_reason": "SW 개발 직무라 졸업요건에 맞아요", "matched_words": ["인턴"],
+            "deadline": "2026-11-09T14:59:00+00:00"}
+    assert worker.compose_message(full)[1] == (
+        "SW 개발 직무라 졸업요건에 맞아요\n관심 키워드 인턴, 11월 9일(월) 마감이에요\n소프트웨어학과 공지"
+    )
+    no_keyword = {k: v for k, v in full.items() if k != "matched_words"}
+    assert worker.compose_message(no_keyword)[1] == (
+        "SW 개발 직무라 졸업요건에 맞아요\n11월 9일(월) 마감이에요\n소프트웨어학과 공지"
+    )
+    # 관련 없음·확인 필요 이유도 그대로 첫 줄에 간다. AI 문구가 없으면 키워드·마감 줄부터.
+    reason_only = worker.compose_message({**base, "ai_reason": "기계 설비 업무예요"})
+    assert reason_only[1] == "기계 설비 업무예요\n소프트웨어학과 공지"
+    assert worker.compose_message({**base, "ai_reason": None, "matched_words": ["인턴"]})[1] == (
+        "관심 키워드 인턴\n소프트웨어학과 공지"
+    )
+    # 수정됨 알림에는 AI 문구를 넣지 않는다.
+    assert "SW" not in worker.compose_message({**full, "kind": "changed"})[1]
+
+
 def test_changed_claim_carries_kind_and_marker():
     seen = {}
 

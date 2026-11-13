@@ -119,12 +119,14 @@ def _deadline_label(value: str | None) -> str | None:
 def compose_message(candidate: dict) -> tuple[str, str]:
     """Notification text, reviewed against the Toss writing rules (2026-11-12, user request).
 
-    A phone shows the title and only the first body line until the user expands it. The title is the notice
-    title alone (a board in brackets pushed it out of the visible line). The first body line is one short
-    sentence with why it matters and the deadline ("관심 키워드 인턴, 12월 5일(토) 마감이에요"),
-    the same shape as the example on the login screen (web/src/login-screen.tsx), so what we show
-    before sign-in is what arrives. The AI reason follows, and the board name closes the body
-    instead of the old "새 공지".
+    A phone shows the title and only the first body line until the user expands it, so the AI reason
+    (why this notice matters to this user) comes first. The title is the notice title alone. The second
+    line is one short sentence with the matched keyword and the deadline
+    ("관심 키워드 인턴, 12월 5일(토) 마감이에요"),
+    and the board name closes the body. This is the same shape as the example on the login screen
+    (web/src/login-screen.tsx): AI reason / keyword and deadline / board, so what we show before
+    sign-in is what arrives. Without an AI reason (no key, AI off, or the 3-hour safety wait) the body is
+    the keyword and deadline line, then the board.
     The original service used "[board] title" and "새 공지"; the difference is recorded in MIGRATION_MATRIX.
     """
     board = candidate.get("source_name") or candidate["notice_id"].split("/")[0]
@@ -136,13 +138,13 @@ def compose_message(candidate: dict) -> tuple[str, str]:
         if deadline:
             lines.append(deadline)
     else:
+        if candidate.get("ai_reason"):
+            lines.append(candidate["ai_reason"])
         words = candidate.get("matched_words")
         keyword = f"관심 키워드 {', '.join(words)}" if words else None
         if keyword:
             lines.append(f"{keyword}, {deadline}" if deadline else keyword)
-        if candidate.get("ai_reason"):
-            lines.append(candidate["ai_reason"])
-        if deadline and not keyword:
+        elif deadline:
             lines.append(deadline)
     lines.append(board)
     return candidate["title"], "\n".join(lines)
