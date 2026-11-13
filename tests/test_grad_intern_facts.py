@@ -490,3 +490,90 @@ def test_mixed_korean_english_text_still_reads_korean_period():
 def test_quote_in_text_tolerates_ocr_line_breaks_and_gemini_prompt_demands_original_language_quotes():
     assert gf.quote_in_text("Working hours: Mon-Fri", "Working\nhours:  Mon-Fri 9AM")
     assert "원문의 언어 그대로" in gf.SYSTEM and "영어" in gf.SYSTEM
+
+
+# ---- 여러 부문 모집 속 IT 부서, 판정 이유와 업무 분야 엇갈림, UI/UX 디자이너 ----
+MULTI_DEPT_BODY = (
+    "[모집분야]\n인사총무부\n환경안전부\nCluster ROC운영팀\n프로젝트SCM팀\n사업기획팀\n전산팀\n경영지원팀\n\n\n"
+    "모집 직무 및 주요 업무\n※채용 인원: 부서별 각1명\n근무지\n부서\n직무내용\nProcess Data Management\n"
+    "ASU설비 운영(운전,설비 운영 시스템)\n전공자(전기전자·화학·신\nROC운영팀\n기타 업무보조\n서울\n기타 IT업무지원\n관련 교육이수자\n"
+    "인사자료업데이트및 문서관리\nMS Office 활용 능력,\n인사총무부\n\n\n우대사항\n"
+)
+
+
+def _work(extracted):
+    return next(c for c in assess_department(PROFILE, extracted.facts).checks if c.rule_id == "DEPT-WORK")
+
+
+def test_multi_department_listing_with_it_team_is_mixed_it():
+    assert gf.static_task_category("[에어퍼스트] 동계 각 부문 인턴 채용공고", MULTI_DEPT_BODY) == ("mixed_it", "전산팀")
+    extracted = gf.build_facts("[에어퍼스트] 동계 각 부문 인턴 채용공고", MULTI_DEPT_BODY, None)
+    assert extracted.facts.task_category == "mixed_it"
+    assert all(gf.quote_in_text(e["quote"], f"[에어퍼스트] 동계 각 부문 인턴 채용공고\n{MULTI_DEPT_BODY}") for e in extracted.evidence)
+    assert _work(extracted).result == "pass"
+
+
+def test_ai_non_software_is_overridden_by_it_department():
+    ai = {"task_category": "non_software", "evidence": [{"field": "tasks", "quote": "ASU설비 운영(운전,설비 운영 시스템)"}]}
+    extracted = gf.build_facts("[에어퍼스트] 동계 각 부문 인턴", MULTI_DEPT_BODY, ai)
+    assert extracted.facts.task_category == "mixed_it"
+
+
+def test_it_words_in_qualifications_do_not_make_mixed_it():
+    body = "[담당업무]\n영업 지원 및 마케팅 자료 제작 업무를 수행합니다\n[자격요건]\nAI 활용 능력 우수자\n컴퓨터 활용(MS Office) 가능자\nIT 자격증 우대\n디지털 전환 시대의 인재"
+    assert gf.static_task_category("[예시] 마케팅 인턴", body) == ("non_software", "영업")
+    assert gf.IT_DEPT.search("AI 활용 능력 우수자, 컴퓨터 활용(MS Office), IT 자격증 우대, 디지털 전환 시대") is None
+    assert gf.IT_DEPT.search("기타IT업무지원") and gf.IT_DEPT.search("IT운영팀") and gf.IT_DEPT.search("Software Engineer") and gf.IT_DEPT.search("DX팀")
+    assert gf.IT_DEPT.search("WITH 팀") is None
+
+
+NON_SW_BODY = "[담당업무]\n영업 지원 및 마케팅 자료 제작 업무를 수행합니다. 고객 응대와 행정 보조도 맡아요.\n[자격요건]\n자유"
+
+
+def test_judgment_with_concrete_sw_work_makes_work_unknown():
+    for reason in (
+        "데이터 분석 및 개발 역량을 활용한 교육 운영 기획 업무로 소프트웨어학과 학생이 지원하기에 적합해요.",
+        "데이터 분석 및 기술적 자동화 업무를 포함하며, 코딩 학습을 권장하는 등 소프트웨어 관련 직무를 수행해요.",
+        "데이터 라벨링 및 모델 검증 업무를 수행하며 SQL, Python 활용 능력을 요구하여 관련 직무예요.",
+    ):
+        extracted = gf.build_facts("[예시] 운영 인턴", NON_SW_BODY, None, ("relevant", reason))
+        assert extracted.facts.task_category == "non_software" and extracted.facts.sw_work_in_judgment
+        check = _work(extracted)
+        assert check.result == "unknown" and "학과 심의" in check.note
+        again = gf.facts_from_dict(extracted.as_dict())  # 저장했다 되살려도 같다
+        assert again is not None and again.sw_work_in_judgment
+        assert any(e.get("source") == "judgment" for e in extracted.evidence)
+
+
+def test_judgment_without_sw_work_keeps_non_software_fail():
+    for reason in (
+        "영상 콘텐츠 기획 및 제작 직무로 소프트웨어학과 학생이 지원 가능해요.",
+        "언론 PR 및 커뮤니케이션 지원 업무는 전공 무관으로 학부생도 지원할 수 있어요.",
+        "패키지 디자인 직무는 소프트웨어학과에서 지원 가능한 관련 직무예요.",
+        "숏폼 영상 편집 및 AI 도구 활용 업무를 수행하며 소프트웨어학과 학생이 지원 가능한 직무예요.",
+        "데이터 기반 인사이트 도출 및 AI 도구 활용 마케팅 직무로 소프트웨어 관련 역량을 활용할 수 있어요.",
+        "소프트웨어 및 AI 분야의 교육 콘텐츠 기획과 커리큘럼 설계 업무로 전공 지식을 활용할 수 있어 지원 가능해요.",
+    ):
+        extracted = gf.build_facts("[예시] 운영 인턴", NON_SW_BODY, None, ("relevant", reason))
+        assert extracted.facts.task_category == "non_software" and not extracted.facts.sw_work_in_judgment, reason
+        assert _work(extracted).result == "fail"
+
+
+def test_old_saved_facts_default_without_sw_work_flag():
+    old = gf.build_facts("[예시] 운영 인턴", NON_SW_BODY, None).as_dict()
+    old.pop("sw_work_in_judgment")
+    assert gf.facts_from_dict(old).sw_work_in_judgment is False
+
+
+def test_ui_ux_designer_is_not_non_software():
+    cases = [
+        ("[NHN] UI/UX 디자이너 인턴 (체험형)", "UI/UX 디자이너 인턴을 모집합니다. 모집직무 UI 디자인 및 프로토타입 제작 업무를 수행합니다. 자격요건 자유"),
+        ("[지엘엔인터내셔널] [하나금융그룹] UI체험형인턴 모집", "[담당업무] 하나금융그룹 앱 UI 디자인 및 운영 지원 업무 수행을 합니다 [자격요건] 자유"),
+        ("[예시] UI 디자이너 인턴", "[담당업무] 화면 시안 디자인과 브랜드 가이드 정리 업무를 맡습니다 [자격요건] 자유"),
+    ]
+    for title, body in cases:
+        category = gf.static_task_category(title, body)
+        assert category is None or category[0] != "non_software", (title, category)
+    assert gf.static_task_category("[예시] 인턴", "[담당업무] UI 디자인 및 화면 제작 업무입니다 [자격요건] 자유")[0] == "application_embedded"
+    # 순수 디자인은 여전히 비SW
+    assert gf.static_task_category("[예시] 패키지 인턴", "[담당업무] 패키지 디자인 및 제작 업무입니다 [자격요건] 자유")[0] == "non_software"

@@ -45,7 +45,7 @@ def facts_from_dict(data: dict) -> InternFacts | None:
             explicitly_stated_hours=number(data.get("explicitly_stated_hours"), int), daily_hours=number(data.get("daily_hours"), int),
             days_per_week=number(data.get("days_per_week"), int), task_category=data.get("task_category") or "unknown",
             academic_credit=number(data.get("academic_credit"), float), duration_months=number(data.get("duration_months"), int),
-            duration_days=number(data.get("duration_days"), int))
+            duration_days=number(data.get("duration_days"), int), sw_work_in_judgment=bool(data.get("sw_work_in_judgment")))
     except (TypeError, ValueError):
         return None
 LEGAL_FORM = re.compile(r"\(주\)|㈜|주식회사|유한회사|유한책임회사|합자회사|재단법인|사단법인|\bInc\.?|\bCorp\.?|\bCo\.,?\s*Ltd\.?", re.I)
@@ -254,6 +254,7 @@ class Extracted:
             "daily_hours": self.facts.daily_hours, "days_per_week": self.facts.days_per_week,
             "academic_credit": self.facts.academic_credit,
             "duration_months": self.facts.duration_months, "duration_days": self.facts.duration_days,
+            "sw_work_in_judgment": self.facts.sw_work_in_judgment,
         }
 
 
@@ -287,7 +288,7 @@ CLOCK = re.compile(r"(\d{1,2})\s*:\s*(\d{2})\s*[~\-–∼]\s*(\d{1,2})\s*:\s*(\d
 # non_software, 섞여 있으면 정하지 않고 Gemini에 맡긴다(섞인 직무를 코드로 단정하지 않는다).
 TASK_SECTION = re.compile(r"(?:\[?\s*담당\s*업무\s*\]?|모집\s*직무|주요\s*업무|하는\s*일)\s*[:：]?\s*(.{20,900}?)(?=\n\s*\n\s*\n|\[\s*(?:접수|자격|우대|근무|복리|채용|지원)|자격\s*요건|우대\s*(?:사항|조건)|$)", re.S)
 SW_WORDS: dict[str, re.Pattern[str]] = {
-    "application_embedded": re.compile(r"UI\s*/?\s*UX|웹\s*디자인|UX\s*리서치|프로덕트\s*디자인|앱\s*디자인|소프트웨어\s*개발|SW\s*개발|프로그래밍|프론트\s*엔드|백\s*엔드|웹\s*개발|앱\s*개발|모바일\s*앱|임베디드|펌웨어|게임\s*개발|클라이언트\s*개발|서버\s*개발|Android|iOS|React|Spring|\bJava\b|Python|C\+\+|JavaScript|TypeScript|Kotlin|Swift|\bSQL\b|코딩|알고리즘|프로그램\s*(?:개발|제작)|(?:앱|웹|서비스|플랫폼|시스템|서버|API|SW|S/W|소프트웨어|게임|AI|데이터)\s*개발|개발자|프로그래머|\bdeveloper\b|software engineer", re.I),
+    "application_embedded": re.compile(r"UI\s*/?\s*UX|\bUI\s*(?:디자인|디자이너)|웹\s*디자인|UX\s*리서치|프로덕트\s*디자인|앱\s*디자인|소프트웨어\s*개발|SW\s*개발|프로그래밍|프론트\s*엔드|백\s*엔드|웹\s*개발|앱\s*개발|모바일\s*앱|임베디드|펌웨어|게임\s*개발|클라이언트\s*개발|서버\s*개발|Android|iOS|React|Spring|\bJava\b|Python|C\+\+|JavaScript|TypeScript|Kotlin|Swift|\bSQL\b|코딩|알고리즘|프로그램\s*(?:개발|제작)|(?:앱|웹|서비스|플랫폼|시스템|서버|API|SW|S/W|소프트웨어|게임|AI|데이터)\s*개발|개발자|프로그래머|\bdeveloper\b|software engineer", re.I),
     "data_ai": re.compile(r"데이터\s*(?:라벨링|레이블링|어노테이션)|\bannotation\b|학습\s*데이터|모델\s*학습|\bML\b|데이터\s*품질\s*(?:검증|관리|개선)|데이터\s*분석|데이터\s*엔지니어|데이터\s*사이언|통계\s*분석|데이터\s*베이스|\bDBA\b|머신\s*러닝|딥\s*러닝|AI\s*모델|인공지능\s*(?:모델|개발)|LLM|MLOps|data\s*(?:scientist|engineer|analyst)", re.I),
     "cloud_platform": re.compile(r"클라우드|인프라|DevOps|Kubernetes|\bAWS\b|\bGCP\b|Azure", re.I),
     "system_network": re.compile(r"시스템\s*(?:운영|엔지니어|관리)|IT\s*(?:인프라|운영)|네트워크\s*(?:운영|엔지니어|구축)|서버\s*(?:운영|관리)"),
@@ -297,7 +298,7 @@ SW_WORDS: dict[str, re.Pattern[str]] = {
 NON_SW_WORDS = re.compile(r"\b(?:Marketing|CRM|E-?Commerce|Finance|Accounting|Sourcing|SCM|Supply\s*Chain|Procurement|Merchandising|Logistics|Sales|Brand|Packaging|Human\s*Resources|HR|Public\s*Relations|Communications?)\b|영업|마케팅|회계|재무|인사|총무|상품\s*기획|MD\b|매장|점포|고객\s*(?:응대|관리)|\bCS\b|물류|생산\s*관리|설비|전기\s*(?:공사|설비)|디자인|콘텐츠\s*제작|경영\s*지원|행정|사무\s*보조|운영\s*지원|가맹점|브랜드|PR\b|홍보|번역|통역|연구\s*보조", re.I)
 
 
-SW_DESIGN = re.compile(r"UI\s*/?\s*UX\s*디자인|UI\s*/?\s*UX|웹\s*디자인|앱\s*디자인|프로덕트\s*디자인", re.I)
+SW_DESIGN = re.compile(r"UI\s*/?\s*UX\s*디자인|UI\s*/?\s*UX|\bUI\s*(?:디자인|디자이너)|웹\s*디자인|앱\s*디자인|프로덕트\s*디자인", re.I)
 _WIDE_SPACE = re.compile(r"[ \t\u00a0\u3000]{4,}")
 _BLANK_LINES = re.compile(r"\n[ \t]*(?:\n[ \t]*){3,}")
 
@@ -309,6 +310,13 @@ def squeeze(text: str) -> str:
 
 # "디지털·IT(50명)", "디지털·IT 관련 업무지원"처럼 여러 직무 중 IT 분야 모집 구분이 따로 있는 공고
 IT_TRACK = re.compile(r"디지털\s*[·ㆍ・,/]?\s*IT\s*(?:\(\s*\d+\s*명|관련|분야|직무|부문)|IT\s*(?:분야|직무)\s*(?:모집|지원|배치)")
+
+
+# 여러 부문을 함께 모집하는 공고의 IT 부서·직무 이름("전산팀", "기타 IT업무지원", "Software Engineer"). 그림 글자는 띄어쓰기가 사라지므로 \s*를 허용한다.
+# "AI 활용 능력 우수자", "컴퓨터 활용", "IT 자격증 우대" 같은 자격·우대 말과 회사 소개의 "디지털 전환"은 업무가 아니므로 잡지 않는다.
+IT_DEPT = re.compile(
+    r"전산\s*(?:팀|실|부서)|정보\s*시스템\s*(?:팀|실)|(?<![A-Za-z])IT\s*(?:팀|운영\s*팀|기획|업무\s*지원|부서)|(?<![A-Za-z])DX\s*(?:팀|추진)"
+    r"|디지털\s*전환\s*(?:팀|추진|부서)|정보\s*보안\s*(?:팀|실)|(?<![A-Za-z])(?:Software|Backend|Back-end|Frontend|Front-end|Mobile|ML|AI|Data)\s*Engineer|소프트웨어\s*엔지니어", re.I)
 
 
 # 표로 된 공고(그림 글자 포함)는 "모집분야 | 일반사무 | 26명"처럼 이름표와 값이 다른 줄에 흩어져 "담당 업무: ..." 한 줄 형태로 읽히지 않는다.
@@ -328,7 +336,7 @@ def static_task_category(title: str, body: str) -> tuple[str, str] | None:
     body = squeeze(body)[:MAX_TEXT]
     # 뚜렷한 직무 표기("일반사무 26명")가 가장 믿을 만한 근거다. 우대·가점 자격증 목록의 단어("데이터분석전문가")에 흔들리지 않게 먼저 본다.
     role = ROLE_HEADCOUNT.search(body) or ROLE_AFTER_LABEL.search(body) or ROLE_AFTER_HEADER.search(body) or ROLE_OWN_LINE.search(body)
-    if role and not IT_TRACK.search(body) and not IT_ROLE_MARK.search(body):
+    if role and not IT_TRACK.search(body) and not IT_ROLE_MARK.search(body) and not IT_DEPT.search(body):
         quote = role.group(0)
         return "non_software", quote.split("\n")[-1].strip(" |\t") or quote.strip()   # 근거 문장은 원문에 있는 한 줄이어야 한다
     match = TASK_SECTION.search(body)
@@ -342,9 +350,13 @@ def static_task_category(title: str, body: str) -> tuple[str, str] | None:
     if non and not sw:
         # 소프트웨어 말이 하나도 없고 비SW 말이 있으면 소프트웨어가 아니라고 본다. 담당 업무 칸이 없는 공고는 제목과 앞부분만 보므로,
         # 그때는 제목에 비SW 말이 있을 때만 단정한다(본문 앞부분의 회사 소개 문구로 단정하지 않는다).
-        if match or NON_SW_WORDS.search(title):
+        dept = IT_DEPT.search(body)
+        if dept:  # 여러 부문 모집 속 IT 부서: 그 부서로 지원하면 해당될 수 있다
+            return "mixed_it", dept.group(0)
+        # 제목이 UI/UX 디자이너·개발자처럼 SW 직무를 말하면 업무 칸의 "디자인" 같은 말로 비SW를 단정하지 않는다
+        if (match or NON_SW_WORDS.search(title)) and not any(p.search(title) for p in SW_WORDS.values()):
             return "non_software", non.group(0)
-    track = IT_TRACK.search(squeeze(body)[:MAX_TEXT])
+    track = IT_TRACK.search(squeeze(body)[:MAX_TEXT]) or IT_DEPT.search(squeeze(body)[:MAX_TEXT])
     if track:
         return "mixed_it", track.group(0)  # 여러 직무 중 디지털·IT 구분이 있다: 그 분야로 지원하면 해당될 수 있다
     return None
@@ -605,7 +617,18 @@ def build_facts(title: str, body: str, ai: dict | None, judgment: tuple[str | No
         if isinstance(raw_tasks, list):
             tasks = [t.strip()[:120] for t in raw_tasks if isinstance(t, str) and quote_in_text(t, text)][:5]
 
+    # 여러 부문을 모집하는 공고에서 정규식·AI가 비SW로만 읽었어도(AI는 "첫 직무만" 본다) 본문에 IT 부서·직무 이름이 있으면 그 부서로 지원할 수 있다.
+    if values.get("task_category") == "non_software" and (dept := IT_DEPT.search(text)):
+        values["task_category"] = "mixed_it"
+        evidence.append({"field": "tasks", "quote": dept.group(0)})
+
     verdict, reason = judgment or (None, None)
+    sw_work_in_judgment = False
+    if values.get("task_category") == "non_software" and verdict == "relevant" and isinstance(reason, str) \
+            and any(p.search(reason) for p in SW_WORDS.values()) and not NON_DEV_REASON.search(reason):
+        # 직무 이름은 비SW지만 사용자의 LLM 판정 이유에 개발·데이터 분석 같은 구체적인 SW 업무가 적혀 있다: FAIL로 단정하지 않고 확인 필요로 둔다.
+        sw_work_in_judgment = True
+        evidence.append({"field": "tasks", "quote": reason.strip()[:160], "source": "judgment"})
     if values.get("task_category", "unknown") == "unknown" and isinstance(reason, str):
         # 같은 사용자의 LLM 판정을 담당 업무 근거로 다시 쓴다(AI 호출 없음). 공고에서 읽은 분야가 있으면 그쪽이 우선이다.
         if verdict == "not_relevant" and NON_DEV_REASON.search(reason):
@@ -653,7 +676,7 @@ def build_facts(title: str, body: str, ai: dict | None, judgment: tuple[str | No
         academic_credit=values.get("academic_credit"),
         duration_months=values.get("duration_months") if "start_date" not in values else None,
         duration_days=values.get("duration_days") if "start_date" not in values else None,
-        roles=roles,
+        roles=roles, sw_work_in_judgment=sw_work_in_judgment,
     )
     for name, empty in (("기관 종류", facts.organization_type == "unknown"), ("근무 형태", facts.work_mode == "unknown"),
                         ("근무 기간", facts.start_date is None and facts.duration_days is None), ("담당 업무", facts.task_category == "unknown")):

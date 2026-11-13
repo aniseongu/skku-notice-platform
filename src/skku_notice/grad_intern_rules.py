@@ -79,6 +79,8 @@ class InternFacts:
     monthly_hours: tuple[tuple[str, int], ...] = ()
     # 공고에서 읽은 직무 이름(여러 직무를 모집하면 여러 개). 판정 근거에 어떤 직무가 관련 있어 보이는지 이름으로 말하는 데 쓴다.
     roles: tuple[str, ...] = ()
+    # 직무 이름은 비SW지만 사용자의 LLM 판정 이유에 개발·데이터 분석 같은 SW 업무가 적혀 있다(학과 심의에서 확인해야 한다)
+    sw_work_in_judgment: bool = False
 
 
 @dataclass(frozen=True)
@@ -190,6 +192,8 @@ def _work_check(facts: InternFacts) -> Check:
         if related:
             return Check("DEPT-WORK", PASS, f"{_role_names(related)} 직무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)")
         return Check("DEPT-WORK", PASS, "공고의 담당 업무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)")
+    if facts.task_category == "non_software" and facts.sw_work_in_judgment:
+        return Check("DEPT-WORK", UNKNOWN, "직무 이름은 SW가 아니지만 개발·데이터 업무가 섞여 있어 학과 심의에서 확인해야 해요")
     if facts.task_category == "non_software":
         return Check("DEPT-WORK", FAIL, "공고의 담당 업무가 IT·SW와 거리가 있어요")
     if facts.task_category == "mixed_it":
