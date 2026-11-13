@@ -13,7 +13,7 @@ from google.genai import types
 from skku_notice.eligibility import ELIGIBILITY_RULE
 from skku_notice.fetch import ImageData
 from skku_notice.gemini_client import gemini_client
-from skku_notice.judge import FALLBACK_REASON, LANGUAGE_RULE, Judgment, clean_reason, has_hangul
+from skku_notice.judge import FALLBACK_REASON, LANGUAGE_RULE, Judgment, clean_reason, haeyo, has_hangul
 
 BATCH = 6
 SCHEMA = {
@@ -68,7 +68,7 @@ def clean_summary(summary: object) -> str | None:
     if not isinstance(summary, str):
         return None
     lines = ["".join(c for c in line if unicodedata.category(c) not in {"Cc", "Cf"}).strip() for line in summary.splitlines()]
-    text = "\n".join(line for line in lines if line)[:400] or None  # 저장 칸 상한 400자
+    text = haeyo("\n".join(line for line in lines if line))[:400] or None  # 해요체로, 저장 칸 상한 400자
     return text if text and has_hangul(text) else None
 
 

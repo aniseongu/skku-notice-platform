@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 import json
 from types import SimpleNamespace
 
@@ -110,3 +111,13 @@ def test_external_postings_get_a_korean_summary_like_school_notices():
     assert result["coop/2"].summary is None
     assert "summary는 해요체" in generate_content.config.system_instruction
     assert "summary" in intern_ai.SCHEMA["properties"]["items"]["items"]["required"]
+
+
+def test_formal_endings_become_haeyo_before_saving():
+    from skku_notice.judge import clean_reason, haeyo
+    assert haeyo("실습생을 모집합니다.\n09:00~18:00입니다.\n확정됩니다.") == "실습생을 모집해요.\n09:00~18:00이에요.\n확정돼요."
+    assert haeyo("신청 안내입니다.") == "신청 안내예요." and haeyo("참고하시기 바랍니다.") == "참고해 주세요."
+    assert haeyo("합격자를 발표했습니다.") == "합격자를 발표했어요." and haeyo("링크를 받습니다.") == "링크를 받아요."
+    assert haeyo("이미 해요체예요.") == "이미 해요체예요."
+    assert clean_reason("소프트웨어 관련 역량을 활용할 수 있는 직무입니다.") == "소프트웨어 관련 역량을 활용할 수 있는 직무예요."
+    assert intern_ai.clean_summary("기관이 개발자를 모집합니다.") == "기관이 개발자를 모집해요."

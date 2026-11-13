@@ -148,7 +148,7 @@ def test_notice_injection_is_data_and_outputs_are_bounded(notice) -> None:
                                "cse-notice/123"
                            ]
     assert result.reason == "R" * 120
-    assert result.summary == "S" * 300
+    assert result.summary == "S" * 350  # 요약 상한은 저장 칸에 맞춘 400자(2026-11-13)
     assert result.image_text == "I" * 4000
 
 

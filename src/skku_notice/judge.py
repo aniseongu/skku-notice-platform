@@ -46,7 +46,7 @@ _ENDING_ECHO = re.compile(r"\s*[~〜\-–—]\s*(?:예요|이에요|해요|돼�
 def clean_reason(reason: str) -> str:
     """판정 이유에서 제어 문자와, 프롬프트의 어미 예시를 그대로 따라 붙인 꼬리("~돼요")를 지운다."""
     text = "".join(c for c in reason if unicodedata.category(c) not in {"Cc", "Cf"}).strip()
-    return _ENDING_ECHO.sub("", text).strip()[:120]
+    return (haeyo(_ENDING_ECHO.sub("", text).strip()) or "")[:120]
 
 # 공지나 그림 글자가 영어여도 사용자에게 보이는 reason과 summary는 한국어 해요체로 쓰게 하는 문장이다.
 # SYSTEM 본문에 넣지 않고 호출할 때 덧붙인다: intern_ai.intern_fingerprint가 SYSTEM을 해시에 넣으므로 SYSTEM을 고치면 저장된
@@ -54,8 +54,73 @@ def clean_reason(reason: str) -> str:
 LANGUAGE_RULE = (
     " 공지 제목, 본문, 이미지에서 읽은 글이 영어나 다른 외국어여도 reason과 summary는 항상 한국어 해요체로 쓰세요. "
     "summary는 내용을 한국어로 요약한 것이지 본문 전체의 번역이 아닙니다. 고유명사와 직무명은 원문 표기를 그대로 써도 됩니다."
+    # 토스 문구 규칙(2026-11-13 사용자 지시): 해요체로 끝내고, 결론부터, 능동형, 읽기 쉬운 날짜.
+    " reason과 summary의 모든 문장은 '-요'로 끝나는 해요체로 쓰고 '-습니다', '-입니다', '-ㅂ니다', '-다'로 끝내지 마세요. "
+    "결론부터 쓰고 능동형으로 쓰세요(예: '신청은 이메일로 진행되며'가 아니라 '이메일로 신청해요'). "
+    "날짜는 '12월 28일(월)', 시각은 '오후 6시'처럼 쓰고 올해와 내년 연도는 생략하세요."
 )
 FALLBACK_REASON = "공지 내용을 원문에서 확인해 주세요"
+
+
+# 요약·이유가 격식체("-습니다", "-ㅂ니다")로 끝나면 해요체로 바꾼다(앱 전체가 해요체, 토스 문구 규칙. 2026-11-13 사용자 지시).
+# 모델에 해요체를 지시해도 일부 모델(Groq 등)이 "모집합니다"처럼 답해서 저장 전에 고친다. 문장 끝(마침표·공백·줄 끝)만 바꾼다.
+_BASE, _JUNG, _JONG = 0xAC00, 28, 21 * 28
+_DIGIT_HAS_BATCHIM = set("013678")  # 영 일 삼 육 칠 팔은 받침이 있다
+_FORMAL_END = re.compile(r"([가-힣])(습니다|니다)(?=[.!?\s]|$)")
+
+
+def _parts(ch: str) -> tuple[int, int, int]:
+    code = ord(ch) - _BASE
+    return code // _JONG, (code % _JONG) // _JUNG, code % _JUNG
+
+
+def _join(cho: int, jung: int, jong: int = 0) -> str:
+    return chr(_BASE + cho * _JONG + jung * _JUNG + jong)
+
+
+def _has_batchim(ch: str) -> bool:
+    if "가" <= ch <= "힣":
+        return _parts(ch)[2] != 0
+    return ch in _DIGIT_HAS_BATCHIM or ch.isalpha()
+
+
+# 받침 ㅂ을 뗀 줄기의 모음에 따라 붙는 해요체 꼴(가→가요, 보→봐요, 주→줘요, 리→려요, 쓰→써요, 되→돼요)
+_VOWEL_HAEYO = {0: 0, 4: 4, 8: 9, 13: 14, 20: 6, 18: 4, 11: 10, 1: 1, 5: 5}  # ㅏ ㅓ ㅗ→ㅘ ㅜ→ㅝ ㅣ→ㅕ ㅡ→ㅓ ㅚ→ㅙ ㅐ ㅔ
+
+
+def _haeyo_word(before: str, stem: str, ending: str) -> str | None:
+    if ending == "습니다":
+        cho, jung, jong = _parts(stem)
+        if jong == 0:
+            return None
+        past = jong == 20  # ㅆ 받침(했·됐·었·겠)은 늘 "어요"
+        return stem + ("아요" if jung in (0, 8) and not past else "어요")
+    cho, jung, jong = _parts(stem)
+    if jong != 17:  # ㅂ 받침이 아니면 "-니다" 꼴이 아니다
+        return None
+    if stem == "입":  # 입니다 → 이에요 / 예요(앞 글자 받침에 따라)
+        return "이에요" if before and _has_batchim(before[-1]) else "예요"
+    if stem == "합":
+        return "해요"
+    new_jung = _VOWEL_HAEYO.get(jung)
+    return None if new_jung is None else _join(cho, new_jung) + "요"
+
+
+_PLEASE = re.compile(r"(\S+?)하시기\s*바랍니다(?=[.!?\s]|$)")
+
+
+def haeyo(text: str | None) -> str | None:
+    """문장 끝의 격식체를 해요체로 바꾼다. 바꿀 수 없는 꼴은 그대로 둔다."""
+    if not isinstance(text, str):
+        return text
+    text = _PLEASE.sub(r"\1해 주세요", text)  # "참고하시기 바랍니다" → "참고해 주세요"
+
+    def swap(match: re.Match) -> str:
+        start = match.start()
+        word = _haeyo_word(text[max(0, start - 1):start], match.group(1), match.group(2))
+        return word if word else match.group(0)
+
+    return _FORMAL_END.sub(swap, text)
 _HANGUL = re.compile(r"[가-힣ㄱ-ㅎㅏ-ㅣ]")
 
 
@@ -174,7 +239,7 @@ def judge_notices(
                     chosen = tuple(word for word in interests if word in selected)
                     result[item["id"]] = Judgment(
                         item["verdict"], _clean_output(item["reason"], 120), model, chosen,
-                        _clean_output(item["summary"], 300)
+                        haeyo(_clean_output(item["summary"], 400))
                         if isinstance(item.get("summary"), str) else None,
                         _clean_output(item["image_text"], 4000)
                         if images and images.get(item["id"])

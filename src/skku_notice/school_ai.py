@@ -16,7 +16,7 @@ from google.genai import types
 from skku_notice.deadline import KST
 from skku_notice.eligibility import ELIGIBILITY_RULE
 from skku_notice.gemini_client import gemini_client
-from skku_notice.judge import FALLBACK_REASON, LANGUAGE_RULE, Judgment, clean_reason, has_hangul
+from skku_notice.judge import FALLBACK_REASON, LANGUAGE_RULE, Judgment, clean_reason, haeyo, has_hangul
 
 BATCH = 6
 SCHEMA = {
@@ -122,7 +122,7 @@ def judge_school_notices(
                 if isinstance(summary, str)
                 else []
             )
-            text = "\n".join(line for line in lines if line)[:400] or None  # 저장 칸 상한 400자
+            text = haeyo("\n".join(line for line in lines if line))[:400] or None  # 해요체로, 저장 칸 상한 400자
             if text and not has_hangul(text):  # 한글이 하나도 없는 요약은 영어 그대로라 저장하지 않는다
                 text = None
             kind = reply.get("deadline_kind")
