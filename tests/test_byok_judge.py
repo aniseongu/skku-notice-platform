@@ -375,3 +375,25 @@ def test_overloaded_model_falls_back_to_another_model_only_for_overload():
 def test_joined_programs_are_never_sent() -> None:
     assert judge.build_judge_profile({"joined_programs": ["futurecar", "ase"]}) == {}
     assert "joined_programs" not in judge.PROFILE_COLUMNS
+
+
+def test_duplicate_ai_results_are_reused_once_per_run_and_counted():
+    store = FakeStore([key_row("user-a")])
+    calls = []
+    store.reuse_duplicates = lambda limit=200: calls.append(limit) or 4
+    counts = judge.run_judging(store, MASTER, NOW, factory(Reply('{"items": []}'), []))
+    assert calls == [200]
+    assert counts["dup_reused"] == 4
+
+
+def test_failed_duplicate_reuse_is_skipped_and_judging_continues(capsys):
+    reply = Reply('{"items": [{"id": "ext/1", "verdict": "relevant", "reason": "서버 개발 직무예요"}]}')
+    store = FakeStore([key_row("user-a")])
+
+    def broken(limit=200):
+        raise judge.StoreError("no function")
+
+    store.reuse_duplicates = broken
+    counts = judge.run_judging(store, MASTER, NOW, factory(reply, []))
+    assert counts["dup_reused"] == 0 and counts["judged"] == 1 and counts["errors"] == 0
+    assert "건너뛰" in capsys.readouterr().err

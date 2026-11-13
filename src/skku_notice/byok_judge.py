@@ -7,6 +7,7 @@ are recorded on the key row without any secret material.
 
 import os
 import re
+import sys
 import time
 from datetime import UTC, datetime, timedelta
 
@@ -114,6 +115,11 @@ class JudgeStore(NoticeStore):
         params = {"user_id": f"eq.{user_id}", "select": ",".join(PROFILE_COLUMNS)}
         rows = self._request("GET", "user_profiles", params=params).json()
         return build_judge_profile(rows[0] if rows else {})
+
+    def reuse_duplicates(self, limit: int = 200) -> int:
+        """같은 공지의 사본에 있는 판정·번역·졸업요건을 대표 글에 복사한다(AI를 다시 부르지 않는다)."""
+        response = self._request("POST", "rpc/reuse_duplicate_ai", json={"p_limit": limit})
+        return int(response.json() or 0)
 
     def enqueue_graduation(self, limit: int) -> int:
         response = self._request("POST", "rpc/enqueue_graduation_assessments", json={"p_limit": limit})
@@ -289,9 +295,15 @@ def run_judging(
     sleep=time.sleep, clock=time.monotonic, provider_factory=make_client,
 ) -> dict[str, int]:
     counts = {"users": 0, "judged": 0, "translated": 0, "translation_failed": 0,
-              "rejected": 0, "limited": 0, "errors": 0}
+              "rejected": 0, "limited": 0, "errors": 0, "dup_reused": 0}
     today = now.astimezone(UTC).date().isoformat()
     started = clock()
+    reuse = getattr(store, "reuse_duplicates", None)
+    if reuse:
+        try:
+            counts["dup_reused"] = reuse()
+        except StoreError:  # 함수가 아직 없거나 실패해도 판정은 계속한다
+            print("사본 AI 결과 재사용을 건너뛰었어요", file=sys.stderr, flush=True)
     for user_id, gemini_row in _users(store):
         if clock() - started > RUN_BUDGET_SECONDS:
             break
