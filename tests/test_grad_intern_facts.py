@@ -642,3 +642,30 @@ def test_equipment_role_with_system_word_is_not_an_it_role():
     assert related_roles(roles) == ("기타 IT업무지원", "챗봇 구현개발참여")
     assert related_roles(("설비 제어 SW 개발",)) == ("설비 제어 SW 개발",)  # 분명한 개발 말이 있으면 IT 직무
     assert related_roles(("ERP 시스템 운영",)) == ("ERP 시스템 운영",)
+
+
+def test_sw_task_phrase_names_the_duty_from_the_notice_text():
+    body = "[담당업무]\n• 로그 기반 검사 신뢰성 검증 및 데이터 분석\n• 보고서 작성\n[자격요건]\nPython 활용 능력 우대"
+    assert gf.sw_task_phrase("[세방전지] 채용연계형 인턴", body, "data_ai") == "로그 기반 검사 신뢰성 검증 및 데이터 분석"
+    # 자격·우대 줄, 회사 소개, 물음, 이름표는 업무 구절이 아니다
+    assert gf.sw_task_phrase("[예시] 인턴", "Python 활용 능력 우대\n게임 개발 업무 이해도가 높은 분", "application_embedded") is None
+    assert gf.sw_task_phrase("[예시] 인턴", "근무부서: 판매 데이터 분석 대시보드 운영", "data_ai") == "판매 데이터 분석 대시보드 운영"
+    assert gf.sw_task_phrase("[예시] 인턴", "AI 모델 최적화 플랫폼이란?", "data_ai") is None
+
+
+def test_pass_note_names_the_sw_duty_and_judgment_only_is_not_a_pass():
+    from skku_notice.grad_intern_rules import InternFacts
+
+    def work(**kw):
+        facts = InternFacts(task_category="data_ai", **kw)
+        return next(c for c in assess_department(PROFILE, facts).checks if c.rule_id == "DEPT-WORK")
+
+    assert work(sw_task="차량 진단 및 고장 데이터 분석").note.startswith("‘차량 진단 및 고장 데이터 분석’ 업무가 학과가 정한 SW 업무 분야")
+    unknown = work(sw_from_judgment=True)
+    assert unknown.result == "unknown" and "공고에서 그 업무를 찾지 못했어요" in unknown.note
+    # 판정 이유로 정했어도 공고에서 업무를 찾으면 통과와 그 업무 이름
+    assert work(sw_from_judgment=True, sw_task="고객 데이터 분석").result == "pass"
+    # 정규식 낱말 하나 대신 업무 구절, 저장 뒤 되살리기
+    extracted = gf.build_facts("[예시] 인턴", "[담당업무]\n• 시장 데이터 분석을 통한 비즈니스 기회 발굴\n", None)
+    assert extracted.facts.sw_task == "시장 데이터 분석을 통한 비즈니스 기회 발굴" and "데이터 분석" not in extracted.facts.roles
+    assert gf.facts_from_dict(extracted.as_dict()).sw_task == extracted.facts.sw_task

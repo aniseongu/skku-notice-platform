@@ -45,7 +45,9 @@ def facts_from_dict(data: dict) -> InternFacts | None:
             explicitly_stated_hours=number(data.get("explicitly_stated_hours"), int), daily_hours=number(data.get("daily_hours"), int),
             days_per_week=number(data.get("days_per_week"), int), task_category=data.get("task_category") or "unknown",
             academic_credit=number(data.get("academic_credit"), float), duration_months=number(data.get("duration_months"), int),
-            duration_days=number(data.get("duration_days"), int), sw_work_in_judgment=bool(data.get("sw_work_in_judgment")))
+            duration_days=number(data.get("duration_days"), int), sw_work_in_judgment=bool(data.get("sw_work_in_judgment")),
+            sw_task=data.get("sw_task") if isinstance(data.get("sw_task"), str) and data.get("sw_task") else None,
+            sw_from_judgment=bool(data.get("sw_from_judgment")))
     except (TypeError, ValueError):
         return None
 LEGAL_FORM = re.compile(r"\(주\)|㈜|주식회사|유한회사|유한책임회사|합자회사|재단법인|사단법인|\bInc\.?|\bCorp\.?|\bCo\.,?\s*Ltd\.?", re.I)
@@ -255,6 +257,7 @@ class Extracted:
             "academic_credit": self.facts.academic_credit,
             "duration_months": self.facts.duration_months, "duration_days": self.facts.duration_days,
             "sw_work_in_judgment": self.facts.sw_work_in_judgment,
+            "sw_task": self.facts.sw_task, "sw_from_judgment": self.facts.sw_from_judgment,
         }
 
 
@@ -594,6 +597,61 @@ def _pick_date(value: object) -> date | None:
     return day if 2000 <= day.year <= 2100 else None
 
 
+# 통과 문구에 적을 SW 업무 구절: 공고 원문의 담당 업무 칸(없으면 본문)에서 SW 낱말이 든 줄을 찾아 짧게 자른다.
+# 자격·우대 줄("Python 활용 능력 우대")은 업무가 아니라서 건너뛴다. 원문에 있는 글자만 쓴다.
+QUALIFICATION_LINE = re.compile(r"우대|자격|전공|능력|가능자|경험|이수|보유|소지|학과|학력|졸업|지원\s*요건|필수|관심|이해도|하신|이신|이면서|원하는|희망|분$|분\s|법|서류|통해|팀은|팀이|회사|기업|저희|우리|\bwith\b|\band\b")
+# 조사·이음말로 끝나는 조각은 업무 이름이 아니다("개발자가 금융 환경의")
+FRAGMENT_END = re.compile(r"(?:은|는|이|가|을|를|와|과|의|에|로|으로|하며|하고|에서|한|된|하는|있는|같은|위한|및|등|·)$")
+_PHRASE_BULLET = re.compile(r"^[\s•·ㆍ\-*▶▷◦○●□■◆◇※>✔✓☑️0-9.)\]]+")
+_PHRASE_LABEL = re.compile(r"^(?:담당\s*업무|주요\s*업무|모집\s*직무|하는\s*일|업무\s*내용|직무\s*내용)\s*[:：]?\s*")
+_PHRASE_SPLIT = re.compile(r"\s*(?:[,，;/|]|\s및\s|\s등\s|\s등$)\s*")
+SW_TASK_MAX = 26
+_ANY_LABEL = re.compile(r"^[^:：]{1,12}[:：]\s*")
+
+
+def _phrase_around(line: str, match: re.Match) -> str | None:
+    """줄에서 SW 낱말이 든 마디를 고른다. 깔끔한 마디가 없으면 None(그 줄은 건너뛴다)."""
+    line = _PHRASE_LABEL.sub("", _PHRASE_BULLET.sub("", line)).strip().rstrip(".")
+    line = _ANY_LABEL.sub("", line)  # "근무부서: …", "Language: …"처럼 앞에 붙은 이름표를 뗀다
+    if line.startswith("[") or "?" in line:
+        return None  # 제목 줄과 물음 문장은 업무가 아니다
+    word = match.group(0)
+    parts = [line] if len(line) <= SW_TASK_MAX else [p.strip() for p in _PHRASE_SPLIT.split(line)]
+    for part in parts:
+        part = part.strip(" ·,/:-").rstrip(".")
+        if (word in part and 2 <= len(part) <= SW_TASK_MAX and not FRAGMENT_END.search(part)
+                and part.count("(") == part.count(")") and not part.endswith(("니다", "어요", "해요", "요"))):
+            return part
+    return None
+
+
+def sw_task_phrase(title: str, body: str, category: str) -> str | None:
+    if category not in SW_WORDS:
+        return None
+    text = squeeze(f"{title}\n{body}")[:MAX_TEXT]
+    plain = squeeze(body)[:MAX_TEXT]
+    section = TASK_SECTION.search(plain)
+    scopes = ([section.group(1)] if section else []) + [plain]
+    patterns = [SW_WORDS[category]] + [p for k, p in SW_WORDS.items() if k != category]
+    single: str | None = None  # 낱말 하나("클라우드")는 더 나은 구절이 없을 때만 쓴다
+    for scope in scopes:
+        for pattern in patterns:
+            for line in scope.splitlines():
+                match = pattern.search(line)
+                if not match or QUALIFICATION_LINE.search(line):
+                    continue
+                phrase = _phrase_around(line, match)
+                if phrase and quote_in_text(phrase, text):
+                    if " " in phrase:
+                        return phrase
+                    single = single or phrase
+    if single:
+        return single
+    # 본문에 없으면 제목의 직무명(회사 이름을 뗀 것)에 SW 낱말이 있을 때만 쓴다.
+    role = title_role(title)
+    return role if role and any(p.search(role) for p in patterns) else None
+
+
 # 사용자별 LLM 판정(user_notice_judgments)의 이유가 "소프트웨어 개발 직무가 아니다"는 뜻이면 담당 업무 근거로 다시 쓴다.
 # 같은 공고를 다시 읽는 AI 호출이 없다. 대상이 아니라서 not_relevant인 경우(경력 필수 등)는 이 말이 없으므로 쓰지 않는다.
 NON_DEV_REASON = re.compile(r"(?:소프트웨어|개발|IT|프로그래밍)[^.]{0,25}(?:거리가|아니|무관|관련이?\s*(?:없|적))|비\s*개발")
@@ -660,6 +718,7 @@ def build_facts(title: str, body: str, ai: dict | None, judgment: tuple[str | No
         evidence.append({"field": "tasks", "quote": dept.group(0)})
 
     verdict, reason = judgment or (None, None)
+    from_judgment = False
     sw_work_in_judgment = False
     if values.get("task_category") == "non_software" and verdict == "relevant" and isinstance(reason, str) \
             and any(p.search(reason) for p in SW_WORDS.values()) and not NON_DEV_REASON.search(reason):
@@ -677,6 +736,7 @@ def build_facts(title: str, body: str, ai: dict | None, judgment: tuple[str | No
             if sw and not NON_DEV_REASON.search(reason):
                 values["task_category"] = max(sw, key=lambda k: sw[k])
                 evidence.append({"field": "tasks", "quote": reason.strip()[:160], "source": "judgment"})
+                from_judgment = True
 
     if org_name is None and isinstance(static.get("organization_name"), str):
         org_name = static["organization_name"]
@@ -711,6 +771,10 @@ def build_facts(title: str, body: str, ai: dict | None, judgment: tuple[str | No
         roles = (from_title,) if from_title else tuple(dict.fromkeys(r for r in (clean_role(x) for x in tasks) if r))[:5]
     elif not roles and (from_title := title_role(title)):
         roles = (from_title,)  # AI 직무도 정규식 근거도 없으면 제목의 직무명을 쓴다(제목은 원문이다)
+    sw_task = sw_task_phrase(title, body, values.get("task_category", "unknown"))
+    if sw_task and not tasks:
+        # 정규식이 잡은 SW 낱말 하나("AWS", "데이터 분석")는 업무 이름이 아니다: 공고 원문의 업무 구절을 대신 쓴다.
+        roles = tuple(r for r in roles if not any(p.fullmatch(r) for p in SW_WORDS.values()))
     facts = InternFacts(
         organization_type=values.get("organization_type", "unknown"),
         corporate_status_verified=bool(values.get("corporate_status_verified", False)),
@@ -723,6 +787,8 @@ def build_facts(title: str, body: str, ai: dict | None, judgment: tuple[str | No
         duration_months=values.get("duration_months") if "start_date" not in values else None,
         duration_days=values.get("duration_days") if "start_date" not in values else None,
         roles=roles, sw_work_in_judgment=sw_work_in_judgment,
+        sw_task=sw_task,
+        sw_from_judgment=from_judgment,
     )
     for name, empty in (("기관 종류", facts.organization_type == "unknown"), ("근무 형태", facts.work_mode == "unknown"),
                         ("근무 기간", facts.start_date is None and facts.duration_days is None), ("담당 업무", facts.task_category == "unknown")):

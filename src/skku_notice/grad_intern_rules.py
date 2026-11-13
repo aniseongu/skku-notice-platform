@@ -81,6 +81,10 @@ class InternFacts:
     roles: tuple[str, ...] = ()
     # 직무 이름은 비SW지만 사용자의 LLM 판정 이유에 개발·데이터 분석 같은 SW 업무가 적혀 있다(학과 심의에서 확인해야 한다)
     sw_work_in_judgment: bool = False
+    # 공고 원문에서 찾은 SW 업무 구절("클라우드 인프라 운영 및 모니터링"). 통과 문구에 어떤 업무인지 적는다(사용자 지시 2026-11-13).
+    sw_task: str | None = None
+    # 업무 분야를 공고가 아니라 사용자의 AI 판정 이유로만 정했다(공고에서 그 업무를 못 찾으면 통과로 단정하지 않는다)
+    sw_from_judgment: bool = False
 
 
 @dataclass(frozen=True)
@@ -218,6 +222,12 @@ def _work_check(facts: InternFacts) -> Check:
             return Check("DEPT-WORK", PASS, f"여러 직무 중 {_role_names(related)} 직무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)")
         if related:
             return Check("DEPT-WORK", PASS, f"{_role_names(related)} 직무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)")
+        # 공고 원문의 SW 업무 구절이 있으면 그것을 적는다(어떤 업무가 SW인지 보이게).
+        if facts.sw_task:
+            return Check("DEPT-WORK", PASS, f"‘{facts.sw_task}’ 업무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)")
+        # 판정 이유로만 SW라고 본 공고인데 공고에서 그 업무를 찾지 못했다: 통과로 단정하지 않는다.
+        if facts.sw_from_judgment:
+            return Check("DEPT-WORK", UNKNOWN, "AI는 SW 업무로 봤지만 공고에서 그 업무를 찾지 못했어요")
         # SW 관련 공고는 어떤 직무가 관련 있는지 이름을 적는다(사용자 지시 2026-11-13). 이름을 모를 때만 일반 문구.
         return Check("DEPT-WORK", PASS, _named(roles, "{names} 직무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)",
                                               "공고의 담당 업무가 학과가 정한 SW 업무 분야로 보여요(심의는 따로 있어요)"))
