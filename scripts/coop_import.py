@@ -3,7 +3,7 @@
 
 사용: python scripts/coop_import.py <raw.json> [--sql-out 경로] [--apply]
   기본은 건수만 보여 주고 SQL 파일만 만든다(DB는 건드리지 않는다).
-  --apply는 만든 SQL을 `supabase db query --remote=<ref> -f`로 실행한다.
+  --apply는 만든 SQL을 `supabase db query --remote=<ref> --yes -f`로 실행한다(--apply가 곧 운영 반영 확인이다).
 JSON과 SQL에는 공고 내용이 들어 있으니 저장소 안에 두지 않는다(기본 경로는 임시 폴더).
 """
 
@@ -101,7 +101,7 @@ def main(argv: list[str] | None = None) -> int:
     if not live:
         print("올릴 공고가 없어 실행하지 않아요.")
         return 1
-    return subprocess.run(["supabase", "db", "query", f"--remote={PROJECT_REF}", "-f", str(out)]).returncode
+    return subprocess.run(["supabase", "db", "query", f"--remote={PROJECT_REF}", "--yes", "-f", str(out)]).returncode
 
 
 if __name__ == "__main__":
