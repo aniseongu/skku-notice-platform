@@ -630,22 +630,21 @@ function CalendarPage({ model }: { model: SettingsModel }) {
   const auto = calendar.auto;
   return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Back model={model} />
-    <Section id="s-calendar" title="저장한 공지의 마감">
-      <Setting name="성대 공지 캘린더" help="마감이 남은 저장 공지를 넣어요">
-        {/* 연결 상태는 단추가 아니라 칩으로 보이고(키·토큰 줄과 같은 모양), 누르는 것은 단추로만 둔다. */}
+    <Section id="s-calendar" title="구글 캘린더">
+      <Setting name="성대 공지 캘린더" help={<>마감이 남은 저장 공지를 넣어요
+        {connected ? <StatusText tone={auto.active ? 'ok' : 'bad'}>{auto.active ? '연결됨' : '연결이 끊겼어요'}</StatusText> : null}
+        {connected && auto.active ? <span className="mt-[2px] block">30분마다 자동으로 반영해요{syncedAt ? ` · 마지막 ${syncedAt}` : ''}</span> : null}
+        {connected && !auto.active && auto.error ? <span className="mt-[2px] block">{auto.error}</span> : null}</>}>
         <div className="flex flex-wrap items-center gap-2 min-[720px]:justify-end">
-          <span role="status" className={`inline-flex min-h-[32px] min-w-[128px] items-center justify-center rounded-pill bg-sunken px-3 text-[14px] font-medium ${connected ? (auto.active ? 'text-accent' : 'text-danger') : 'text-ink-2'}`}>{connected ? (auto.active ? '연결됨' : '다시 연결 필요') : '연결 안 됨'}</span>
           <span className="flex shrink-0 gap-1">
             {!connected
               ? <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-3 py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2" aria-label="구글 캘린더에 연결하기" disabled={calendar.busy} onClick={calendar.connect}>연결하기</button>
               : auto.active
                 ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 key-action min-h-[44px] px-3 py-0 text-ink" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '반영하는 중' : '지금 반영하기'}</button>
                 : <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-3 py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2" disabled={calendar.busy} onClick={calendar.connect}>다시 연결하기</button>}
-            {connected ? <button type="button" className="[@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex min-h-[44px] items-center justify-center rounded-md border-0 bg-transparent px-3 py-0 text-[15px] font-semibold text-danger whitespace-nowrap select-none disabled:text-ink-3 disabled:opacity-60" disabled={calendar.busy} onClick={calendar.disconnect}>연결 끊기</button> : null}
+            {connected ? <button type="button" className="[@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex min-h-[44px] items-center justify-center rounded-md border-0 bg-transparent px-3 py-0 text-[15px] font-semibold text-ink-2 whitespace-nowrap select-none disabled:text-ink-3 disabled:opacity-60" disabled={calendar.busy} onClick={calendar.disconnect}>연결 끊기</button> : null}
           </span>
         </div>
-        {connected && auto.active ? <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0">30분마다 자동으로 반영해요{syncedAt ? ` · 마지막 ${syncedAt}` : ''}</p> : null}
-        {connected && !auto.active ? <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0">{auto.error ?? '자동으로 반영하려면 다시 연결해 주세요'}</p> : null}
         {calendar.message ? <p className="field-note ok text-[14px] leading-[20px] text-accent m-0" role="status">{calendar.message}</p> : null}
         {calendar.error ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">{calendar.error}</p> : null}
       </Setting>
@@ -658,11 +657,9 @@ function CalendarPage({ model }: { model: SettingsModel }) {
       </div>
     </Section>
     <Section id="s-calendar-help" title="알아 두세요">
-      <div className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch"><ul className="rule-list m-0 grid gap-[4px] pl-[18px] text-[13px] leading-[19px] text-ink-2">
-        <li>이 앱이 만든 캘린더만 다뤄요. 내 다른 캘린더는 읽지 못해요</li>
-        <li>연결 정보는 암호화해 보관하고, 끊으면 지워요</li>
-        <li>끊어도 캘린더는 남아요. 구글 캘린더에서 지울 수 있어요</li>
-      </ul></div>
+      <Setting name="내 다른 캘린더는 읽지 않아요" help="이 앱이 만든 성대 공지 캘린더만 다뤄요" />
+      <Setting name="구글 연결은 암호화해 보관해요" help="끊으면 바로 지워요" />
+      <Setting name="끊어도 캘린더는 남아요" help="필요 없으면 구글 캘린더에서 지울 수 있어요" />
     </Section>
   </div>;
 }
@@ -774,6 +771,13 @@ function KeyRow({ name, help, state, children, guide }: { name: string; help: st
   </Setting>;
 }
 
+const STATUS_TONE = { ok: 'text-accent', bad: 'text-danger', muted: 'text-ink-3' };
+
+/** 연결 상태: 면과 테두리 없는 글자와 작은 점. 눌리는 단추와 모양이 겹치지 않게 이름·설명 아래에 둔다(키·토큰·캘린더가 같이 쓴다). */
+export function StatusText({ tone, children }: { tone: keyof typeof STATUS_TONE; children: ReactNode }) {
+  return <span role="status" className={`mt-[4px] flex items-center gap-[6px] text-[13px] leading-[20px] font-medium ${STATUS_TONE[tone]}`}><span aria-hidden="true" className="size-[6px] shrink-0 rounded-full bg-current" />{children}</span>;
+}
+
 const SECRET_LABELS = { empty: '미설정', saved: '저장됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '입력하기', edit: '수정하기', remove: '지우기', save: '저장하기' };
 
 /** 비밀 한 줄: 저장 상태, 입력하기·수정하기·지우기, 눌러서 펼치는 입력칸과 받는 방법(Gemini 키와 아이캠퍼스 토큰이 같이 쓴다). */
@@ -794,7 +798,8 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
   const retry = status?.disabled && labels.retry ? labels.retry : labels.edit;
   const form = !status && !loading || editing;
   // 연결 전에는 입력칸이 처음부터 보이고, 받는 방법은 아래에 접어 둔다. 연결하면 키 끝자리를 칩 안에 보여 준다.
-  return <Setting name={name} help={help}>
+  const statusNode = form || confirming ? null : <StatusText tone={status ? (status.disabled ? 'bad' : 'ok') : 'muted'}>{state}</StatusText>;
+  return <Setting name={name} help={<>{help}{statusNode}</>}>
     {form ? <>
       <div className="flex items-center gap-2">
         <div className="relative min-w-0 flex-1">
@@ -820,9 +825,8 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
       </div>
     </> : <>
       <div className={`flex items-center gap-2 ${alignEnd ? 'min-[720px]:justify-end' : ''}`}>
-        <span className={`inline-flex min-h-[32px] min-w-[128px] items-center justify-center rounded-pill bg-sunken px-3 text-[14px] font-medium ${status?.disabled ? 'text-danger' : 'text-accent'}`}>{state}</span>
         <span className="flex shrink-0 gap-2"><button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 key-action min-h-[44px] px-3 py-0" aria-label={`${name} ${retry}`} disabled={loading} onClick={() => setEditing(true)}>{retry}</button>
-        {status ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 key-action min-h-[44px] px-3 py-0 text-danger" aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={() => setConfirming(true)}>{labels.remove}</button> : null}</span>
+        {status ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 key-action min-h-[44px] px-3 py-0 text-ink-2" aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={() => setConfirming(true)}>{labels.remove}</button> : null}</span>
       </div>
       {status?.lastError && !labels.broken ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{status.lastError}</p> : null}
       {note ? <p className="field-note text-[14px] leading-[20px] text-ink-2" role="status">{note}</p> : null}
