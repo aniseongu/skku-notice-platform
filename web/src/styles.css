@@ -27,6 +27,8 @@
   --color-danger-fill: var(--danger-fill);
   --color-soon: var(--soon);
   --color-glass: var(--glass);
+  --color-toast: var(--toast);
+  --color-on-toast: var(--on-toast);
   /* 읽은 글 줄의 면과 PC 마우스 올림 면(계산 색) */
   --color-read: light-dark(color-mix(in oklch, var(--surface) 25%, var(--sunken)), color-mix(in oklch, var(--surface) 40%, var(--bg)));
   --color-hover: color-mix(in oklch, var(--sunken) 70%, var(--surface));
