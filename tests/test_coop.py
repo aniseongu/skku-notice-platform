@@ -143,3 +143,14 @@ def test_same_titles_get_department_only_when_they_collide():
         "skku-coop/1002": "테스트기업 주식회사 · 데이터 분석 (기획팀)",
         "skku-coop/1003": "테스트기업 주식회사 · 다른 직무",
     }
+
+
+def test_zero_headcount_rows_are_blank_and_checked_note_is_separated():
+    row = _row(deadline='2026-11-29 00:00<input type="checkbox" id="c" checked disabled/><label for="c">일정별도 협의</label>')
+    n = parse_row(row, NOW)
+    assert "접수마감: 2026-11-29 00:00, 일정별도 협의" in n.body
+    assert "0명" not in n.body
+    assert "선발대상: 전체학과 2명 (학년 무관)" in n.body
+    only_zero = _row()
+    only_zero["detail"] = only_zero["detail"].replace("2 명", "0 명")
+    assert "선발대상: 전체학과 (학년 무관)" in parse_row(only_zero, NOW).body

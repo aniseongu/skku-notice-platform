@@ -92,18 +92,20 @@ def _value(td: LexborNode, key: str) -> str:
     checked_radio: list[str] = []
     for box in node.css("input"):
         label = node.css_first(f'label[for="{box.attributes.get("id")}"]') if box.attributes.get("id") else None
-        if "checked" in box.attributes:
-            if label is not None:
-                text = label.text(strip=True)
-                (checked_days if box.attributes.get("type") == "checkbox" and key == "days" else checked_radio).append(text)
-        elif label is not None:
+        if "checked" in box.attributes and label is not None:
+            text = label.text(strip=True)
+            (checked_days if box.attributes.get("type") == "checkbox" and key == "days" else checked_radio).append(text)
+        if label is not None:
             label.decompose()
         box.decompose()
     if key == "days":
         return _weekdays(checked_days)
     if key == "contract":
         return " / ".join(checked_radio)
-    return _clean_text(_plain(node.body.inner_html if node.body else ""))
+    # 날짜와 체크한 "일정별도 협의"가 함께 있으면 붙지 않게 쉼표로 나눈다("2026-11-29 00:00, 일정별도 협의").
+    text = _clean_text(_plain(node.body.inner_html if node.body else ""))
+    parts = [x for x in [text, *checked_radio] if x and x != "-"]
+    return ", ".join(parts)
 
 
 def _weekdays(labels: list[str]) -> str:
@@ -169,13 +171,16 @@ def _parse_period(*texts: str | None) -> tuple[date | None, date | None]:
 def _targets(value: str) -> str:
     """"[전체학과 / 1 명 / 무관] / 평가교수 :"를 "전체학과 1명 (학년 무관)"으로. 같은 항목은 한 번만."""
     seen: list[str] = []
+    unnamed: list[str] = []
     for dept, count, grade in TARGET_RE.findall(value):
         grade = grade.strip()
-        line = f"{dept.strip()} {count}명 ({'학년 무관' if grade in ('', '무관') else grade})"
-        if line not in seen:
-            seen.append(line)
-    if seen:
-        return "\n".join(seen)
+        who = f"{dept.strip()} ({'학년 무관' if grade in ('', '무관') else grade})"
+        # 인원 0인 줄은 인원을 정하지 않은 칸이다(총 모집인원은 따로 있다). 인원이 있는 줄이 없을 때만 대상만 보인다.
+        target, line = (unnamed, who) if int(count) == 0 else (seen, f"{dept.strip()} {count}명 ({'학년 무관' if grade in ('', '무관') else grade})")
+        if line not in target:
+            target.append(line)
+    if seen or unnamed:
+        return "\n".join(seen or unnamed)
     return re.sub(r"\s*/?\s*평가교수\s*:\s*", "", value).strip()
 
 
@@ -281,7 +286,7 @@ def parse_row(row: dict, imported_at: datetime) -> CoopNotice | None:
     sections: list[tuple[str, list[tuple[str, str, bool]]]] = [
         ("하는 일", [("직무명", f.get("job", ""), True), ("직무개요", f.get("overview", ""), False),
                   ("교육목표", f.get("goal", ""), False), ("운영/지도계획", f.get("plan", ""), False)]),
-        ("지원 자격", [("선발대상", _targets(f.get("targets", "")), False), ("총 모집인원", f.get("headcount", ""), False),
+        ("지원 자격", [("선발대상", _targets(f.get("targets", "")), False), ("총 모집인원", "" if re.fullmatch(r"0\s*명", f.get("headcount", "")) else f.get("headcount", ""), False),
                    ("요구역량", f.get("skills", ""), False), ("기타사항", f.get("etc", ""), False)]),
         ("실습 조건", [("실습기간", period, False), ("정규 실습시간", f.get("hours", ""), False),
                    ("실습요일", f.get("days", ""), False), ("실습지원비(정규)", _money(f.get("pay", "")), False),
