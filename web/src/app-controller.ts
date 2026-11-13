@@ -1952,7 +1952,7 @@ export class AppController extends Reactive {
     return null;
   }
 
-  /** 열어 본 공지에 요약이 없으면 내 Gemini 키로 자동으로 만든다. 공지마다 한 번만 시도하고, 실패하면 "다시 만들기"로 사용자가 누른다. */
+  /** 열어 본 공지에 요약이 없으면 내 AI 키로 자동으로 만든다. 공지마다 한 번만 시도하고, 실패하면 요약 칸을 보이지 않는다("다시 만들기" 단추는 없앴다, 사용자 지시 2026-11-13). */
   private autoSummaries = new Set<string>();
   autoSummary(notice: Notice): void {
     if (this.summaries.get(notice.id) !== null || this.autoSummaries.has(notice.id)) return;   // 아직 불러오는 중이거나 이미 있다

@@ -1207,10 +1207,10 @@ test('summary is made automatically: progress text, a retry button on failure, n
   await expect(detail.getByRole('button', { name: /요약 만들기/ })).toHaveCount(0);
   await set({ summarizing: true });
   await expect(detail.getByRole('region', { name: '요약' })).toContainText('요약을 만들고 있어요');
-  await set({ summaryError: '오늘 쓸 수 있는 요약을 모두 썼어요. 내일 다시 눌러 주세요.' });
-  await expect(detail.getByRole('region', { name: '요약' })).toContainText('내일 다시');
-  await detail.getByRole('button', { name: '다시 만들기' }).click();
-  expect(await page.evaluate(() => (window as unknown as { asked: number }).asked)).toBe(1);
+  // 자동 요약이 실패해도 "다시 만들기" 단추는 없다(사용자 지시): 요약 칸을 보이지 않는다.
+  await set({ summarizing: false });
+  await expect(detail.getByRole('region', { name: '요약' })).toHaveCount(0);
+  await expect(detail.getByRole('button', { name: '다시 만들기' })).toHaveCount(0);
   await set({ mySummary: '재학생이 12월 5일까지 신청해요.' });
   await expect(detail.getByRole('button', { name: '다시 만들기' })).toHaveCount(0);
   await expect(detail.getByRole('region', { name: '요약' })).toContainText('12월 5일까지');

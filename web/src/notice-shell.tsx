@@ -505,7 +505,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
   const shown = withMyDeadline(notice, mine);
   return <notice-detail-screen model={{
     notice: shown, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
-    today: todayKst(), body: shownBody, mySummary: mine?.summary ?? null, summarizing: app.summarizing === notice.id, summaryError: app.summaryErrorId === notice.id && !app.summarizing ? app.summaryError : '', makeSummary: () => { void app.makeSummary(notice); }, interests,
+    today: todayKst(), body: shownBody, mySummary: mine?.summary ?? null, summarizing: app.summarizing === notice.id, interests,
     ai: judgement?.ai ?? mine?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
     coop: app.kindOf(notice) === 'coop',
     pending: !(judgement?.ai ?? mine?.ai) && !interests.length && !hasGrad && app.judgePending(notice),
