@@ -109,17 +109,27 @@ def safe_notice_url(value: str) -> bool:
         return False
 
 
-def _deadline_label(value: str | None) -> str | None:
+def _clock(hour: int, minute: int) -> str:
+    """앱 문구 규칙처럼 "오후 6시", "오전 10시 30분"으로 쓴다."""
+    half = "오전" if hour < 12 else "오후"
+    shown = hour % 12 or 12
+    return f"{half} {shown}시" + (f" {minute}분" if minute else "")
+
+
+def _deadline_label(value: str | None, kind: str | None = None) -> str | None:
+    """마감은 "12월 5일(토) 마감이에요", 마감 없는 행사·시험은 "12월 9일(화) 오후 2시 일정이에요".
+    시각이 없는 날짜는 마감 23:59, 일정 09:00으로 저장되므로(판정 규칙) 그 시각은 적지 않는다."""
     if not value:
         return None
     try:
         local = datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(KST)
     except ValueError:
         return None
+    event = kind == "일정"
     label = f"{local.month}월 {local.day}일({'월화수목금토일'[local.weekday()]})"
-    if (local.hour, local.minute) != (23, 59):
-        label += f" {local:%H:%M}"
-    return f"{label} 마감이에요"
+    if (local.hour, local.minute) != ((9, 0) if event else (23, 59)):
+        label += f" {_clock(local.hour, local.minute)}"
+    return f"{label} {'일정' if event else '마감'}이에요"
 
 
 def compose_message(candidate: dict) -> tuple[str, str]:
@@ -139,7 +149,7 @@ def compose_message(candidate: dict) -> tuple[str, str]:
     board = candidate.get("source_name") or candidate["notice_id"].split("/")[0]
     school = board.endswith(" 공지")
     title = f"[{board.removesuffix(' 공지')}] {candidate['title']}" if school else candidate["title"]
-    deadline = _deadline_label(candidate.get("deadline"))
+    deadline = _deadline_label(candidate.get("deadline"), candidate.get("deadline_kind"))
     lines = []
     if candidate.get("kind") == "changed":
         what = "제목" if candidate.get("change_kind") == "제목" else "본문"

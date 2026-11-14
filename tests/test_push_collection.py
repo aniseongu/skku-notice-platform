@@ -121,7 +121,7 @@ def test_message_puts_the_notice_title_first_and_never_says_only_new_notice():
         {**base, "kind": "changed", "change_kind": "제목", "deadline": "2026-11-09T03:30:00+00:00"}
     )
     assert title == "[소프트웨어학과] 장학 안내"
-    assert body == "학교가 제목을 고쳤어요\n11월 9일(월) 12:30 마감이에요"
+    assert body == "학교가 제목을 고쳤어요\n11월 9일(월) 오후 12시 30분 마감이에요"
     assert worker.compose_message({**base, "kind": "changed"})[1].startswith("학교가 본문을 고쳤어요")
     assert "새 공지" not in worker.compose_message({"notice_id": "school/2", "title": "t"})[1]
 
@@ -269,3 +269,24 @@ def test_reply_to_only_uses_plain_addresses():
     address = "first.last+tag@sub.example.co.kr"
     good = feedback_mail({"kind": "bug", "body": "x", "reply_email": address, "created_at": "t"})
     assert good["reply_to"] == address
+
+
+
+def test_deadline_line_matches_the_login_example_and_handles_events():
+    label = worker._deadline_label
+    assert label("2026-12-05T14:59:00+00:00") == "12월 5일(토) 마감이에요"  # 23:59는 시각을 적지 않는다
+    assert label("2026-12-05T09:00:00+00:00", "마감") == "12월 5일(토) 오후 6시 마감이에요"
+    assert label("2026-12-09T05:00:00+00:00", "일정") == "12월 9일(수) 오후 2시 일정이에요"
+    assert label("2026-12-09T00:00:00+00:00", "일정") == "12월 9일(수) 일정이에요"  # 시각 없는 일정(09:00)
+    assert label("2026-12-09T01:30:00+00:00", "일정") == "12월 9일(수) 오전 10시 30분 일정이에요"
+
+
+def test_school_notice_with_ai_deadline_reads_like_the_login_example():
+    reason = "소프트웨어학과 학생이 지원할 수 있는 개발 인턴이에요"
+    title, body = worker.compose_message({
+        "notice_id": "cse/1", "source_name": "소프트웨어학과 공지",
+        "title": "겨울방학 소프트웨어 인턴 모집 안내",
+        "ai_reason": reason, "matched_words": ["인턴"], "kind": "new_notice",
+        "deadline": "2026-12-05T14:59:00+00:00", "deadline_kind": "마감"})
+    assert title == "[소프트웨어학과] 겨울방학 소프트웨어 인턴 모집 안내"
+    assert body == f"{reason}\n관심 키워드 인턴, 12월 5일(토) 마감이에요"
