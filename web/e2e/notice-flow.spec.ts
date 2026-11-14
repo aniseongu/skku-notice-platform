@@ -2143,3 +2143,27 @@ test('install banner: one tap installs on phones, closing keeps it away, PC neve
   await inject();
   await expect(banner).toBeHidden();
 });
+
+test('install banner keeps the last notice and temporary messages accessible', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'install banner only appears on phones');
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, subscriptions: ['skku-notice01'], subscriptionsLoading: false });
+  await page.evaluate(() => { (document.querySelector('notice-app') as unknown as AppHandle).install = { prompt: () => Promise.resolve() }; });
+  const banner = page.getByRole('region', { name: '앱 설치' });
+  await expect(banner).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const last = await page.locator('notice-rows-screen a.row').last().boundingBox();
+  const box = await banner.boundingBox();
+  expect(last!.y + last!.height).toBeLessThanOrEqual(box!.y);
+  await withApp(page, { toast: '알림을 저장했어요' });
+  await expect(page.getByRole('status').filter({ hasText: '알림을 저장했어요' })).toBeVisible();
+  await expect(banner).toHaveCount(0);
+  await withApp(page, { toast: '' });
+  await expect(banner).toBeVisible();
+  await banner.getByRole('button', { name: '닫기' }).focus();
+  await expect(banner.getByRole('button', { name: '닫기' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(banner).toHaveCount(0);
+});

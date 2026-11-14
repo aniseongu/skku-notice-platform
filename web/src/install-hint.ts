@@ -23,7 +23,7 @@ export const MANUAL_INSTALL_HINT: Record<ManualInstallMode, { lead: string; acti
   'ios-browser': { lead: '주소창 옆 공유 버튼에서 ', action: '‘홈 화면에 추가’', tail: '를 누르면 앱처럼 쓸 수 있어요' },
   'ios-open-safari': { lead: '', action: 'Safari', tail: '로 열어 공유 버튼에서 ‘홈 화면에 추가’를 누르면 앱처럼 쓸 수 있어요' },
   // 삼성 안내: 메뉴(≡) → 현재 페이지 추가 → 홈 화면. 메뉴 이름은 따로 따옴표로 묶어 한 항목으로 읽히지 않게 한다.
-  samsung: { lead: '오른쪽 아래 메뉴(≡)에서 ', action: '‘현재 페이지 추가’ → ‘홈 화면’', tail: '을 누르면 앱처럼 쓸 수 있어요' },
+  samsung: { lead: '메뉴(≡)에서 ', action: '‘현재 페이지 추가’ → ‘홈 화면’', tail: '을 눌러 앱으로 써요' },
   // 파이어폭스 안드로이드는 주소창이 기본으로 아래라 메뉴 위치를 적지 않는다. 설치할 수 있는 사이트는 ‘설치’, 아니면 ‘홈 화면에 추가’로 보인다.
   firefox: { lead: '메뉴(⋮)에서 ', action: '‘설치’나 ‘홈 화면에 추가’', tail: '를 누르면 앱처럼 쓸 수 있어요' },
   menu: { lead: '브라우저 메뉴(⋮)에서 ', action: '‘홈 화면에 추가’', tail: '를 누르면 앱처럼 쓸 수 있어요' },

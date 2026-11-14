@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import type { AppController } from './app-controller';
 import { remember } from './app-controller';
+import { subscribeUpdate, updateAvailable } from './app-update';
 import { installBannerDismissed, installBannerDue, installMode, isStandalone, MANUAL_INSTALL_HINT } from './install-hint';
 
 const KEY = 'install-banner';
@@ -8,8 +9,9 @@ const KEY = 'install-banner';
 /** 홈 화면에 추가하지 않은 휴대폰 브라우저에서 화면 아래에 얇게 뜨는 설치 제안. 닫을 수 있고, 닫으면 한동안 다시 묻지 않는다. PC(720px 이상)에서는 가린다. */
 export function InstallBanner({ app }: { app: AppController }) {
   const [closed, setClosed] = useState(false);
+  const update = useSyncExternalStore(subscribeUpdate, updateAvailable, () => false);
   const mode = installMode(navigator.userAgent, isStandalone(), !!app.install);
-  if (closed || mode === 'none' || !installBannerDue(remember(KEY), Date.now())) return null;
+  if (closed || app.toast || update || mode === 'none' || !installBannerDue(remember(KEY), Date.now())) return null;
   const close = () => { remember(KEY, installBannerDismissed(remember(KEY), Date.now())); setClosed(true); };
   const hint = mode === 'prompt' ? null : MANUAL_INSTALL_HINT[mode];
   // 설치 창이 있으면 한 줄 제안과 [설치] 단추 하나, 없으면 방법을 처음부터 보여 준다(누를 곳 없이 읽고 닫기만 하면 된다).
