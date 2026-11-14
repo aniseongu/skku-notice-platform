@@ -189,7 +189,7 @@ export class AppController extends Reactive {
   static properties = {
     notices: { state: true }, sources: { state: true }, matched: { state: true }, generatedAt: { state: true },
     view: { state: true }, board: { state: true }, keyword: { state: true }, keywords: { state: true }, query: { state: true },
-    loading: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
+    loading: { state: true }, manualRefreshing: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
     toast: { state: true }, linkCopied: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, coopSort: { state: true }, coopKind: { state: true }, savedSort: { state: true },
@@ -329,6 +329,7 @@ export class AppController extends Reactive {
   }
 
   loading = true;
+  manualRefreshing = false;
   failed = false;
   selectedId: string | null = rememberSelected();
   private lastSelected: string | null | undefined = undefined;
@@ -542,7 +543,9 @@ export class AppController extends Reactive {
   }
 
   async collectNow() {
-    await this.refresh();
+    if (this.loading || this.gated) return;
+    this.manualRefreshing = true;
+    try { await this.refresh(); } finally { this.manualRefreshing = false; }
   }
 
   updateRead(ids: string[], read: boolean) {

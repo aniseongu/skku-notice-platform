@@ -759,6 +759,20 @@ test('leaving settings returns to the list with the detail pane closed, whicheve
   }
 });
 
+test('initial loading does not animate the refresh button', async ({ page }) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  await page.route('**/notices.json', async (route) => { await gate; await route.continue(); });
+  await page.goto('/?api=sample/api/v1');
+  const button = page.getByRole('button', { name: '공지 다시 가져오기' });
+  await expect(page.getByText('공지를 불러오고 있어요')).toBeVisible();
+  await expect(button).toBeDisabled();
+  await expect(button.locator('.animate-spin')).toHaveCount(0);
+  await expect(page.locator('.navigation-head .animate-spin')).toHaveCount(0);
+  release();
+  await expect(button).toBeEnabled();
+});
+
 test('refresh button and R refetch the notice list, lock while loading, and keep the list with a message on failure', async ({ page }) => {
   let hits = 0;
   let mode: 'ok' | 'slow' | 'fail' = 'ok';
@@ -782,6 +796,7 @@ test('refresh button and R refetch the notice list, lock while loading, and keep
   mode = 'slow';
   await button.click();
   await expect(button).toBeDisabled();                                // 받는 동안은 다시 누를 수 없다
+  await expect(button.locator('.animate-spin')).toHaveCount(1);        // 직접 누른 자리에서만 진행 상태를 보여 준다
   await expect(button).toBeEnabled();
   mode = 'ok';
   const beforeKey = hits;
