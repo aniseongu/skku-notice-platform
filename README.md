@@ -1,184 +1,84 @@
-<div align="center">
-
-<img src="web/public/icon-192.png" width="96" height="96" alt="성공 아이콘">
-
 # 성공
 
-성균관대 공지, 인턴 공고, 현장실습을 모아 보고, 나에게 맞는 공지만 알림으로 받는 다중 사용자 웹 앱
+성균관대 공지와 인턴 공고를 모아 보고, 관심 있는 소식을 놓치지 않도록 돕는 웹 앱입니다. 게시판과 키워드를 고르고 저장한 공지를 기기 간에 확인할 수 있습니다.
 
-![version](https://img.shields.io/badge/version-0.1.0-124532)
-![PWA](https://img.shields.io/badge/PWA-installable-124532)
-[![Cloudflare Pages](https://img.shields.io/badge/Cloudflare%20Pages-F38020?logo=cloudflarepages&logoColor=white)](https://pages.cloudflare.com/)
+**[성공 열기](https://skku-notice-platform.pages.dev/)** · [개인정보 처리방침](https://skku-notice-platform.pages.dev/privacy.html) · [문의하기](https://github.com/aniseongu/skku-notice-platform/issues)
 
-[![Open Cloudflare](https://img.shields.io/badge/Open%20Cloudflare-F38020?style=for-the-badge&logo=cloudflarepages&logoColor=white)](https://skku-notice-platform.pages.dev/)
+## 주요 기능
 
-</div>
+- **공지 모아 보기** — 성균관대와 학과 게시판, 외부 인턴 공고, 현장실습 정보를 검색하고 저장합니다.
+- **내게 맞는 알림** — 구독한 게시판과 관심 키워드를 바탕으로 웹 푸시 알림을 받습니다.
+- **AI 공지 확인** — 직접 연결한 Gemini 또는 Groq 키로 공지의 관련성과 요약을 확인합니다. 인턴십 졸업요건 확인도 지원합니다.
+- **일정 연동** — 아이캠퍼스 과제·퀴즈 알림과 저장한 공지의 Google 캘린더 동기화를 선택할 수 있습니다.
+- **기기 간 사용** — Google 로그인으로 구독·키워드·저장·읽음 상태를 동기화하고, 모바일 홈 화면에 앱으로 추가할 수 있습니다.
 
-기존 [개인용 성공](https://github.com/aniseongu/skku-notice-alert)의 화면 구조와 알림 규칙을 로그인한 여러 사용자가 각자 쓰도록 옮긴 공지 플랫폼입니다. 웹은 Cloudflare Pages에서 서비스합니다. 새 공지가 올라왔을 때의 자동 알림 수신과 장기 부하는 계속 검증하고 있습니다.
+처음 사용할 때 Google 로그인, 전공과 AI 키 설정이 필요합니다. AI 판단과 인턴십 요건 안내는 참고용이며, 최종 인정 여부는 학교와 학과에 확인해야 합니다.
 
-## 사용 화면
+## 화면
 
-### 1. 로그인
+| PC | 모바일 |
+| :---: | :---: |
+| <img src="assets/readme/pc-list-light.jpg" alt="PC 공지 목록과 상세 화면" width="680"> | <img src="assets/readme/mobile-list-light.jpg" alt="모바일 공지 목록 화면" width="220"> |
 
-Google 계정으로 로그인합니다. 공지는 로그인한 사용자만 볼 수 있습니다. 위의 알림 예시는 실제 알림과 같은 모양으로, 제목 앞에 게시판 이름(`[소프트웨어학과]`)이 붙고 아래에 AI가 본 이유와 관심 키워드·마감이 옵니다. 휴대폰에서는 Google 단추 위에 "앱으로 설치하기"(설치한 앱으로 열면 사라집니다)가 보이고, 단추 바로 아래에서 개인정보처리방침을 로그인 전에도 읽을 수 있으며, 맨 아래에는 "문의하기 · 오픈소스" 링크를 작게 둡니다. 모바일 캡처는 안드로이드에서 설치 단추가 보이는 모습입니다.
+화면은 2026년 11월에 촬영한 예시입니다.
 
-| PC: 라이트 | PC: 다크 |
-|:---:|:---:|
-| <img src="assets/readme/login-desktop-light.jpg" alt="PC 로그인 화면 (라이트)" width="420"> | <img src="assets/readme/login-desktop-dark.jpg" alt="PC 로그인 화면 (다크)" width="420"> |
+## 구성
 
-| 모바일: 라이트 | 모바일: 다크 |
-|:---:|:---:|
-| <img src="assets/readme/login-mobile-light.jpg" alt="모바일 로그인 화면 (라이트)" width="200"> | <img src="assets/readme/login-mobile-dark.jpg" alt="모바일 로그인 화면 (다크)" width="200"> |
+```mermaid
+flowchart LR
+  Pages["Cloudflare Pages<br/>React · Vite"] --> User["사용자 브라우저 · PWA"]
+  User <--> Supabase["Supabase<br/>PostgreSQL · Auth"]
+  User --> Edge["Supabase Edge Function<br/>키와 외부 서비스 연결"]
+  Edge --> Supabase
+  Sources[학교 게시판 · 인턴 공고] --> Workers["OCI 워커<br/>수집 · OCR · AI 판정 · 푸시"]
+  Workers <--> Supabase
+  Workers --> AI[Gemini · Groq]
+  Workers --> Push[브라우저 푸시 서비스]
+  Push --> User
+  Import[현장실습 수동 가져오기] --> Supabase
+  API["NestJS API<br/>OCI 내부 전용"] --> Supabase
+```
 
-### 2. 첫 설정
+OCI에서는 아이캠퍼스와 Google 캘린더 동기화도 처리합니다. NestJS API는 서버 내부에서만 실행되며, 웹 앱의 공개 API로 연결되어 있지는 않습니다. 사용자 데이터는 Supabase RLS로 분리하고 AI 키와 외부 서비스 토큰은 암호화해 보관합니다.
 
-처음 로그인하면 7단계 설정이 시작됩니다. 주전공(학과 이름으로 바로 찾거나 대학을 먼저 고른 뒤 학과), 복수전공, 학교 정보, 인턴십, 받을 공지, 알림, AI 키 순서입니다. 처음에만 열리고 건너뛸 수 없으며, 전공과 AI 키(Groq, Gemini 중 최소 1개 이상)는 꼭 입력해야 끝납니다. 받을 공지 단계에서는 켜 둔 게시판 아래에 기타 게시판과 관심 키워드가 바로 보입니다. 다음 단추가 막혀 있으면 이유를 한 줄로 알려 줍니다.
+## 로컬 실행
 
-| 1단계 주전공 | 5단계 받을 공지 | 7단계 AI 키 |
-|:---:|:---:|:---:|
-| <img src="assets/readme/onboarding-desktop-1.jpg" alt="PC 첫 설정 1단계: 대학 고르기" width="300"> | <img src="assets/readme/onboarding-desktop-5.jpg" alt="PC 첫 설정 5단계: 받을 공지" width="300"> | <img src="assets/readme/onboarding-desktop-7.jpg" alt="PC 첫 설정 7단계: AI 키 연결" width="300"> |
-
-| 1. 주전공 | 2. 학과 | 3. 학교 정보 | 4. 인턴십 |
-|:---:|:---:|:---:|:---:|
-| <img src="assets/readme/onboarding-mobile-1.jpg" alt="모바일 첫 설정 1단계" width="180"> | <img src="assets/readme/onboarding-mobile-2.jpg" alt="모바일 첫 설정: 학과 고르기" width="180"> | <img src="assets/readme/onboarding-mobile-3.jpg" alt="모바일 첫 설정 3단계" width="180"> | <img src="assets/readme/onboarding-mobile-4.jpg" alt="모바일 첫 설정 4단계" width="180"> |
-
-| 5. 받을 공지 | 6. 알림 | 7. AI 키 |
-|:---:|:---:|:---:|
-| <img src="assets/readme/onboarding-mobile-5.jpg" alt="모바일 첫 설정 5단계" width="180"> | <img src="assets/readme/onboarding-mobile-6.jpg" alt="모바일 첫 설정 6단계" width="180"> | <img src="assets/readme/onboarding-mobile-7.jpg" alt="모바일 첫 설정 7단계" width="180"> |
-
-### 3. 공지 보기
-
-#### PC
-
-목록과 공지 상세를 함께 봅니다. 목록에는 관심 키워드, AI 판정 이유, 마감 D-day가 보이고, 공지를 누르면 오른쪽에 판정 이유, AI 요약, 본문이 열립니다. 열린 공지를 다시 누르면 상세 칸이 닫힙니다.
-
-| 라이트 | 다크 |
-|:---:|:---:|
-| <img src="assets/readme/pc-list-light.jpg" alt="PC 공지 목록과 상세 (라이트)" width="420"> | <img src="assets/readme/pc-list-dark.jpg" alt="PC 공지 목록과 상세 (다크)" width="420"> |
-
-#### 모바일
-
-아래 탭으로 성대 공지, 인턴 공고, 현장실습, 저장한 공지를 오가고, 공지를 눌러 AI 요약과 본문, 원문을 확인합니다.
-
-| 목록: 라이트 | 목록: 다크 | 상세: 라이트 | 상세: 다크 |
-|:---:|:---:|:---:|:---:|
-| <img src="assets/readme/mobile-list-light.jpg" alt="모바일 공지 목록 (라이트)" width="180"> | <img src="assets/readme/mobile-list-dark.jpg" alt="모바일 공지 목록 (다크)" width="180"> | <img src="assets/readme/mobile-detail-light.jpg" alt="모바일 공지 상세 (라이트)" width="180"> | <img src="assets/readme/mobile-detail-dark.jpg" alt="모바일 공지 상세 (다크)" width="180"> |
-
-### 4. 현장실습
-
-학교 현장실습업무지원 시스템(톨게이트)의 "현장실습 기관조회"를 공지처럼 정리해 보여 줍니다. 제목은 "기관 · 직무명"이고, 상세는 하는 일, 지원 자격, 실습 조건, 일정, 학교 안내, 기관 순서로 나눕니다. 인턴 공고와 같이 AI 판정과 요약, 인턴십 요건 확인이 붙고, 신청은 "톨게이트에서 신청하기"로 학교 로그인 뒤에 합니다. 접수마감(마감이 없으면 실습 시작일)이 지나면 목록에서 사라지고 서버에서도 지우며, 신청할 수 있는 현장실습이 하나도 없으면 메뉴에서도 숨깁니다. 아래 캡처는 README용 예시 기관입니다(실제 기관 정보는 로그인한 사용자에게만 보입니다).
-
-| PC: 라이트 | PC: 다크 |
-|:---:|:---:|
-| <img src="assets/readme/coop-pc-light.jpg" alt="PC 현장실습 목록과 상세 (라이트, 예시 기관)" width="420"> | <img src="assets/readme/coop-pc-dark.jpg" alt="PC 현장실습 목록과 상세 (다크, 예시 기관)" width="420"> |
-
-| 모바일: 라이트 | 모바일: 다크 |
-|:---:|:---:|
-| <img src="assets/readme/coop-mobile-light.jpg" alt="모바일 현장실습 상세 (라이트, 예시 기관)" width="200"> | <img src="assets/readme/coop-mobile-dark.jpg" alt="모바일 현장실습 상세 (다크, 예시 기관)" width="200"> |
-
-### 5. 인턴십 졸업요건 확인
-
-소프트웨어학과 원전공 사용자는 인턴 공고의 상세에서 학과 졸업 인턴십과 학교 3품 인턴십 요건에 맞는지 봅니다. 기준과 공고에서 읽은 값을 함께 말합니다. 전일제는 기간(약 시간)이 기준(28일 이상)을 넘는지, 파트타임은 총 시간이 기준(160시간 이상)을 넘는지, 3품은 약 몇 시간이라 기준(280시간)에 닿는지 적습니다. 여러 직무를 뽑는 공고는 소프트웨어와 관련 있어 보이는 직무 이름을 근거로 보여 줍니다. 실제 인정은 학교와 학과 확인이 필요합니다.
-
-| 라이트 | 다크 |
-|:---:|:---:|
-| <img src="assets/readme/graduation-pc-light.jpg" alt="PC 공지 상세의 인턴십 요건 확인 (라이트)" width="420"> | <img src="assets/readme/graduation-pc-dark.jpg" alt="PC 공지 상세의 인턴십 요건 확인 (다크)" width="420"> |
-
-| 모바일: 라이트 | 모바일: 다크 |
-|:---:|:---:|
-| <img src="assets/readme/graduation-mobile-light.jpg" alt="모바일 공지 상세의 인턴십 요건 확인 (라이트)" width="200"> | <img src="assets/readme/graduation-mobile-dark.jpg" alt="모바일 공지 상세의 인턴십 요건 확인 (다크)" width="200"> |
-
-### 6. 설정
-
-설정 홈에서 알림과 관심 키워드, 계정, 화면 모드를 바꾸고, 아이캠퍼스와 구글 캘린더는 "기타"에 있습니다. 라이트·다크·자동 모드는 설정에서 고릅니다.
-
-| 설정 홈 | 알림 | 아이캠퍼스 |
-|:---:|:---:|:---:|
-| <img src="assets/readme/settings-home.jpg" alt="설정 홈" width="200"> | <img src="assets/readme/settings-notifications.jpg" alt="알림 설정: 이 기기 알림과 등록된 기기" width="200"> | <img src="assets/readme/settings-icampus.jpg" alt="아이캠퍼스 설정: 알림, 토큰, 하루 요약" width="200"> |
-
-## 할 수 있는 것
-
-- **공지 보기**: 성균관대 공지, 단과대학·학과 게시판(60여 개), 부트캠프, 외부 인턴 공고(링커리어, 자소설닷컴, 학생인재개발팀), 학교 현장실습(톨게이트)을 한곳에서 봅니다. 게시판은 로그인한 사용자가 고른 것만 수집하고, 모든 공지는 로그인한 사용자만 읽을 수 있습니다.
-- **현장실습**: 신청 기간마다 운영자가 톨게이트에 직접 로그인한 브라우저에서 진행 중인 기관 목록과 상세를 가져옵니다(서버가 학교 계정으로 자동 로그인하지 않습니다). 직무, 하는 일, 지원 자격, 실습 조건, 일정을 구역으로 나눠 보여 주고, 접수마감이 지나면 지웁니다. 한 번에 수백 건이 들어와서 새 공지 알림은 보내지 않습니다.
-- **첫 로그인 설정**: 주전공과 복수전공(대학을 먼저 고른 뒤 학과), 학교 정보(학년·재학 상태·병역), 인턴십, 받을 공지(전공과 상관없는 게시판과 관심 키워드 포함), 알림, AI 키의 7단계입니다. 처음에만 열리고 건너뛸 수 없으며, 전공과 AI 키(Groq, Gemini 중 최소 1개 이상)는 꼭 입력해야 끝납니다. 받을 공지 단계에서는 켜 둔 게시판 아래에 기타 게시판과 관심 키워드가 바로 보입니다.
-- **공지 읽기**: 검색, 최신순·마감순 정렬, 읽지 않은 글 보기, 선택한 공지나 현재 목록의 읽음 표시, 저장한 공지 모아 보기를 지원합니다. 관심 키워드에는 현재 보기에서 키워드에 맞는 글 수를 보여 주고, 마감이 있는 공지와 인턴 공고에는 마감을 표시합니다. 키보드로 J·K(이동), S(저장), Enter(원문), Esc(닫기), 1~4(성대 공지·인턴 공고·현장실습·저장)를 쓸 수 있습니다.
-- **공지 상세**: 본문, 그림 속 글자(OCR로 읽은 글), 첨부 파일, 원문 열기를 한 화면에서 봅니다. 학교가 제목이나 본문을 고친 글에는 고친 날짜를 표시하고, 본문이 아직 없으면 원문으로 바로 갈 수 있게 안내합니다.
-- **알림**: 웹 푸시(VAPID)로 새 공지를 보냅니다. 학교 공지는 제목 앞에 게시판 이름을 붙이고(`[소프트웨어학과] 공지 제목`), 본문 첫 줄에 AI가 본 이유를 둡니다. 관심 키워드가 맞는 공지는 소리로, 나머지는 조용히 보내고 학교가 고친 중요한 글은 한 번 더 알립니다.
-- **기기별 알림 관리**: 이 기기의 알림을 직접 켜고 끄며, 테스트 알림으로 도착하는 모습을 확인합니다. 등록된 기기 목록에서 기기 이름을 바꾸고 다른 기기를 지울 수 있습니다. 로그아웃하면 이 기기의 알림 등록을 해제하고 계정이 바뀌면 이전 계정의 기기 구독을 정리합니다. 키워드는 설정에서 바로 추가·삭제하고 계정에 순서대로 저장합니다.
-- **화면과 설치**: 라이트·다크·자동 모드, 앱 설치(PWA), 성대 공지 탭에 "모든 게시판"이나 "받는 게시판만" 보기를 고를 수 있습니다. 휴대폰 로그인 화면의 Google 단추 위에는 "앱으로 설치하기" 단추(안드로이드 등 브라우저가 설치 창을 줄 때)나 홈 화면 추가 안내(iOS Safari)가 보이고, 설치한 앱으로 열면 사라집니다. 로그인 화면 맨 아래에는 "문의하기 · 오픈소스" 링크를 조용히 둡니다.
-- **내 AI 키**: 사용자가 직접 넣은 AI 키(Groq, Gemini)로 성대 공지와 인턴 공고가 나에게 맞는지 판정해, 맞는 공지를 소리로 알립니다(무료 모델만 씁니다). 키를 여러 개 넣으면 상한 대비 덜 쓴 키부터 번갈아 쓰고, 한 곳이 막히면 다른 곳으로 넘어갑니다. 상한은 업체마다 다르게 두었고, 이미 판정한 공지는 다시 호출하지 않습니다. 키는 암호화해 서버에만 보관하며 브라우저가 읽을 수 없고, 그 사용자 본인의 공지 처리에만 쓰입니다.
-- **판정 순서와 보관**: 새로 가입해 밀린 공지가 많아도 구독한 게시판의 마감이 가까운 공지부터 판정하고, 이미 마감된 공지에는 키를 쓰지 않습니다. 서버의 공지는 마감 30일 뒤(마감이 없으면 처음 본 지 90일 뒤) 지우며, 사용자가 저장한 공지는 지우지 않습니다.
-- **인턴십 졸업요건 확인**: 소프트웨어학과 원전공이나 학교 3품 인턴십을 선택한 사용자에게, 인턴 공고에 적힌 근무 기간·시간으로 학과 기준(전일제 28일 이상, 파트타임 160시간 이상)과 3품 기준(280시간)에 맞는지 판단해 이유와 근거를 보여 줍니다. 여러 직무를 뽑는 공고에서 소프트웨어와 관련 있어 보이는 직무가 있으면 그 이름을 말하고 가능으로 봅니다. 규칙 버전이 바뀌면 저장된 판정을 서버가 조금씩 새 규칙으로 다시 만듭니다. 실제 인정 여부는 학교와 학과에 확인해야 합니다.
-- **아이캠퍼스 토큰(선택)**: 사용자가 직접 만든 아이캠퍼스(Canvas) 토큰으로 마감이 가까운 과제와 퀴즈를 알립니다. 설정의 "기타" 아래 "아이캠퍼스" 페이지에서 알림, 토큰, 하루 요약 순서로 정합니다. 기기마다 "끄기, 하루 요약, 요약과 마감" 중 받을 방식을 고르고, 하루 요약 시간은 직접 정합니다. 토큰은 AI 키와 같은 방식으로 보호합니다.
-- **구글 캘린더(선택)**: 구글 로그인으로 허용하면 저장한 공지의 마감을 "성대 공지" 캘린더에 넣습니다. 한 번 연결하면 서버가 30분마다 저장한 공지를 확인해서 자동으로 맞춥니다(구글이 주는 장기 열쇠를 암호화해 보관하며, 연결을 끊거나 계정을 지우면 지워집니다). 이 앱이 만든 캘린더 안의 일정만 다루고 내 다른 캘린더는 읽지 못합니다.
-- **공지 요약**: AI 키가 있으면 성대 공지, 인턴 공고, 현장실습의 상세에 1~3문장 요약이 자동으로 만들어집니다.
-- **새 버전 안내**: 쓰는 도중 새 버전이 배포되면 화면을 갑자기 바꾸지 않고 "새 버전이 나왔어요 · 업데이트 · 나중에" 알림 줄로 묻습니다. "업데이트"를 누르면 새 버전으로 다시 열고, "나중에"를 고르면 다음에 앱을 열 때 바뀝니다.
-- **프로필 설정**: 전공, 학년, 재학 상태, 병역과 관심 분야(주관식)를 바꿉니다. AI 판정과 인턴십 졸업요건 확인에만 쓰이며 이름, 학번, 연락처는 받지 않습니다(입학 연도만 받습니다).
-- **계정 삭제와 개인정보 처리방침**: 설정 맨 아래의 "계정 삭제"로 계정과 저장한 모든 정보를 바로 지울 수 있습니다. 어떤 정보를 어디에 쓰는지는 앱 안의 [개인정보 처리방침](web/public/privacy.html)(`PRIVACY.md`와 같은 내용)에 적었습니다. 로그인 화면의 "계속하면 개인정보처리방침에 동의하는 거예요"에서 로그인 전에도 읽을 수 있고, 브라우저 저장 공간(추적 쿠키 없음), 이용자의 권리와 행사 방법, 개인정보 보호책임자(운영자, 연락처는 처리방침에 적은 이메일)도 담았습니다.
-- 구독, 키워드, 저장, 읽음은 계정별로 DB에 저장하고 행 수준 보안(RLS)으로 사용자 간 접근을 막습니다. 저장·읽음의 화면 동기화는 계속 검증하고 있습니다.
-
-## 시스템 아키텍처
-
-![성공 시스템 아키텍처: 공지 출처 → 서버의 타이머 워커(① 수집, ② OCR, ③ AI 판정, ④ 푸시 발송, ⑤ 아이캠퍼스 읽기, ⑥ 구글 캘린더) → Supabase(PostgreSQL·Auth·Edge Function) → 웹앱과 기기 알림. AI 판정은 사용자의 AI 키로 AI 업체를 호출하고, 푸시는 브라우저 푸시 서비스를 거쳐 기기에 전달됩니다](assets/readme/system-architecture-dark.svg)
-
-## 서버를 따로 둔 이유
-
-웹과 키 저장은 Cloudflare Pages, Supabase Edge Function 같은 서버리스에서 돌리고, 공지를 가져오는 일은 Oracle Cloud 서버 한 대에서 타이머로 돌립니다. 포스터 이미지 한 장을 OCR로 읽는 데 100초 넘게, 메모리를 500MB쯤 써서 실행 시간과 메모리에 제한이 있는 함수에서 돌리기 어려웠습니다. 학교 게시판은 요청 사이에 간격을 두고 하나씩 읽어야 하는데, 이것도 오래 살아 있는 프로세스가 다루기 편했습니다. 또 작업마다 시스템 계정과 비밀 파일을 따로 두면 사용자 키를 푸는 작업과 푸시 비밀키를 가진 작업이 서로의 키를 읽지 못합니다. 대신 서버가 멈추면 수집도 멈추고, 재부팅 뒤 복구는 아직 확인하지 않았습니다.
-
-## 기술 구성
-
-[![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB)](https://react.dev/)
-[![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vite.dev/)
-[![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=flat-square&logo=nestjs&logoColor=white)](https://nestjs.com/)
-[![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Cloudflare Pages](https://img.shields.io/badge/Cloudflare_Pages-F38020?style=flat-square&logo=cloudflarepages&logoColor=white)](https://pages.cloudflare.com/)
-[![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-F80000?style=flat-square&logo=data:image/svg%2Bxml;base64,PHN2ZyBmaWxsPSJ3aGl0ZSIgcm9sZT0iaW1nIiB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI%2BPHBhdGggZD0iTTE2LjQxMiA0LjQxMmgtOC44MmE3LjU4OCA3LjU4OCAwIDAgMC0uMDA4IDE1LjE3Nmg4LjgyOGE3LjU4OCA3LjU4OCAwIDAgMCAwLTE1LjE3NnptLS4xOTMgMTIuNTAySDcuNzg2YTQuOTE1IDQuOTE1IDAgMCAxIDAtOS44MjhoOC40MzNhNC45MTQgNC45MTQgMCAxIDEgMCA5LjgyOHoiLz48L3N2Zz4%3D)](https://www.oracle.com/cloud/free/)
-[![Playwright](https://img.shields.io/badge/Playwright-2EAD33?style=flat-square&logo=data:image/svg%2Bxml;base64,PHN2ZyBmaWxsPSJ3aGl0ZSIgcm9sZT0iaW1nIiB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI%2BPHBhdGggZD0iTTIzLjk5NiA3LjQ2MmMtLjA1Ni44MzctLjI1NyAyLjEzNS0uNzE2IDMuODUtLjk5NSAzLjcxNS00LjI3IDEwLjg3NC0xMC40MiA5LjIyNy02LjE1LTEuNjUtNS40MDctOS40ODctNC40MTItMTMuMjAxLjQ2LTEuNzE2LjkzNC0yLjk0IDEuMzA1LTMuNjk0LjQyLS44NTMuODQ2LS4yODkgMS44MTUuNTIzLjY4NC41NzMgMi40MSAxLjc5MSA1LjAxMSAyLjQ4OCAyLjYwMS42OTcgNC43MDYuNTA2IDUuNTgzLjM1MiAxLjI0NS0uMjE5IDEuODk3LS40OTQgMS44MzQuNDU1Wm0tOS44MDcgMy44NjNzLS4xMjctMS44MTktMS43NzMtMi4yODZjLTEuNjQ0LS40NjctMi42MTMgMS4wNC0yLjYxMyAxLjA0Wm00LjA1OCA0LjUzOS03Ljc2OS0yLjE3MnMuNDQ2IDIuMzA2IDMuMzM4IDMuMTUzYzIuODYyLjgzNiA0LjQzLS45OCA0LjQzLS45ODFabTIuNzAxLTIuNTFzLS4xMy0xLjgxOC0xLjc3My0yLjI4NmMtMS42NDQtLjQ2OS0yLjYxMiAxLjAzOC0yLjYxMiAxLjAzOFpNOC41NyAxOC4yM2MtNC43NDkgMS4yNzktNy4yNjEtNC4yMjQtOC4wMjEtNy4wOEMuMTk3IDkuODMxLjA0NCA4LjgzMi4wMDMgOC4xODhjLS4wNDctLjczLjQ1NS0uNTIgMS40MTUtLjM1NC42NzcuMTE4IDIuMy4yNjEgNC4zMDgtLjI4YTExLjI4IDExLjI4IDAgMCAwIDIuNDEtLjk1NmMtLjA1OC4xOTctLjExNC40LS4xNy42MS0uNDMzIDEuNjE4LS44MjcgNC4wNTUtLjYzMiA2LjQyNi0xLjk3Ni43MzItMi4yNjcgMi40MjMtMi4yNjcgMi40MjNsMi41MjQtLjcxNWMuMjI3IDEuMDAyLjYgMS45ODcgMS4xNSAyLjgzOGE1LjkxNCA1LjkxNCAwIDAgMS0uMTcxLjA0OVptLTQuMTg4LTYuMjk4YzEuMjY1LS4zMzMgMS4zNjMtMS42MzEgMS4zNjMtMS42MzFsLTMuMzc0Ljg4OHMuNzQ1IDEuMDc2IDIuMDEuNzQzWiIvPjwvc3ZnPg%3D%3D)](https://playwright.dev/)
-[![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/aniseongu/skku-notice-platform/actions)
-
-## 로컬 확인
+Node.js 22.12 이상과 Python 3.12 이상을 사용합니다. 인증 설정 없이 예시 공지로 화면을 확인할 수 있습니다.
 
 ```sh
 cd web
 npm ci
-npm test            # 단위 테스트(Node), Supabase 정책·함수는 PGlite로 검증
-npm run test:e2e    # Playwright(데스크톱·모바일)
-npm run build
-npm run dev -- --host 127.0.0.1
+VITE_SUPABASE_URL= VITE_SUPABASE_PUBLISHABLE_KEY= npm run dev -- --host 127.0.0.1
 ```
 
-샘플 공지는 개발 서버 URL에 `?api=sample/api/v1`을 붙여 볼 수 있습니다. 샘플은 실제 사용자 데이터가 아닙니다. Python 테스트와 린트는 프로젝트 루트에서 실행합니다.
+브라우저에서 `http://127.0.0.1:5173/?api=sample/api/v1`을 엽니다. 실제 인증을 연결하려면 [환경 변수 예시](web/.env.example)를 참고해 `web/.env.local`에 Supabase URL과 publishable 키를 설정하세요. 관리자 키는 웹 환경 변수에 넣지 않습니다.
 
 ```sh
+# 웹 테스트와 빌드 (web/)
+npm test
+npm run test:e2e
+npm run build
+
+# Python 테스트 (저장소 루트, uv 필요)
 uv run pytest -q
 uv run ruff check src tests
 ```
 
-## 인증 설정
+## 저장소 구조
 
-`web/.env.example`을 `web/.env.local`로 복사하고 Supabase 프로젝트 URL과 **publishable** 키를 입력합니다. 이 값은 빌드 결과에 공개되므로 secret 또는 service-role 키를 넣지 않습니다. OAuth 복귀 주소는 Supabase 허용 목록에 추가해야 합니다.
+| 경로 | 내용 |
+| --- | --- |
+| `web/` | React 웹 앱과 PWA |
+| `apps/api/` | NestJS 내부 API |
+| `src/skku_notice/` | 공지 수집·OCR·판정·알림 워커 |
+| `supabase/` | DB 마이그레이션과 Edge Function |
+| `infra/oracle/` | OCI 서비스와 타이머 설정 |
 
-## 데이터와 마이그레이션
+운영 DB는 초기 마이그레이션을 수동 적용해 CLI 이력이 완전하지 않습니다. 운영 환경에 `supabase db push`를 사용하지 않습니다.
 
-테이블, 함수, RLS 정책은 `supabase/migrations/`에 있습니다. 운영 DB에는 Supabase CLI로 새 파일 하나씩 적용합니다(`supabase db query --remote=<ref> -f <파일>`). 처음 파일들은 SQL Editor로 적용해서 CLI 마이그레이션 이력이 없으므로 `supabase db push`는 쓰지 않습니다. 새 환경에서는 파일 이름 순서대로 적용하세요. 키와 토큰의 암호문 열은 서비스 역할만 읽을 수 있습니다(`supabase/functions/byok/`).
+## 참고 사항
 
-수집 워커의 `SUPABASE_SECRET_KEY`, 푸시 `VAPID_PRIVATE_KEY`, 키 암호화용 `BYOK_MASTER_KEY`는 서버의 제한된 환경 파일에만 두고 프론트 환경 변수와 로그에 넣지 않습니다. 비밀과 개인 데이터는 커밋하지 않습니다.
-
-## 수집하는 게시판 목록
-
-수집하는 단과대학·학과 게시판은 `scripts/board_catalog.py` 한 파일에 모아 두고, 여기서 서버 설정(`config/sources.yaml`)과 웹의 게시판 목록(`web/src/skku-boards.ts`)을 함께 만듭니다. 게시판을 더하거나 고칠 때는 이 파일만 바꾼 뒤 `generate`로 다시 만들고, `verify`로 모든 게시판이 실제로 읽히는지 확인합니다. 로그인이 필요하거나 읽지 못한 게시판은 넣지 않았고, 정해 둔 주소 외의 임의 주소는 수집하지 않습니다.
-
-## 알려진 한계
-
-- 서버가 손으로 보낸 테스트 푸시가 기기에 도착하는 것은 웨일에서 확인했지만, 새 공지가 올라와 자동으로 보내지는 전체 경로와 아이캠퍼스 알림 도착은 계속 관찰하고 있습니다. 푸시 확인은 푸시 서비스가 있는 브라우저(Chrome, 웨일 등)에서 해야 하며, VS Code 내장 브라우저(Electron)는 웹 푸시를 지원하지 않습니다. 발송 뒤 상태를 기록하기 전에 장애가 나면 알림이 한 번 더 갈 수 있습니다.
-- 무료 AI 키의 한도는 업체마다 다르고 공식 표가 자주 바뀝니다. 앱의 하루 상한은 조사한 한도보다 낮게 잡은 추정값이라, 키가 자주 막히면 조정해야 합니다.
-- 외부 인턴 공고 수집은 해당 사이트의 이용약관과 robots.txt 정책을 따로 확인해야 하며, 운영자가 위험을 알고 켠 기능입니다.
-- 현장실습은 학교 로그인이 필요하고 robots.txt가 수집을 막는 시스템이라, 운영자가 직접 로그인한 브라우저에서 사람 속도로 가져오고 로그인한 사용자에게만 보여 줍니다. 자동으로 갱신되지 않아 신청 기간 중 새로 붙은 기관은 다시 가져와야 보입니다. 구글 계정이면 누구나 가입할 수 있어 성대생으로만 제한되지는 않습니다.
-- 1GB 서버에서 OCR이 긴 이미지를 처리하는 데 시간이 걸립니다. 부하가 큰 상황의 안정성은 검증하지 않았습니다.
-- 사범대학, 약학대학, 의과대학 등 일부 학과 게시판은 로그인이 필요하거나 읽지 못해 목록에 없습니다.
-- 개인용 서비스의 RSS 피드는 옮기지 않았습니다.
-- 구글 캘린더 권한은 구글이 "민감한 권한"으로 분류해서, 앱이 구글의 검증을 받기 전에는 허용 화면에 "확인되지 않은 앱"이 나옵니다.
+- 현장실습 정보는 운영자가 학교에 직접 로그인해 가져오며 자동 갱신되지 않습니다. 공지와 현장실습 정보는 로그인한 사용자에게만 표시되지만, 학교 구성원 여부를 별도로 확인하지는 않습니다.
+- 수동 테스트 푸시는 확인했지만 새 공지 자동 푸시의 전체 경로와 장기 부하는 계속 검증하고 있습니다. 모바일 브라우저별 실제 앱 설치 동작도 추가 확인이 필요합니다.
+- 외부 공고와 현장실습 수집에는 각 사이트의 이용 조건과 접근 정책에 따른 제약이 있습니다.
+- 기존 [개인용 성공](https://github.com/aniseongu/skku-notice-alert)과는 별도로 운영하는 프로젝트입니다.
