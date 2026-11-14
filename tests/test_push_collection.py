@@ -67,6 +67,36 @@ def test_invalid_notice_url_is_not_sent_and_claim_is_bounded(monkeypatch):
     assert store.marks[0] == (1, "failed", NOW)
 
 
+def test_external_intern_notices_are_sent_to_each_candidates_device(monkeypatch):
+    linkareer = {**candidate('device-a', 'https://linkareer.com/activity/12345'),
+                 'user_id': 'user-a', 'notice_id': 'linkareer-intern/12345',
+                 'endpoint': 'https://fcm.googleapis.com/fcm/send/device-a'}
+    jasoseol = {**candidate('device-b', 'https://jasoseol.com/recruit/67890'),
+                'user_id': 'user-b', 'notice_id': 'jasoseol-intern/67890',
+                'endpoint': 'https://fcm.googleapis.com/fcm/send/device-b'}
+    store = MemoryStore([linkareer, jasoseol])
+    sent = []
+    monkeypatch.setattr(worker, 'send_one', lambda subscription, *_args, **kw:
+                        sent.append((subscription['endpoint'], kw['url'])) or 'sent')
+    assert worker.run_batch(store, 'key', 'https://example.com', NOW)['sent'] == 2
+    assert sent == [(linkareer['endpoint'], linkareer['url']), (jasoseol['endpoint'], jasoseol['url'])]
+    assert store.marks == [(1, 'sent', NOW), (2, 'sent', NOW)]
+
+
+@pytest.mark.parametrize('url', [
+    'https://linkareer.com.evil.invalid/activity/1', 'https://evil.invalid@linkareer.com/activity/1',
+    'http://linkareer.com/activity/1', 'https://linkareer.com:444/activity/1',
+    'https://linkareer.com/activity/not-a-number', 'https://linkareer.com/redirect?url=https://evil.invalid',
+    'https://jasoseol.com/recruit/1/extra', 'https://jasoseol.com.evil.invalid/recruit/1',
+])
+def test_unapproved_external_notice_urls_do_not_send(monkeypatch, url):
+    store = MemoryStore([candidate('device', url)])
+    sent = []
+    monkeypatch.setattr(worker, 'send_one', lambda *_args, **_kwargs: sent.append(True))
+    assert worker.run_batch(store, 'key', 'https://example.com', NOW)['retry'] == 1
+    assert sent == []
+
+
 def test_vapid_subject_is_normalized_to_what_py_vapid_accepts():
     from py_vapid import _check_sub
 

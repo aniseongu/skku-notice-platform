@@ -88,13 +88,19 @@ class PushStore(NoticeStore):
         )
 
 
-def safe_school_url(value: str) -> bool:
+def safe_notice_url(value: str) -> bool:
+    """Match the service worker's school and approved internship notification targets."""
     try:
         url = urlsplit(value)
         host = (url.hostname or "").lower()
+        school = host == "skku.edu" or host.endswith(".skku.edu")
+        internship = (
+            (host == "linkareer.com" and re.fullmatch(r"/activity/[0-9]+/?", url.path) is not None)
+            or (host == "jasoseol.com" and re.fullmatch(r"/recruit/[0-9]+/?", url.path) is not None)
+        )
         return (
             url.scheme == "https"
-            and (host == "skku.edu" or host.endswith(".skku.edu"))
+            and (school or internship)
             and not url.username
             and not url.password
             and url.port in (None, 443)
@@ -171,7 +177,7 @@ def run_batch(store: PushStore, private_key: str, subject: str, now: datetime) -
         if claim is None:
             counts["skipped"] += 1
             continue
-        if not safe_school_url(candidate["url"]):
+        if not safe_notice_url(candidate["url"]):
             store.mark(claim, "failed", now)
             counts["retry"] += 1
             continue
