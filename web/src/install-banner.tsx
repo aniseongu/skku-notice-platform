@@ -14,7 +14,7 @@ export function InstallBanner({ app }: { app: AppController }) {
   if (closed || app.toast || update || mode === 'none' || !installBannerDue(remember(KEY), Date.now())) return null;
   const close = () => { remember(KEY, installBannerDismissed(remember(KEY), Date.now())); setClosed(true); };
   const hint = mode === 'prompt' ? null : MANUAL_INSTALL_HINT[mode];
-  return <section className="install-banner fixed inset-x-0 bottom-0 z-[4] max-h-[75dvh] overflow-y-auto rounded-t-lg border border-line bg-surface px-[20px] pt-[20px] pb-[calc(20px+env(safe-area-inset-bottom))] shadow-lg min-[720px]:hidden" aria-label="앱 설치">
+  return <section className="install-banner fixed inset-x-0 bottom-0 z-[4] max-h-[75dvh] overflow-y-auto rounded-t-lg border border-line bg-surface px-[20px] pt-[20px] pb-[calc(20px+env(safe-area-inset-bottom))] shadow-lg [animation:install-rise_240ms_ease-out_both] motion-reduce:animate-none min-[720px]:hidden" aria-label="앱 설치">
     <div className="flex items-start gap-[12px]">
       <img src="icon-192.png" alt="" className="size-[48px] flex-none rounded-md border border-line" />
       <div className="min-w-0 flex-1 pt-[2px]">

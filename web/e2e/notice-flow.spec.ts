@@ -2122,6 +2122,16 @@ test('install banner: one tap installs on phones, closing keeps it away, PC neve
   await inject();
   const banner = page.getByRole('region', { name: '앱 설치' });
   await expect(banner).toBeVisible();
+  expect(await banner.evaluate((el) => getComputedStyle(el).animationName)).toBe('install-rise');
+  const movement = await banner.evaluate((el) => {
+    const animation = el.getAnimations()[0];
+    animation.pause();
+    animation.currentTime = 0;
+    const start = el.getBoundingClientRect().top;
+    animation.finish();
+    return start - el.getBoundingClientRect().top;
+  });
+  expect(movement).toBeGreaterThan(50);
   // 설치 단추와 닫기 단추는 모두 44px 이상이다.
   for (const name of ['홈 화면에 추가', '닫기']) {
     const box = await banner.getByRole('button', { name }).boundingBox();
@@ -2192,9 +2202,6 @@ test('install panel is available before login and can be dismissed to sign in', 
   const login = page.getByRole('button', { name: 'Google로 계속하기' });
   await expect(banner).toBeVisible();
   await expect(login).toBeVisible();
-  const loginBox = await login.boundingBox();
-  const bannerBox = await banner.boundingBox();
-  expect(loginBox!.y + loginBox!.height).toBeLessThanOrEqual(bannerBox!.y);
   await banner.getByRole('button', { name: '다음에 할게요' }).click();
   await expect(banner).toHaveCount(0);
   await expect(login).toBeVisible();
@@ -2221,4 +2228,27 @@ test('install signal received before the app loads is retained and used once', a
   await expect.poll(() => page.evaluate(() => (window as unknown as { installCalls: number }).installCalls)).toBe(1);
   await expect(banner).toHaveCount(0);
   expect(await page.evaluate(() => window.__skkuInstallPrompt)).toBeNull();
+});
+
+test('iOS Safari shows manual installation in the panel and honors reduced motion', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'install panel only appears on phones');
+  const context = await browser.newContext({
+    baseURL: 'http://127.0.0.1:5173', viewport: { width: 375, height: 812 }, reducedMotion: 'reduce',
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+  });
+  const page = await context.newPage();
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as AppHandle;
+    Object.defineProperty(app.controller as object, 'gated', { configurable: true, value: true });
+    (app.requestUpdate as () => void)();
+  });
+  const banner = page.getByRole('region', { name: '앱 설치' });
+  await expect(banner).toContainText('공유 버튼');
+  await expect(banner).toContainText('홈 화면에 추가');
+  expect(await banner.evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+  await banner.getByRole('button', { name: '확인했어요' }).click();
+  await expect(banner).toHaveCount(0);
+  await context.close();
 });

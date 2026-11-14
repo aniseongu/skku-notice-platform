@@ -11,6 +11,11 @@
 @import './styles/platform.css';
 @import 'tailwindcss/utilities.css' layer(utilities);
 
+@keyframes install-rise {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
 /* 사용자 토큰을 Tailwind 이름으로 연결한다(inline: 값을 복사하지 않고 var()를 그대로 쓰므로 다크 모드와 테마 선택이 따라온다). */
 @theme inline {
   --color-*: initial;
