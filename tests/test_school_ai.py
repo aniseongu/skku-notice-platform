@@ -22,7 +22,7 @@ def test_english_reply_is_replaced_with_korean_fallback_and_english_summary_is_d
     from types import SimpleNamespace
 
     from skku_notice import school_ai
-    from skku_notice.judge import FALLBACK_REASON, LANGUAGE_RULE
+    from skku_notice.judge import FALLBACK_REASON, LANGUAGE_RULE, SUMMARY_FORMAT
 
     seen = {}
 
@@ -39,7 +39,7 @@ def test_english_reply_is_replaced_with_korean_fallback_and_english_summary_is_d
 
     out = school_ai.judge_school_notices(
         [{"id": "a", "title": "Global Internship", "body": "x"}, {"id": "b", "title": "t", "body": "y"}], "m", "k", client=Client())
-    assert seen["system"] == school_ai.SYSTEM + LANGUAGE_RULE
+    assert seen["system"] == school_ai.SYSTEM + LANGUAGE_RULE + SUMMARY_FORMAT
     assert out["a"].reason == FALLBACK_REASON and out["a"].summary is None
     assert out["b"].summary == "12월 5일까지 신청해요."
 

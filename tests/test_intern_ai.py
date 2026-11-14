@@ -109,7 +109,7 @@ def test_external_postings_get_a_korean_summary_like_school_notices():
     expected = "한국전자에서 백엔드 개발 실습생을 뽑아요.\n12월 1일까지 톨게이트에서 신청해요."
     assert result["coop/1"].summary == expected
     assert result["coop/2"].summary is None
-    assert "summary는 해요체" in generate_content.config.system_instruction
+    assert generate_content.config.system_instruction.endswith(intern_ai.SUMMARY_RULE)
     assert "summary" in intern_ai.SCHEMA["properties"]["items"]["items"]["required"]
 
 
