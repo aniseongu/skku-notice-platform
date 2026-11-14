@@ -558,7 +558,7 @@ function Keywords({ model }: { model: SettingsModel }) {
     <Back model={model} />
     <Section id="s-keywords" title="관심 키워드">
       <div className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch">
-        <p className="setting-help text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty] m-0">제목이나 본문에 이 글자가 그대로 들어간 공지를 "관심"으로 표시해요</p>
+        <p className="setting-help text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty] m-0">학교 공지에 낱말이 모두 들어 있으면 관심으로 표시하고 소리로 알려요</p>
         <div className="inline-row flex flex-wrap gap-[8px] [&_.input]:min-w-0 [&_.input]:flex-[1_1_200px]">
           <input className="input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink text-[15px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px]" type="text" autoComplete="off" aria-label="새 키워드" placeholder="예: 겨울방학 인턴" value={draft}
             onChange={(event) => setDraft(event.currentTarget.value)}
@@ -571,13 +571,18 @@ function Keywords({ model }: { model: SettingsModel }) {
       <div className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch">
         <p className="setting-name text-[15px] leading-[22px] font-semibold m-0">내 키워드 {model.keywords.length}개</p>
         {model.keywords.length
-          ? <ul className="keyword-list m-0 list-none border-t-0 p-0 [&>li]:flex [&>li]:min-h-[44px] [&>li]:items-center [&>li]:justify-between [&>li]:border-b [&>li]:border-line [&>li]:text-[15px] [&>li:last-child]:border-b-0">{model.keywords.map((word) => <li key={word}><span>{word}</span>
+          ? <ul className="keyword-list m-0 list-none border-t-0 p-0 [&>li]:flex [&>li]:min-h-[44px] [&>li]:items-center [&>li]:justify-between [&>li]:border-b [&>li]:border-line [&>li]:text-[15px] [&>li:last-child]:border-b-0">{model.keywords.map((word) => <li key={word}><span className="flex min-w-0 flex-col py-[10px]"><span>{word}</span>{GENERIC_INTERN_WORD.test(word) ? <span className="field-note text-[14px] leading-[20px] text-ink-2">{INTERN_KEYWORD_NOTE}</span> : null}</span>
             <button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" aria-label={`${word} 삭제`} onClick={() => model.removeKeyword(word)}>삭제</button></li>)}</ul>
           : <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0">아직 키워드가 없어요. 위에 입력해서 추가해 보세요</p>}
       </div>
     </Section>
   </div>;
 }
+
+// 인턴 공고 탭은 모든 글이 인턴이라 "인턴" 같은 넓은 키워드는 그 탭에서 표시하지 않는다(app-controller의 GENERIC_INTERN과 같은 낱말).
+// 그 키워드를 가진 사람에게만 그 줄 아래에 알린다(모두에게 보이는 설명을 늘리지 않는다, 토스 규칙). "겨울방학 인턴"처럼 좁힌 키워드는 표시된다.
+const GENERIC_INTERN_WORD = /^(인턴|인턴십|인턴쉽|intern|internship)$/i;
+const INTERN_KEYWORD_NOTE = '인턴만 쓰면 모든 인턴 공고에 맞아서 인턴 공고에는 표시하지 않아요. 겨울방학 인턴처럼 좁혀 보세요';
 
 const TEXT_FIELDS: { key: ProfileTextField; name: string; help: string; placeholder: string }[] = [
   { key: 'interests', name: '관심 분야', help: '어떤 일이나 주제에 관심이 있는지 적어요', placeholder: '예: 인공지능, 백엔드 개발, 데이터 분석' },
@@ -781,8 +786,8 @@ export function StatusText({ tone, children }: { tone: keyof typeof STATUS_TONE;
 const SECRET_LABELS = { empty: '미설정', saved: '저장됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '입력하기', edit: '수정하기', remove: '지우기', save: '저장하기' };
 
 /** 비밀 한 줄: 저장 상태, 입력하기·수정하기·지우기, 눌러서 펼치는 입력칸과 받는 방법(Gemini 키와 아이캠퍼스 토큰이 같이 쓴다). */
-export function SecretRow({ name, help, placeholder, status, loading, busy, error, onRegister, onRemove, guide, valid, note, labels = SECRET_LABELS, extra, alignEnd = false }: {
-  note?: string | null; labels?: typeof SECRET_LABELS; extra?: ReactNode; alignEnd?: boolean;
+export function SecretRow({ name, help, placeholder, status, loading, busy, error, onRegister, onRemove, guide, valid, note, labels = SECRET_LABELS, extra, alignEnd = false, removable = true }: {
+  removable?: boolean; note?: string | null; labels?: typeof SECRET_LABELS; extra?: ReactNode; alignEnd?: boolean;
   name: string; help: string; placeholder: string;
   status: { keyHint: string; disabled: boolean; lastError: string | null } | null;
   loading: boolean; busy: boolean; error: string;
@@ -826,10 +831,11 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
     </> : <>
       <div className={`flex items-center gap-2 ${alignEnd ? 'min-[720px]:justify-end' : ''}`}>
         <span className="flex shrink-0 gap-2"><button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 key-action min-h-[44px] px-3 py-0" aria-label={`${name} ${retry}`} disabled={loading} onClick={() => setEditing(true)}>{retry}</button>
-        {status ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 key-action min-h-[44px] px-3 py-0 text-ink-2" aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={() => setConfirming(true)}>{labels.remove}</button> : null}</span>
+        {status && removable ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 key-action min-h-[44px] px-3 py-0 text-ink-2" aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={() => setConfirming(true)}>{labels.remove}</button> : null}</span>
       </div>
       {status?.lastError && !labels.broken ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{status.lastError}</p> : null}
-      {note ? <p className="field-note text-[14px] leading-[20px] text-ink-2" role="status">{note}</p> : null}
+      {/* 안내는 위의 단추와 같은 쪽에 붙인다(부모의 field-note 오른쪽 정렬 규칙을 받지 않게 다른 이름을 쓴다). */}
+      {note ? <p className={`key-note m-0 text-[14px] leading-[20px] text-ink-2 ${alignEnd ? 'min-[720px]:text-right' : ''}`} role="status">{note}</p> : null}
       {error ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{error}</p> : null}
     </>}
   </Setting>;

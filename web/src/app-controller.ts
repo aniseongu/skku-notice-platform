@@ -25,7 +25,7 @@ import { withMyDeadline } from './notice-view';
 import { keywordMatchesNotice } from './keyword-match';
 import { loadGraduation, loadGraduationStatuses, badgeOf, gradParts, requestGraduation, isInternshipNotice, type GradPart, type GraduationBadge, type GraduationStatuses, isSoftwareOriginal, visibleTracks, type GraduationAssessment } from './graduation-assessment';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
-import type { Draft } from './onboarding-flow';
+import { initialDraft, missingRequired, savedDoubleAnswer, type Draft, type Step } from './onboarding-flow';
 import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
 import { localKey, setLocalOwner } from './local-scope.ts';
 import { isRememberedOnboarded, rememberOnboarded } from './onboarded-flag.ts';
@@ -841,7 +841,52 @@ export class AppController extends Reactive {
   needsOnboarding(): boolean {
     if (!this.authUserId) return false;
     if (this.onboardingOpen) return true;
-    return this.profileStatus === 'ready' && !this.profile.onboardedAt && !this.onboardingDismissed;
+    if (this.profileStatus !== 'ready') return false;
+    if (!this.profile.onboardedAt) return !this.onboardingDismissed;
+    return this.missingRequiredSteps().length > 0;
+  }
+
+  /** 연결해 둔 AI 키 중 쓸 수 있는 것이 있는지. 아직 모르면(기능이 꺼졌거나, 불러오는 중이거나, 불러오지 못함) null이라 잠그지 않는다. */
+  hasUsableAiKey(): boolean | null {
+    if (!this.authUserId || !this.byokOn || this.byokLoading || this.byokError) return null;
+    return (!!this.byokStatus && !this.byokStatus.disabled) || this.aiKeys.some((key) => !key.disabled);
+  }
+
+  /** 첫 설정을 끝낸 계정에서 비어 있는 필수 항목(REQUIRED_ITEMS 순서). 끝내지 않은 계정은 전체 첫 설정을 거치므로 비워 둔다. */
+  missingRequiredSteps(): Step[] {
+    if (!this.authUserId || this.profileStatus !== 'ready' || !this.profile.onboardedAt) return [];
+    const draft = initialDraft(this.profile, [], []);
+    return missingRequired(draft, savedDoubleAnswer(draft), { usable: this.hasUsableAiKey() });
+  }
+
+  /** 비어 있는 항목을 채우는 화면은 채우는 동안(키를 연결한 순간에도) 닫히지 않게 붙들어 둔다. 끝내기나 저장이 끝나면 closeOnboarding이 닫는다. */
+  holdOnboarding() { this.onboardingOpen = true; }
+
+  /** 비어 있던 프로필 항목만 저장한다(게시판·키워드는 건드리지 않는다). 계정이 바뀌면 결과를 버린다. */
+  async saveMissingProfile(draft: Draft, close: boolean): Promise<boolean> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch, client = authClient;
+    if (!client || !userId || this.onboardingBusy) return false;
+    const software = isSoftwareOriginal({ programs: draft.programs });
+    const next: UserProfile = {
+      ...this.profile, programs: draft.programs, year: draft.year, enrollmentStatus: draft.enrollmentStatus, militaryService: draft.militaryService,
+      admissionYear: software ? draft.admissionYear : this.profile.admissionYear,
+      university3pInternshipSelected: draft.university3pInternshipSelected, university3pInternshipDone: draft.university3pInternshipDone,
+      deptInternshipDone: software ? draft.deptInternshipDone : this.profile.deptInternshipDone,
+    };
+    this.onboardingBusy = true; this.onboardingError = '';
+    try {
+      if (epoch !== this.subscriptionsEpoch || !(await sessionIs(client, userId))) throw new Error('계정이 바뀌었어요');
+      await storeProfile(client, userId, next);
+      if (epoch !== this.subscriptionsEpoch) return false;
+      this.profile = next;
+      if (close) this.closeOnboarding();
+      return true;
+    } catch {
+      if (epoch === this.subscriptionsEpoch) this.onboardingError = '저장하지 못했어요. 다시 시도해 주세요.';
+      return false;
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.onboardingBusy = false;
+    }
   }
 
   /** 로그인했지만 프로필을 아직 모르고 첫 설정을 마친 계정으로도 기억하지 않으면, 목록 대신 불러오는 화면을 보인다. */

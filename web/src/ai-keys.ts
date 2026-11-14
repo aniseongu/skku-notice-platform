@@ -11,6 +11,11 @@ export function connectedAiKeys(model: { byok?: ByokInfo | null }): number {
 /** 0·1·2개일 때 AI가 어떻게 일하는지. 한도는 업체마다 달라서, 여러 개를 연결하면 번갈아 쓰고 한 곳이 막히면 다른 곳으로 넘어간다. */
 export function aiKeysLead(count: number): string {
   if (count <= 0) return '하나 이상 연결하면 AI가 공지를 확인해 드려요';
-  if (count === 1) return '하나만 연결하면 그 한도까지만 확인해요. 다른 곳도 연결하면 번갈아 써서 더 많이 확인해요';
+  if (count === 1) return 'AI 키는 하나 이상 있어야 해요. 다른 곳도 연결하면 번갈아 써서 더 많이 확인해요';
   return '연결한 키를 번갈아 쓰고, 한 곳이 막히면 다른 곳으로 넘어가요';
+}
+
+/** 이 키 하나를 지워도 쓸 수 있는 키가 남는지. 쓸 수 없는 키(끊긴 키)는 지워도 개수가 줄지 않으니 늘 지울 수 있고, 마지막으로 쓸 수 있는 키는 지울 수 없다. */
+export function canRemoveKey(key: KeyInfo, usableCount: number): boolean {
+  return key.disabled || usableCount > 1;
 }

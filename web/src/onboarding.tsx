@@ -9,7 +9,7 @@ import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } fro
 import { COLLEGES, MAX_PROGRAMS, findCollege, programKey, programLabel, type Program } from './skku-programs';
 import { BOARD_CATALOG, boardCollege, boardsForPrograms, OTHER_BOARDS } from './skku-boards';
 import {
-  KEYWORD_SUGGESTIONS, STEPS, STEP_LABEL, canContinue, earlierMissing, filterDepartments, initialDraft, missingHint, nextStep, previousStep,
+  KEYWORD_SUGGESTIONS, REQUIRED_ITEMS, STEPS, STEP_LABEL, canContinue, earlierMissing, filterDepartments, initialDraft, missingHint, nextStep, previousStep,
   resumeStep, savedBefore, stepIndex, toggleValue, withPrograms, type Draft, type DoubleAnswer, type Step,
 } from './onboarding-flow';
 import { APP_NAME } from './brand';
@@ -134,7 +134,20 @@ export function Onboarding({ app }: { app: AppController }) {
   useSyncExternalStore(app.subscribe, app.getVersion);
   const [draft, setDraft] = useState<Draft>(() => initialDraft(app.profile, app.subscriptions, app.keywords));
   // 저장까지 하고 AI 키 단계에서 나간 사람은 답한 질문을 다시 거치지 않고 AI 키 단계부터 잇는다.
-  const [step, setStep] = useState<Step>(() => resumeStep(app.profile, draft));
+  // 이미 첫 설정을 끝낸 계정(isFill)이 새로 필요한 정보 때문에 열면, 비어 있는 항목(REQUIRED_ITEMS 기준)만 순서대로 보인다.
+  const [isFill] = useState(() => !!app.profile.onboardedAt);
+  const [fill, setFill] = useState<Step[]>(() => (app.profile.onboardedAt ? app.missingRequiredSteps() : []));
+  const fillMode = isFill && fill.length > 0;
+  const [step, setStep] = useState<Step>(() => (fill.length && app.profile.onboardedAt ? fill[0] : resumeStep(app.profile, draft)));
+  // 채우는 중에 키를 불러와 새로 빈 항목이 드러나면 목록에 더한다. 채운 항목은 목록에 남아 진행이 되돌아가지 않는다.
+  const missingNow = isFill ? app.missingRequiredSteps() : [];
+  const missingKey = missingNow.join();
+  useEffect(() => {
+    if (!isFill) return;
+    app.holdOnboarding();
+    const add = missingNow.filter((name) => !fill.includes(name));
+    if (add.length) setFill(REQUIRED_ITEMS.map((item) => item.step).filter((name) => fill.includes(name) || add.includes(name)));
+  }, [missingKey]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [addingDouble, setAddingDouble] = useState(false);
   const [pendingDouble, setPendingDouble] = useState<Program | null>(null);
   const [doubleAnswer, setDoubleAnswer] = useState<DoubleAnswer>(() => (draft.programs.length > 1 ? 'yes' : app.profile.onboardedAt || savedBefore(app.profile) ? 'no' : null));
@@ -153,12 +166,19 @@ export function Onboarding({ app }: { app: AppController }) {
   // AI 키 단계에 들어오면 키 기능이 켜져 있는지 한 번 더 확인한다(처음 확인이 실패했어도 여기서 이어진다).
   useEffect(() => { if (step === 'ai' && !app.byokOn) void app.recheckByok(); }, [step, app]);
 
-  const index = stepIndex(step);
+  const index = fillMode ? fill.indexOf(step) : stepIndex(step);
   const primary = draft.programs[0];
   const doubles = draft.programs.slice(1);
-  const go = (to: Step | null) => { if (to) setStep(to); };
+  // 채우는 화면에서는 어느 단계로 가라는 요청이든 "다음 빈 항목"으로 간다. 프로필 항목은 마지막 프로필 항목에서 한 번에 저장하고, 끝이면 닫는다.
+  const nextFill = fillMode ? fill[index + 1] : undefined;
+  const advanceFill = async () => {
+    const laterProfile = fill.slice(index + 1).some((name) => name !== 'ai');
+    if (step !== 'ai' && !laterProfile && !(await app.saveMissingProfile(draft, !nextFill))) return;
+    if (nextFill) setStep(nextFill);
+  };
+  const go = (to: Step | null) => { if (!to) return; if (fillMode) void advanceFill(); else setStep(to); };
   // 앞 단계에 필수 답이 비어 있으면(새 필수 항목이 생겼을 때 등) 이 단계는 넘어가지 않고 그 단계로 돌아가게 한다.
-  const blocked = earlierMissing(step, draft, doubleAnswer);
+  const blocked = fillMode ? null : earlierMissing(step, draft, doubleAnswer);
   const setPrimary = (program: Program) => {
     setDraft(withPrograms(draft, [program, ...doubles.filter((other) => programKey(other) !== programKey(program))]));
   };
@@ -177,6 +197,7 @@ export function Onboarding({ app }: { app: AppController }) {
     if (addingDouble) { cancelDouble(); return; }
     if (step === 'primary' && !changingPrimary) { setChangingPrimary(true); return; }
     // 앞으로 갈 때 알림이 이미 켜져 있어 건너뛴 단계는 뒤로 갈 때도 건너뛴다.
+    if (fillMode) { if (index > 0) setStep(fill[index - 1]); return; }
     if (step === 'ai' && app.pushStatus !== 'off') { go('boards'); return; }
     go(previousStep(step));
   };
@@ -310,13 +331,13 @@ export function Onboarding({ app }: { app: AppController }) {
       {app.onboardingBusy ? '저장하고 있어요' : app.onboardingError ? '다시 시도하기' : '다음'}</button>;
   } else if (step === 'ai') {
     title = 'AI를 연결해 주세요';
-    const connected = !!app.byokStatus || app.aiKeys.length > 0;
+    const connected = fillMode ? app.hasUsableAiKey() === true : !!app.byokStatus || app.aiKeys.length > 0;
     body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]"><div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0 min-[720px]:[&_.setting]:grid-cols-[minmax(0,1fr)] min-[720px]:[&_.setting]:gap-[8px]"><AiRows byok={aiConnectModel(app)} /></div>
       {app.byokOn ? null : <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold whitespace-nowrap self-start" onClick={() => { void app.recheckByok(); }}>다시 확인하기</button>}
       {app.onboardingError ? <p className="error-text text-[14px] text-danger" role="alert">{app.onboardingError}</p> : null}</div>;
     foot = <>
       {connected ? null : <RequiredHint text="키를 하나 연결해 주세요" />}
-      <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!connected || app.onboardingBusy || app.byokBusy || app.aiBusy} onClick={finishWithKey}>
+      <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!connected || app.onboardingBusy || app.byokBusy || app.aiBusy} onClick={nextFill ? () => setStep(nextFill) : finishWithKey}>
         {app.onboardingBusy ? '저장하고 있어요' : '끝내기'}</button>
     </>;
   } else {
@@ -335,7 +356,14 @@ export function Onboarding({ app }: { app: AppController }) {
     </>;
   }
 
-  const showBack = index > 0 || addingDouble || (step === 'primary' && !changingPrimary);
+  if (fillMode) {
+    if (step === 'ai') {
+      const broken = !!app.byokStatus?.disabled || app.aiKeys.some((key) => key.disabled);
+      title = broken ? 'AI 키를 다시 연결해 주세요' : 'AI 키를 연결해 주세요';
+      lead = broken ? '연결해 둔 키가 더 이상 작동하지 않아서 다시 열었어요' : '연결된 AI 키가 없어서 다시 열었어요. 키를 연결하면 바로 이어서 써요';
+    } else lead = index === 0 ? '새로 필요한 정보가 생겼어요. 이것만 고르면 바로 쓸 수 있어요' : '';
+  }
+  const showBack = fillMode ? index > 0 || addingDouble || (step === 'primary' && !changingPrimary) : index > 0 || addingDouble || (step === 'primary' && !changingPrimary);
   return <div className="onb fixed inset-0 z-[60] grid grid-cols-[minmax(0,1fr)] bg-bg text-ink min-[900px]:grid-cols-[minmax(320px,5fr)_minmax(0,7fr)] [&_.seg_button]:rounded-pill [&_.chip]:min-h-[44px] [&_.chip]:before:inset-0 [&_.text-button]:min-h-[44px] [&_.choice:focus-visible]:[outline-offset:-2px]" role="dialog" aria-modal="true" aria-labelledby="onb-title">
     {/* 넓은 화면에서만 보이는 왼쪽 칸: 앱 아이콘과 이름, 설명, 단계 목록. 진행 정보는 오른쪽 progressbar가 알리므로 낭독기에서는 건너뛴다. */}
     <aside className="onb-brand hidden min-[900px]:flex min-[900px]:flex-col min-[900px]:justify-between min-[900px]:gap-[32px] min-[900px]:border-r min-[900px]:border-line min-[900px]:bg-[color-mix(in_oklch,var(--accent)_8%,var(--bg))] min-[900px]:pt-[40px] min-[900px]:pr-[44px] min-[900px]:pb-[48px] min-[900px]:pl-[44px]" aria-hidden="true">
@@ -345,7 +373,7 @@ export function Onboarding({ app }: { app: AppController }) {
         <p className="m-0 text-[15px] text-ink-2">몇 가지만 고르면 필요한 게시판과 알림을 맞춰 드려요.</p>
       </div>
       <ol className="onb-steplist m-0 grid list-none gap-[14px] p-0">{STEP_LABELS.map((label, i) =>
-        <li className="flex items-center gap-[12px] text-[15px] text-ink-3 data-[state=current]:font-bold data-[state=current]:text-ink data-[state=done]:text-ink-2 data-[state=current]:[&_.num]:border-accent data-[state=current]:[&_.num]:bg-accent data-[state=current]:[&_.num]:text-on-accent data-[state=done]:[&_.num]:border-accent data-[state=done]:[&_.num]:text-accent" key={label} data-state={i < index ? 'done' : i === index ? 'current' : 'todo'}><span className="num inline-grid size-[28px] flex-none place-items-center rounded-[50%] border-[1.5px] border-line bg-surface text-[13px] font-bold">{i < index ? '✓' : i + 1}</span>{label}</li>)}</ol>
+        <li className="flex items-center gap-[12px] text-[15px] text-ink-3 data-[state=current]:font-bold data-[state=current]:text-ink data-[state=done]:text-ink-2 data-[state=current]:[&_.num]:border-accent data-[state=current]:[&_.num]:bg-accent data-[state=current]:[&_.num]:text-on-accent data-[state=done]:[&_.num]:border-accent data-[state=done]:[&_.num]:text-accent" key={label} data-state={i < stepIndex(step) ? 'done' : i === stepIndex(step) ? 'current' : 'todo'}><span className="num inline-grid size-[28px] flex-none place-items-center rounded-[50%] border-[1.5px] border-line bg-surface text-[13px] font-bold">{i < stepIndex(step) ? '✓' : i + 1}</span>{label}</li>)}</ol>
     </aside>
     <div className="onb-main flex min-h-0 flex-col overflow-y-auto [overscroll-behavior:contain]" ref={bodyRef} onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 0)}>
       {/* 내리면 위쪽 바에도 아래 단추 줄처럼 경계선을 둔다(줄이 바 밑에서 잘려 보이지 않게). */}
@@ -354,10 +382,10 @@ export function Onboarding({ app }: { app: AppController }) {
           {showBack
             ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover" aria-label="이전 단계" onClick={back}><svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href="icons/sprite.svg#back" /></svg></button>
             : <span className="onb-top-slot block size-[44px]" aria-hidden="true" />}
-          <div className="onb-progress flex items-center gap-[6px]" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={index + 1}
-            aria-valuetext={`${STEPS.length}단계 중 ${index + 1}단계`} aria-label="첫 설정 진행">
-            {STEPS.map((name, i) => <span className={`h-[4px] flex-1 rounded-pill [transition:background_.2s] ${i <= index ? 'bg-ink' : 'bg-line'}`} key={name} data-done={i <= index} />)}
-          </div>
+          {fillMode && fill.length < 2 ? <div className="onb-progress" aria-hidden="true" /> : <div className="onb-progress flex items-center gap-[6px]" role="progressbar" aria-valuemin={1} aria-valuemax={fillMode ? fill.length : STEPS.length} aria-valuenow={index + 1}
+            aria-valuetext={`${fillMode ? fill.length : STEPS.length}단계 중 ${index + 1}단계`} aria-label={fillMode ? '필요한 정보 채우기 진행' : '첫 설정 진행'}>
+            {(fillMode ? fill : STEPS).map((name, i) => <span className={`h-[4px] flex-1 rounded-pill [transition:background_.2s] ${i <= index ? 'bg-ink' : 'bg-line'}`} key={name} data-done={i <= index} />)}
+          </div>}
           {/* 첫 설정은 처음에만 열리고 건너뛸 수도, 닫을 수도 없다(전공과 AI 키는 필수). */}
           <span className="onb-top-slot block size-[44px]" aria-hidden="true" />
         </div>
@@ -366,6 +394,7 @@ export function Onboarding({ app }: { app: AppController }) {
         <h1 id="onb-title" ref={heading} tabIndex={-1}>{title}</h1>
         {lead ? <p className="onb-lead m-0 text-ink-2">{lead}</p> : null}
         {body}
+        {fillMode && app.onboardingError && step !== 'ai' && step !== 'boards' ? <p className="error-text text-[14px] text-danger" role="alert">{app.onboardingError}</p> : null}
       </div>
       {foot ? <div className="onb-foot sticky bottom-0 z-[2] border-t border-line bg-bg pt-[12px] [&_.solid-button]:w-full [&_.ghost-button]:w-full [&_.solid-button:disabled]:border-line [&_.solid-button:disabled]:bg-sunken [&_.solid-button:disabled]:text-ink-2 [&_.solid-button:disabled]:opacity-100"><div className="onb-foot-inner mx-auto grid w-[min(100%,36rem)] gap-[8px] px-[16px] pt-0 pb-[calc(12px+env(safe-area-inset-bottom))]">
         {blocked ? <>

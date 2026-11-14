@@ -103,6 +103,21 @@ test('settings hub opens each page in the app, back works and the theme can be c
   await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
 });
 
+test('keyword help says how matching works and only a bare 인턴 keyword gets the internship note under its own row', async ({ page }) => {
+  await settingsAt(page, '&section=keywords');
+  const screen = page.locator('platform-settings-screen');
+  await expect(screen.getByText('학교 공지에 낱말이 모두 들어 있으면 관심으로 표시하고 소리로 알려요')).toBeVisible();
+  const input = screen.getByRole('textbox', { name: '새 키워드' });
+  for (const word of ['겨울방학 인턴', '인턴']) { await input.fill(word); await input.press('Enter'); }
+  const note = '인턴만 쓰면 모든 인턴 공고에 맞아서 인턴 공고에는 표시하지 않아요. 겨울방학 인턴처럼 좁혀 보세요';
+  const rows = screen.locator('.keyword-list li');
+  await expect(rows.filter({ hasText: note })).toHaveCount(1);
+  await expect(rows.filter({ hasText: note })).toContainText(/^인턴/);
+  await expect(rows.filter({ hasText: '겨울방학 인턴' }).filter({ hasNotText: note })).toHaveCount(1);
+  await screen.getByRole('button', { name: '인턴 삭제', exact: true }).click();
+  await expect(screen.getByText(note)).toHaveCount(0);
+});
+
 test('keywords work like the original: Enter or the button adds, duplicates are ignored and delete is immediate', async ({ page }) => {
   await settingsAt(page, '&section=keywords');
   const screen = page.locator('platform-settings-screen');
@@ -188,7 +203,7 @@ test('profile page edits year and status in place and can reopen the first-run s
   await expect(screen.getByRole('button', { name: 'Google 계정으로 계속하기' }).or(
     screen.getByText('지금은 로그인할 수 없어요. 잠시 뒤 다시 열어 주세요'))).toBeVisible();
   const profile = { programs: [{ college: '소프트웨어융합대학', department: '소프트웨어학과' }, { college: '경영대학', department: '경영학과' }],
-    year: 3, semester: null, enrollmentStatus: '재학', militaryService: null, onboardedAt: '2026-11-07T00:00:00Z' };
+    year: 3, semester: null, enrollmentStatus: '재학', militaryService: null, onboardedAt: '2026-11-07T00:00:00Z', admissionYear: 2024, deptInternshipDone: true, university3pInternshipSelected: true, university3pInternshipDone: false, };
   await withApp(page, { authUserId: 'account-a', profile, profileStatus: 'ready', saveProfile: 'fn:save', openOnboarding: 'fn:open' });
   await expect(screen.getByText('소프트웨어학과 (소프트웨어융합대학)')).toBeVisible();
   await withApp(page, { profileStatus: 'unavailable' });
@@ -273,8 +288,8 @@ test('connection keys page says how the AI works for 0, 1 and 2 connected keys',
   await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false });
   const states: [string, unknown, unknown[], RegExp][] = [
     ['아무것도 연결 안 함', null, [], /하나 이상 연결하면/],
-    ['Groq 하나', null, [key('groq')], /그 한도까지만 확인해요/],
-    ['Gemini 하나', gemini, [], /그 한도까지만 확인해요/],
+    ['Groq 하나', null, [key('groq')], /AI 키는 하나 이상 있어야 해요/],
+    ['Gemini 하나', gemini, [], /AI 키는 하나 이상 있어야 해요/],
     ['Gemini + Groq', gemini, [key('groq')], /번갈아 쓰고, 한 곳이 막히면/],
   ];
   for (const [label, byokStatus, aiKeys, text] of states) {
@@ -313,8 +328,8 @@ test('first-run setup: choices only, department list follows the college, double
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
     const w = window as unknown as { calls: unknown[][] };
     w.calls = [];
-    app.finishOnboarding = (draft: unknown) => { w.calls.push(['finish', draft]); (app.applyOnboardingSaved as (profile: unknown) => void)({ ...(app.profile as object), onboardedAt: 'x' }); return Promise.resolve(true); };
-    app.closeOnboarding = () => { w.calls.push(['close']); app.onboardingOpen = false; app.profile = { ...(app.profile as object), onboardedAt: 'x' }; };
+    app.finishOnboarding = (draft: unknown) => { w.calls.push(['finish', draft]); (app.applyOnboardingSaved as (profile: unknown) => void)({ ...(app.profile as object), programs: [{ college: '경영대학', department: '경영학과' }], year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false, onboardedAt: 'x' }); return Promise.resolve(true); };
+    app.closeOnboarding = () => { w.calls.push(['close']); app.onboardingOpen = false; app.profile = { ...(app.profile as object), programs: [{ college: '경영대학', department: '경영학과' }], year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false, onboardedAt: 'x' }; };
     app.enablePush = () => { w.calls.push(['push']); return Promise.resolve(); };
     app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
     app.profileStatus = 'ready';
@@ -445,7 +460,7 @@ test('first-run setup requires one AI key at the end and records completion only
     app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
     app.profileStatus = 'ready'; app.authUserId = 'account-a'; app.pushStatus = 'on'; app.byokOn = true; app.byokLoading = false; app.byokStatus = null; app.aiKeys = [];
     app.finishOnboarding = (draft: unknown, final: unknown) => { w.calls.push(['finish', final]); (app.applyOnboardingSaved as (p: unknown) => void)({ ...(app.profile as object) }); return Promise.resolve(true); };
-    app.completeOnboarding = () => { w.calls.push(['complete']); app.profile = { ...(app.profile as object), onboardedAt: 'x' }; (app.closeOnboarding as () => void)(); return Promise.resolve(true); };
+    app.completeOnboarding = () => { w.calls.push(['complete']); app.profile = { ...(app.profile as object), programs: [{ college: '경영대학', department: '경영학과' }], year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false, onboardedAt: 'x' }; (app.closeOnboarding as () => void)(); return Promise.resolve(true); };
   });
   const dialog = page.getByRole('dialog');
   const next = () => dialog.getByRole('button', { name: '다음' }).click();
@@ -619,7 +634,7 @@ test('first-run setup never finishes without a key, even when the key service is
     app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
     app.profileStatus = 'ready'; app.authUserId = 'account-a'; app.pushStatus = 'on'; app.byokOn = false; app.byokLoading = false; app.byokStatus = null; app.aiKeys = []; app.recheckByok = () => Promise.resolve(false);
     app.finishOnboarding = (draft: unknown, final: unknown) => { w.calls.push(['finish', final]); (app.applyOnboardingSaved as (p: unknown) => void)({ ...(app.profile as object) }); return Promise.resolve(true); };
-    app.completeOnboarding = () => { w.calls.push(['complete']); app.profile = { ...(app.profile as object), onboardedAt: 'x' }; (app.closeOnboarding as () => void)(); return Promise.resolve(true); };
+    app.completeOnboarding = () => { w.calls.push(['complete']); app.profile = { ...(app.profile as object), programs: [{ college: '경영대학', department: '경영학과' }], year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false, onboardedAt: 'x' }; (app.closeOnboarding as () => void)(); return Promise.resolve(true); };
   });
   const dialog = page.getByRole('dialog');
   const next = () => dialog.getByRole('button', { name: '다음' }).click();
@@ -665,7 +680,7 @@ test('nothing chosen yet (an old skip): no boards and no notices, and no way to 
   await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
   await expect(screen.getByRole('heading', { name: '첫 설정' })).toHaveCount(0);
   // 이미 마친 사람이 게시판을 모두 끄면 게시판 고르기로 이어 준다.
-  await page.evaluate(() => { const app = document.querySelector('notice-app') as unknown as Record<string, unknown>; app.profile = { ...(app.profile as object), onboardedAt: 'x' }; (app.setView as (v: string) => void)('all'); });
+  await page.evaluate(() => { const app = document.querySelector('notice-app') as unknown as Record<string, unknown>; app.profile = { ...(app.profile as object), programs: [{ college: '경영대학', department: '경영학과' }], year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false, onboardedAt: 'x' }; (app.setView as (v: string) => void)('all'); });
   await expect(page.getByText('받을 게시판이 없어요')).toBeVisible();
   await expect(page.getByRole('button', { name: '게시판 고르기' })).toBeVisible();
 });
@@ -813,7 +828,7 @@ test('refresh button and R refetch the notice list, lock while loading, and keep
 test('settings home puts the daily settings first and groups iCampus and Google Calendar under "기타" further down', async ({ page }) => {
   await settingsAt(page);
   const screen = page.locator('platform-settings-screen');
-  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, profile: { programs: [{ college: '경영대학', department: '경영학과' }], year: 2, semester: 1, enrollmentStatus: '재학', militaryService: '해당 없음', onboardedAt: 'x', interests: '', wants: '', avoids: '' } });
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, profile: { programs: [{ college: '경영대학', department: '경영학과' }], year: 2, semester: 1, enrollmentStatus: '재학', militaryService: '해당 없음', onboardedAt: 'x', interests: '', wants: '', avoids: '', university3pInternshipSelected: true, university3pInternshipDone: false, } });
   const heads = await screen.locator('h2.settings-head').allInnerTexts();
   expect(heads).toEqual(['내 설정', '계정', '화면', '기타']);
   const mine = screen.getByRole('region', { name: '내 설정' }), etc = screen.getByRole('region', { name: '기타' });
@@ -998,7 +1013,7 @@ test('account shows an icon, name and email and leads to profile settings where 
   const screen = page.locator('platform-settings-screen');
   const onePixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
   const profile = { programs: [{ college: '경영대학', department: '경영학과' }], year: 2, semester: null, enrollmentStatus: '재학', militaryService: null,
-    onboardedAt: 'x', interests: '', wants: '', avoids: '' };
+    onboardedAt: 'x', interests: '', wants: '', avoids: '', university3pInternshipSelected: true, university3pInternshipDone: false, };
   await withApp(page, { authUserId: 'account-a', authEmail: 'student@g.skku.edu', authName: '홍길동', authAvatar: null, profile, profileStatus: 'ready', onboardingDismissed: true, saveProfile: 'fn:save' });
   // 사진이 없으면 인스타그램처럼 기본 사람 모양이 보인다.
   const account = screen.locator('.account-row');
@@ -1047,7 +1062,7 @@ test('the side menu has no profile entry; the profile lives inside settings, and
   await page.evaluate(() => {
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
     app.authUserId = 'account-a'; app.authName = '홍길동'; app.authEmail = 'a@skku.edu';
-    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: 'x', interests: '', wants: '', avoids: '' };
+    app.profile = { programs: [{ college: '경영대학', department: '경영학과' }], year: 3, semester: null, enrollmentStatus: '재학', militaryService: null, onboardedAt: 'x', interests: '', wants: '', avoids: '', university3pInternshipSelected: true, university3pInternshipDone: false, };
     app.profileStatus = 'ready'; app.onboardingDismissed = true;
   });
   const screen = page.locator('platform-settings-screen');
@@ -1081,10 +1096,10 @@ test('core settings tasks finish within their click budget and in the expected o
   await settingsAt(page);
   const screen = page.locator('platform-settings-screen');
   await withApp(page, {
-    authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false, byokStatus: null,
+    authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false, byokStatus: null, aiKeys: [{ provider: 'groq', keyHint: 'abcd', model: 'm', disabled: false, lastError: null, usedToday: 0 }],   // 키가 없는 계정은 설정에 들어올 수 없다
     subscriptions: ['skku-notice01'], keywords: [],
     registerKey: 'fn:registerKey', registerCanvas: 'fn:registerCanvas', toggleSubscription: 'fn:toggle',
-    profile: { programs: [], year: 2, semester: 1, enrollmentStatus: '재학', militaryService: '해당 없음', onboardedAt: 'x', interests: '', wants: '', avoids: '' },
+    profile: { programs: [{ college: '경영대학', department: '경영학과' }], year: 2, semester: 1, enrollmentStatus: '재학', militaryService: '해당 없음', onboardedAt: 'x', interests: '', wants: '', avoids: '', university3pInternshipSelected: true, university3pInternshipDone: false, },
     saveProfile: 'fn:saveProfile',
   });
   const log: string[] = [];
@@ -1540,8 +1555,8 @@ test('software original major is asked for the admission year and the internship
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
     const w = window as unknown as { calls: unknown[][] };
     w.calls = [];
-    app.finishOnboarding = (draft: unknown) => { w.calls.push(['finish', draft]); (app.applyOnboardingSaved as (profile: unknown) => void)({ ...(app.profile as object), onboardedAt: 'x' }); return Promise.resolve(true); };
-    app.closeOnboarding = () => { app.onboardingOpen = false; app.profile = { ...(app.profile as object), onboardedAt: 'x' }; };
+    app.finishOnboarding = (draft: unknown) => { w.calls.push(['finish', draft]); (app.applyOnboardingSaved as (profile: unknown) => void)({ ...(app.profile as object), programs: [{ college: '소프트웨어융합대학', department: '소프트웨어학과' }], admissionYear: 2024, deptInternshipDone: true, year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false, onboardedAt: 'x' }); return Promise.resolve(true); };
+    app.closeOnboarding = () => { app.onboardingOpen = false; app.profile = { ...(app.profile as object), programs: [{ college: '소프트웨어융합대학', department: '소프트웨어학과' }], admissionYear: 2024, deptInternshipDone: true, year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false, onboardedAt: 'x' }; };
     app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
     app.profileStatus = 'ready';
     app.pushStatus = 'on';
@@ -1679,7 +1694,7 @@ test('board order: edit mode shows drag handles only, the keyboard can lift, mov
   await page.locator('notice-rows-screen a.row').first().waitFor();
   await page.evaluate(() => {
     const app = document.querySelector('notice-app') as unknown as Record<string, any>;
-    app.authUserId = 'account-a'; app.profileStatus = 'ready'; app.profile = { ...app.profile, onboardedAt: 'x' };
+    app.authUserId = 'account-a'; app.profileStatus = 'ready'; app.profile = { ...app.profile, programs: [{ college: '경영대학', department: '경영학과' }], year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false, onboardedAt: 'x' };
     app.subscriptions = app.sources.filter((s: { external?: boolean }) => !s.external).slice(0, 3).map((s: { id: string }) => s.id);
     app.openSettings('notifications');
   });
@@ -2291,4 +2306,90 @@ test('a summary saved on one line is shown as three lines', async ({ page }, tes
   await rows.nth(1).click();
   const lines = page.locator('notice-detail-screen .summary p');
   await expect(lines).toHaveText(['장학생을 모집해요.', '대상은 재학생이에요.', '12월 5일(금)까지 온라인으로 신청해요']);
+});
+
+// 필수 정보 채우기: 첫 설정을 끝낸 계정에 빈 필수 항목이 있으면 그 항목만 채워야 앱을 쓸 수 있다.
+const doneProfile = { programs: [{ college: '경영대학', department: '경영학과' }], year: 3, semester: null, enrollmentStatus: '재학', militaryService: null, onboardedAt: 'x',
+  admissionYear: null, university3pInternshipSelected: true, deptInternshipDone: null, university3pInternshipDone: false };
+const openFill = async (page: import('@playwright/test').Page, patch: Record<string, unknown>) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, subscriptionsLoading: false, byokOn: true, byokLoading: false, byokError: '', byokStatus: null, aiKeys: [], profile: doneProfile, ...patch });
+};
+const liveKey = { provider: 'groq', keyHint: 'abcd', model: 'm', disabled: false, lastError: null, usedToday: 0 };
+
+test('finished account without a usable AI key is sent to the AI key step only, and cannot leave without one', async ({ page }) => {
+  await openFill(page, {});
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: 'AI 키를 연결해 주세요' })).toBeVisible();
+  await expect(dialog.getByText('연결된 AI 키가 없어서 다시 열었어요. 키를 연결하면 바로 이어서 써요')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '끝내기' })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: /나중에|닫기|건너/ })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: '이전 단계' })).toHaveCount(0);
+  await expect(dialog.getByRole('progressbar')).toHaveCount(0);   // 항목이 하나면 막대가 없다
+  await expect(dialog.locator('.onb-steplist li')).toHaveCount(7);   // 왼쪽 목록은 그대로 모든 단계를 보인다
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeVisible();
+  // 키가 연결되어도 끝내기를 누를 때까지 화면을 둔다.
+  await withApp(page, { aiKeys: [liveKey], completeOnboarding: 'fn:complete' });
+  await expect(dialog.getByRole('button', { name: '끝내기' })).toBeEnabled();
+  await page.evaluate(() => { const app = document.querySelector('notice-app') as unknown as Record<string, () => void>; const w = window as unknown as { calls: unknown[][] }; app.completeOnboarding = () => { w.calls.push(['complete']); app.closeOnboarding(); return undefined as never; }; });
+  await dialog.getByRole('button', { name: '끝내기' }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
+test('a key the provider rejects asks to connect again with its own wording', async ({ page }) => {
+  await openFill(page, { aiKeys: [{ ...liveKey, disabled: true }] });
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: 'AI 키를 다시 연결해 주세요' })).toBeVisible();
+  await expect(dialog.getByText('연결해 둔 키가 더 이상 작동하지 않아서 다시 열었어요')).toBeVisible();
+});
+
+test('finished account with a usable key, or with key state still unknown, never sees the setup', async ({ page }) => {
+  await openFill(page, { aiKeys: [liveKey] });
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await withApp(page, { aiKeys: [], byokLoading: true });
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await withApp(page, { byokLoading: false, byokError: '키 정보를 불러오지 못했어요.' });
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await withApp(page, { byokError: '', byokOn: false });
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('software major missing the admission year sees only the internship step, and finishing saves and closes', async ({ page }) => {
+  await openFill(page, { aiKeys: [liveKey], profile: { ...doneProfile, programs: [{ college: '소프트웨어융합대학', department: '소프트웨어학과' }] }, saveMissingProfile: 'fn:saveMissing' });
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: '인턴십 진행 상황을 알려 주세요' })).toBeVisible();
+  await expect(dialog.getByText('새로 필요한 정보가 생겼어요. 이것만 고르면 바로 쓸 수 있어요')).toBeVisible();
+  await expect(dialog.locator('.onb-steplist li')).toHaveCount(7);
+  await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
+  await dialog.getByRole('button', { name: '2024', exact: true }).click();
+  await dialog.getByRole('group', { name: '솦 인턴십' }).getByRole('button', { name: '마쳤어요' }).click();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>; const w = window as unknown as { calls: unknown[][] };
+    app.saveMissingProfile = (draft: { admissionYear: number }, close: boolean) => { w.calls.push(['saved', draft.admissionYear, close]); app.profile = { ...(app.profile as object), admissionYear: draft.admissionYear, deptInternshipDone: true }; if (close) (app.closeOnboarding as () => void)(); return Promise.resolve(true); };
+  });
+  await dialog.getByRole('button', { name: '다음' }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(await calls(page)).toEqual([['saved', 2024, true]]);
+});
+
+test('profile gap and missing key together: only those two steps, in order', async ({ page }) => {
+  await openFill(page, { profile: { ...doneProfile, programs: [{ college: '소프트웨어융합대학', department: '소프트웨어학과' }] } });
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.locator('.onb-steplist li')).toHaveCount(7);
+  await expect(dialog.getByRole('progressbar').locator('span')).toHaveCount(2);
+  await expect(dialog.getByRole('progressbar')).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: '인턴십 진행 상황을 알려 주세요' })).toBeVisible();
+});
+
+test('settings: the only usable AI key cannot be removed, with two keys removal is offered', async ({ page }) => {
+  await settingsAt(page, '&keys=1');
+  const screen = page.locator('platform-settings-screen');
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false, byokError: '', byokStatus: null, aiKeys: [liveKey], profile: doneProfile });
+  await expect(screen.getByRole('button', { name: 'Groq 키 바꾸기' })).toBeVisible();
+  await expect(screen.getByRole('button', { name: 'Groq 키 연결 끊기' })).toHaveCount(0);
+  await expect(screen.getByText('AI 키는 하나 이상 있어야 해요. 다른 곳도 연결하면 번갈아 써서 더 많이 확인해요')).toBeVisible();
+  await withApp(page, { aiKeys: [liveKey, { ...liveKey, provider: 'gemini', keyHint: 'wxyz' }] });
+  await expect(screen.getByRole('button', { name: 'Groq 키 연결 끊기' })).toBeVisible();
 });

@@ -95,6 +95,33 @@ export function canContinue(step: Step, draft: Draft, doubleAnswer: DoubleAnswer
   }
 }
 
+/** 필수 항목이 비었는지 판단할 때 쓰는 값. keysUsable이 null이면 아직 모르는 것(기능 꺼짐, 불러오는 중, 불러오기 실패)이라 비었다고 보지 않는다. */
+export interface RequiredContext { draft: Draft; doubleAnswer: DoubleAnswer; keysUsable: boolean | null }
+export interface RequiredItem { step: Step; label: string; missing: (ctx: RequiredContext) => boolean }
+
+/** 계정이 반드시 채워야 하는 정보의 목록. 순서가 화면 순서다.
+ * 업데이트로 새 필수 정보가 생기면 여기 항목 하나를 더한다(단계 화면, 확인 함수, 이름). 기존 사용자는 다음 접속 때 그 항목만 채우는 화면을 본다.
+ * 왼쪽 단계 목록, 진행 막대, 시작 단계, 건너뛰는 단계, 앞을 막는 판단이 모두 이 배열에서 나온다. */
+export const REQUIRED_ITEMS: readonly RequiredItem[] = [
+  { step: 'primary', label: '주전공', missing: ({ draft, doubleAnswer }) => !canContinue('primary', draft, doubleAnswer) },
+  { step: 'double', label: '복수전공', missing: ({ draft, doubleAnswer }) => !canContinue('double', draft, doubleAnswer) },
+  { step: 'status', label: '학교 정보', missing: ({ draft, doubleAnswer }) => !canContinue('status', draft, doubleAnswer) },
+  { step: 'internship', label: '인턴십', missing: ({ draft, doubleAnswer }) => !canContinue('internship', draft, doubleAnswer) },
+  { step: 'ai', label: 'AI 키', missing: ({ keysUsable }) => keysUsable === false },
+];
+
+/** 채워야 하지만 비어 있는 항목(목록 순서). 첫 설정을 끝낸 계정에 이 화면만 보이게 하는 기준이다. registry는 시험에서 바꿔 끼운다. */
+export function missingItems(ctx: RequiredContext, registry: readonly RequiredItem[] = REQUIRED_ITEMS): RequiredItem[] {
+  return registry.filter((item) => item.missing(ctx));
+}
+
+export function missingRequired(draft: Draft, doubleAnswer: DoubleAnswer, keys: { usable: boolean | null }, registry: readonly RequiredItem[] = REQUIRED_ITEMS): Step[] {
+  return missingItems({ draft, doubleAnswer, keysUsable: keys.usable }, registry).map((item) => item.step);
+}
+
+/** 저장된 프로필로 만든 값의 복수전공 답. 복수전공이 있으면 '있어요', 없으면 '없어요'. */
+export const savedDoubleAnswer = (draft: Pick<Draft, 'programs'>): DoubleAnswer => (draft.programs.length > 1 ? 'yes' : 'no');
+
 /** 필수 답이 있는 단계. 뒤 단계에 있는 사이에 새 필수 항목이 생겨도 이 순서대로 되돌아가게 한다. */
 export const REQUIRED_STEPS: readonly Step[] = ['primary', 'double', 'status', 'internship'];
 export const STEP_LABEL: Readonly<Partial<Record<Step, string>>> = { primary: '주전공', double: '복수전공', status: '학교 정보', internship: '인턴십' };

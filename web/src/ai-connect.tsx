@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { looksLikeAiKey, PROVIDER_GUIDE, type AiPreferences } from './ai-providers';
 import type { AppController } from './app-controller';
 import type { AiProvider } from './ai-providers';
+import { canRemoveKey, connectedAiKeys } from './ai-keys';
 import { Choice, ext, Guide, Setting, SecretRow, type SettingsModel } from './platform-settings';
 
 type Byok = NonNullable<SettingsModel['byok']>;
@@ -57,17 +58,21 @@ export function AiRows({ byok, alignEnd = false }: { byok?: Byok; alignEnd?: boo
   if (!byok?.available || !ai) {
     return <Setting name="AI 연결" help="지금은 키를 연결할 수 없어요. 잠시 뒤 다시 열어 주세요" />;
   }
+  // 쓸 수 있는 키가 하나뿐이면 그 키는 지울 수 없다(지우면 첫 설정으로 되돌아간다). 바꾸는 것은 언제든 된다. 이유는 구역 설명 한 줄(aiKeysLead)이 말한다.
+  const usable = connectedAiKeys({ byok });
   return <>
     {ORDER.map((id) => {
       const name = `${NAME[id]} 키`;
       if (id === 'gemini') {
         return <SecretRow key={id} name={name} help={BLURB[id]} placeholder={GUIDE[id].placeholder} status={byok.status} loading={byok.loading} busy={byok.busy}
           error={byok.error} alignEnd={alignEnd} labels={LABELS} guide={null} valid={looksLikeAiKey}
+          removable={!byok.status || canRemoveKey(byok.status, usable)}
           onRegister={byok.register} onRemove={byok.remove} />;
       }
       const status = ai.keys.find((key) => key.provider === id) ?? null;
       return <SecretRow key={id} name={name} help={BLURB[id]} placeholder={GUIDE[id].placeholder} status={status} loading={byok.loading} busy={ai.busy}
         error={last === id ? ai.error : ''} alignEnd={alignEnd} labels={LABELS} guide={null} valid={looksLikeAiKey}
+        removable={!status || canRemoveKey(status, usable)}
         onRegister={(key) => { setLast(id); ai.register(id as AiProvider, key); }} onRemove={() => { setLast(id); ai.remove(id as AiProvider); }} />;
     })}
     <SharedGuide />

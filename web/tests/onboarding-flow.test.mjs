@@ -4,7 +4,7 @@ import test from 'node:test';
 import { BOARD_CATALOG, COLLEGE_BOARD, DEFAULT_BOARD, DEPARTMENT_BOARD, boardsForPrograms } from '../src/skku-boards.ts';
 import { COLLEGES, validProgram } from '../src/skku-programs.ts';
 import { EMPTY_PROFILE } from '../src/profile.ts';
-import { KEYWORD_SUGGESTIONS, canContinue, earlierMissing, filterDepartments, initialDraft, nextStep, previousStep, resumeStep, toggleValue, withPrograms } from '../src/onboarding-flow.ts';
+import { KEYWORD_SUGGESTIONS, REQUIRED_ITEMS, missingItems, missingRequired, savedDoubleAnswer, canContinue, earlierMissing, filterDepartments, initialDraft, nextStep, previousStep, resumeStep, toggleValue, withPrograms } from '../src/onboarding-flow.ts';
 
 const sw = { college: '소프트웨어융합대학', department: '소프트웨어학과' };
 const biz = { college: '경영대학', department: '경영학과' };
@@ -134,4 +134,30 @@ test('저장까지 하고 AI 키 단계에서 나간 사람은 다시 열면 AI 
   // 소프트웨어학과 원전공인데 입학 연도가 비어 있으면(새로 생긴 필수 질문) 처음부터 묻는다
   const missing = { ...saved, programs: [sw] };
   assert.equal(resumeStep(missing, initialDraft(missing, [], [])), 'primary');
+});
+
+const completeProfile = { ...EMPTY_PROFILE, programs: [biz], year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false, onboardedAt: 'x' };
+const missingFor = (profile, usable, registry) => { const draft = initialDraft(profile, [], []); return missingRequired(draft, savedDoubleAnswer(draft), { usable }, registry); };
+
+test('missingRequired: complete account is empty, no key is [ai], unknown key is never missing', () => {
+  assert.deepEqual(missingFor(completeProfile, true), []);
+  assert.deepEqual(missingFor(completeProfile, false), ['ai']);
+  assert.deepEqual(missingFor(completeProfile, null), []);
+});
+
+test('missingRequired: software major without admission year, and empty profile, come back in step order', () => {
+  const swProfile = { ...completeProfile, programs: [sw], admissionYear: null, deptInternshipDone: true };
+  assert.deepEqual(missingFor(swProfile, true), ['internship']);
+  assert.deepEqual(missingFor(swProfile, false), ['internship', 'ai']);
+  assert.deepEqual(missingFor({ ...EMPTY_PROFILE, onboardedAt: 'x' }, true), ['primary', 'status', 'internship']);
+});
+
+test('missingRequired: a new required item added to the registry is the only missing step for an otherwise complete account', () => {
+  const fake = { step: 'phone', label: '연락처', missing: () => true };
+  const registry = [...REQUIRED_ITEMS, fake];
+  assert.deepEqual(missingFor(completeProfile, true, registry), ['phone']);
+  // 목록이 순서와 이름의 유일한 출처다.
+  const draft = initialDraft(completeProfile, [], []);
+  assert.deepEqual(missingItems({ draft, doubleAnswer: 'no', keysUsable: true }, registry).map((item) => item.label), ['연락처']);
+  assert.deepEqual(REQUIRED_ITEMS.map((item) => item.step), ['primary', 'double', 'status', 'internship', 'ai']);
 });
