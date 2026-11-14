@@ -190,7 +190,7 @@ export class AppController extends Reactive {
   static properties = {
     notices: { state: true }, sources: { state: true }, matched: { state: true }, generatedAt: { state: true },
     view: { state: true }, board: { state: true }, keyword: { state: true }, keywords: { state: true }, query: { state: true },
-    loading: { state: true }, manualRefreshing: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
+    loading: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
     toast: { state: true }, linkCopied: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, coopSort: { state: true }, coopKind: { state: true }, savedSort: { state: true },
@@ -330,7 +330,6 @@ export class AppController extends Reactive {
   }
 
   loading = true;
-  manualRefreshing = false;
   /** 마지막 refresh가 시작한 내 판정 읽기. 직접 새로고침의 결과를 셀 때 기다린다. */
   private mineSync: Promise<void> | null = null;
   failed = false;
@@ -546,23 +545,20 @@ export class AppController extends Reactive {
     } finally { this.authBusy = false; }
   }
 
-  /** 직접 누른 새로고침은 목록이 그대로여도 끝났는지 알 수 있게 결과를 토스트로 알린다(실패 안내는 refresh가 한다).
+  /** 직접 누른 새로고침은 따로 진행 표시를 두지 않는다(받는 동안 단추만 흐려진다). 목록이 그대로여도 끝났는지 알 수 있게 결과를 토스트로 알린다(실패 안내는 refresh가 한다).
    * 지금 보는 목록에 새로 나타난 공지 수를 센다. 내 판정을 다 받은 뒤 세야 AI 확인 중인 공지와 보이는 공지가 맞는다. */
   async collectNow() {
     if (this.loading || this.gated) return;
-    this.manualRefreshing = true;
     const before = new Set(this.notices.map((n) => n.id));
     this.mineSync = null;
-    try {
-      await this.refresh();
-      if (this.failed) return;
-      await (this.mineSync as Promise<void> | null)?.catch(() => undefined);   // refresh 안에서 정해져 타입이 좁혀지지 않게 한다
-      const added = (n: Notice) => !before.has(n.id);
-      const shown = this.visible().filter(added).length;
-      const tab = this.tab();
-      const waiting = tab === 'saved' ? 0 : this.scopeTab(this.filtered(this.decorated(this.notices.filter(added))), tab).filter((n) => this.isWaiting(n)).length;
-      this.showToast(shown ? `새 공지 ${shown}개를 가져왔어요` : waiting ? `새 공지 ${waiting}개는 AI가 확인하고 있어요` : '새 공지가 없어요');
-    } finally { this.manualRefreshing = false; }
+    await this.refresh();
+    if (this.failed) return;
+    await (this.mineSync as Promise<void> | null)?.catch(() => undefined);   // refresh 안에서 정해져 타입이 좁혀지지 않게 한다
+    const added = (n: Notice) => !before.has(n.id);
+    const shown = this.visible().filter(added).length;
+    const tab = this.tab();
+    const waiting = tab === 'saved' ? 0 : this.scopeTab(this.filtered(this.decorated(this.notices.filter(added))), tab).filter((n) => this.isWaiting(n)).length;
+    this.showToast(shown ? `새 공지 ${shown}개를 가져왔어요` : waiting ? `새 공지 ${waiting}개는 AI가 확인하고 있어요` : '새 공지가 없어요');
   }
 
   updateRead(ids: string[], read: boolean) {

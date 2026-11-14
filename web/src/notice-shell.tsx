@@ -18,7 +18,6 @@ import { Avatar } from './ui';
 import { Onboarding } from './onboarding';
 import { InstallBanner } from './install-banner';
 import { LoginScreen, LoginStatus } from './login-screen';
-import { Spinner } from './spinner';
 import type { CanvasMode } from './devices';
 import { bodyInterests, withMyDeadline } from './notice-view';
 import './platform-settings';
@@ -135,7 +134,7 @@ export function NoticeShell({ app }: { app: AppController }) {
                 {app.detailOpen || !selected ? null : <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover wide-only max-[719px]:hidden min-[720px]:flex" aria-label="상세 칸 열기" title="상세 칸 열기"
                   onClick={() => app.setDetail(true)}><Icon name="panel" /></button>}
                 <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover" aria-label="공지 다시 가져오기" title="공지 다시 가져오기 (R)" aria-keyshortcuts="r"
-                  disabled={app.loading} onClick={() => { void app.collectNow(); }}>{app.manualRefreshing ? <Spinner size={22} /> : <Icon name="refresh" />}</button>
+                  disabled={app.loading} onClick={() => { void app.collectNow(); }}><Icon name="refresh" /></button>
               </>}
               {settings ? null : <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover narrow-only min-[720px]:hidden!" aria-label="설정" onClick={app.openSettingsHome}><GearIcon /></button>}
               {settings ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover wide-only min-[720px]:-mr-[11px] max-[719px]:hidden min-[720px]:flex" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} title={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 (Esc)' : '설정 닫기 (Esc)'}

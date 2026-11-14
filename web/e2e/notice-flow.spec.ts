@@ -782,8 +782,7 @@ test('initial loading does not animate the refresh button', async ({ page }) => 
   const button = page.getByRole('button', { name: '공지 다시 가져오기' });
   await expect(page.getByText('공지를 불러오고 있어요')).toBeVisible();
   await expect(button).toBeDisabled();
-  await expect(button.locator('.loading-mark')).toHaveCount(0);
-  await expect(page.locator('.navigation-head .loading-mark')).toHaveCount(0);
+  await expect(page.locator('.loading-mark, .animate-spin')).toHaveCount(0);
   release();
   await expect(button).toBeEnabled();
 });
@@ -817,7 +816,7 @@ test('refresh button and R refetch the notice list, lock while loading, and keep
   mode = 'slow';
   await button.click();
   await expect(button).toBeDisabled();                                // 받는 동안은 다시 누를 수 없다
-  await expect(button.locator('.loading-mark')).toHaveCount(1);        // 직접 누른 자리에서만 진행 상태를 보여 준다
+  await expect(page.locator('.loading-mark, .animate-spin')).toHaveCount(0); // 진행 표시는 따로 없다(단추만 흐려지고 끝나면 토스트)
   await expect(button).toBeEnabled();
   mode = 'ok';
   const beforeKey = hits;
