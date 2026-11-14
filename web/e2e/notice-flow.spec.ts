@@ -1150,7 +1150,7 @@ test('google calendar page: connect first, then sync and disconnect, with plain 
   await expect(screen.getByRole('heading', { name: '구글 캘린더' })).toBeVisible();
   await expect(screen.getByRole('button', { name: '구글 캘린더에 연결하기' })).toBeVisible();   // 연결 전에는 누르는 단추만 있고 연결됨 표시는 없다
   await expect(screen.getByText('연결됨')).toHaveCount(0);
-  await expect(screen.getByText(/내 다른 캘린더는 읽지 않아요/)).toBeVisible();
+  await expect(screen.getByRole('heading', { name: '알아 두세요' })).toHaveCount(0);
   // 단계 안내: 누르면 무슨 일이 생기는지, "확인되지 않은 앱"이 나오면 어떻게 하는지 알려 준다.
   await screen.getByText('연결하는 방법').click();
   await expect(screen.getByText(/고급.*을 누른 뒤.*계속/)).toBeVisible();

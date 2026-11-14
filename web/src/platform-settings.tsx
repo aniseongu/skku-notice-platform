@@ -661,11 +661,6 @@ function CalendarPage({ model }: { model: SettingsModel }) {
         ]} />
       </div>
     </Section>
-    <Section id="s-calendar-help" title="알아 두세요">
-      <Setting name="내 다른 캘린더는 읽지 않아요" help="이 앱이 만든 성대 공지 캘린더만 다뤄요" />
-      <Setting name="구글 연결은 암호화해 보관해요" help="끊으면 바로 지워요" />
-      <Setting name="끊어도 캘린더는 남아요" help="필요 없으면 구글 캘린더에서 지울 수 있어요" />
-    </Section>
   </div>;
 }
 
