@@ -26,20 +26,12 @@
 
 ```mermaid
 flowchart LR
-  Pages["Cloudflare Pages<br/>React · Vite"] --> User["사용자 브라우저 · PWA"]
-  User <--> Supabase["Supabase<br/>PostgreSQL · Auth"]
-  User --> Edge["Supabase Edge Function<br/>키와 외부 서비스 연결"]
-  Edge --> Supabase
-  Sources[학교 게시판 · 인턴 공고] --> Workers["OCI 워커<br/>수집 · OCR · AI 판정 · 푸시"]
-  Workers <--> Supabase
-  Workers --> AI[Gemini · Groq]
-  Workers --> Push[브라우저 푸시 서비스]
-  Push --> User
-  Import[현장실습 수동 가져오기] --> Supabase
-  API["NestJS API<br/>OCI 내부 전용"] --> Supabase
+  Sources["학교 게시판<br/>인턴 공고"] --> Workers["OCI 워커<br/>수집 · OCR · 판정 · 푸시"]
+  Workers <--> Supabase["Supabase<br/>DB · 인증 · Edge Function"]
+  Supabase <--> Web["React PWA<br/>Cloudflare Pages"]
 ```
 
-OCI에서는 아이캠퍼스와 Google 캘린더 동기화도 처리합니다. NestJS API는 서버 내부에서만 실행되며, 웹 앱의 공개 API로 연결되어 있지는 않습니다. 사용자 데이터는 Supabase RLS로 분리하고 AI 키와 외부 서비스 토큰은 암호화해 보관합니다.
+OCI 워커는 Gemini·Groq과 브라우저 푸시 서비스를 이용하고, 아이캠퍼스와 Google 캘린더 동기화도 처리합니다. 현장실습은 운영자가 수동으로 가져옵니다. NestJS API는 서버 내부에서만 실행되며, 웹 앱의 공개 API로 연결되어 있지는 않습니다. 사용자 데이터는 Supabase RLS로 분리하고 AI 키와 외부 서비스 토큰은 암호화해 보관합니다.
 
 ## 로컬 실행
 
