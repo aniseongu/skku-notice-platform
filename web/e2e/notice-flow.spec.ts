@@ -782,8 +782,8 @@ test('initial loading does not animate the refresh button', async ({ page }) => 
   const button = page.getByRole('button', { name: '공지 다시 가져오기' });
   await expect(page.getByText('공지를 불러오고 있어요')).toBeVisible();
   await expect(button).toBeDisabled();
-  await expect(button.locator('.animate-spin')).toHaveCount(0);
-  await expect(page.locator('.navigation-head .animate-spin')).toHaveCount(0);
+  await expect(button.locator('.loading-mark')).toHaveCount(0);
+  await expect(page.locator('.navigation-head .loading-mark')).toHaveCount(0);
   release();
   await expect(button).toBeEnabled();
 });
@@ -817,7 +817,7 @@ test('refresh button and R refetch the notice list, lock while loading, and keep
   mode = 'slow';
   await button.click();
   await expect(button).toBeDisabled();                                // 받는 동안은 다시 누를 수 없다
-  await expect(button.locator('.animate-spin')).toHaveCount(1);        // 직접 누른 자리에서만 진행 상태를 보여 준다
+  await expect(button.locator('.loading-mark')).toHaveCount(1);        // 직접 누른 자리에서만 진행 상태를 보여 준다
   await expect(button).toBeEnabled();
   mode = 'ok';
   const beforeKey = hits;
@@ -2290,15 +2290,15 @@ test('opening a notice shows no spinner; a slow body gets quiet skeleton bars an
   const status = detail.getByRole('status').filter({ hasText: '본문을 불러오고 있어요' });
   await expect(status).toHaveCount(1);
   await expect(status.locator('[class*="h-[14px]"]')).toHaveCount(4);          // 0.3초 뒤 막대
-  await expect(detail.locator('.animate-spin')).toHaveCount(0);
+  await expect(detail.locator('.loading-mark')).toHaveCount(0);
   await expect(detail).toContainText('느린 본문 확인');
   await expect(status).toHaveCount(0);
-  await expect(detail.locator('.animate-spin')).toHaveCount(0);
+  await expect(detail.locator('.loading-mark')).toHaveCount(0);
   // 빨리 오면 막대도 없다.
   delay = 0;
   await rows.nth(2).click();
   await expect(detail).toContainText('느린 본문 확인');
-  await expect(detail.locator('.animate-spin, [class*="h-[14px]"]')).toHaveCount(0);
+  await expect(detail.locator('.loading-mark, [class*="h-[14px]"]')).toHaveCount(0);
 });
 
 test('a summary saved on one line is shown as three lines', async ({ page }, testInfo) => {

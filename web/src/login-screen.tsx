@@ -18,7 +18,7 @@ const GoogleG = () => <svg className="flex-none w-[20px] h-[20px]" width="18" he
 export function LoginStatus({ text = '불러오고 있어요' }: { text?: string }) {
   const [shown, setShown] = useState(false);
   useEffect(() => { const timer = window.setTimeout(() => setShown(true), 300); return () => window.clearTimeout(timer); }, []);
-  return <div className="flex min-h-dvh items-center justify-center bg-bg px-[24px]"><div role="status" className={`flex flex-col items-center gap-[16px] text-center ${shown ? '' : 'invisible'}`}><Spinner size={64} /><p className="m-0 text-[15px] leading-[22px] text-ink-2">{text}</p></div></div>;
+  return <div className="flex min-h-dvh items-center justify-center bg-bg px-[24px]"><div role="status" className={`flex flex-col items-center gap-[16px] text-center ${shown ? '' : 'invisible'}`}><Spinner size={40} stroke={1.5} className="text-ink-3" /><p className="m-0 text-[15px] leading-[22px] text-ink-2">{text}</p></div></div>;
 }
 
 export function LoginScreen({ app }: { app: AppController }) {
