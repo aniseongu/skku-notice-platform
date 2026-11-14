@@ -42,6 +42,8 @@ def test_request_uses_bearer_header_system_prompt_and_strict_schema_for_known_mo
     assert seen["auth"] == f"Bearer {SECRET}"
     assert seen["body"]["messages"][0] == {"role": "system", "content": "규칙"}
     assert seen["body"]["response_format"]["type"] == "json_schema"
+    assert seen["body"]["response_format"]["json_schema"]["strict"] is True  # gpt-oss는 스키마를 강제한다
+    assert seen["body"]["temperature"] == 0
     assert SECRET not in json.dumps(seen["body"])
 
 
@@ -175,3 +177,21 @@ def test_gemini_client_is_built_with_bounded_retries_and_no_network():
 
     client = gemini_client("AIza" + "K" * 35)
     assert client is not None and hasattr(client, "models")
+
+
+def test_every_judging_schema_meets_groq_strict_rules():
+    from skku_notice import grad_intern_facts, intern_ai, judge, school_ai, translate
+    from skku_notice.ai_providers import strict_ready
+
+    for module in (school_ai, intern_ai, judge, translate, grad_intern_facts):
+        assert strict_ready(json_schema(module.SCHEMA)), module.__name__
+    assert not strict_ready({"type": "object", "properties": {"a": {"type": "string"}}, "required": [], "additionalProperties": False})
+
+
+def test_gemini_calls_leave_temperature_at_the_default():
+    from pathlib import Path
+
+    root = Path(__file__).parents[1]
+    for name in ("school_ai", "intern_ai", "judge", "translate", "grad_intern_facts"):
+        assert "temperature=" not in (root / f"src/skku_notice/{name}.py").read_text(), name
+    assert "temperature: 0, responseMimeType" not in (root / "supabase/functions/byok/index.ts").read_text()

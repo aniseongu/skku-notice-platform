@@ -40,7 +40,8 @@ async function geminiSummary(apiKey: string, model: string, input: string): Prom
   const call = (name: string) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(name)}:generateContent`, {
     method: 'POST', headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(25000), redirect: 'error',
     body: JSON.stringify({ systemInstruction: { parts: [{ text: SUMMARY_PROMPT }] }, contents: [{ role: 'user', parts: [{ text: input }] }],
-      generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: SUMMARY_SCHEMA } }),
+      // Gemini 3은 temperature를 바꾸지 않는다(Google 권장: 기본값 유지, 낮추면 반복·품질 저하).
+      generationConfig: { responseMimeType: 'application/json', responseSchema: SUMMARY_SCHEMA } }),
   });
   let response = await call(model);
   if ([500, 503, 504].includes(response.status)) {
@@ -55,14 +56,18 @@ async function geminiSummary(apiKey: string, model: string, input: string): Prom
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 }
 
-/** Groq: OpenAI 호환 채팅 API를 JSON 모드로 부른다(출처: console.groq.com/docs/structured-outputs, /docs/reasoning).
- * 스키마를 지원하지 않는 모델도 있어 JSON 모드로 받고 형식은 parseSummary가 확인한다. gpt-oss는 추론을 낮춰 답이 비지 않게 한다. */
+/** Groq: OpenAI 호환 채팅 API(출처: console.groq.com/docs/structured-outputs, /docs/reasoning).
+ * gpt-oss는 strict 구조화 출력(스키마에 맞는 답만 만든다)을 쓰고, 다른 모델이나 스키마를 거절하면 JSON 모드로 다시 부른다.
+ * 형식은 parseSummary가 한 번 더 확인한다. gpt-oss는 추론을 낮춰 답이 비지 않게 한다. */
+const GROQ_SUMMARY_SCHEMA = { type: 'object', additionalProperties: false, required: ['summary', 'deadline_kind', 'deadline_at'],
+  properties: { summary: { type: 'string' }, deadline_kind: { type: 'string', enum: ['마감', '일정', '없음'] }, deadline_at: { type: 'string' } } };
 async function groqSummary(apiKey: string, model: string | null, input: string): Promise<string> {
   const name = model || 'openai/gpt-oss-20b';
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const strict = name.startsWith('openai/gpt-oss');
+  const call = (format: object) => fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(25000), redirect: 'error',
     body: JSON.stringify({
-      model: name, temperature: 0, max_completion_tokens: 2048, response_format: { type: 'json_object' },
+      model: name, temperature: 0, max_completion_tokens: 2048, response_format: format,
       ...(name.startsWith('openai/gpt-oss') ? { reasoning_effort: 'low', include_reasoning: false } : {}),
       messages: [
         { role: 'system', content: SUMMARY_PROMPT + ' 반드시 {"summary": 문자열, "deadline_kind": "마감" 또는 "일정" 또는 "없음", "deadline_at": 문자열} 형식의 JSON 객체 하나만 답하세요.' },
@@ -70,6 +75,8 @@ async function groqSummary(apiKey: string, model: string | null, input: string):
       ],
     }),
   });
+  let response = await call(strict ? { type: 'json_schema', json_schema: { name: 'summary', strict: true, schema: GROQ_SUMMARY_SCHEMA } } : { type: 'json_object' });
+  if (strict && response.status === 400) response = await call({ type: 'json_object' });  // 스키마를 거절하면 JSON 모드로
   if (!response.ok) throw statusError(response.status);
   const data = await response.json();
   return data.choices?.[0]?.message?.content ?? '';

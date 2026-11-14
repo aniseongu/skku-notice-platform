@@ -136,7 +136,7 @@ def judge_internships(
         client = client or gemini_client(api_key)
         response = client.models.generate_content(
             model=model, contents=contents,
-            config=types.GenerateContentConfig(system_instruction=SYSTEM + LANGUAGE_RULE + SUMMARY_RULE, temperature=0,
+            config=types.GenerateContentConfig(system_instruction=SYSTEM + LANGUAGE_RULE + SUMMARY_RULE,
                                                response_mime_type="application/json", response_schema=SCHEMA),
         )
         replies = json.loads(response.text)["items"]

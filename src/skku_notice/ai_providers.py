@@ -72,6 +72,19 @@ def json_schema(schema: object) -> object:
     return schema
 
 
+def strict_ready(schema: object) -> bool:
+    """Groq strict 모드 조건: 모든 객체가 additionalProperties false이고 모든 속성이 required다(console.groq.com/docs/structured-outputs)."""
+    if isinstance(schema, dict):
+        if schema.get("type") == "object":
+            props = set((schema.get("properties") or {}).keys())
+            if schema.get("additionalProperties") is not False or props != set(schema.get("required") or []):
+                return False
+        return "nullable" not in schema and all(strict_ready(v) for v in schema.values())
+    if isinstance(schema, list):
+        return all(strict_ready(v) for v in schema)
+    return True
+
+
 def _text_of(contents: object) -> str:
     parts = contents if isinstance(contents, list) else [contents]
     texts = []
@@ -111,6 +124,8 @@ class _Models:
             user += "\n\n반드시 아래 JSON 스키마를 따르는 JSON 객체 하나만 답하세요.\n" + json.dumps(
                 json_schema(schema), ensure_ascii=False)
         messages.append({"role": "user", "content": user})
+        # Gemini 3 호출은 temperature를 넣지 않는다(Google: 기본값 1.0 유지 강력 권장, 낮추면 반복·품질 저하, 이후 세대는 무시·400).
+        # 같은 config로 오는 Groq는 판정이 흔들리지 않게 0으로 보낸다.
         body: dict = {"model": model, "messages": messages, "temperature": getattr(config, "temperature", 0) or 0}
         # 출처: https://console.groq.com/docs/reasoning
         # 추론 토큰도 답 길이 한도에 들어가서, 추론이 길면 내용이 빈 채로 finish_reason이 length로 끝난다. 추론을 낮춘다.
@@ -120,8 +135,11 @@ class _Models:
             body["include_reasoning"] = False
         if schema is not None:
             if strict:
+                # strict: true는 스키마에 맞는 답만 만들게 디코딩을 묶는다(gpt-oss 지원, 2026-11-15 공식 문서 확인).
+                # 조건(전부 required, additionalProperties false)을 못 맞춘 스키마는 형식만 안내하는 best-effort로 보낸다.
+                converted = json_schema(schema)
                 body["response_format"] = {"type": "json_schema", "json_schema": {
-                    "name": "result", "strict": False, "schema": json_schema(schema)}}
+                    "name": "result", "strict": strict_ready(converted), "schema": converted}}
             else:
                 body["response_format"] = {"type": "json_object"}
         return body

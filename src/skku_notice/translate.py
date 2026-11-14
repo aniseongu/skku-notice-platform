@@ -72,7 +72,7 @@ def translate_notice(
             contents=contents,
             config=types.GenerateContentConfig(
                 # 번역은 답이 길다(Groq 기본 상한 3,000보다 크게)
-                system_instruction=SYSTEM, temperature=0.2, max_output_tokens=8000,
+                system_instruction=SYSTEM, max_output_tokens=8000,
                 response_mime_type="application/json", response_schema=SCHEMA,
             ),
         )

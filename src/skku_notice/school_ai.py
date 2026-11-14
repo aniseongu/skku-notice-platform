@@ -93,7 +93,7 @@ def judge_school_notices(
             model=model,
             contents=contents,
             config=types.GenerateContentConfig(
-                system_instruction=SYSTEM + LANGUAGE_RULE + SUMMARY_FORMAT, temperature=0,
+                system_instruction=SYSTEM + LANGUAGE_RULE + SUMMARY_FORMAT,
                 response_mime_type="application/json", response_schema=SCHEMA,
             ),
         )

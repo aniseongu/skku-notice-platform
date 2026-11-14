@@ -576,7 +576,7 @@ def call_gemini(title: str, body: str, model: str, api_key: str, client: object 
         client = client or gemini_client(api_key)
         response = client.models.generate_content(
             model=model, contents=[types.Part.from_text(text=payload)],
-            config=types.GenerateContentConfig(system_instruction=SYSTEM, temperature=0,
+            config=types.GenerateContentConfig(system_instruction=SYSTEM,
                                                response_mime_type="application/json", response_schema=SCHEMA),
         )
         data = json.loads(response.text)
