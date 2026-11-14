@@ -87,7 +87,8 @@ function Body({ body: rawBody, heading = '본문' }: { body: NoticeBody; heading
 /** 본문을 기다리는 자리. 0.3초 안에 오면 아무것도 그리지 않고, 길어지면 움직이지 않는 막대만 둔다. 낭독용 상태 글은 처음부터 있다. */
 function BodyLoading() {
   const shown = useDelayed();
-  return <div role="status" className="mt-[20px]"><span className="visually-hidden">본문을 불러오고 있어요</span>
+  return <div role="status" className={DETAIL_SECTION}><span className="visually-hidden">본문을 불러오고 있어요</span>
+    {shown ? <h3 className={SECTION_TITLE} aria-hidden="true">본문</h3> : null}
     {shown ? <div className="grid gap-[12px]" aria-hidden="true"><span className={`${SKELETON_BAR} w-full`}></span><span className={`${SKELETON_BAR} w-[92%]`}></span><span className={`${SKELETON_BAR} w-full`}></span><span className={`${SKELETON_BAR} w-[64%]`}></span></div> : null}</div>;
 }
 

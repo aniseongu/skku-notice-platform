@@ -28,5 +28,5 @@ export const BADGE = 'badge rounded-pill bg-sunken px-[8px] py-[1px] text-[12px]
 export const CHOICE = 'choice group/ch [@media(hover:hover)]:[&:hover:not([aria-checked=true])]:bg-hover active:[&:not([aria-checked=true])]:bg-hover relative flex min-h-[56px] items-center justify-between gap-[12px] rounded-none border-0 bg-surface px-[16px] py-[8px] text-left text-[15px] font-normal text-ink aria-checked:font-bold [.choice+&]:before:absolute [.choice+&]:before:top-0 [.choice+&]:before:right-[16px] [.choice+&]:before:left-[16px] [.choice+&]:before:h-[1px] [.choice+&]:before:bg-line [.choice+&]:before:content-[\'\']';
 export const CHOICE_CHECK = 'choice-check grid size-[20px] flex-none place-items-center rounded-[50%] border-[1.5px] border-ink-3 group-aria-checked/ch:border-ink group-aria-checked/ch:after:size-[8px] group-aria-checked/ch:after:rounded-[50%] group-aria-checked/ch:after:bg-ink group-aria-checked/ch:after:content-[\'\']';
 
-/** 기다리는 자리의 조용한 막대(움직이지 않는다). 목록 뼈대와 상세의 본문·요약 자리가 같이 쓴다. */
-export const SKELETON_BAR = 'block h-[14px] rounded-sm bg-sunken';
+/** 기다리는 자리의 조용한 막대(움직이지 않는다). 목록 뼈대와 상세의 본문·요약 자리가 같이 쓴다. sunken은 면과 거의 같아 보여 한 단계 진한 line을 쓴다. */
+export const SKELETON_BAR = 'block h-[14px] rounded-sm bg-line';

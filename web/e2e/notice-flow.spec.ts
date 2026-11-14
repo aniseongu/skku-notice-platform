@@ -2268,7 +2268,7 @@ test('opening a notice shows no spinner; a slow body gets quiet skeleton bars an
   await rows.nth(1).click();
   const status = detail.getByRole('status').filter({ hasText: '본문을 불러오고 있어요' });
   await expect(status).toHaveCount(1);
-  await expect(status.locator('[class*="bg-sunken"]')).toHaveCount(4);          // 0.3초 뒤 막대
+  await expect(status.locator('[class*="h-[14px]"]')).toHaveCount(4);          // 0.3초 뒤 막대
   await expect(detail.locator('.animate-spin')).toHaveCount(0);
   await expect(detail).toContainText('느린 본문 확인');
   await expect(status).toHaveCount(0);
@@ -2277,7 +2277,7 @@ test('opening a notice shows no spinner; a slow body gets quiet skeleton bars an
   delay = 0;
   await rows.nth(2).click();
   await expect(detail).toContainText('느린 본문 확인');
-  await expect(detail.locator('.animate-spin, [class*="bg-sunken"][class*="h-[14px]"]')).toHaveCount(0);
+  await expect(detail.locator('.animate-spin, [class*="h-[14px]"]')).toHaveCount(0);
 });
 
 test('a summary saved on one line is shown as three lines', async ({ page }, testInfo) => {
