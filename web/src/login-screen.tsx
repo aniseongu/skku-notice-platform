@@ -25,12 +25,12 @@ export function LoginScreen({ app }: { app: AppController }) {
   const busy = app.authBusy;
   // 가운데 알림 예시는 실제 알림(src/skku_notice/push_collection.py)과 같은 모양이다: 제목은 공지 제목, 본문 첫 줄은 AI 판정 문구, 둘째 줄은 관심 키워드와 마감(키워드가 없으면 마감만), 마지막 줄은 게시판. 알림은 AI 판정이 끝난 뒤에 간다.
   // 토스 첫 화면 구성(TDS Top: 위 그림, 28px 제목, 17px 설명, 아래 고정 단추 하나)을 따른다. 가운데에는 이 앱이 하는 일을 알림 예시 하나로 보여 준다.
-  return <div className="flex flex-col min-h-dvh bg-bg">
+  return <div className="flex flex-col min-h-dvh bg-bg max-[719px]:[notice-app:has(.install-banner)_&]:pb-[calc(300px+env(safe-area-inset-bottom))]">
     <div className="flex flex-1 flex-col w-full px-[20px] py-0 min-[720px]:my-auto min-[720px]:flex-none min-[720px]:max-w-[420px] min-[720px]:self-center min-[720px]:px-0 min-[720px]:py-[48px]">
       <div className="flex flex-1 flex-col pt-[calc(48px_+_env(safe-area-inset-top))] min-[720px]:flex-none min-[720px]:pt-0">
         {/* 맨 위에 앱 아이콘과 이름(사용자 요청: 아이콘은 보여야 한다), 그 아래 TDS Top의 그림 자리에 알림 예시를 둔다. */}
         <div className="flex items-center gap-[10px] mb-[28px] text-[22px] leading-[30px] font-bold text-ink"><svg className="w-[48px] h-[48px] flex-none" aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg><span>{APP_NAME}</span></div>
-        <div className="pointer-events-none">
+        <div className="pointer-events-none max-[719px]:[notice-app:has(.install-banner)_&]:hidden">
           <p className="m-0 mb-[8px] text-[13px] leading-[18px] font-semibold text-ink-2" id="login-preview-label">알림 예시</p>
           <div className="w-full px-[16px] py-[14px] border border-line rounded-lg bg-surface" role="img" aria-labelledby="login-preview-label" aria-describedby="login-note-text">
             <div className="flex items-center gap-[6px] text-[13px] leading-[18px] text-ink-2">
@@ -59,7 +59,7 @@ export function LoginScreen({ app }: { app: AppController }) {
         <p className="m-0 mt-[14px] text-[13px] leading-[20px] text-center text-ink-2 min-[720px]:text-[14px]">계속하면 <a className="inline-block px-[4px] py-[12px] -mx-[4px] -my-[12px] text-ink" href="./privacy.html">개인정보처리방침</a>에 동의하는 거예요</p>
       </div>
     </div>
-    <InstallBanner app={app} placement="login" />
+    <InstallBanner app={app} />
   {/* 서비스 정보는 화면 맨 아래에 둔다. PC에서는 창 바닥에 붙어 로그인 묶음과 떨어져 있고, 휴대폰에서는 로그인 묶음 바로 아래 바닥이다. 개인 연락처는 처리방침에만 적는다. */}
     <footer className="px-[20px] pt-[8px] pb-[calc(20px_+_env(safe-area-inset-bottom))] text-center text-[12px] leading-[18px] text-ink-3"><a className="inline-block px-[6px] py-[13px] -my-[13px] text-ink-3 underline underline-offset-2" href="https://github.com/aniseongu/skku-notice-platform/issues" target="_blank" rel="noopener noreferrer">문의하기</a> · <a className="inline-block px-[6px] py-[13px] -my-[13px] text-ink-3 underline underline-offset-2" href="https://github.com/aniseongu/skku-notice-platform" target="_blank" rel="noopener noreferrer">오픈소스</a></footer>
   </div>;

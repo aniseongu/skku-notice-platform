@@ -103,6 +103,7 @@ export function settingsTitle(): string {
 }
 
 export interface InstallPrompt extends Event { prompt(): Promise<void> }
+declare global { interface Window { __skkuInstallPrompt: InstallPrompt | null } }
 
 // 선택 모드와 고른 공지도 이 탭에만 기억한다. 새로고침해도 선택하던 그대로 두고, 계정이 바뀌면 지운다.
 interface SavedSelection { user: string; ids: string[] }
@@ -373,6 +374,7 @@ export class AppController extends Reactive {
 
   /** 화면에 붙을 때 한 번 부른다. 이벤트 구독과 첫 데이터 읽기를 시작한다. */
   start() {
+    this.install = window.__skkuInstallPrompt ?? null;
     this.subscribe(() => { if (this.selectionReady) storeSelection(this.selecting ? { user: this.authUserId ?? 'guest', ids: this.selectedReads } : null); });
     // 새 문서는 목록에서 시작한다. 이전 문서의 상세 history 상태가 설정 닫기에서 되살아나지 않게 맞춘다.
     if (history.state?.notice) history.replaceState(null, '');
@@ -1818,8 +1820,10 @@ export class AppController extends Reactive {
 
   async runInstall() {
     if (!this.install) return;
-    await this.install.prompt();
+    const prompt = this.install;
     this.install = null;
+    window.__skkuInstallPrompt = null;
+    await prompt.prompt();
   }
 
   onKey(event: KeyboardEvent) {

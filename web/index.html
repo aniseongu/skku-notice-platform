@@ -16,6 +16,15 @@
   <link rel="icon" href="icon-48-dark.png" type="image/png" sizes="48x48" media="(prefers-color-scheme: dark)">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" media="(prefers-color-scheme: light)">
   <link rel="apple-touch-icon" href="apple-touch-icon-dark.png" media="(prefers-color-scheme: dark)">
+  <script>
+    // 앱 코드가 준비되기 전에 도착한 설치 신호도 놓치지 않는다.
+    window.__skkuInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      window.__skkuInstallPrompt = event;
+    });
+    window.addEventListener('appinstalled', () => { window.__skkuInstallPrompt = null; });
+  </script>
   <script type="module" src="/src/main.ts"></script>
 </head>
 <body>

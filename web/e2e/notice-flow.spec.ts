@@ -2123,7 +2123,7 @@ test('install banner: one tap installs on phones, closing keeps it away, PC neve
   const banner = page.getByRole('region', { name: '앱 설치' });
   await expect(banner).toBeVisible();
   // 설치 단추와 닫기 단추는 모두 44px 이상이다.
-  for (const name of ['설치', '닫기']) {
+  for (const name of ['홈 화면에 추가', '닫기']) {
     const box = await banner.getByRole('button', { name }).boundingBox();
     expect(box!.height).toBeGreaterThanOrEqual(44);
     expect(box!.width).toBeGreaterThanOrEqual(44);
@@ -2131,6 +2131,8 @@ test('install banner: one tap installs on phones, closing keeps it away, PC neve
   // 닫으면 사라지고 새로 열어도 다시 뜨지 않는다.
   await banner.getByRole('button', { name: '닫기' }).click();
   await expect(banner).toHaveCount(0);
+  await page.getByRole('button', { name: /^인턴 공고/ }).first().click();
+  await expect(page.getByRole('heading', { name: '인턴 공고' })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: /^인턴 공고/ }).first()).toBeVisible();
   await inject();
@@ -2175,7 +2177,7 @@ test('install banner keeps the last notice and temporary messages accessible', a
   await expect(banner).toHaveCount(0);
 });
 
-test('install banner is available before login without covering Google sign-in', async ({ page }, testInfo) => {
+test('install panel is available before login and can be dismissed to sign in', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', 'install banner only appears on phones');
   await page.setViewportSize({ width: 360, height: 780 });
   await page.goto('/?api=sample/api/v1');
@@ -2193,7 +2195,30 @@ test('install banner is available before login without covering Google sign-in',
   const loginBox = await login.boundingBox();
   const bannerBox = await banner.boundingBox();
   expect(loginBox!.y + loginBox!.height).toBeLessThanOrEqual(bannerBox!.y);
-  await banner.getByRole('button', { name: '닫기' }).click();
+  await banner.getByRole('button', { name: '다음에 할게요' }).click();
   await expect(banner).toHaveCount(0);
   await expect(login).toBeVisible();
+});
+
+test('install signal received before the app loads is retained and used once', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'install panel only appears on phones');
+  let resume: () => void = () => {};
+  const blocked = new Promise<void>((resolve) => { resume = resolve; });
+  await page.route('**/src/main.ts', async (route) => { await blocked; await route.continue(); });
+  await page.goto('/?api=sample/api/v1', { waitUntil: 'commit' });
+  await page.waitForFunction(() => '__skkuInstallPrompt' in window);
+  await page.evaluate(() => {
+    const event = new Event('beforeinstallprompt', { cancelable: true });
+    Object.assign(event, { prompt: async () => { (window as unknown as { installCalls: number }).installCalls++; } });
+    (window as unknown as { installCalls: number }).installCalls = 0;
+    window.dispatchEvent(event);
+  });
+  resume();
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true });
+  const banner = page.getByRole('region', { name: '앱 설치' });
+  await banner.getByRole('button', { name: '홈 화면에 추가' }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { installCalls: number }).installCalls)).toBe(1);
+  await expect(banner).toHaveCount(0);
+  expect(await page.evaluate(() => window.__skkuInstallPrompt)).toBeNull();
 });
