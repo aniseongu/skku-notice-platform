@@ -10,7 +10,9 @@
     letter-spacing: -0.01em;
     word-break: keep-all;
     overflow-wrap: break-word;
-    font-synthesis: none;
+    /* 굵기 합성은 허용한다. 삼성인터넷 "기기 글꼴을 웹페이지에 사용"은 Pretendard 대신 굵기가 하나뿐인 기기 글꼴을 쓰는데,
+       none이면 제목·D-day 같은 굵은 글자가 모두 보통 굵기로 보인다. Pretendard Variable은 굵기를 모두 가져서 합성되지 않는다. 기울임은 계속 막는다. */
+    font-synthesis: weight;
     -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
     accent-color: var(--accent);
