@@ -1611,6 +1611,16 @@ export class AppController extends Reactive {
     qsel('.list-pane')?.scrollTo({ top: 0 });
   }
 
+  /** 보기 탭을 직접 고르면 이전 목록 조건을 지우고 해당 보기의 전체를 보여 준다. */
+  openTab(tab: Tab) {
+    this.query = ''; this.keyword = null;
+    this.board = 'all'; this.coopKind = 'all';
+    this.unreadOnly = false; this.graduationOnly = false;
+    remember('board', 'all'); remember('coop-kind', 'all');
+    remember('view-unread', '0'); remember('view-grad', '0');
+    this.setView(tab);
+  }
+
   /** 설정 첫 쪽을 거치지 않고 하위 쪽으로 바로 들어왔는지. 이때 X는 설정을 닫는다. */
   get settingsLeavesDirectly(): boolean {
     return history.state?.direct === true;
@@ -1853,7 +1863,7 @@ export class AppController extends Reactive {
       '/': () => qs<HTMLInputElement>('.search input')?.focus(),
       j: () => move(1), ArrowDown: () => move(1), k: () => move(-1), ArrowUp: () => move(-1),
       Enter: () => { const notice = list[index]; if (notice) { this.markRead(notice); window.open(safeUrl(notice.url), '_blank', 'noopener'); } },
-      r: () => this.collectNow(), 1: () => this.setView('all'), 2: () => this.setView('intern'), 3: () => { if (this.hasCoop()) this.setView('coop'); }, 4: () => this.setView('saved'),
+      r: () => this.collectNow(), 1: () => this.openTab('all'), 2: () => this.openTab('intern'), 3: () => { if (this.hasCoop()) this.openTab('coop'); }, 4: () => this.openTab('saved'),
       s: () => { const notice = list[index]; if (notice) this.toggleSave(notice); },
     };
     const action = actions[event.key];

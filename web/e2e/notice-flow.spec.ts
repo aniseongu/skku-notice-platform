@@ -2047,6 +2047,29 @@ test('현장실습 tab filters by 기관 구분 like a board picker and keeps th
   await expect(rows).toHaveCount(2);
 });
 
+test('choosing a tab clears list filters, including when choosing the current tab again', async ({ page }, testInfo) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  const nav = page.locator(testInfo.project.name === 'mobile' ? '.tabbar' : '.sidebar nav[aria-label="보기"]');
+  for (const [label, tab] of [['인턴 공고', 'intern'], ['현장실습', 'coop'], ['성대 공지', 'all'], ['성대 공지', 'all'], ['저장', 'saved']] as const) {
+    await page.evaluate(() => {
+      const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+      Object.assign(app, { query: '없는 검색어', keyword: '장학', board: 'selected-board', coopKind: '대기업', unreadOnly: true, graduationOnly: true });
+    });
+    await nav.getByRole('button', { name: new RegExp(`^${label}`) }).click();
+    await expect.poll(() => page.evaluate(() => {
+      const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+      return [app.view, app.query, app.keyword, app.board, app.coopKind, app.unreadOnly, app.graduationOnly];
+    })).toEqual([tab, '', null, 'all', 'all', false, false]);
+    if (tab === 'coop') await expect(page.locator('notice-rows-screen a.row')).toHaveCount(2);
+  }
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    return [app.board, app.coopKind, app.unreadOnly, app.graduationOnly];
+  })).toEqual(['all', 'all', false, false]);
+});
+
 test('switching to or from the 현장실습 tab closes an open detail, and key 3 opens the tab', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '상세 칸 열림은 넓은 화면의 동작이다');
   await page.goto('/?api=sample/api/v1');
