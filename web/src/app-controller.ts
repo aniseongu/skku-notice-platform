@@ -190,7 +190,7 @@ export class AppController extends Reactive {
   static properties = {
     notices: { state: true }, sources: { state: true }, matched: { state: true }, generatedAt: { state: true },
     view: { state: true }, board: { state: true }, keyword: { state: true }, keywords: { state: true }, query: { state: true },
-    loading: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
+    loading: { state: true }, accountDataLoaded: { state: true }, aiStateLoaded: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
     toast: { state: true }, linkCopied: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, coopSort: { state: true }, coopKind: { state: true }, savedSort: { state: true },
@@ -235,6 +235,8 @@ export class AppController extends Reactive {
   pushChain: { chain: ReturnType<typeof createEnableChain>; userId: string; epoch: number } | null = null;
   pushRetry = false;
   byokOn = false;
+  /** 키 기능이 켜졌는지 서버에 한 번이라도 물어봤는지. 모르는 동안은 AI 키 상태를 기다린다. */
+  private byokChecked = false;
   aiKeys: AiKeyStatus[] = [];
   aiPrefs: AiPreferences = DEFAULT_AI_PREFERENCES;
   aiBusy = false;
@@ -330,6 +332,13 @@ export class AppController extends Reactive {
   }
 
   loading = true;
+  /** 로그인 뒤 처음 목록을 그리기 전에 기다리는 계정 정보(내 판정·졸업요건, 마감, 번역)와 AI 키 상태를 받았는지.
+   * 공지만 먼저 그리면 이 정보가 따로 도착할 때마다 판정 문구가 붙고, AI 확인 중인 공지가 빠지고, 줄 높이가 바뀌어 화면이 여러 번 움직인다.
+   * 그래서 처음 한 번은 모두 온 뒤 한꺼번에 그린다(userDataReady). 이후 새로고침은 그 자리에서 바꾼다. */
+  accountDataLoaded = true;
+  aiStateLoaded = true;
+  /** 첫 목록을 무작정 기다리지 않게 하는 상한. 이 시간이 지나면 받은 것만으로 그린다. */
+  static readonly FIRST_LOAD_LIMIT_MS = 5000;
   /** 마지막 refresh가 시작한 내 판정 읽기. 직접 새로고침의 결과를 셀 때 기다린다. */
   private mineSync: Promise<void> | null = null;
   failed = false;
@@ -369,6 +378,8 @@ export class AppController extends Reactive {
   async recheckByok(): Promise<boolean> {
     const available = await byokAvailable(import.meta.env.VITE_SUPABASE_URL);
     this.byokOn = available;
+    this.byokChecked = true;
+    if (!available) this.aiStateLoaded = true;   // 키 기능이 없으면 기다릴 AI 상태가 없다
     if (available && this.authUserId) { this.byokLoading = true; void this.refreshByok(this.authUserId, this.subscriptionsEpoch); }
     return available;
   }
@@ -410,7 +421,14 @@ export class AppController extends Reactive {
           this.preferencesLoading = !!userId;
           this.preferencesError = '';
           this.preferencesUnavailable = false;
-          if (userId) setTimeout(() => { void this.refreshMyDeadlines(userId, epoch); void this.refreshMyTranslations(userId, epoch); void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshBoardOrder(userId, epoch); void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.refreshMine(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch); }, 0);
+          this.accountDataLoaded = !userId; this.aiStateLoaded = !userId;
+          if (userId) setTimeout(() => {
+            // 첫 목록에 필요한 계정 정보를 모두 받으면 한꺼번에 그린다(userDataReady). 너무 늦으면 상한 시간에 그냥 그린다.
+            const first = [this.refreshMyDeadlines(userId, epoch), this.refreshMyTranslations(userId, epoch), this.refreshMine(userId, epoch)];
+            void Promise.allSettled(first).then(() => { if (epoch === this.subscriptionsEpoch) this.accountDataLoaded = true; });
+            setTimeout(() => { if (epoch === this.subscriptionsEpoch) { this.accountDataLoaded = true; this.aiStateLoaded = true; } }, AppController.FIRST_LOAD_LIMIT_MS);
+            void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshBoardOrder(userId, epoch); void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch);
+          }, 0);
           setLocalOwner(userId);
           this.saved = loadSaved();
           this.keywords = loadKeywords();
@@ -484,6 +502,7 @@ export class AppController extends Reactive {
       this.notices = notices!.notices.filter((notice) => !isExpired(notice, bySource.get(notice.source_id)));
       this.sources = notices!.sources;
       this.generatedAt = notices!.generated_at;
+      remember('has-coop', this.hasCoop() ? '1' : '0');
       if (this.authUserId) void this.refreshMyDeadlines(this.authUserId, this.subscriptionsEpoch);
       if (this.authUserId) this.mineSync = this.refreshMine(this.authUserId, this.subscriptionsEpoch);
       if (this.authUserId) void this.refreshMyTranslations(this.authUserId, this.subscriptionsEpoch);
@@ -685,6 +704,8 @@ export class AppController extends Reactive {
   graduationStatuses = new Map<string, GraduationStatuses>();
   graduationOnly = remember('view-grad') === '1';
   /** 목록에 졸업요건 표지를 보여 줄 수 있는 사용자인지: 로그인했고 아직 채우지 않은 요건이 있다. */
+  /** 첫 목록을 그려도 되는지. 로그인하지 않았으면 기다릴 계정 정보가 없다. */
+  userDataReady(): boolean { return !this.authUserId || (this.accountDataLoaded && this.aiStateLoaded); }
   gradEnabled(): boolean { const v = visibleTracks(this.profile); return !!authClient && !!this.authUserId && (v.dept || v.p3); }
   /** 목록·상세에 적을 졸업요건 결과(영역별). 키워드 인턴과 겹치지 않게 shownInterests가 이 값을 보고 인턴 키워드를 뺀다. */
   gradPartsFor(notice: Notice, verdict?: string | null): GradPart[] {
@@ -997,7 +1018,7 @@ export class AppController extends Reactive {
   }
 
   async refreshByok(userId: string, epoch: number): Promise<void> {
-    if (!authClient || !this.byokOn) { if (epoch === this.subscriptionsEpoch) this.byokLoading = false; return; }
+    if (!authClient || !this.byokOn) { if (epoch === this.subscriptionsEpoch) { this.byokLoading = false; if (!authClient || this.byokChecked) this.aiStateLoaded = true; } return; }
     try {
       const [status, canvas] = await Promise.all([loadByokStatus(authClient, userId), loadCanvasStatus(authClient, userId).catch(() => null)]);
       if (epoch !== this.subscriptionsEpoch) return;
@@ -1005,11 +1026,12 @@ export class AppController extends Reactive {
       const [aiKeys, aiPrefs] = await Promise.all([loadAiKeyStatuses(authClient, userId), loadAiPreferences(authClient, userId)]);
       if (epoch !== this.subscriptionsEpoch) return;
       this.aiKeys = aiKeys; this.aiPrefs = aiPrefs;
+      this.aiStateLoaded = true;   // 판정 대기(judgePending)는 키와 AI 설정만 보면 정해진다. 채우기 작업은 기다리지 않는다
       await this.refreshByokBackfill(userId, epoch);
     } catch {
       if (epoch === this.subscriptionsEpoch) this.byokError = '키 정보를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.';
     } finally {
-      if (epoch === this.subscriptionsEpoch) this.byokLoading = false;
+      if (epoch === this.subscriptionsEpoch) { this.byokLoading = false; this.aiStateLoaded = true; }
     }
   }
 
@@ -1638,7 +1660,11 @@ export class AppController extends Reactive {
   hasCoop(): boolean { return this.notices.some((notice) => this.kindOf(notice) === 'coop'); }
 
   /** 메뉴에 보일 탭. 현장실습은 모두 마감되면 메뉴에서 숨긴다(사용자 결정 2026-11-13). 단축키 번호는 TABS 순서 그대로다. */
-  shownTabs(): typeof TABS { return TABS.filter((t) => t.id !== 'coop' || this.hasCoop()); }
+  shownTabs(): typeof TABS {
+    // 공지를 받기 전에는 마지막으로 본 상태(이 기기에 기억)로 그린다. 받은 뒤에 탭이 생기거나 사라지면 메뉴 아래가 밀린다.
+    const coop = this.notices.length || !this.loading ? this.hasCoop() : remember('has-coop') !== '0';
+    return TABS.filter((t) => t.id !== 'coop' || coop);
+  }
   visible(): Notice[] {
     const decorate = (items: Notice[]) => this.decorated(items);
     if (this.tab() === 'saved') {

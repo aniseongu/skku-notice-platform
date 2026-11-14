@@ -9,7 +9,7 @@ import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, d
 import { APP_NAME } from './brand';
 import type { FeedbackKind } from './feedback';
 import { installMode, isStandalone } from './install-hint';
-import { CHECKBOX, CHIP, CHIPS, CHIP_ADD, SKELETON_BAR } from './cls';
+import { CHECKBOX, CHIP, CHIPS, CHIP_ADD } from './cls';
 import { authClient } from './auth';
 import { keywordCounts } from './keyword-counts';
 import { type AppController, STALE_MS, TABS, remember, settingsTitle } from './app-controller';
@@ -21,7 +21,7 @@ import { LoginScreen, LoginStatus } from './login-screen';
 import type { CanvasMode } from './devices';
 import { bodyInterests, withMyDeadline } from './notice-view';
 import './platform-settings';
-import { ROW_LAYOUT } from './notice-rows';
+import './notice-rows';   // 목록 줄 요소(notice-rows-screen)를 등록한다. 값을 가져오지 않아도 빠지지 않게 모듈째 가져온다
 import './notice-detail';
 
 // 선택 모드의 단추: 터치 44px(넓은 화면 36px), 주 행동은 채운 단추, 보조는 옅은 면, 끝내기는 글자만.
@@ -70,7 +70,9 @@ export function NoticeShell({ app }: { app: AppController }) {
   if (!app.authReady) return <LoginStatus />;
   if (app.gated) return <LoginScreen app={app} />;
   if (app.awaitingProfile()) return <LoginStatus />;
-  const counts = Object.fromEntries(TABS.map((t) => [t.id, app.tabCount(t.id)]));
+  // 첫 목록이 준비되기 전의 개수는 계정 정보가 오면 바뀌므로(판정 대기 공지가 빠진다) 보이지 않는다.
+  const ready = app.userDataReady();
+  const counts = Object.fromEntries(TABS.map((t) => [t.id, ready ? app.tabCount(t.id) : null]));
   const list = app.visible();
   const settings = app.view === 'settings';
   const keywordScope = app.tab() === 'saved' ? app.savedNotices() : app.notices.filter((notice) =>
@@ -99,8 +101,8 @@ export function NoticeShell({ app }: { app: AppController }) {
           {app.shownTabs().map((t) => <SideItem key={t.id} label={t.label} count={counts[t.id]} active={app.tab() === t.id}
             onClick={() => app.openTab(t.id)} shortcut={String(TABS.indexOf(t) + 1)} icon={t.icon} />)}
         </nav>
-        <SideGroup app={app} id="keywords" title="관심 키워드" count={keywordTotals.total}>
-          {app.keywords.map((word) => <SideItem key={word} label={word} count={keywordTotals.counts[word]}
+        <SideGroup app={app} id="keywords" title="관심 키워드" count={ready ? keywordTotals.total : 0}>
+          {app.keywords.map((word) => <SideItem key={word} label={word} count={ready ? keywordTotals.counts[word] : null}
             active={app.keyword === word} onClick={() => app.setKeyword(app.keyword === word ? null : word)}
             ariaLabel={`${word}, 공지 ${keywordTotals.counts[word]}개`} />)}
           <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('keywords')}>{app.keywords.length ? '키워드 관리하기' : '키워드 추가하기'}</button>
@@ -151,7 +153,7 @@ export function NoticeShell({ app }: { app: AppController }) {
                 {app.keywords.length ? <button type="button" className={CHIP} aria-pressed={!app.keyword} onClick={() => app.setKeyword(null)}>모두</button> : null}
                 {app.keywords.map((word) => <button type="button" className={CHIP} key={word} aria-pressed={app.keyword === word}
                   aria-label={`${word}, 공지 ${keywordTotals.counts[word]}개`}
-                  onClick={() => app.setKeyword(app.keyword === word ? null : word)}>{word} {keywordTotals.counts[word]}</button>)}
+                  onClick={() => app.setKeyword(app.keyword === word ? null : word)}>{word}{ready ? ` ${keywordTotals.counts[word]}` : ''}</button>)}
                 <button type="button" className={CHIP_ADD} onClick={() => app.openSettings('keywords')}><Icon name="plus" />키워드 추가하기</button>
               </div>
             </div>
@@ -270,12 +272,12 @@ function SideGroup({ app, id, title, count, children }: { app: AppController; id
 
 // 목록 기준 시각과 AI 확인 상태를 함께 보여 주고 공간이 부족하면 줄을 바꾼다.
 function UpdatedLine({ app, count }: { app: AppController; count?: number }) {
-  const waiting = app.waitingCount();
+  const waiting = app.userDataReady() ? app.waitingCount() : 0;
   return <div className={`flex flex-wrap items-baseline gap-x-[2px] ${waiting ? 'max-[719px]:[&_.updated]:text-[12px]' : ''}`}><UpdatedTime app={app} count={count} />{waiting ? <p className={`${UPDATED} waiting text-ink-3`} role="status"><span aria-hidden="true" className="mr-[2px]">·</span>AI 확인 전 {waiting}건<span className="visually-hidden">의 공지는 아직 목록에 보이지 않아요</span></p> : null}</div>;
 }
 
 function UpdatedTime({ app, count }: { app: AppController; count?: number }) {
-  if (app.loading && !app.generatedAt) return <p className={`${UPDATED} text-ink-3`} role="status">공지를 불러오고 있어요</p>;
+  if ((app.loading && !app.generatedAt) || !app.userDataReady()) return <p className={`${UPDATED} text-ink-3`} role="status">공지를 불러오고 있어요</p>;
   if (!app.generatedAt) return <p className={`${UPDATED} text-ink-3`}>받은 시각을 알 수 없어요</p>;
   const stale = Date.now() - Date.parse(app.generatedAt) > STALE_MS;
   const time = new Intl.DateTimeFormat('ko-KR', {
@@ -291,10 +293,8 @@ const Empty = ({ title, body, action, onAction }: { title: string; body: string;
     {action ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={onAction}>{action}</button> : null}</div>;
 
 function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
-  if (app.loading && !app.notices.length) {
-    return <ol className="rows m-0 list-none overflow-hidden bg-surface p-0 min-[720px]:rounded-none min-[720px]:bg-transparent">{Array.from({ length: 6 }, (_, i) =>
-      <li className={`row skeleton ${ROW_LAYOUT} min-[720px]:[grid-template-areas:"meta_title_dday"_"meta_reason_dday"]`} aria-hidden="true" key={i}><span className={`${SKELETON_BAR} [grid-area:meta] h-[12px] w-[30%]`}></span><span className={`${SKELETON_BAR} [grid-area:title]`}></span><span className={`${SKELETON_BAR} [grid-area:reason] w-[70%]`}></span></li>)}</ol>;
-  }
+  // 처음 불러오는 동안은 목록 자리를 비워 둔다. 기다린다는 말은 위의 기준 시각 줄 한 곳에만 있다(공지를 불러오고 있어요).
+  if ((app.loading && !app.notices.length) || !app.userDataReady()) return null;
   if (app.failed && !app.notices.length) {
     return <Empty title="목록을 불러오지 못했어요" body="공지 데이터를 연결하는 중이에요. 잠시 뒤 다시 확인해 주세요" action="다시 불러오기" onAction={() => { void app.refresh(); }} />;
   }
@@ -393,7 +393,8 @@ function ViewFilters({ app }: { app: AppController }) {
     }}><Icon name="select-list" />선택</button>;
   if (app.view === 'saved') return <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>{select}<SortSelect app={app} /></div></div>;
   return <div className={`view-options ${VIEW_ROW} justify-between`} role="group" aria-label="공지 보기 조건">
-    <div className="view-filters flex min-w-0 flex-wrap items-center gap-x-[12px] gap-y-0">
+    {/* 휴대폰에서 두 조건이 다 있으면 이 줄이 폭을 다 쓰고 선택·정렬은 다음 줄로 간다. 글꼴 폭에 따라 줄바꿈이 달라져 목록이 밀리지 않게 한다. */}
+    <div className={`view-filters flex min-w-0 flex-wrap items-center gap-x-[12px] gap-y-0 ${app.gradEnabled() ? 'max-[719px]:w-full' : ''}`}>
       <button type="button" className={VIEW_TOGGLE} aria-pressed={app.unreadOnly} onClick={() => {
         app.unreadOnly = !app.unreadOnly;
         app.listChanged();

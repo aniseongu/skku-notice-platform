@@ -2398,3 +2398,18 @@ test('settings: the only usable AI key cannot be removed, with two keys removal 
   await withApp(page, { aiKeys: [liveKey, { ...liveKey, provider: 'gemini', keyHint: 'wxyz' }] });
   await expect(screen.getByRole('button', { name: 'Groq 키 연결 끊기' })).toBeVisible();
 });
+
+test('first load does not shift the layout while data arrives', async ({ page }) => {
+  // 첫 화면이 여러 번 움직이지 않는지 본다(Cumulative Layout Shift). 웹 기준 "좋음"은 0.1 이하, 여기서는 더 엄격하게 본다.
+  await page.addInitScript(() => {
+    (window as unknown as { shifts: number }).shifts = 0;
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries() as unknown as { value: number; hadRecentInput: boolean }[]) if (!entry.hadRecentInput) (window as unknown as { shifts: number }).shifts += entry.value;
+    }).observe({ type: 'layout-shift', buffered: true });
+  });
+  await page.route('**/notices.json', async (route) => { await new Promise((resolve) => setTimeout(resolve, 600)); await route.continue(); });
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.waitForTimeout(1500);
+  expect(await page.evaluate(() => (window as unknown as { shifts: number }).shifts)).toBeLessThan(0.02);
+});
