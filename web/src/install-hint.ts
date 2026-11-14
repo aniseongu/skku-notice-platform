@@ -59,3 +59,18 @@ export function isStandalone(): boolean {
   if (typeof window === 'undefined') return false;
   return window.matchMedia?.('(display-mode: standalone)').matches === true || (navigator as { standalone?: boolean }).standalone === true;
 }
+
+const SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
+
+/** 닫은 기록("횟수:시각")을 보고 설치 배너를 다시 보일지 정한다. 한 번 닫으면 14일 쉬고, 두 번 닫으면 다시 보이지 않는다. 기록이 깨졌으면 보이지 않는다. */
+export function installBannerDue(raw: string | null, now: number): boolean {
+  if (raw === null) return true;
+  const [count, at] = raw.split(':').map(Number);
+  if (!Number.isFinite(count) || !Number.isFinite(at)) return false;
+  return count < 2 && now - at >= SNOOZE_MS;
+}
+
+export function installBannerDismissed(raw: string | null, now: number): string {
+  const count = Number(raw?.split(':')[0]);
+  return `${Number.isFinite(count) ? count + 1 : 1}:${now}`;
+}

@@ -2110,3 +2110,36 @@ test('when every 현장실습 posting has closed, the menu hides it and a rememb
   await page.keyboard.press('3');
   await expect(page).toHaveURL(/tab=all/);
 });
+
+test('install banner: one tap installs on phones, closing keeps it away, PC never shows it', async ({ page }) => {
+  const inject = async () => {
+    await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true });
+    await page.evaluate(() => { ((document.querySelector('notice-app') as unknown) as AppHandle).install = { prompt: () => Promise.resolve() }; });
+  };
+  await page.setViewportSize({ width: 412, height: 891 });
+  await page.goto('/?api=sample/api/v1');
+  await expect(page.getByRole('button', { name: /^인턴 공고/ }).first()).toBeVisible();
+  await inject();
+  const banner = page.getByRole('region', { name: '앱 설치' });
+  await expect(banner).toBeVisible();
+  // 설치 단추와 닫기 단추는 모두 44px 이상이다.
+  for (const name of ['설치', '닫기']) {
+    const box = await banner.getByRole('button', { name }).boundingBox();
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+    expect(box!.width).toBeGreaterThanOrEqual(44);
+  }
+  // 닫으면 사라지고 새로 열어도 다시 뜨지 않는다.
+  await banner.getByRole('button', { name: '닫기' }).click();
+  await expect(banner).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('button', { name: /^인턴 공고/ }).first()).toBeVisible();
+  await inject();
+  await expect(banner).toHaveCount(0);
+  // PC 폭에서는 기록과 상관없이 보이지 않는다.
+  await page.evaluate(() => localStorage.removeItem('install-banner'));
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.reload();
+  await expect(page.getByRole('button', { name: /^인턴 공고/ }).first()).toBeVisible();
+  await inject();
+  await expect(banner).toBeHidden();
+});

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 // 로그인 전용 화면. 로그인하기 전에는 앱의 어떤 부분도 보이지 않고 이 화면만 뜬다.
 import { APP_NAME } from './brand';
-import { installMode, isStandalone, MANUAL_INSTALL_HINT } from './install-hint';
 import type { AppController } from './app-controller';
 import { Spinner } from './spinner';
 
@@ -23,8 +22,6 @@ export function LoginStatus({ text = '불러오고 있어요' }: { text?: string
 
 export function LoginScreen({ app }: { app: AppController }) {
   const busy = app.authBusy;
-  // 휴대폰에서만 "앱으로 설치하기"를 보인다. 주 행동은 Google 단추 하나이고 설치는 그 아래 조용한 보조 행동이다.
-  const mode = installMode(navigator.userAgent, isStandalone(), !!app.install);
   // 가운데 알림 예시는 실제 알림(src/skku_notice/push_collection.py)과 같은 모양이다: 제목은 공지 제목, 본문 첫 줄은 AI 판정 문구, 둘째 줄은 관심 키워드와 마감(키워드가 없으면 마감만), 마지막 줄은 게시판. 알림은 AI 판정이 끝난 뒤에 간다.
   // 토스 첫 화면 구성(TDS Top: 위 그림, 28px 제목, 17px 설명, 아래 고정 단추 하나)을 따른다. 가운데에는 이 앱이 하는 일을 알림 예시 하나로 보여 준다.
   return <div className="flex flex-col min-h-dvh bg-bg">
@@ -51,11 +48,6 @@ export function LoginScreen({ app }: { app: AppController }) {
         </div>
       </div>
       <div className="pt-[24px] pb-[calc(20px_+_env(safe-area-inset-bottom))] min-[720px]:mt-0 min-[720px]:pb-0">
-        {/* 설치 안내는 Google 단추 위에 둔다. 아래 묶음이 화면 바닥에 붙어 있어 이 칸이 생기거나 사라져도 Google 단추 자리는 움직이지 않는다. 눌리는 곳이지만 Google 단추보다 가볍게(테두리 없는 옅은 면) 그린다. */}
-        {mode === 'prompt' ? <button type="button" className="mb-[12px] flex h-[52px] w-full items-center justify-center gap-[8px] rounded-md border border-line bg-sunken text-[15px] font-semibold text-ink [@media(hover:hover)]:hover:bg-line active:bg-line min-[720px]:hidden" onClick={() => { void app.runInstall(); }}>
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14" /></svg>앱으로 설치하기</button> : null}
-        {/* iOS Safari, 삼성인터넷 등 설치 창이 없는 브라우저에는 설치 창이 없어서 누르는 단추가 아니라 방법만 조용히 알려 준다(면과 테두리를 주지 않아 눌리는 곳처럼 보이지 않게). */}
-        {mode !== 'prompt' && mode !== 'none' ? <p className="install-hint m-0 mb-[12px] text-center text-[14px] leading-[21px] text-ink-2 break-keep text-balance min-[720px]:hidden">{MANUAL_INSTALL_HINT[mode].lead}<b className="font-semibold text-ink whitespace-nowrap">{MANUAL_INSTALL_HINT[mode].action}</b>{MANUAL_INSTALL_HINT[mode].tail}</p> : null}
         <button type="button" className="flex items-center justify-center gap-[10px] w-full h-[56px] border border-[light-dark(#747775,#8E918F)] rounded-md bg-[light-dark(#FFFFFF,#131314)] text-[light-dark(#1F1F1F,#E3E3E3)] text-[17px] font-semibold [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-[light-dark(#F2F2F2,#1E1F20)] [&:active:not(:disabled)]:bg-[light-dark(#F2F2F2,#1E1F20)] disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2" disabled={busy} aria-busy={busy} onClick={() => { void app.signIn(); }}>
           {busy ? null : <GoogleG />}
           <span>{busy ? 'Google로 이동하고 있어요' : 'Google로 계속하기'}</span>

@@ -65,3 +65,15 @@ test('앱 속 브라우저는 OS와 상관없이 다른 브라우저로 열기�
 test('설치 창 신호가 오면 어느 브라우저든 prompt가 먼저다', () => {
   for (const ua of Object.values(UA)) assert.equal(installMode(ua, false, true), 'prompt');
 });
+
+test('설치 배너: 처음엔 보이고, 한 번 닫으면 14일 쉬고, 두 번 닫으면 끝', async () => {
+  const { installBannerDue, installBannerDismissed } = await import('../src/install-hint.ts');
+  const day = 24 * 60 * 60 * 1000;
+  assert.equal(installBannerDue(null, 0), true);
+  const once = installBannerDismissed(null, 1000);
+  assert.equal(once, '1:1000');
+  assert.equal(installBannerDue(once, 1000 + 13 * day), false);
+  assert.equal(installBannerDue(once, 1000 + 14 * day), true);
+  assert.equal(installBannerDue(installBannerDismissed(once, 5), 5 + 99 * day), false);
+  assert.equal(installBannerDue('깨짐', 0), false);
+});

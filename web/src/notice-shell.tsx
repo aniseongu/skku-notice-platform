@@ -16,6 +16,7 @@ import { type AppController, STALE_MS, TABS, remember, settingsTitle } from './a
 import type { UserProfile } from './profile';
 import { Avatar } from './ui';
 import { Onboarding } from './onboarding';
+import { InstallBanner } from './install-banner';
 import { LoginScreen, LoginStatus } from './login-screen';
 import { Spinner } from './spinner';
 import type { CanvasMode } from './devices';
@@ -179,6 +180,7 @@ export function NoticeShell({ app }: { app: AppController }) {
         onClick={() => app.openTab(t.id)}><Icon name={t.icon} /><span>{t.label}</span></button>)}
     </nav>
     <UpdateBar />
+    {app.authUserId && !onboarding && !settings && !reading && !app.selecting ? <InstallBanner app={app} /> : null}
     <div className="toast fixed bottom-[calc(var(--tabbar-h)+16px+env(safe-area-inset-bottom))] left-1/2 min-[1080px]:top-[11px] min-[1080px]:right-[272px] min-[1080px]:px-[12px] min-[1080px]:py-[10px] min-[1080px]:bottom-auto min-[1080px]:left-auto min-[1080px]:[transform:none] z-[4] w-max max-w-[calc(100%-32px)] [transform:translateX(-50%)] rounded-md bg-toast px-[16px] py-[12px] text-[14px] text-on-toast [box-shadow:var(--shadow-pop)]" role="status" hidden={!app.toast}>{app.toast}{app.toastLink ? <div className="toast-actions flex items-center justify-between gap-[12px]">
       <a className={`${TOAST_ACTION} underline`} href={app.toastLink} target={app.toastLink.startsWith('?') ? '_self' : '_blank'} rel="noopener noreferrer">{app.toastLinkLabel}</a>
       <button type="button" className={`${TOAST_ACTION} min-w-[44px] justify-center border-0 bg-transparent px-[4px] py-0`} onClick={() => { app.toast = ''; app.toastLink = null; }}>닫기</button></div> : null}</div>
