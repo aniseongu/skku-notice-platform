@@ -1330,9 +1330,14 @@ test('notifications page: this device and the device list, like the original set
     { id: 'd1', endpoint: 'https://fcm.googleapis.com/a', name: 'Windows · Whale', canvasMode: 'reminders', createdAt: '2026-11-07T10:00:00Z' },
     { id: 'd2', endpoint: 'https://fcm.googleapis.com/b', name: 'Android · Chrome', canvasMode: 'summary', createdAt: '2026-11-08T01:00:00Z' },
   ];
-  await withApp(page, { authUserId: 'account-a', pushStatus: 'on', devices, thisDeviceId: 'd1', summaryTime: '21:05',
+  // 기기 목록을 받기 전에는 기기 구역과 그 아래(받을 게시판)를 그리지 않는다. 나중에 끼어들어 아래가 밀리지 않게.
+  await withApp(page, { authUserId: 'account-a', pushStatus: 'on', devicesLoaded: false, refreshDevices: 'fn:refresh' });
+  await expect(screen.getByRole('region', { name: '이 기기' })).toBeVisible();
+  await expect(screen.getByRole('region', { name: '받을 게시판' })).toHaveCount(0);
+  await withApp(page, { authUserId: 'account-a', pushStatus: 'on', devices, devicesLoaded: true, thisDeviceId: 'd1', summaryTime: '21:05',
     canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null },
     refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', removeDevice: 'fn:remove', renameDevice: 'fn:rename', setSummaryTime: 'fn:time' });
+  await expect(screen.getByRole('region', { name: '받을 게시판' })).toBeVisible();
   // 아이캠퍼스 알림은 이 쪽에 없다(설정 홈의 아이캠퍼스에서 켠다).
   await expect(screen.getByRole('switch', { name: /아이캠퍼스/ })).toHaveCount(0);
   // 알림 기기 목록: 이 기기에는 지우기가 없고 다른 기기는 지울 수 있다.

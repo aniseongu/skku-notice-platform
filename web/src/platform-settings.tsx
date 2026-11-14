@@ -74,6 +74,8 @@ export interface SettingsModel {
   account?: { busy: boolean; error: string; remove: () => void };
   devicesInfo?: {
     devices: Device[];
+    /** 기기 목록을 받았는지. 받기 전에는 기기 구역과 그 아래를 그리지 않는다. */
+    loaded?: boolean;
     thisId: string | null;
     summaryTime: string | null;
     hasCanvasToken: boolean;
@@ -431,6 +433,7 @@ function Notifications({ model }: { model: SettingsModel }) {
   const refresh = info?.refresh;
   // 설정 쪽을 열 때와 이 기기 알림을 켜고 끌 때 기기 목록을 다시 읽는다.
   useEffect(() => { if (model.userId) refresh?.(); }, [model.userId, model.pushStatus]);
+  const waitDevices = !!model.userId && info?.loaded === false;
   return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Back model={model} />
     <Section id="s-notify" title="이 기기">
@@ -461,6 +464,8 @@ function Notifications({ model }: { model: SettingsModel }) {
         </ul>
       </Setting>
     </Section>
+    {/* 기기 목록을 받기 전에는 기기 구역과 그 아래(받을 게시판)를 그리지 않는다. 기기 구역이 나중에 끼어들면 아래가 밀린다. 보통은 로그인 때 미리 받아 둔다. */}
+    {waitDevices ? null : <>
     {model.userId && info && info.devices.length > 0 ? <Section id="s-devices" title="알림 기기">
       <Setting name="등록된 기기" help="알림을 받도록 켜 둔 기기예요. 이 기기는 위에서 끄고, 다른 기기는 여기서 지워요">
         <ul className="device-list m-0 grid list-none gap-[4px] p-0 [&>li]:grid [&>li]:grid-cols-[1fr_auto] [&>li]:items-center [&>li]:gap-x-[12px] [&>li]:gap-y-[2px] [&>li]:border-t [&>li]:border-line [&>li]:py-[10px] [&>li:first-child]:border-t-0 [&_.field-note]:col-[1] [&_.field-note]:m-0 [&>li>.inline-row]:col-[1/-1]">
@@ -469,6 +474,7 @@ function Notifications({ model }: { model: SettingsModel }) {
       </Setting>
     </Section> : null}
     <BoardsSection model={model} />
+    </>}
   </div>;
 }
 

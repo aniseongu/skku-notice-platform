@@ -101,8 +101,10 @@ export function NoticeShell({ app }: { app: AppController }) {
           {app.shownTabs().map((t) => <SideItem key={t.id} label={t.label} count={counts[t.id]} active={app.tab() === t.id}
             onClick={() => app.openTab(t.id)} shortcut={String(TABS.indexOf(t) + 1)} icon={t.icon} />)}
         </nav>
-        <SideGroup app={app} id="keywords" title="관심 키워드" count={ready ? keywordTotals.total : 0}>
-          {app.keywords.map((word) => <SideItem key={word} label={word} count={ready ? keywordTotals.counts[word] : null}
+        {/* 키워드·게시판 묶음은 계정 정보(키워드, 구독)가 온 뒤 한 번에 그린다. 먼저 그리면 늦게 온 항목만큼 길어지며 아래가 밀린다. */}
+        {ready ? <>
+        <SideGroup app={app} id="keywords" title="관심 키워드" count={keywordTotals.total}>
+          {app.keywords.map((word) => <SideItem key={word} label={word} count={keywordTotals.counts[word]}
             active={app.keyword === word} onClick={() => app.setKeyword(app.keyword === word ? null : word)}
             ariaLabel={`${word}, 공지 ${keywordTotals.counts[word]}개`} />)}
           <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('keywords')}>{app.keywords.length ? '키워드 관리하기' : '키워드 추가하기'}</button>
@@ -113,6 +115,7 @@ export function NoticeShell({ app }: { app: AppController }) {
             onClick={() => { pickChoice(app, b.id); if (settings) app.leaveSettings(); }} />)}
           {app.tab() === 'intern' || app.tab() === 'coop' ? null : <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('notifications')}>게시판 더 고르기</button>}
         </SideGroup>
+        </> : null}
         <div className="side-foot mt-auto flex flex-col gap-[1px] pt-[12px]">
           <SideItem label="설정" count={null} active={settings} onClick={app.openSettingsHome} />
         </div>
@@ -228,7 +231,7 @@ function settingsModel(app: AppController) {
     saveProfile: (profile: UserProfile) => { void app.saveProfile(profile); },
     byok: aiConnectModel(app),
     account: { busy: app.accountBusy, error: app.accountError, remove: () => { void app.deleteAccount(); } },
-    devicesInfo: { devices: app.devices, thisId: app.thisDeviceId, summaryTime: app.summaryTime, hasCanvasToken: !!app.canvasStatus, busy: app.devicesBusy, error: app.devicesError,
+    devicesInfo: { devices: app.devices, loaded: app.devicesLoaded, thisId: app.thisDeviceId, summaryTime: app.summaryTime, hasCanvasToken: !!app.canvasStatus, busy: app.devicesBusy, error: app.devicesError,
       refresh: () => { void app.refreshDevices(); }, setMode: (mode: string) => { void app.setCanvasMode(mode as CanvasMode); }, remove: (id: string) => { void app.removeDevice(id); }, rename: (id: string, name: string) => app.renameDevice(id, name),
       setSummaryTime: (period: 'am' | 'pm', hour: number, minute: number) => { void app.setSummaryTime(period, hour, minute); } },
     calendar: { auto: app.calendarAuto, id: app.calendarId, syncedAt: app.calendarSyncedAt, busy: app.calendarBusy, message: app.calendarMessage, error: app.calendarError, savedCount: app.saved.length,

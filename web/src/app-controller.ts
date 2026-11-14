@@ -190,7 +190,7 @@ export class AppController extends Reactive {
   static properties = {
     notices: { state: true }, sources: { state: true }, matched: { state: true }, generatedAt: { state: true },
     view: { state: true }, board: { state: true }, keyword: { state: true }, keywords: { state: true }, query: { state: true },
-    loading: { state: true }, accountDataLoaded: { state: true }, aiStateLoaded: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
+    loading: { state: true }, devicesLoaded: { state: true }, accountDataLoaded: { state: true }, aiStateLoaded: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
     toast: { state: true }, linkCopied: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, coopSort: { state: true }, coopKind: { state: true }, savedSort: { state: true },
@@ -260,6 +260,8 @@ export class AppController extends Reactive {
   /** 내 Gemini 키로 매긴 판정과 서버가 찾아 준 관심 키워드(원본의 matched.json 자리) */
   myJudgments = new Map<string, MyJudgment>();
   myInterests = new Map<string, string[]>();
+  /** 기기 목록을 이 계정에서 한 번이라도 받았는지. 받기 전에는 알림 설정의 기기 구역 아래를 그리지 않는다(나중에 끼어들어 아래가 밀리지 않게). */
+  devicesLoaded = false;
   /** 내 알림 기기 목록, 이 기기의 번호, 하루 요약 시간(HH:MM, 아이캠퍼스 토큰이 없으면 null) */
   devices: Device[] = [];
   thisDeviceId: string | null = null;
@@ -332,7 +334,7 @@ export class AppController extends Reactive {
   }
 
   loading = true;
-  /** 로그인 뒤 처음 목록을 그리기 전에 기다리는 계정 정보(내 판정·졸업요건, 마감, 번역)와 AI 키 상태를 받았는지.
+  /** 로그인 뒤 처음 목록을 그리기 전에 기다리는 계정 정보(내 판정·졸업요건, 마감, 번역, 구독, 키워드, 게시판 순서)와 AI 키 상태를 받았는지.
    * 공지만 먼저 그리면 이 정보가 따로 도착할 때마다 판정 문구가 붙고, AI 확인 중인 공지가 빠지고, 줄 높이가 바뀌어 화면이 여러 번 움직인다.
    * 그래서 처음 한 번은 모두 온 뒤 한꺼번에 그린다(userDataReady). 이후 새로고침은 그 자리에서 바꾼다. */
   accountDataLoaded = true;
@@ -408,7 +410,7 @@ export class AppController extends Reactive {
           this.authUserId = userId;
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.thisDeviceId = null; this.devicesError = ''; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.devicesLoaded = false; this.thisDeviceId = null; this.devicesError = ''; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -424,10 +426,13 @@ export class AppController extends Reactive {
           this.accountDataLoaded = !userId; this.aiStateLoaded = !userId;
           if (userId) setTimeout(() => {
             // 첫 목록에 필요한 계정 정보를 모두 받으면 한꺼번에 그린다(userDataReady). 너무 늦으면 상한 시간에 그냥 그린다.
-            const first = [this.refreshMyDeadlines(userId, epoch), this.refreshMyTranslations(userId, epoch), this.refreshMine(userId, epoch)];
+            // 구독·키워드·게시판 순서도 목록과 왼쪽 메뉴의 모양을 바꾸므로 같이 기다린다.
+            const first = [this.refreshMyDeadlines(userId, epoch), this.refreshMyTranslations(userId, epoch), this.refreshMine(userId, epoch),
+              this.refreshSubscriptions(userId, epoch), this.refreshPreferences(userId, epoch), this.refreshBoardOrder(userId, epoch)];
             void Promise.allSettled(first).then(() => { if (epoch === this.subscriptionsEpoch) this.accountDataLoaded = true; });
             setTimeout(() => { if (epoch === this.subscriptionsEpoch) { this.accountDataLoaded = true; this.aiStateLoaded = true; } }, AppController.FIRST_LOAD_LIMIT_MS);
-            void this.refreshSubscriptions(userId, epoch); void this.refreshPreferences(userId, epoch); void this.refreshBoardOrder(userId, epoch); void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch);
+            void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch);
+            void this.refreshDevices();   // 알림 설정을 열 때 기기 구역이 뒤늦게 끼어들지 않게 미리 받는다
           }, 0);
           setLocalOwner(userId);
           this.saved = loadSaved();
@@ -1101,7 +1106,7 @@ export class AppController extends Reactive {
   // ----- 알림 기기와 아이캠퍼스 알림 설정(원본의 이 기기 아캠 알림, 알림 기기, 하루 요약 시간) -----
   async refreshDevices(): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
-    if (!authClient || !userId) return;
+    if (!authClient || !userId) { this.devicesLoaded = true; return; }   // 받을 기기 목록이 없으면 기다리지 않는다
     try {
       const [devices, time] = await Promise.all([loadDevices(authClient, userId), loadSummaryTime(authClient, userId).catch(() => null)]);
       let endpoint = '';
@@ -1116,7 +1121,9 @@ export class AppController extends Reactive {
         await saveDeviceName(authClient, userId, mine.id, suggestion).catch(() => undefined);
         if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.devices = this.devices.map((device) => (device.id === mine.id ? { ...device, name: suggestion } : device));
       }
-    } catch { /* 열이 아직 없으면 기능 없이 보인다 */ }
+    } catch { /* 열이 아직 없으면 기능 없이 보인다 */ } finally {
+      if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.devicesLoaded = true;
+    }
   }
 
   async setCanvasMode(mode: CanvasMode): Promise<void> {
