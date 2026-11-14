@@ -117,7 +117,7 @@ export function NoticeShell({ app }: { app: AppController }) {
         </div>
       </aside>
 
-      <main className={`list-pane min-[720px]:min-h-0 min-[720px]:overflow-y-auto min-[720px]:bg-surface min-[720px]:pb-[32px] ${app.selecting ? 'max-[719px]:pb-[calc(88px+env(safe-area-inset-bottom))]' : 'max-[719px]:pb-[calc(var(--tabbar-h)+24px+env(safe-area-inset-bottom))] max-[719px]:[notice-app:has(.install-banner)_&]:pb-[calc(var(--tabbar-h)+160px+env(safe-area-inset-bottom))]'} ${noDetail ? '' : 'min-[1080px]:border-r min-[1080px]:border-line'}`}>
+      <main className={`list-pane min-[720px]:min-h-0 min-[720px]:overflow-y-auto min-[720px]:bg-surface min-[720px]:pb-[32px] ${app.selecting ? 'max-[719px]:pb-[calc(88px+env(safe-area-inset-bottom))]' : 'max-[719px]:pb-[calc(var(--tabbar-h)+24px+env(safe-area-inset-bottom))] max-[719px]:[notice-app:has(.install-banner)_&]:pb-[calc(var(--tabbar-h)+220px+env(safe-area-inset-bottom))]'} ${noDetail ? '' : 'min-[1080px]:border-r min-[1080px]:border-line'}`}>
         {reading ? <ReadingView app={app} notice={reading} /> : <>
           <div className="navigation-head contents">
             <header className={`${TOPBAR} ${settings ? TOPBAR_SETTINGS : TOPBAR_FEED}`}>

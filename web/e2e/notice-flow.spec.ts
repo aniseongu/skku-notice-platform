@@ -2157,6 +2157,13 @@ test('install banner keeps the last notice and temporary messages accessible', a
   const last = await page.locator('notice-rows-screen a.row').last().boundingBox();
   const box = await banner.boundingBox();
   expect(last!.y + last!.height).toBeLessThanOrEqual(box!.y);
+  // 고정 배너 아래를 지나가는 공지도 스크롤하면 읽고 누를 수 있다.
+  const rows = page.locator('notice-rows-screen a.row');
+  for (let i = 0; i < await rows.count(); i++) {
+    const row = rows.nth(i);
+    await row.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    expect(await row.evaluate((el) => { const r = el.getBoundingClientRect(); const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!hit && el.contains(hit); })).toBe(true);
+  }
   await withApp(page, { toast: '알림을 저장했어요' });
   await expect(page.getByRole('status').filter({ hasText: '알림을 저장했어요' })).toBeVisible();
   await expect(banner).toHaveCount(0);
@@ -2166,4 +2173,27 @@ test('install banner keeps the last notice and temporary messages accessible', a
   await expect(banner.getByRole('button', { name: '닫기' })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(banner).toHaveCount(0);
+});
+
+test('install banner is available before login without covering Google sign-in', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'install banner only appears on phones');
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as AppHandle;
+    Object.defineProperty(app.controller as object, 'gated', { configurable: true, value: true });
+    app.install = { prompt: () => Promise.resolve() };
+    app.authReady = true;
+  });
+  const banner = page.getByRole('region', { name: '앱 설치' });
+  const login = page.getByRole('button', { name: 'Google로 계속하기' });
+  await expect(banner).toBeVisible();
+  await expect(login).toBeVisible();
+  const loginBox = await login.boundingBox();
+  const bannerBox = await banner.boundingBox();
+  expect(loginBox!.y + loginBox!.height).toBeLessThanOrEqual(bannerBox!.y);
+  await banner.getByRole('button', { name: '닫기' }).click();
+  await expect(banner).toHaveCount(0);
+  await expect(login).toBeVisible();
 });

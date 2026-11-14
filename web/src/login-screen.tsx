@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { APP_NAME } from './brand';
 import type { AppController } from './app-controller';
 import { Spinner } from './spinner';
+import { InstallBanner } from './install-banner';
 
 // 출처: https://developers.google.com/identity/branding-guidelines
 const GoogleG = () => <svg className="flex-none w-[20px] h-[20px]" width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
@@ -58,6 +59,7 @@ export function LoginScreen({ app }: { app: AppController }) {
         <p className="m-0 mt-[14px] text-[13px] leading-[20px] text-center text-ink-2 min-[720px]:text-[14px]">계속하면 <a className="inline-block px-[4px] py-[12px] -mx-[4px] -my-[12px] text-ink" href="./privacy.html">개인정보처리방침</a>에 동의하는 거예요</p>
       </div>
     </div>
+    <InstallBanner app={app} placement="login" />
   {/* 서비스 정보는 화면 맨 아래에 둔다. PC에서는 창 바닥에 붙어 로그인 묶음과 떨어져 있고, 휴대폰에서는 로그인 묶음 바로 아래 바닥이다. 개인 연락처는 처리방침에만 적는다. */}
     <footer className="px-[20px] pt-[8px] pb-[calc(20px_+_env(safe-area-inset-bottom))] text-center text-[12px] leading-[18px] text-ink-3"><a className="inline-block px-[6px] py-[13px] -my-[13px] text-ink-3 underline underline-offset-2" href="https://github.com/aniseongu/skku-notice-platform/issues" target="_blank" rel="noopener noreferrer">문의하기</a> · <a className="inline-block px-[6px] py-[13px] -my-[13px] text-ink-3 underline underline-offset-2" href="https://github.com/aniseongu/skku-notice-platform" target="_blank" rel="noopener noreferrer">오픈소스</a></footer>
   </div>;
