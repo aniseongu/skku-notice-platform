@@ -331,6 +331,8 @@ export class AppController extends Reactive {
 
   loading = true;
   manualRefreshing = false;
+  /** 마지막 refresh가 시작한 내 판정 읽기. 직접 새로고침의 결과를 셀 때 기다린다. */
+  private mineSync: Promise<void> | null = null;
   failed = false;
   selectedId: string | null = rememberSelected();
   private lastSelected: string | null | undefined = undefined;
@@ -484,7 +486,7 @@ export class AppController extends Reactive {
       this.sources = notices!.sources;
       this.generatedAt = notices!.generated_at;
       if (this.authUserId) void this.refreshMyDeadlines(this.authUserId, this.subscriptionsEpoch);
-      if (this.authUserId) void this.refreshMine(this.authUserId, this.subscriptionsEpoch);
+      if (this.authUserId) this.mineSync = this.refreshMine(this.authUserId, this.subscriptionsEpoch);
       if (this.authUserId) void this.refreshMyTranslations(this.authUserId, this.subscriptionsEpoch);
       // 개인용 서비스의 판정 결과는 플랫폼에서 읽지 않는다.
       this.matched = null;
@@ -544,10 +546,23 @@ export class AppController extends Reactive {
     } finally { this.authBusy = false; }
   }
 
+  /** 직접 누른 새로고침은 목록이 그대로여도 끝났는지 알 수 있게 결과를 토스트로 알린다(실패 안내는 refresh가 한다).
+   * 지금 보는 목록에 새로 나타난 공지 수를 센다. 내 판정을 다 받은 뒤 세야 AI 확인 중인 공지와 보이는 공지가 맞는다. */
   async collectNow() {
     if (this.loading || this.gated) return;
     this.manualRefreshing = true;
-    try { await this.refresh(); } finally { this.manualRefreshing = false; }
+    const before = new Set(this.notices.map((n) => n.id));
+    this.mineSync = null;
+    try {
+      await this.refresh();
+      if (this.failed) return;
+      await (this.mineSync as Promise<void> | null)?.catch(() => undefined);   // refresh 안에서 정해져 타입이 좁혀지지 않게 한다
+      const added = (n: Notice) => !before.has(n.id);
+      const shown = this.visible().filter(added).length;
+      const tab = this.tab();
+      const waiting = tab === 'saved' ? 0 : this.scopeTab(this.filtered(this.decorated(this.notices.filter(added))), tab).filter((n) => this.isWaiting(n)).length;
+      this.showToast(shown ? `새 공지 ${shown}개를 가져왔어요` : waiting ? `새 공지 ${waiting}개는 AI가 확인하고 있어요` : '새 공지가 없어요');
+    } finally { this.manualRefreshing = false; }
   }
 
   updateRead(ids: string[], read: boolean) {

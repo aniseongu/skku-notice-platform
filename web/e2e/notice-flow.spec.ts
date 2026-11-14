@@ -790,13 +790,14 @@ test('initial loading does not animate the refresh button', async ({ page }) => 
 
 test('refresh button and R refetch the notice list, lock while loading, and keep the list with a message on failure', async ({ page }) => {
   let hits = 0;
-  let mode: 'ok' | 'slow' | 'fail' = 'ok';
+  let mode: 'ok' | 'slow' | 'fail' | 'new' = 'ok';
   await page.route('**/notices.json', async (route) => {
     hits++;
     if (mode === 'fail') { await route.fulfill({ status: 500, body: 'error' }); return; }
     const res = await route.fetch();
     const data = await res.json();
     if (hits >= 2 && mode === 'ok') data.notices[0].title = `[새로 가져옴] ${data.notices[0].title}`;
+    if (mode === 'new') data.notices.unshift({ ...data.notices[0], id: 'manual-refresh-new', title: '새로 올라온 공지' });
     if (mode === 'slow') await new Promise((resolve) => setTimeout(resolve, 800));
     await route.fulfill({ response: res, json: data });
   });
@@ -808,6 +809,11 @@ test('refresh button and R refetch the notice list, lock while loading, and keep
   await button.click();
   await expect.poll(() => hits).toBeGreaterThan(first);
   await expect(rows.first()).toContainText('[새로 가져옴]');           // 새로 받은 내용으로 바뀐다
+  await expect(page.getByText('새 공지가 없어요')).toBeVisible();        // 목록이 그대로여도 끝났다고 알린다
+  mode = 'new';
+  await button.click();
+  await expect(page.getByText('새 공지 1개를 가져왔어요')).toBeVisible();
+  await expect(rows.filter({ hasText: '새로 올라온 공지' })).toHaveCount(1);
   mode = 'slow';
   await button.click();
   await expect(button).toBeDisabled();                                // 받는 동안은 다시 누를 수 없다
