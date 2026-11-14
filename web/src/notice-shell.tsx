@@ -9,7 +9,7 @@ import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, d
 import { APP_NAME } from './brand';
 import type { FeedbackKind } from './feedback';
 import { installMode, isStandalone } from './install-hint';
-import { CHECKBOX, CHIP, CHIPS, CHIP_ADD } from './cls';
+import { CHECKBOX, CHIP, CHIPS, CHIP_ADD, SKELETON_BAR } from './cls';
 import { authClient } from './auth';
 import { keywordCounts } from './keyword-counts';
 import { type AppController, STALE_MS, TABS, remember, settingsTitle } from './app-controller';
@@ -192,7 +192,6 @@ export function NoticeShell({ app }: { app: AppController }) {
 /** 원문 링크 글자. 현장실습은 톨게이트 로그인이 필요한 페이지라서 그 사실이 보이게 한다. */
 const openLabel = (app: AppController, notice: Notice) => app.kindOf(notice) === 'coop' ? '톨게이트에서 신청하기' : '원문 열기';
 
-const SKELETON_BAR = 'block h-[14px] rounded-sm bg-sunken';
 const TOAST_ACTION = '[@media(hover:hover)]:hover:opacity-80 active:opacity-80 inline-flex min-h-[44px] items-center text-inherit [font:inherit]';
 const boardChoices = (app: AppController) => app.tab() === 'coop'
   ? [{ id: 'all', label: '모든 기관' }, ...app.coopKinds().map((kind) => ({ id: kind, label: kind }))]

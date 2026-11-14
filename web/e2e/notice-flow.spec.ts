@@ -2252,3 +2252,43 @@ test('iOS Safari shows manual installation in the panel and honors reduced motio
   await expect(banner).toHaveCount(0);
   await context.close();
 });
+
+test('opening a notice shows no spinner; a slow body gets quiet skeleton bars and a fast one shows nothing', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '두 칸 화면에서 확인한다');
+  let delay = 900;
+  await page.route(/\/notices\/[\w-]+\/\d+\.json/, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ body: '느린 본문 확인', body_html: null, images: [], attachments: [], fetched_at: 'x', body_from_image: false }) });
+  });
+  await page.goto('/?api=sample/api/v1');
+  const rows = page.locator('notice-rows-screen a.row');
+  await rows.first().waitFor();
+  await page.waitForLoadState('networkidle');
+  const detail = page.locator('notice-detail-screen');
+  await rows.nth(1).click();
+  const status = detail.getByRole('status').filter({ hasText: '본문을 불러오고 있어요' });
+  await expect(status).toHaveCount(1);
+  await expect(status.locator('[class*="bg-sunken"]')).toHaveCount(4);          // 0.3초 뒤 막대
+  await expect(detail.locator('.animate-spin')).toHaveCount(0);
+  await expect(detail).toContainText('느린 본문 확인');
+  await expect(status).toHaveCount(0);
+  await expect(detail.locator('.animate-spin')).toHaveCount(0);
+  // 빨리 오면 막대도 없다.
+  delay = 0;
+  await rows.nth(2).click();
+  await expect(detail).toContainText('느린 본문 확인');
+  await expect(detail.locator('.animate-spin, [class*="bg-sunken"][class*="h-[14px]"]')).toHaveCount(0);
+});
+
+test('a summary saved on one line is shown as three lines', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '두 칸 화면에서 확인한다');
+  await page.route(/\/notices\/[\w-]+\/\d+\.json/, (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+    body: '본문', body_html: null, images: [], attachments: [], fetched_at: 'x', body_from_image: false,
+    summary: '장학생을 모집해요. 대상은 재학생이에요. 12월 5일(금)까지 온라인으로 신청해요' }) }));
+  await page.goto('/?api=sample/api/v1');
+  const rows = page.locator('notice-rows-screen a.row');
+  await rows.first().waitFor();
+  await rows.nth(1).click();
+  const lines = page.locator('notice-detail-screen .summary p');
+  await expect(lines).toHaveText(['장학생을 모집해요.', '대상은 재학생이에요.', '12월 5일(금)까지 온라인으로 신청해요']);
+});

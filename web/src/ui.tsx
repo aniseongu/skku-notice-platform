@@ -97,3 +97,10 @@ export function BackToGroups({ current, noun = '단과대', onBack }: { current:
     <span className="flex items-center gap-[10px]"><span className={`choice-chevron ${CHEVRON_LEFT_STRONG}`} aria-hidden="true" />{current}</span>
   </button>;
 }
+
+/** 기다림이 ms보다 길어졌을 때만 true. 빨리 끝나는 기다림은 아무것도 그리지 않아 번쩍이지 않는다(토스 기준). */
+export function useDelayed(ms = 300): boolean {
+  const [shown, setShown] = useState(false);
+  useEffect(() => { const timer = window.setTimeout(() => setShown(true), ms); return () => window.clearTimeout(timer); }, [ms]);
+  return shown;
+}
