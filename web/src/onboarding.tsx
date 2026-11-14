@@ -360,7 +360,7 @@ export function Onboarding({ app }: { app: AppController }) {
     if (step === 'ai') {
       const broken = !!app.byokStatus?.disabled || app.aiKeys.some((key) => key.disabled);
       title = broken ? 'AI 키를 다시 연결해 주세요' : 'AI 키를 연결해 주세요';
-      lead = broken ? '연결해 둔 키가 더 이상 작동하지 않아서 다시 열었어요' : '연결된 AI 키가 없어서 다시 열었어요. 키를 연결하면 바로 이어서 써요';
+      lead = broken ? '연결해 둔 키가 더 이상 작동하지 않아서 다시 열었어요' : '연결된 AI 키가 없어서 다시 열었어요';
     } else lead = index === 0 ? '새로 필요한 정보가 생겼어요. 이것만 고르면 바로 쓸 수 있어요' : '';
   }
   const showBack = fillMode ? index > 0 || addingDouble || (step === 'primary' && !changingPrimary) : index > 0 || addingDouble || (step === 'primary' && !changingPrimary);

@@ -109,7 +109,7 @@ test('keyword help says how matching works and only a bare 인턴 keyword gets t
   await expect(screen.getByText('학교 공지에 낱말이 모두 들어 있으면 관심으로 표시하고 소리로 알려요')).toBeVisible();
   const input = screen.getByRole('textbox', { name: '새 키워드' });
   for (const word of ['겨울방학 인턴', '인턴']) { await input.fill(word); await input.press('Enter'); }
-  const note = '인턴만 쓰면 모든 인턴 공고에 맞아서 인턴 공고에는 표시하지 않아요. 겨울방학 인턴처럼 좁혀 보세요';
+  const note = '인턴 공고에는 표시하지 않아요. 겨울방학 인턴처럼 좁혀 보세요';
   const rows = screen.locator('.keyword-list li');
   await expect(rows.filter({ hasText: note })).toHaveCount(1);
   await expect(rows.filter({ hasText: note })).toContainText(/^인턴/);
@@ -2322,7 +2322,7 @@ test('finished account without a usable AI key is sent to the AI key step only, 
   await openFill(page, {});
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'AI 키를 연결해 주세요' })).toBeVisible();
-  await expect(dialog.getByText('연결된 AI 키가 없어서 다시 열었어요. 키를 연결하면 바로 이어서 써요')).toBeVisible();
+  await expect(dialog.getByText('연결된 AI 키가 없어서 다시 열었어요')).toBeVisible();
   await expect(dialog.getByRole('button', { name: '끝내기' })).toBeDisabled();
   await expect(dialog.getByRole('button', { name: /나중에|닫기|건너/ })).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: '이전 단계' })).toHaveCount(0);

@@ -582,7 +582,7 @@ function Keywords({ model }: { model: SettingsModel }) {
 // 인턴 공고 탭은 모든 글이 인턴이라 "인턴" 같은 넓은 키워드는 그 탭에서 표시하지 않는다(app-controller의 GENERIC_INTERN과 같은 낱말).
 // 그 키워드를 가진 사람에게만 그 줄 아래에 알린다(모두에게 보이는 설명을 늘리지 않는다, 토스 규칙). "겨울방학 인턴"처럼 좁힌 키워드는 표시된다.
 const GENERIC_INTERN_WORD = /^(인턴|인턴십|인턴쉽|intern|internship)$/i;
-const INTERN_KEYWORD_NOTE = '인턴만 쓰면 모든 인턴 공고에 맞아서 인턴 공고에는 표시하지 않아요. 겨울방학 인턴처럼 좁혀 보세요';
+const INTERN_KEYWORD_NOTE = '인턴 공고에는 표시하지 않아요. 겨울방학 인턴처럼 좁혀 보세요';
 
 const TEXT_FIELDS: { key: ProfileTextField; name: string; help: string; placeholder: string }[] = [
   { key: 'interests', name: '관심 분야', help: '어떤 일이나 주제에 관심이 있는지 적어요', placeholder: '예: 인공지능, 백엔드 개발, 데이터 분석' },
