@@ -181,7 +181,8 @@ export function NoticeShell({ app }: { app: AppController }) {
     </nav>
     <UpdateBar />
     {app.authUserId && !onboarding && !settings && !reading && !app.selecting ? <InstallBanner app={app} /> : null}
-    <div className="toast fixed bottom-[calc(var(--tabbar-h)+16px+env(safe-area-inset-bottom))] left-1/2 min-[1080px]:top-[11px] min-[1080px]:right-[272px] min-[1080px]:px-[12px] min-[1080px]:py-[10px] min-[1080px]:bottom-auto min-[1080px]:left-auto min-[1080px]:[transform:none] z-[4] w-max max-w-[calc(100%-32px)] [transform:translateX(-50%)] rounded-md bg-toast px-[16px] py-[12px] text-[14px] text-on-toast [box-shadow:var(--shadow-pop)]" role="status" hidden={!app.toast}>{app.toast}{app.toastLink ? <div className="toast-actions flex items-center justify-between gap-[12px]">
+    {/* 토스트는 모든 화면 폭에서 아래 가운데(TDS Toast의 아래 위치: 동작 단추를 둘 수 있다). 휴대폰은 탭 바 위, 넓은 화면은 바닥에서 24px. */}
+    <div className="toast fixed bottom-[calc(var(--tabbar-h)+16px+env(safe-area-inset-bottom))] left-1/2 min-[720px]:bottom-[24px] z-[4] w-max max-w-[calc(100%-32px)] [transform:translateX(-50%)] rounded-md bg-toast px-[16px] py-[12px] text-[14px] text-on-toast [box-shadow:var(--shadow-pop)]" role="status" hidden={!app.toast}>{app.toast}{app.toastLink ? <div className="toast-actions flex items-center justify-between gap-[12px]">
       <a className={`${TOAST_ACTION} underline`} href={app.toastLink} target={app.toastLink.startsWith('?') ? '_self' : '_blank'} rel="noopener noreferrer">{app.toastLinkLabel}</a>
       <button type="button" className={`${TOAST_ACTION} min-w-[44px] justify-center border-0 bg-transparent px-[4px] py-0`} onClick={() => { app.toast = ''; app.toastLink = null; }}>닫기</button></div> : null}</div>
     {app.shortcutsOpen ? <ShortcutsDialog app={app} /> : null}
