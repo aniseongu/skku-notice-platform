@@ -238,7 +238,7 @@ function Overview({ model }: { model: SettingsModel }) {
       <SettingsLink model={model} label="문의하기" help="궁금한 점이나 바라는 점을 남겨 주세요" section="feedback" />
       <a className="settings-link [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href="https://github.com/aniseongu/skku-notice-platform" target="_blank" rel="noopener noreferrer">
         <span><span className="setting-name text-[15px] leading-[22px] font-semibold">오픈소스</span>
-          <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">GitHub에서 코드를 볼 수 있어요<span className="visually-hidden"> (새 창으로 열려요)</span></span></span>
+          <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">GitHub에서 코드를 볼 수 있어요 · 버전 {__APP_VERSION__}<span className="visually-hidden"> (새 창으로 열려요)</span></span></span>
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mr-[2px] flex-none text-ink-3"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>
       </a>
     </div>

@@ -4,8 +4,17 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import tailwindcss from '@tailwindcss/vite';
 import { APP_NAME } from './src/brand';
+import { execSync } from 'node:child_process';
+
+// 설정에 보이는 버전(커밋 앞 7자리). 휴대폰이 예전 캐시를 쓰는지 바로 구분하려고 둔다. Cloudflare Pages 빌드는 CF_PAGES_COMMIT_SHA를 준다.
+const appVersion = (() => {
+  const sha = process.env.CF_PAGES_COMMIT_SHA;
+  if (sha) return sha.slice(0, 7);
+  try { return execSync('git rev-parse --short=7 HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return 'dev'; }
+})();
 
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   // GitHub Pages 하위 경로(/<저장소>/)에서도 열리도록 상대 경로로 낸다.
   base: './',
   build: { target: 'es2022', assetsDir: 'code' },
