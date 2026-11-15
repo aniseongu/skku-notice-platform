@@ -2418,3 +2418,26 @@ test('first load does not shift the layout while data arrives', async ({ page })
   await page.waitForTimeout(1500);
   expect(await page.evaluate(() => (window as unknown as { shifts: number }).shifts)).toBeLessThan(0.02);
 });
+
+test('reload keeps the phone window scroll without shifting the layout', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', '휴대폰에서는 목록 칸이 아니라 창이 스크롤된다');
+  await page.route('**/notices.json', async (route) => { await new Promise((resolve) => setTimeout(resolve, 400)); await route.continue(); });
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('a.row').first().waitFor();
+  await page.evaluate(() => scrollTo(0, 900));
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(800);
+  const saved = await page.evaluate(() => scrollY);
+  await page.addInitScript(() => {
+    (window as unknown as { shifts: number }).shifts = 0;
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries() as unknown as { value: number; hadRecentInput: boolean }[]) if (!entry.hadRecentInput) (window as unknown as { shifts: number }).shifts += entry.value;
+    }).observe({ type: 'layout-shift', buffered: true });
+  });
+  await page.reload();
+  await page.locator('a.row').first().waitFor();
+  // 목록이 그려진 같은 프레임에 되살아나야 하므로 첫 확인에서 이미 제자리여야 한다.
+  expect(Math.abs((await page.evaluate(() => scrollY)) - saved)).toBeLessThan(3);
+  await page.waitForTimeout(1200);
+  expect(Math.abs((await page.evaluate(() => scrollY)) - saved)).toBeLessThan(3);
+  expect(await page.evaluate(() => (window as unknown as { shifts: number }).shifts)).toBeLessThan(0.02);
+});
