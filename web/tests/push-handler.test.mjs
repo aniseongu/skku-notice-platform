@@ -73,3 +73,21 @@ test('background push opens an allowed internship original', async () => {
     assert.equal(w.opened.at(-1), url);
   }
 });
+
+test('a lost subscription is recreated with the same server key when the browser changes it', async () => {
+  const events = new Map();
+  const made = [];
+  const key = new Uint8Array([4, 1, 2]);
+  const self = {
+    location: new URL('https://example.test/sw.js'),
+    registration: { scope: 'https://example.test/', pushManager: { getSubscription: async () => null, subscribe: async (options) => { made.push(options); return {}; } } },
+    addEventListener: (name, handler) => events.set(name, handler),
+  };
+  vm.runInNewContext(source, { self, URL });
+  let pending;
+  events.get('pushsubscriptionchange')({ oldSubscription: { options: { applicationServerKey: key } }, waitUntil: (promise) => { pending = promise; } });
+  await pending;
+  assert.equal(made.length, 1);
+  assert.equal(made[0].applicationServerKey, key);
+  assert.equal(made[0].userVisibleOnly, true);
+});

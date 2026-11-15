@@ -3,27 +3,34 @@ import test from 'node:test';
 import { createEnableChain, disableDevicePush, enableDevicePush, inspectDevicePush, releaseDevicePush } from '../src/platform-browser-push.ts';
 
 const publicKey = Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 1)]).toString('base64url');
-function fixture({ owner = null, saveError = null, deleteError = null } = {}) {
+function fixture({ owner = null, saveError = null, deleteError = null, endpoint = null } = {}) {
   const values = new Map(owner ? [['platform:push-owner', owner]] : []);
+  if (endpoint) values.set('platform:push-endpoint', endpoint);
   const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
-  let current = null, unsubscribed = 0;
+  let current = null, unsubscribed = 0, serial = 0;
   const records = [];
-  function makeSubscription() {
-    return { endpoint: 'https://fcm.googleapis.com/fcm/send/test', options: { applicationServerKey: null },
-      toJSON: () => ({ endpoint: 'https://fcm.googleapis.com/fcm/send/test', keys: { p256dh: 'public', auth: 'auth' } }),
+  const deleted = [];
+  function makeSubscription(url = `https://fcm.googleapis.com/fcm/send/test-${++serial}`) {
+    return { endpoint: url, options: { applicationServerKey: null },
+      toJSON: () => ({ endpoint: url, keys: { p256dh: 'public', auth: 'auth' } }),
       unsubscribe: async () => { unsubscribed++; current = null; return true; } };
   }
   const registration = { pushManager: { getSubscription: async () => current,
     subscribe: async () => { current = makeSubscription(); return current; } } };
   const client = { from() {
+    const filters = {};
+    let mode = 'select';
     const query = { upsert: async (row) => { records.push(row); return { error: saveError }; },
-      select: () => query, delete: () => query, eq: () => query,
-      maybeSingle: async () => ({ data: records.length ? { id: 'device' } : null, error: null }),
-      then: (resolve) => resolve({ error: deleteError }) };
+      select: () => query, delete: () => { mode = 'delete'; return query; }, eq: (column, value) => { filters[column] = value; return query; },
+      maybeSingle: async () => ({ data: records.some((row) => row.user_id === filters.user_id && row.endpoint === filters.endpoint) ? { id: 'device' } : null, error: null }),
+      then: (resolve, reject) => {
+        if (mode === 'delete' && !deleteError) { deleted.push(filters.endpoint); for (let i = records.length - 1; i >= 0; i--) if (records[i].endpoint === filters.endpoint) records.splice(i, 1); }
+        return Promise.resolve({ error: deleteError }).then(resolve, reject);
+      } };
     return query;
   } };
-  return { storage, registration, client, records, values, makeSubscription,
-    setCurrent: (value) => { current = value; }, getUnsubscribed: () => unsubscribed };
+  return { storage, registration, client, records, values, deleted, makeSubscription,
+    setCurrent: (value) => { current = value; }, getCurrent: () => current, getUnsubscribed: () => unsubscribed };
 }
 
 test('registers a browser device for its owner and can inspect it', async () => {
@@ -98,4 +105,63 @@ test('discard removes a subscription that never reached the server', async () =>
   await assert.rejects(chain.run(), /offline/);
   await chain.discard();
   assert.equal(f.getUnsubscribed(), 1);
+});
+
+const heal = { vapidKey: publicKey, permission: 'granted' };
+
+test('app update that loses the browser subscription is re-registered silently on next open', async () => {
+  const f = fixture();
+  await enableDevicePush(f.client, 'a', f.registration, f.storage, publicKey, async () => 'granted');
+  const first = f.records[0].endpoint;
+  f.setCurrent(null);   // 업데이트 뒤 브라우저가 구독을 잃었다
+  f.records.length = 0; // 서버도 410으로 정리했다
+  assert.equal(await inspectDevicePush(f.client, 'a', f.registration, f.storage, heal), true);
+  assert.equal(f.records.length, 1);
+  assert.notEqual(f.records[0].endpoint, first);
+  assert.equal(f.values.get('platform:push-endpoint'), f.records[0].endpoint);
+});
+
+test('a browser-replaced subscription is uploaded and the dead address removed', async () => {
+  const f = fixture();
+  await enableDevicePush(f.client, 'a', f.registration, f.storage, publicKey, async () => 'granted');
+  const old = f.records[0].endpoint;
+  f.setCurrent(f.makeSubscription());   // 서비스 워커가 pushsubscriptionchange에서 새로 만들었다
+  assert.equal(await inspectDevicePush(f.client, 'a', f.registration, f.storage, heal), true);
+  assert.deepEqual(f.deleted, [old]);
+  assert.equal(f.records.at(-1).endpoint, f.getCurrent().endpoint);
+});
+
+test('a device deleted from another device list is not revived', async () => {
+  const f = fixture();
+  await enableDevicePush(f.client, 'a', f.registration, f.storage, publicKey, async () => 'granted');
+  f.records.length = 0;   // 다른 기기에서 이 기기를 지웠다. 브라우저 구독은 그대로다.
+  assert.equal(await inspectDevicePush(f.client, 'a', f.registration, f.storage, heal), false);
+  assert.equal(f.records.length, 0);
+});
+
+test('no silent re-registration without permission, for another owner, or after turning off', async () => {
+  for (const [owner, permission] of [['a', 'default'], ['b', 'granted'], [null, 'granted']]) {
+    const f = fixture({ owner });
+    assert.equal(await inspectDevicePush(f.client, 'a', f.registration, f.storage, { vapidKey: publicKey, permission }), false);
+    assert.equal(f.records.length, 0);
+  }
+});
+
+test('turning on replaces a leftover subscription that the server does not know', async () => {
+  const f = fixture({ owner: 'a' });
+  const stale = f.makeSubscription();
+  f.setCurrent(stale);
+  await enableDevicePush(f.client, 'a', f.registration, f.storage, publicKey, async () => 'granted');
+  assert.equal(f.getUnsubscribed(), 1);
+  assert.notEqual(f.records[0].endpoint, stale.endpoint);
+  assert.deepEqual(f.deleted, [stale.endpoint]);
+});
+
+test('a browser that never answers does not leave the check hanging', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = fixture({ owner: 'a' });
+  const registration = { pushManager: { getSubscription: () => new Promise(() => {}) } };
+  const pending = inspectDevicePush(f.client, 'a', registration, f.storage, heal);
+  t.mock.timers.tick(10_000);
+  await assert.rejects(pending, /알림 상태를 확인하지 못했어요/);
 });

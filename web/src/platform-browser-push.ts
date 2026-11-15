@@ -3,6 +3,45 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { connectionChain } from './connection-chain.ts';
 
 const OWNER_KEY = 'platform:push-owner';
+// 서버에 올린 구독 주소. 앱 업데이트 등으로 브라우저가 구독을 잃거나 새 주소로 바꾸면 이 값과 달라져서 알아챈다.
+const ENDPOINT_KEY = 'platform:push-endpoint';
+// 일부 브라우저(삼성 인터넷 등)는 getSubscription·ready가 끝나지 않을 때가 있다. 확인 중에 멈춰 있지 않게 끊는다.
+const CHECK_MS = 10_000;
+const SUBSCRIBE_MS = 30_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then((value) => { clearTimeout(timer); resolve(value); }, (error: unknown) => { clearTimeout(timer); reject(error); });
+  });
+}
+
+const readSubscription = (registration: ServiceWorkerRegistration) =>
+  withTimeout(registration.pushManager.getSubscription(), CHECK_MS, '이 기기의 알림 상태를 확인하지 못했어요. 브라우저를 다시 열고 시도해 주세요.');
+const newSubscription = (registration: ServiceWorkerRegistration, key: Uint8Array<ArrayBuffer>) =>
+  withTimeout(registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }), SUBSCRIBE_MS, '알림 서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+
+function forget(storage: Storage): void {
+  storage.removeItem(OWNER_KEY);
+  storage.removeItem(ENDPOINT_KEY);
+}
+
+async function saveDevice(client: SupabaseClient, userId: string, subscription: PushSubscription, storage: Storage, previous: string | null): Promise<void> {
+  const data = subscription.toJSON();
+  if (!data.endpoint || !data.keys?.p256dh || !data.keys.auth) throw new Error('알림 기기 정보를 확인하지 못했어요.');
+  const { error } = await client.from('user_push_subscriptions').upsert({
+    user_id: userId, endpoint: data.endpoint, p256dh: data.keys.p256dh, auth_secret: data.keys.auth,
+    device_name: await suggestDeviceName(),
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'endpoint' });
+  if (error) throw error;
+  storage.setItem(OWNER_KEY, userId);
+  storage.setItem(ENDPOINT_KEY, data.endpoint);
+  // 이 기기가 예전에 쓰던 주소는 더 이상 받지 못한다. 남겨 두면 기기 목록에 같은 기기가 두 번 보인다.
+  if (previous && previous !== data.endpoint) {
+    await client.from('user_push_subscriptions').delete().eq('user_id', userId).eq('endpoint', previous).then(() => undefined, () => undefined);
+  }
+}
 
 function decodeVapid(value: string): Uint8Array<ArrayBuffer> {
   const binary = atob(value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4));
@@ -18,17 +57,37 @@ function owner(storage: Storage): string | null {
 async function dropForeign(subscription: PushSubscription | null, userId: string, storage: Storage): Promise<PushSubscription | null> {
   if (!subscription || owner(storage) === userId) return subscription;
   if (!await subscription.unsubscribe()) throw new Error('이 기기의 이전 알림을 끄지 못했어요.');
-  storage.removeItem(OWNER_KEY);
+  forget(storage);
   return null;
 }
 
-export async function inspectDevicePush(client: SupabaseClient, userId: string, registration: ServiceWorkerRegistration, storage: Storage): Promise<boolean> {
-  const subscription = await dropForeign(await registration.pushManager.getSubscription(), userId, storage);
-  if (!subscription) return false;
+async function registered(client: SupabaseClient, userId: string, endpoint: string): Promise<boolean> {
   const { data, error } = await client.from('user_push_subscriptions').select('id')
-    .eq('user_id', userId).eq('endpoint', subscription.endpoint).maybeSingle();
+    .eq('user_id', userId).eq('endpoint', endpoint).maybeSingle();
   if (error) throw error;
   return !!data;
+}
+
+/**
+ * 이 기기 알림이 켜져 있는지 확인한다. heal을 주면 끊긴 구독을 조용히 되살린다.
+ * 되살리는 경우는 이 계정이 이 기기에서 알림을 켠 뒤 끄지 않았는데(소유자 표시가 남아 있음) 브라우저가 구독을 잃었거나
+ * 새 주소로 바꾼 때뿐이다. 앱 업데이트 뒤 삼성 인터넷 등에서 구독이 사라지는 일이 있었다(2026-11-15).
+ * 다른 기기 목록에서 지운 경우는 브라우저 구독이 그대로라서 되살리지 않는다. 권한은 이미 허용된 때만 쓰므로 묻는 창이 뜨지 않는다.
+ */
+export async function inspectDevicePush(client: SupabaseClient, userId: string, registration: ServiceWorkerRegistration, storage: Storage,
+  heal?: { vapidKey: string | null; permission: NotificationPermission }): Promise<boolean> {
+  const subscription = await dropForeign(await readSubscription(registration), userId, storage);
+  if (subscription && await registered(client, userId, subscription.endpoint)) {
+    storage.setItem(ENDPOINT_KEY, subscription.endpoint);   // 이 값이 없던 예전 등록도 다음부터 바뀜을 알아채게 한다
+    return true;
+  }
+  if (!heal?.vapidKey || heal.permission !== 'granted' || owner(storage) !== userId) return false;
+  const previous = storage.getItem(ENDPOINT_KEY);
+  const lost = !subscription;
+  const replaced = !!subscription && !!previous && subscription.endpoint !== previous;
+  if (!lost && !replaced) return false;
+  await saveDevice(client, userId, subscription ?? await newSubscription(registration, decodeVapid(heal.vapidKey)), storage, previous);
+  return true;
 }
 
 // 권한 요청 → 구독 생성 → 서버 등록을 순서대로 실행한다. 실패하면 다시 run()할 때 끝난 단계는 건너뛰고 실패한 단계부터 이어 간다.
@@ -37,34 +96,25 @@ export function createEnableChain(client: SupabaseClient, userId: string, regist
   storage: Storage, vapidKey: string, requestPermission: () => Promise<NotificationPermission>) {
   const key = decodeVapid(vapidKey);
   let subscription: PushSubscription | null = null;
+  let previous: string | null = null;
   let created = false;
   let saved = false;
   const chain = connectionChain([
     async () => { if (await requestPermission() !== 'granted') throw new Error('브라우저에서 알림을 허용해 주세요.'); },
     async () => {
-      subscription = await dropForeign(await registration.pushManager.getSubscription(), userId, storage);
-      const currentKey = subscription?.options.applicationServerKey;
-      if (subscription && currentKey) {
-        const bytes = new Uint8Array(currentKey);
-        if (bytes.length !== key.length || bytes.some((value, index) => value !== key[index])) {
-          if (!await subscription.unsubscribe()) throw new Error('이 기기의 이전 알림을 끄지 못했어요.');
-          storage.removeItem(OWNER_KEY);
-          subscription = null;
-        }
+      previous = owner(storage) === userId ? storage.getItem(ENDPOINT_KEY) : null;
+      const existing = await dropForeign(await readSubscription(registration), userId, storage);
+      // 꺼져 있는 상태에서 켜는 것이므로 남아 있는 구독은 서버에 없거나 이미 끊긴 주소일 수 있다(앱 업데이트 뒤 실제로 있었다).
+      // 다시 쓰지 않고 새로 만든다.
+      if (existing) {
+        previous ??= existing.endpoint;
+        if (!await existing.unsubscribe()) throw new Error('이 기기의 이전 알림을 끄지 못했어요.');
       }
-      created = !subscription;
-      if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+      subscription = await newSubscription(registration, key);
+      created = true;
     },
     async () => {
-      const data = subscription!.toJSON();
-      if (!data.endpoint || !data.keys?.p256dh || !data.keys.auth) throw new Error('알림 기기 정보를 확인하지 못했어요.');
-      const { error } = await client.from('user_push_subscriptions').upsert({
-        user_id: userId, endpoint: data.endpoint, p256dh: data.keys.p256dh, auth_secret: data.keys.auth,
-        device_name: await suggestDeviceName(),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'endpoint' });
-      if (error) throw error;
-      storage.setItem(OWNER_KEY, userId);
+      await saveDevice(client, userId, subscription!, storage, previous);
       saved = true;
     },
   ]);
@@ -85,10 +135,10 @@ export async function enableDevicePush(client: SupabaseClient, userId: string, r
 
 export async function disableDevicePush(client: SupabaseClient, userId: string, registration: ServiceWorkerRegistration,
   storage: Storage): Promise<boolean> {
-  const subscription = await registration.pushManager.getSubscription();
-  if (!subscription) { storage.removeItem(OWNER_KEY); return true; }
+  const subscription = await readSubscription(registration);
+  if (!subscription) { forget(storage); return true; }
   if (!await subscription.unsubscribe()) throw new Error('이 기기의 알림을 끄지 못했어요.');
-  storage.removeItem(OWNER_KEY);
+  forget(storage);
   const { error } = await client.from('user_push_subscriptions').delete()
     .eq('user_id', userId).eq('endpoint', subscription.endpoint);
   return !error;
@@ -98,7 +148,7 @@ export async function disableDevicePush(client: SupabaseClient, userId: string, 
 // 남은 서버 행은 발송 실패 정리로 닫힌다. 다른 사용자 소유의 구독은 건드리지 않는다.
 export async function releaseDevicePush(userId: string, registration: ServiceWorkerRegistration, storage: Storage): Promise<void> {
   if (owner(storage) !== userId) return;
-  const subscription = await registration.pushManager.getSubscription();
+  const subscription = await readSubscription(registration);
   if (subscription && !await subscription.unsubscribe()) throw new Error('이 기기의 알림을 끄지 못했어요.');
-  storage.removeItem(OWNER_KEY);
+  forget(storage);
 }

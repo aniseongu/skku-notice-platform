@@ -33,3 +33,20 @@ self.addEventListener('notificationclick', (event) => {
   const target = event.notification.data?.url || self.registration.scope;
   event.waitUntil(self.clients.openWindow(target));
 });
+
+// 브라우저가 구독을 바꾸거나 잃으면(앱 업데이트 뒤 등) 같은 서버 키로 바로 새 구독을 만든다.
+// 이 워커에는 로그인 정보가 없어서 서버 등록은 앱을 열 때 페이지가 이어서 한다(바뀐 주소를 알아채고 다시 올린다).
+// 출처: https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope/pushsubscriptionchange_event
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil((async () => {
+    if (await self.registration.pushManager.getSubscription()) return;
+    let key = event.oldSubscription?.options?.applicationServerKey;
+    if (!key) {
+      const config = await (await fetch(new URL('push-config.json', self.registration.scope), { cache: 'no-store' })).json();
+      const value = String(config.vapidPublicKey || '');
+      const binary = atob(value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4));
+      key = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    }
+    await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+  })().catch(() => { /* 앱을 열면 페이지가 다시 등록한다 */ }));
+});

@@ -1428,18 +1428,28 @@ export class AppController extends Reactive {
     const supported = isSecureContext && 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
     if (!supported) { if (epoch === this.subscriptionsEpoch) this.pushStatus = 'unsupported'; return; }
     try {
+      // 서비스 워커가 끝내 준비되지 않으면(바꿔 끼우는 중 등) "확인하고 있어요"에 멈추지 않게 끊는다.
+      const ready = new Promise<ServiceWorkerRegistration>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('timeout')), 10_000);
+        void navigator.serviceWorker.ready.then((value) => { clearTimeout(timer); resolve(value); });
+      });
       const [registration, config] = await Promise.all([
-        navigator.serviceWorker.ready,
+        ready,
         fetch(new URL('push-config.json', document.baseURI), { cache: 'no-store' }).then((r) => r.ok ? r.json() as Promise<{ vapidPublicKey?: string }> : null).catch(() => null),
       ]);
       if (epoch !== this.subscriptionsEpoch) return;
       this.pushRegistration = registration;
       this.pushVapidKey = config?.vapidPublicKey ?? null;
-      const on = await inspectDevicePush(authClient, userId, registration, localStorage);
-      if (epoch !== this.subscriptionsEpoch) return;
+      // 켜 둔 기기인데 앱 업데이트 등으로 브라우저가 구독을 잃었으면 여기서 조용히 다시 등록한다.
+      const on = await inspectDevicePush(authClient, userId, registration, localStorage,
+        { vapidKey: this.pushVapidKey, permission: Notification.permission });
+      if (epoch !== this.subscriptionsEpoch) { if (on) void this.releasePush(userId); return; }
       this.pushStatus = on ? 'on' : Notification.permission === 'denied' ? 'denied' : 'off';
-    } catch {
-      if (epoch === this.subscriptionsEpoch) { this.pushStatus = 'off'; this.pushError = '알림 상태를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.'; }
+    } catch (error) {
+      if (epoch === this.subscriptionsEpoch) {
+        this.pushStatus = Notification.permission === 'denied' ? 'denied' : 'off';
+        this.pushError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '알림 상태를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.';
+      }
     }
   }
 
