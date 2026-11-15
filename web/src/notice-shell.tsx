@@ -225,7 +225,7 @@ function settingsModel(app: AppController) {
     keywords: app.keywords, keywordNote: app.keywordNote,
     addKeyword: (word: string) => app.addKeyword(word), removeKeyword: (word: string) => app.removeKeyword(word),
     pushStatus: app.pushStatus, pushError: app.pushError, pushRetry: app.pushRetry,
-    enablePush: () => { void app.enablePush(); }, disablePush: () => { void app.disablePush(); },
+    enablePush: () => { void app.enablePush(); }, disablePush: () => { void app.disablePush(); }, sendPushReport: () => { void app.sendPushReport(); },
     testNotification: () => { void app.testNotification(); },
     profile: app.profile, profileStatus: app.profileStatus, profileMessage: app.profileMessage, profileError: app.profileError,
     saveProfile: (profile: UserProfile) => { void app.saveProfile(profile); },

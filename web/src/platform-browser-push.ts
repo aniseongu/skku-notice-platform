@@ -1,6 +1,7 @@
 import { suggestDeviceName } from './devices.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { connectionChain } from './connection-chain.ts';
+import { activation, note } from './push-diagnostics.ts';
 
 const OWNER_KEY = 'platform:push-owner';
 // 서버에 올린 구독 주소. 앱 업데이트 등으로 브라우저가 구독을 잃거나 새 주소로 바꾸면 이 값과 달라져서 알아챈다.
@@ -126,12 +127,16 @@ export function createEnableChain(client: SupabaseClient, userId: string, regist
   let asked = 0;
   const chain = connectionChain([
     async () => {
+      note(`step0 perm=${permission()} act=${activation()} vis=${typeof document === 'undefined' ? '?' : document.visibilityState}`);
       if (permission() === 'granted') return;
       // 두 번째부터는 권한을 따로 묻지 않고 다음 단계의 구독 요청이 직접 묻게 한다. 크로미움은 권한이 없으면
       // pushManager.subscribe()가 허용 창을 띄운다(Google 웹 푸시 예제가 쓰는 방식). Notification.requestPermission이
       // 허용 창을 띄우지 못한 기기(삼성 인터넷 휴대폰, 2026-11-16)에서 다른 길로 묻는다.
       if (++asked > 1) return;
-      const result = await withTimeout(requestPermission(), PERMISSION_MS, permissionHelp());
+      const asking = requestPermission();
+      // 시간 제한 뒤에라도 브라우저가 답하는지 기록한다(조용한 요청이면 한참 뒤 'default'로 끝난다).
+      asking.then((value) => note(`ask-result ${value}`), (error: unknown) => note(`ask-error ${error instanceof Error ? error.name : String(error)}`));
+      const result = await withTimeout(asking, PERMISSION_MS, permissionHelp());
       if (result === 'granted') return;
       // 'default'는 고르지 않고 닫았거나 조용한 요청이 끝난 것이다(크롬 개발자 블로그: 결정 없음으로 다룬다).
       throw new Error(result === 'denied' ? DECLINED : '알림 허용을 고르지 않았어요. 다시 눌러 허용해 주세요.');
@@ -146,15 +151,25 @@ export function createEnableChain(client: SupabaseClient, userId: string, regist
         // 끊긴 구독은 해제도 답이 없을 수 있다. 기다리다 넘어가도 새 구독을 만들면 브라우저가 바꿔 끼운다.
         await withTimeout(existing.unsubscribe(), CHECK_MS, '').catch(() => false);
       }
-      if (permission() === 'granted') subscription = await newSubscription(registration, key);
+      note(`step1 perm=${permission()} act=${activation()} existing=${!!existing}`);
+      if (permission() === 'granted') {
+        subscription = await newSubscription(registration, key).catch((error: unknown) => {
+          note(`subscribe-error ${error instanceof Error ? `${error.name}:${error.message.slice(0, 60)}` : String(error)}`);
+          throw error;
+        });
+      }
       else {
         // 구독 요청이 허용 창을 띄운다. 거절하면 NotAllowedError가 난다.
         subscription = await withTimeout(registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }), SUBSCRIBE_MS, permissionHelp())
-          .catch((error: unknown) => { throw error instanceof Error && error.name === 'NotAllowedError' ? new Error(DECLINED) : error; });
+          .catch((error: unknown) => {
+            note(`subscribe-error ${error instanceof Error ? `${error.name}:${error.message.slice(0, 60)}` : String(error)}`);
+            throw error instanceof Error && error.name === 'NotAllowedError' ? new Error(DECLINED) : error;
+          });
       }
       created = true;
     },
     async () => {
+      note('step2 save');
       await saveDevice(client, userId, subscription!, storage, previous);
       saved = true;
     },

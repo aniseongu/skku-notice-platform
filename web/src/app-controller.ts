@@ -26,6 +26,7 @@ import { keywordMatchesNotice } from './keyword-match';
 import { loadGraduation, loadGraduationStatuses, badgeOf, gradParts, requestGraduation, isInternshipNotice, type GradPart, type GraduationBadge, type GraduationStatuses, isSoftwareOriginal, visibleTracks, type GraduationAssessment } from './graduation-assessment';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import { initialDraft, missingRequired, savedDoubleAnswer, type Draft, type Step } from './onboarding-flow';
+import { note as pushNote, pushReport } from './push-diagnostics';
 import { createEnableChain, deviceEndpoint, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
 import { localKey, setLocalOwner } from './local-scope.ts';
 import { isRememberedOnboarded, rememberOnboarded } from './onboarded-flag.ts';
@@ -1492,6 +1493,7 @@ export class AppController extends Reactive {
         if (denied && this.pushChain === current) { this.pushChain = null; void current.chain.discard(); }
         this.pushError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '알림을 켜지 못했어요. 다시 시도하면 이어서 진행해요.';
         if (!denied) this.watchPermission(userId, epoch);
+        pushNote(`failed ${error instanceof Error ? `${error.name}:${error.message.slice(0, 40)}` : String(error)}`);
       } else {
         // 기다리는 동안 계정이 바뀌었다면 서버에 못 올린 구독을 이 기기에서 끊는다.
         if (this.pushChain === current) this.pushChain = null;
@@ -1501,6 +1503,14 @@ export class AppController extends Reactive {
       // 성공했어도 그 사이 계정이 바뀌었다면 이전 사용자 소유로 남은 구독을 이 기기에서 끊는다.
       if (epoch !== this.subscriptionsEpoch) void this.releasePush(userId);
     }
+  }
+
+  /** 알림 켜기 실패 진단을 문의(버그)로 보낸다. 사용자가 단추를 누를 때만 보낸다. */
+  async sendPushReport(): Promise<void> {
+    const registration = this.pushRegistration ?? await navigator.serviceWorker?.getRegistration().catch(() => undefined) ?? null;
+    const body = await pushReport(registration, __APP_VERSION__);
+    const result = await sendFeedback(authClient, 'bug', body, '');
+    this.showToast(result === 'ok' ? '진단 정보를 보냈어요' : result === 'limit' ? '오늘은 더 보낼 수 없어요' : '보내지 못했어요. 잠시 뒤 다시 눌러 주세요');
   }
 
   // 허용 창을 늦게 누르거나(조용한 요청), 브라우저 사이트 설정에서 허용하면 권한이 나중에 바뀐다. 그때 누르기를 다시 요구하지 않고 이어서 켠다.
