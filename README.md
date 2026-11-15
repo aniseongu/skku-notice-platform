@@ -50,14 +50,12 @@ PC에서는 목록과 공지 상세를 함께 보고, 휴대폰에서는 아래 
 
 ## 주요 기능
 
-| 기능 | 내용 |
-| --- | --- |
-| 공지 모아 보기 | 학교 게시판 65곳(학과 게시판은 구독자가 있을 때만 수집), 외부 인턴 공고 3곳, 현장실습을 검색·저장하고 마감순으로 정렬합니다. |
-| 내게 맞는 알림 | 구독한 게시판의 새 공지를 웹 푸시로 보내고, 관심 키워드에 맞지 않는 공지는 무음으로 보냅니다. |
-| AI 공지 확인 | 사용자가 직접 연결한 Gemini 또는 Groq 키로 공지가 나에게 해당하는지 판정하고 세 줄로 요약하며, 영어 공지는 번역합니다. |
-| 인턴십 졸업요건 | 소프트웨어학과 원전공과 3품 인턴십 기준에 인턴 공고의 근무 기간·시간이 맞는지 근거와 함께 보여 줍니다. |
-| 일정 연동 | 아이캠퍼스 과제·퀴즈 마감 알림과 저장한 공지의 Google 캘린더 동기화를 고를 수 있습니다. |
-| 앱처럼 쓰기 | 홈 화면에 설치하고 라이트·다크 모드, 키보드 단축키, 기기 간 동기화를 지원합니다. |
+- **공지 모아 보기:** 학교 게시판 65곳(학과 게시판은 구독자가 있을 때만 수집), 외부 인턴 공고 3곳, 현장실습을 검색·저장하고 마감순으로 정렬합니다.
+- **내게 맞는 알림:** 구독한 게시판의 새 공지를 웹 푸시로 보내고, 관심 키워드에 맞지 않는 공지는 무음으로 보냅니다.
+- **AI 공지 확인:** 사용자가 직접 연결한 Gemini 또는 Groq 키로 공지가 나에게 해당하는지 판정하고 세 줄로 요약하며, 영어 공지는 번역합니다.
+- **인턴십 졸업요건:** 소프트웨어학과 원전공과 3품 인턴십 기준에 인턴 공고의 근무 기간·시간이 맞는지 근거와 함께 보여 줍니다.
+- **일정 연동:** 아이캠퍼스 과제·퀴즈 마감 알림과 저장한 공지의 Google 캘린더 동기화를 고를 수 있습니다.
+- **앱처럼 쓰기:** 홈 화면에 설치하고 라이트·다크 모드, 키보드 단축키, 기기 간 동기화를 지원합니다.
 
 AI 판정과 인턴십 요건 안내는 참고용이며, 최종 인정 여부는 학교와 학과에 확인해야 합니다.
 
@@ -77,7 +75,7 @@ AI 판정과 인턴십 요건 안내는 참고용이며, 최종 인정 여부는
 
 <p>
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://skillicons.dev/icons?i=ts,react,vite,tailwind,py,nodejs,nestjs,supabase,postgres,deno,cloudflare,githubactions&theme=dark">
+  <source media="(prefers-color-scheme: dark)" srcset="https://skillicons.dev/icons?i=ts%2Creact%2Cvite%2Ctailwind%2Cpy%2Cnodejs%2Cnestjs%2Csupabase%2Cpostgres%2Cdeno%2Ccloudflare%2Cgithubactions&theme=dark">
   <img src="https://skillicons.dev/icons?i=ts,react,vite,tailwind,py,nodejs,nestjs,supabase,postgres,deno,cloudflare,githubactions&theme=light" alt="TypeScript, React, Vite, Tailwind CSS, Python, Node.js, NestJS, Supabase, PostgreSQL, Deno, Cloudflare, GitHub Actions">
 </picture>
 </p>
@@ -88,10 +86,10 @@ AI 판정과 인턴십 요건 안내는 참고용이며, 최종 인정 여부는
 | 구분 | 사용 기술 |
 | --- | --- |
 | 웹 | TypeScript, React 19, Vite, Tailwind CSS v4, vite-plugin-pwa(Workbox), supabase-js, dnd-kit, DOMPurify, Pretendard |
-| 수집과 처리 | Python 3.12, httpx, selectolax, nh3, RapidOCR·ONNX Runtime, Google Gen AI SDK(Gemini), Groq API, pywebpush |
-| 데이터와 인증 | Supabase(PostgreSQL, Auth, RLS), Edge Function(Deno) |
+| 워커 | Python 3.12, httpx, selectolax, nh3, RapidOCR·ONNX Runtime, Google Gen AI SDK(Gemini), Groq API, pywebpush |
+| DB·인증 | Supabase(PostgreSQL, Auth, RLS), Edge Function(Deno) |
 | 서버 | Oracle Cloud 무료 VM, systemd 타이머 6개, NestJS 내부 API |
-| 배포와 검증 | Cloudflare Pages(main 푸시 시 자동 배포), GitHub Actions CI, Playwright, PGlite, pytest, ruff |
+| 배포·검증 | Cloudflare Pages(main 푸시 시 자동 배포), GitHub Actions CI, Playwright, PGlite, pytest, ruff |
 
 ## 로컬 실행
 
