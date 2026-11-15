@@ -194,5 +194,38 @@ test('a permission prompt that never shows stops waiting and says where to allow
   t.mock.timers.tick(10_000);
   await assert.rejects(pending, /알림 허용 창이 뜨지 않았어요/);
   assert.equal(f.records.length, 0);
-  assert.match(permissionHelp('Mozilla/5.0 (Linux; Android 10; K) SamsungBrowser/29.0 Chrome/130 Mobile'), /휴대폰 설정 → 애플리케이션 → 삼성 인터넷 → 알림을 켜고/);
+  assert.match(permissionHelp('Mozilla/5.0 (Linux; Android 10; K) SamsungBrowser/29.0 Chrome/130 Mobile'), /다시 누르면 다른 방법으로 물어봐요/);
+});
+
+test('when the permission prompt did not show, the retry lets the subscribe call ask instead', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = fixture();
+  let asks = 0;
+  let state = 'default';
+  const registration = { pushManager: { getSubscription: async () => f.getCurrent(),
+    subscribe: async (options) => { state = 'granted'; return f.registration.pushManager.subscribe(options); } } };
+  const chain = createEnableChain(f.client, 'a', registration, f.storage, publicKey, () => { asks++; return new Promise(() => {}); }, () => state);
+  const first = chain.run();
+  t.mock.timers.tick(10_000);
+  await assert.rejects(first, /알림 허용 창이 뜨지 않았어요/);
+  t.mock.timers.reset();
+  await chain.run();
+  assert.equal(asks, 1);   // 두 번째에는 Notification.requestPermission을 부르지 않는다
+  assert.equal(f.records.length, 1);
+  assert.equal(f.values.get('platform:push-owner'), 'a');
+});
+
+test('closing the prompt without choosing is not reported as blocked', async () => {
+  const f = fixture();
+  await assert.rejects(enableDevicePush(f.client, 'a', f.registration, f.storage, publicKey, async () => 'default'), /고르지 않았어요/);
+});
+
+test('refusing the prompt shown by subscribe asks to allow in the browser', async () => {
+  const f = fixture();
+  const registration = { pushManager: { getSubscription: async () => null,
+    subscribe: async () => { throw Object.assign(new Error('Registration failed - permission denied'), { name: 'NotAllowedError' }); } } };
+  const chain = createEnableChain(f.client, 'a', registration, f.storage, publicKey, async () => 'default', () => 'default');
+  await assert.rejects(chain.run(), /고르지 않았어요/);
+  await assert.rejects(chain.run(), /브라우저에서 알림을 허용해 주세요/);
+  assert.equal(f.records.length, 0);
 });

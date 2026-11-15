@@ -1491,6 +1491,7 @@ export class AppController extends Reactive {
         this.pushRetry = !denied;
         if (denied && this.pushChain === current) { this.pushChain = null; void current.chain.discard(); }
         this.pushError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '알림을 켜지 못했어요. 다시 시도하면 이어서 진행해요.';
+        if (!denied) this.watchPermission(userId, epoch);
       } else {
         // 기다리는 동안 계정이 바뀌었다면 서버에 못 올린 구독을 이 기기에서 끊는다.
         if (this.pushChain === current) this.pushChain = null;
@@ -1500,6 +1501,21 @@ export class AppController extends Reactive {
       // 성공했어도 그 사이 계정이 바뀌었다면 이전 사용자 소유로 남은 구독을 이 기기에서 끊는다.
       if (epoch !== this.subscriptionsEpoch) void this.releasePush(userId);
     }
+  }
+
+  // 허용 창을 늦게 누르거나(조용한 요청), 브라우저 사이트 설정에서 허용하면 권한이 나중에 바뀐다. 그때 누르기를 다시 요구하지 않고 이어서 켠다.
+  // 크롬 개발자 블로그(안드로이드 알림 요청)가 권하는 방식: permissions.query의 change에서 granted면 구독한다.
+  private permissionWatch: PermissionStatus | null = null;
+  watchPermission(userId: string, epoch: number): void {
+    if (this.permissionWatch || !navigator.permissions?.query) return;
+    void navigator.permissions.query({ name: 'notifications' }).then((status) => {
+      this.permissionWatch = status;
+      status.onchange = () => {
+        if (status.state !== 'granted') return;
+        status.onchange = null; this.permissionWatch = null;
+        if (epoch === this.subscriptionsEpoch && this.authUserId === userId && this.pushStatus === 'off' && this.pushChain) void this.enablePush();
+      };
+    }).catch(() => { /* 권한 상태를 볼 수 없는 브라우저는 다시 누르기로 이어 간다 */ });
   }
 
   async disablePush(): Promise<void> {

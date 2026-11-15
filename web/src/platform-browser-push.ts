@@ -26,12 +26,15 @@ const SAVE_MS = 15_000;
 const PERMISSION_MS = 10_000;
 
 export function permissionHelp(userAgent: string = typeof navigator === 'undefined' ? '' : navigator.userAgent): string {
+  // 휴대폰 설정에서 브라우저나 홈 화면에 설치한 앱(크로미움은 설치한 앱을 따로 된 안드로이드 앱으로 둔다)의 알림이 꺼져 있으면
+  // 사이트 권한이 "묻기"로 돌아가고 허용 창도 뜨지 않는다.
   return /SamsungBrowser/.test(userAgent)
-    // 사이트 알림 목록은 한 번 물어본 사이트만 보여 주고 직접 추가할 수 없다. 사이트가 묻는 것 자체를 켜고 브라우저 탭에서 다시 누르게 한다.
-    // 휴대폰 설정에서 브라우저 앱의 알림이 꺼져 있으면 사이트 권한이 "묻기"로 돌아가고 허용 창도 뜨지 않는다(2026-11-16 휴대폰에서 재현된 모양).
-    ? '알림 허용 창이 뜨지 않았어요. 휴대폰 설정 → 애플리케이션 → 삼성 인터넷 → 알림을 켜고, 삼성 인터넷 메뉴 → 설정 → 사이트 및 다운로드 → 사이트 알림 스위치도 켠 뒤 다시 눌러 주세요.'
-    : '알림 허용 창이 뜨지 않았어요. 휴대폰이나 컴퓨터 설정에서 이 브라우저의 알림을 켜고, 브라우저 설정에서 사이트가 알림을 물을 수 있게 한 뒤 다시 눌러 주세요.';
+    ? '알림 허용 창이 뜨지 않았어요. 다시 누르면 다른 방법으로 물어봐요. 그래도 안 되면 휴대폰 설정 → 애플리케이션에서 삼성 인터넷과 홈 화면에 설치한 앱의 알림을 켜 주세요.'
+    : '알림 허용 창이 뜨지 않았어요. 다시 누르면 다른 방법으로 물어봐요. 그래도 안 되면 기기 설정에서 이 브라우저와 설치한 앱의 알림을 켜 주세요.';
 }
+
+const currentPermission = (): NotificationPermission => typeof Notification === 'undefined' ? 'default' : Notification.permission;
+const DECLINED = '브라우저에서 알림을 허용해 주세요.';
 
 /** 이 기기의 구독 주소(기기 목록에서 "이 기기"를 찾을 때). 응답하지 않는 브라우저에서는 빈 값으로 넘어간다. */
 export async function deviceEndpoint(registration: ServiceWorkerRegistration): Promise<string> {
@@ -113,15 +116,25 @@ export async function inspectDevicePush(client: SupabaseClient, userId: string, 
 // 권한 요청 → 구독 생성 → 서버 등록을 순서대로 실행한다. 실패하면 다시 run()할 때 끝난 단계는 건너뛰고 실패한 단계부터 이어 간다.
 // 첫 단계(권한 요청)는 run()을 부른 같은 호출 안에서 시작되므로 클릭 동작 안에서 실행된다.
 export function createEnableChain(client: SupabaseClient, userId: string, registration: ServiceWorkerRegistration,
-  storage: Storage, vapidKey: string, requestPermission: () => Promise<NotificationPermission>) {
+  storage: Storage, vapidKey: string, requestPermission: () => Promise<NotificationPermission>,
+  permission: () => NotificationPermission = currentPermission) {
   const key = decodeVapid(vapidKey);
   let subscription: PushSubscription | null = null;
   let previous: string | null = null;
   let created = false;
   let saved = false;
+  let asked = 0;
   const chain = connectionChain([
     async () => {
-      if (await withTimeout(requestPermission(), PERMISSION_MS, permissionHelp()) !== 'granted') throw new Error('브라우저에서 알림을 허용해 주세요.');
+      if (permission() === 'granted') return;
+      // 두 번째부터는 권한을 따로 묻지 않고 다음 단계의 구독 요청이 직접 묻게 한다. 크로미움은 권한이 없으면
+      // pushManager.subscribe()가 허용 창을 띄운다(Google 웹 푸시 예제가 쓰는 방식). Notification.requestPermission이
+      // 허용 창을 띄우지 못한 기기(삼성 인터넷 휴대폰, 2026-11-16)에서 다른 길로 묻는다.
+      if (++asked > 1) return;
+      const result = await withTimeout(requestPermission(), PERMISSION_MS, permissionHelp());
+      if (result === 'granted') return;
+      // 'default'는 고르지 않고 닫았거나 조용한 요청이 끝난 것이다(크롬 개발자 블로그: 결정 없음으로 다룬다).
+      throw new Error(result === 'denied' ? DECLINED : '알림 허용을 고르지 않았어요. 다시 눌러 허용해 주세요.');
     },
     async () => {
       previous = owner(storage) === userId ? storage.getItem(ENDPOINT_KEY) : null;
@@ -133,7 +146,12 @@ export function createEnableChain(client: SupabaseClient, userId: string, regist
         // 끊긴 구독은 해제도 답이 없을 수 있다. 기다리다 넘어가도 새 구독을 만들면 브라우저가 바꿔 끼운다.
         await withTimeout(existing.unsubscribe(), CHECK_MS, '').catch(() => false);
       }
-      subscription = await newSubscription(registration, key);
+      if (permission() === 'granted') subscription = await newSubscription(registration, key);
+      else {
+        // 구독 요청이 허용 창을 띄운다. 거절하면 NotAllowedError가 난다.
+        subscription = await withTimeout(registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }), SUBSCRIBE_MS, permissionHelp())
+          .catch((error: unknown) => { throw error instanceof Error && error.name === 'NotAllowedError' ? new Error(DECLINED) : error; });
+      }
       created = true;
     },
     async () => {
