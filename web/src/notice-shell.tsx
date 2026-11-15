@@ -147,7 +147,7 @@ export function NoticeShell({ app }: { app: AppController }) {
             </header>
           </div>
 
-          {settings ? <platform-settings-screen model={settingsModel(app)} /> : <>
+          {settings ? (app.settingsReady() ? <platform-settings-screen model={settingsModel(app)} /> : null) : <>
             <div className="tools narrow-only px-[var(--gutter)] pt-[4px] pb-0 min-[720px]:hidden!">
               <label className="search flex h-[44px] items-center gap-[8px] rounded-md bg-sunken px-[16px] text-ink-3 focus-within:outline-2 focus-within:outline-accent [&_.i]:size-[20px] [&_input]:h-full [&_input]:min-w-0 [&_input]:flex-1 [&_input]:border-0 [&_input]:bg-transparent [&_input]:text-ink [&_input]:[outline:0] [&_input]:placeholder:text-ink-3"><Icon name="search" />
                 <input type="search" placeholder="공지 찾기" autoComplete="off" aria-label="공지 검색" value={app.query}

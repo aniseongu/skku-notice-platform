@@ -21,6 +21,16 @@ const readSubscription = (registration: ServiceWorkerRegistration) =>
 const newSubscription = (registration: ServiceWorkerRegistration, key: Uint8Array<ArrayBuffer>) =>
   withTimeout(registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }), SUBSCRIBE_MS, '알림 서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
 
+const SAVE_MS = 15_000;
+
+/** 이 기기의 구독 주소(기기 목록에서 "이 기기"를 찾을 때). 응답하지 않는 브라우저에서는 빈 값으로 넘어간다. */
+export async function deviceEndpoint(registration: ServiceWorkerRegistration): Promise<string> {
+  try { return (await readSubscription(registration))?.endpoint ?? ''; } catch { return ''; }
+}
+
+// 기기 이름은 꾸밈이라 브라우저가 늦게 답하면 기다리지 않고 기기 종류 이름을 쓴다.
+const deviceName = () => Promise.race([suggestDeviceName(), new Promise<string>((resolve) => setTimeout(() => resolve(suggestDeviceName(undefined, false)), 3000))]);
+
 function forget(storage: Storage): void {
   storage.removeItem(OWNER_KEY);
   storage.removeItem(ENDPOINT_KEY);
@@ -29,11 +39,11 @@ function forget(storage: Storage): void {
 async function saveDevice(client: SupabaseClient, userId: string, subscription: PushSubscription, storage: Storage, previous: string | null): Promise<void> {
   const data = subscription.toJSON();
   if (!data.endpoint || !data.keys?.p256dh || !data.keys.auth) throw new Error('알림 기기 정보를 확인하지 못했어요.');
-  const { error } = await client.from('user_push_subscriptions').upsert({
+  const { error } = await withTimeout(Promise.resolve(client.from('user_push_subscriptions').upsert({
     user_id: userId, endpoint: data.endpoint, p256dh: data.keys.p256dh, auth_secret: data.keys.auth,
-    device_name: await suggestDeviceName(),
+    device_name: await deviceName(),
     updated_at: new Date().toISOString(),
-  }, { onConflict: 'endpoint' });
+  }, { onConflict: 'endpoint' })), SAVE_MS, '서버에 이 기기를 등록하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.');
   if (error) throw error;
   storage.setItem(OWNER_KEY, userId);
   storage.setItem(ENDPOINT_KEY, data.endpoint);
@@ -108,7 +118,8 @@ export function createEnableChain(client: SupabaseClient, userId: string, regist
       // 다시 쓰지 않고 새로 만든다.
       if (existing) {
         previous ??= existing.endpoint;
-        if (!await existing.unsubscribe()) throw new Error('이 기기의 이전 알림을 끄지 못했어요.');
+        // 끊긴 구독은 해제도 답이 없을 수 있다. 기다리다 넘어가도 새 구독을 만들면 브라우저가 바꿔 끼운다.
+        await withTimeout(existing.unsubscribe(), CHECK_MS, '').catch(() => false);
       }
       subscription = await newSubscription(registration, key);
       created = true;

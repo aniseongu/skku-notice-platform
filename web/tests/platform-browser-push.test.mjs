@@ -165,3 +165,23 @@ test('a browser that never answers does not leave the check hanging', async (t) 
   t.mock.timers.tick(10_000);
   await assert.rejects(pending, /알림 상태를 확인하지 못했어요/);
 });
+
+test('turning on does not wait forever for a dead subscription that never finishes unsubscribing', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = fixture({ owner: 'a' });
+  const stale = { ...f.makeSubscription(), unsubscribe: () => new Promise(() => {}) };
+  f.setCurrent(stale);
+  const pending = enableDevicePush(f.client, 'a', f.registration, f.storage, publicKey, async () => 'granted');
+  for (let i = 0; i < 5; i++) { await new Promise((resolve) => setImmediate(resolve)); t.mock.timers.tick(10_000); }
+  await pending;
+  assert.equal(f.records.length, 1);
+  assert.notEqual(f.records[0].endpoint, stale.endpoint);
+});
+
+test('deviceEndpoint gives up quietly when the browser never answers', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { deviceEndpoint } = await import('../src/platform-browser-push.ts');
+  const pending = deviceEndpoint({ pushManager: { getSubscription: () => new Promise(() => {}) } });
+  t.mock.timers.tick(10_000);
+  assert.equal(await pending, '');
+});

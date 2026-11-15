@@ -26,7 +26,7 @@ import { keywordMatchesNotice } from './keyword-match';
 import { loadGraduation, loadGraduationStatuses, badgeOf, gradParts, requestGraduation, isInternshipNotice, type GradPart, type GraduationBadge, type GraduationStatuses, isSoftwareOriginal, visibleTracks, type GraduationAssessment } from './graduation-assessment';
 import { EMPTY_PROFILE, loadProfile, saveProfile as storeProfile, type UserProfile } from './profile';
 import { initialDraft, missingRequired, savedDoubleAnswer, type Draft, type Step } from './onboarding-flow';
-import { createEnableChain, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
+import { createEnableChain, deviceEndpoint, disableDevicePush, inspectDevicePush, releaseDevicePush } from './platform-browser-push';
 import { localKey, setLocalOwner } from './local-scope.ts';
 import { isRememberedOnboarded, rememberOnboarded } from './onboarded-flag.ts';
 import type { Subscription } from '@supabase/supabase-js';
@@ -190,7 +190,7 @@ export class AppController extends Reactive {
   static properties = {
     notices: { state: true }, sources: { state: true }, matched: { state: true }, generatedAt: { state: true },
     view: { state: true }, board: { state: true }, keyword: { state: true }, keywords: { state: true }, query: { state: true },
-    loading: { state: true }, devicesLoaded: { state: true }, accountDataLoaded: { state: true }, aiStateLoaded: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
+    loading: { state: true }, devicesLoaded: { state: true }, accountDataLoaded: { state: true }, aiStateLoaded: { state: true }, settingsCapped: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
     toast: { state: true }, linkCopied: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, coopSort: { state: true }, coopKind: { state: true }, savedSort: { state: true },
@@ -339,6 +339,8 @@ export class AppController extends Reactive {
    * 그래서 처음 한 번은 모두 온 뒤 한꺼번에 그린다(userDataReady). 이후 새로고침은 그 자리에서 바꾼다. */
   accountDataLoaded = true;
   aiStateLoaded = true;
+  /** 설정 화면이 기다리는 상한(FIRST_LOAD_LIMIT_MS)이 지났다. 응답이 없는 항목이 있어도 그때는 그린다. */
+  settingsCapped = true;
   /** 첫 목록을 무작정 기다리지 않게 하는 상한. 이 시간이 지나면 받은 것만으로 그린다. */
   static readonly FIRST_LOAD_LIMIT_MS = 5000;
   /** 마지막 refresh가 시작한 내 판정 읽기. 직접 새로고침의 결과를 셀 때 기다린다. */
@@ -423,14 +425,14 @@ export class AppController extends Reactive {
           this.preferencesLoading = !!userId;
           this.preferencesError = '';
           this.preferencesUnavailable = false;
-          this.accountDataLoaded = !userId; this.aiStateLoaded = !userId;
+          this.accountDataLoaded = !userId; this.aiStateLoaded = !userId; this.settingsCapped = !userId;
           if (userId) setTimeout(() => {
             // 첫 목록에 필요한 계정 정보를 모두 받으면 한꺼번에 그린다(userDataReady). 너무 늦으면 상한 시간에 그냥 그린다.
             // 구독·키워드·게시판 순서도 목록과 왼쪽 메뉴의 모양을 바꾸므로 같이 기다린다.
             const first = [this.refreshMyDeadlines(userId, epoch), this.refreshMyTranslations(userId, epoch), this.refreshMine(userId, epoch),
               this.refreshSubscriptions(userId, epoch), this.refreshPreferences(userId, epoch), this.refreshBoardOrder(userId, epoch)];
             void Promise.allSettled(first).then(() => { if (epoch === this.subscriptionsEpoch) this.accountDataLoaded = true; });
-            setTimeout(() => { if (epoch === this.subscriptionsEpoch) { this.accountDataLoaded = true; this.aiStateLoaded = true; } }, AppController.FIRST_LOAD_LIMIT_MS);
+            setTimeout(() => { if (epoch === this.subscriptionsEpoch) { this.accountDataLoaded = true; this.aiStateLoaded = true; this.settingsCapped = true; } }, AppController.FIRST_LOAD_LIMIT_MS);
             void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch);
             void this.refreshDevices();   // 알림 설정을 열 때 기기 구역이 뒤늦게 끼어들지 않게 미리 받는다
           }, 0);
@@ -711,6 +713,13 @@ export class AppController extends Reactive {
   /** 목록에 졸업요건 표지를 보여 줄 수 있는 사용자인지: 로그인했고 아직 채우지 않은 요건이 있다. */
   /** 첫 목록을 그려도 되는지. 로그인하지 않았으면 기다릴 계정 정보가 없다. */
   userDataReady(): boolean { return !this.authUserId || (this.accountDataLoaded && this.aiStateLoaded); }
+  /** 설정 화면은 이 기기 알림 상태, 기기 목록, 프로필까지 받은 뒤 한 번에 그린다. 먼저 그리면 새로고침 때 "확인하고 있어요"→"켜져 있어요",
+   * "아직 받는 게시판이 없어요"→목록처럼 문구가 차례로 바뀌며 아래가 밀린다. */
+  settingsReady(): boolean {
+    if (!this.authUserId) return true;
+    if (!this.userDataReady()) return false;
+    return this.settingsCapped || (this.pushStatus !== 'checking' && this.devicesLoaded && this.profileStatus !== 'idle' && this.profileStatus !== 'loading');
+  }
   gradEnabled(): boolean { const v = visibleTracks(this.profile); return !!authClient && !!this.authUserId && (v.dept || v.p3); }
   /** 목록·상세에 적을 졸업요건 결과(영역별). 키워드 인턴과 겹치지 않게 shownInterests가 이 값을 보고 인턴 키워드를 뺀다. */
   gradPartsFor(notice: Notice, verdict?: string | null): GradPart[] {
@@ -1110,7 +1119,12 @@ export class AppController extends Reactive {
     try {
       const [devices, time] = await Promise.all([loadDevices(authClient, userId), loadSummaryTime(authClient, userId).catch(() => null)]);
       let endpoint = '';
-      try { endpoint = (await (await navigator.serviceWorker.ready).pushManager.getSubscription())?.endpoint ?? ''; } catch { /* 이 기기를 알 수 없으면 목록에서 표시만 못 한다 */ }
+      // 서비스 워커나 구독 조회가 답하지 않는 브라우저(삼성 인터넷)에서 기기 목록이 끝없이 기다리지 않게 한다.
+      const registration = this.pushRegistration ?? await Promise.race([
+        navigator.serviceWorker ? navigator.serviceWorker.ready : Promise.resolve(null),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+      ]).catch(() => null);
+      if (registration) endpoint = await deviceEndpoint(registration);
       if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
       this.devices = devices; this.summaryTime = time;
       this.thisDeviceId = devices.find((device) => device.endpoint === endpoint)?.id ?? null;
@@ -1460,7 +1474,9 @@ export class AppController extends Reactive {
     if (!authClient || !userId || this.pushStatus !== 'off') return;
     if (!registration || !this.pushVapidKey) { this.pushError = '알림 설정을 아직 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.'; return; }
     if (!this.pushChain || this.pushChain.userId !== userId || this.pushChain.epoch !== epoch) {
-      this.pushChain = { chain: createEnableChain(authClient, userId, registration, localStorage, this.pushVapidKey, () => Notification.requestPermission()), userId, epoch };
+      this.pushChain = { chain: createEnableChain(authClient, userId, registration, localStorage, this.pushVapidKey,
+        // 이미 허용했으면 묻지 않는다. 일부 브라우저는 허용된 상태에서 다시 물으면 답하지 않는다.
+        () => Notification.permission === 'granted' ? Promise.resolve('granted' as NotificationPermission) : Notification.requestPermission()), userId, epoch };
     }
     const current = this.pushChain;
     this.pushStatus = 'busy'; this.pushError = '';
