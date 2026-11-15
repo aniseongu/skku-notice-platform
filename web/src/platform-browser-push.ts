@@ -22,6 +22,14 @@ const newSubscription = (registration: ServiceWorkerRegistration, key: Uint8Arra
   withTimeout(registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }), SUBSCRIBE_MS, '알림 서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
 
 const SAVE_MS = 15_000;
+// 허용 창이 화면에 안 뜨면(설치한 앱에는 주소창이 없어 브라우저가 작은 아이콘으로만 묻는 경우 등) 대답이 오지 않는다.
+const PERMISSION_MS = 10_000;
+
+export function permissionHelp(userAgent: string = typeof navigator === 'undefined' ? '' : navigator.userAgent): string {
+  return /SamsungBrowser/.test(userAgent)
+    ? '알림 허용 창이 뜨지 않았어요. 삼성 인터넷 메뉴 → 설정 → 사이트 및 다운로드 → 사이트 알림에서 이 사이트를 허용한 뒤 다시 눌러 주세요.'
+    : '알림 허용 창이 뜨지 않았어요. 브라우저 설정의 사이트 알림에서 이 사이트를 허용한 뒤 다시 눌러 주세요.';
+}
 
 /** 이 기기의 구독 주소(기기 목록에서 "이 기기"를 찾을 때). 응답하지 않는 브라우저에서는 빈 값으로 넘어간다. */
 export async function deviceEndpoint(registration: ServiceWorkerRegistration): Promise<string> {
@@ -110,7 +118,9 @@ export function createEnableChain(client: SupabaseClient, userId: string, regist
   let created = false;
   let saved = false;
   const chain = connectionChain([
-    async () => { if (await requestPermission() !== 'granted') throw new Error('브라우저에서 알림을 허용해 주세요.'); },
+    async () => {
+      if (await withTimeout(requestPermission(), PERMISSION_MS, permissionHelp()) !== 'granted') throw new Error('브라우저에서 알림을 허용해 주세요.');
+    },
     async () => {
       previous = owner(storage) === userId ? storage.getItem(ENDPOINT_KEY) : null;
       const existing = await dropForeign(await readSubscription(registration), userId, storage);

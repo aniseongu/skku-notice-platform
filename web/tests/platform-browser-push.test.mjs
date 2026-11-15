@@ -185,3 +185,14 @@ test('deviceEndpoint gives up quietly when the browser never answers', async (t)
   t.mock.timers.tick(10_000);
   assert.equal(await pending, '');
 });
+
+test('a permission prompt that never shows stops waiting and says where to allow it', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { permissionHelp } = await import('../src/platform-browser-push.ts');
+  const f = fixture();
+  const pending = enableDevicePush(f.client, 'a', f.registration, f.storage, publicKey, () => new Promise(() => {}));
+  t.mock.timers.tick(10_000);
+  await assert.rejects(pending, /알림 허용 창이 뜨지 않았어요/);
+  assert.equal(f.records.length, 0);
+  assert.match(permissionHelp('Mozilla/5.0 (Linux; Android 10; K) SamsungBrowser/29.0 Chrome/130 Mobile'), /삼성 인터넷 메뉴 → 설정 → 사이트 및 다운로드 → 사이트 알림/);
+});
