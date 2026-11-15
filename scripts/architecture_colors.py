@@ -1,10 +1,14 @@
 # ruff: noqa: E501  (사용법 설명과 CSS 템플릿은 한 줄에 한 항목이라 줄이 길다)
-"""시스템 아키텍처 그림(assets/readme/system-architecture-dark.svg)의 색을 웹 다크 모드 토큰에서 다시 만든다.
+"""시스템 아키텍처 그림의 색을 웹 토큰에서 다시 만든다.
 
-사용: python3 scripts/architecture_colors.py          # web/src/styles/tokens.css의 다크 토큰으로 SVG의 <style>과 화살표 색을 갱신
+그림의 정본은 assets/readme/system-architecture-dark.svg다. 이 파일의 <style>과 화살표 색을 웹 다크 토큰으로 맞추고,
+같은 그림에 웹 라이트 토큰을 입혀 system-architecture-light.svg를 만든다. README는 GitHub 테마에 따라 둘 중 하나를 보여 준다.
+
+사용: python3 scripts/architecture_colors.py          # web/src/styles/tokens.css의 토큰으로 두 SVG를 갱신
       python3 scripts/architecture_colors.py --check  # 갱신할 내용이 있으면 1로 끝난다(웹 색이 바뀌었는데 그림이 그대로인지 확인)
 
-기술 로고(Python, React, Supabase 등)는 브랜드 색이라 건드리지 않는다. 그림의 도형 색은 모두 SVG 안의 클래스가 정한다.
+기술 로고(Python, React, Supabase 등)는 브랜드 색이라 건드리지 않는다. 그림의 도형 색은 SVG 안의 클래스가 정한다.
+예외는 클래스 밖에 적은 회색 선 아이콘(다크 text-3 값)과 흰 Edge Function 로고로, 라이트 그림에서 각각 라이트 text-3과 text로 바꾼다.
 """
 
 import math
@@ -15,6 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CSS = ROOT / "web/src/styles/tokens.css"
 SVG = ROOT / "assets/readme/system-architecture-dark.svg"
+LIGHT_SVG = ROOT / "assets/readme/system-architecture-light.svg"
 
 
 def oklch_hex(lightness: float, chroma: float, hue: float) -> str:
@@ -43,7 +48,8 @@ def mix(a: str, b: str, t: float) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-def dark_tokens() -> dict[str, str]:
+def theme_tokens(index: int) -> dict[str, str]:
+    """index 0은 라이트, 1은 다크(light-dark(라이트, 다크)의 순서)."""
     css = CSS.read_text(encoding="utf-8")
     hue = float(re.search(r"--h:\s*([\d.]+)", css).group(1))
     tokens = {}
@@ -51,8 +57,8 @@ def dark_tokens() -> dict[str, str]:
         line = re.search(rf"--{re.escape(name)}:\s*light-dark\(.*", css)
         values = re.findall(r"oklch\(([\d.]+)\s+([\d.]+)\s+var\(--h\)\)", line.group(0)) if line else []
         if len(values) < 2:
-            raise SystemExit(f"web/src/styles/tokens.css에서 --{name}의 다크 값을 찾지 못했다")
-        lightness, chroma = values[1]  # light-dark(라이트, 다크)의 두 번째가 다크
+            raise SystemExit(f"web/src/styles/tokens.css에서 --{name}의 값을 찾지 못했다")
+        lightness, chroma = values[index]
         tokens[name] = oklch_hex(float(lightness), float(chroma), hue)
     return tokens
 
@@ -71,24 +77,42 @@ def build_style(t: dict[str, str]) -> str:
 </style>"""
 
 
-def main() -> int:
-    tokens = dark_tokens()
-    old = SVG.read_text(encoding="utf-8")
-    new = re.sub(r"<style>.*?</style>", build_style(tokens), old, flags=re.S)
-    new = re.sub(
+def recolor(svg: str, tokens: dict[str, str]) -> str:
+    svg = re.sub(r"<style>.*?</style>", build_style(tokens), svg, flags=re.S)
+    return re.sub(
         r'(<marker id="m".*?<path d="M0 0 L10 5 L0 10 z" fill=")#[0-9a-fA-F]{6}',
         rf"\g<1>{tokens['accent']}",
-        new,
+        svg,
         flags=re.S,
     )
-    if new == old:
-        print("그림의 색이 웹 다크 토큰과 같다")
+
+
+def light_from_dark(dark_svg: str, dark: dict[str, str], light: dict[str, str]) -> str:
+    svg = recolor(dark_svg, light)
+    svg = re.sub(rf'(stroke|fill)="{re.escape(dark["text-3"])}"', rf'\1="{light["text-3"]}"', svg, flags=re.I)
+    return svg.replace('fill="#FFFFFF"', f'fill="{light["text"]}"')
+
+
+def main() -> int:
+    dark, light = theme_tokens(1), theme_tokens(0)
+    old = SVG.read_text(encoding="utf-8")
+    # 클래스 밖 회색 아이콘은 다크 text-3 값으로 적혀 있으므로, 토큰이 바뀌면 그 값도 함께 옮긴다
+    previous = re.search(r"\.m\{fill:(#[0-9a-fA-F]{6})", old)
+    new = recolor(old, dark)
+    if previous and previous.group(1).lower() != dark["text-3"]:
+        new = re.sub(rf'(stroke|fill)="{re.escape(previous.group(1))}"', rf'\1="{dark["text-3"]}"', new, flags=re.I)
+    new_light = light_from_dark(new, dark, light)
+    old_light = LIGHT_SVG.read_text(encoding="utf-8") if LIGHT_SVG.exists() else ""
+    if new == old and new_light == old_light:
+        print("그림의 색이 웹 토큰과 같다")
         return 0
     if "--check" in sys.argv:
-        print("웹 색이 바뀌었다: python3 scripts/architecture_colors.py 로 그림을 갱신한다")
+        print("웹 색이나 그림이 바뀌었다: python3 scripts/architecture_colors.py 로 두 그림을 갱신한다")
         return 1
     SVG.write_text(new, encoding="utf-8")
-    print("그림의 색을 갱신했다:", ", ".join(f"{k} {v}" for k, v in tokens.items()))
+    LIGHT_SVG.write_text(new_light, encoding="utf-8")
+    print("다크:", ", ".join(f"{k} {v}" for k, v in dark.items()))
+    print("라이트:", ", ".join(f"{k} {v}" for k, v in light.items()))
     return 0
 
 
