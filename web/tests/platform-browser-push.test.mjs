@@ -194,5 +194,5 @@ test('a permission prompt that never shows stops waiting and says where to allow
   t.mock.timers.tick(10_000);
   await assert.rejects(pending, /알림 허용 창이 뜨지 않았어요/);
   assert.equal(f.records.length, 0);
-  assert.match(permissionHelp('Mozilla/5.0 (Linux; Android 10; K) SamsungBrowser/29.0 Chrome/130 Mobile'), /삼성 인터넷 메뉴 → 설정 → 사이트 및 다운로드 → 사이트 알림/);
+  assert.match(permissionHelp('Mozilla/5.0 (Linux; Android 10; K) SamsungBrowser/29.0 Chrome/130 Mobile'), /삼성 인터넷 메뉴 → 설정 → 사이트 및 다운로드 → 사이트 알림의 맨 위 스위치/);
 });
