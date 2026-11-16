@@ -97,10 +97,13 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
   await button.click();
   const name = root.getByRole('textbox', { name: '게시판 이름' });
   await expect(name).toHaveAttribute('required', '');
+  const inputStyle = await name.evaluate((el) => ({ height: el.getBoundingClientRect().height, weight: getComputedStyle(el).fontWeight }));
+  expect(Math.round(inputStyle.height)).toBe(45);
+  expect(inputStyle.weight).toBe('400');
   await expect(root.getByRole('button', { name: '요청 보내기' })).toBeDisabled();
   await name.fill('교환학생');
   const address = root.getByRole('textbox', { name: '주소 (선택)' });
-  await expect(address).toHaveAccessibleDescription('성균관대 주소를 적으면 바로 확인해서 모두가 고를 수 있게 추가해요. 주소가 없으면 개발자가 확인해요');
+  await expect(address).toHaveAccessibleDescription('성균관대 게시판 주소를 적으면 보통 30분 안에 확인해서 모두가 고를 수 있게 추가해요. 주소가 없거나 확인하지 못하면 개발자가 살펴봐요');
   await address.fill('https://skku.edu.example.com/');
   await expect(root.getByText('https로 시작하는 성균관대 주소인지 확인해 주세요')).toBeVisible();
   await expect(root.getByRole('button', { name: '요청 보내기' })).toBeDisabled();
@@ -108,7 +111,7 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
   await root.getByRole('button', { name: '요청 보내기' }).click();
   await expect(name).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { boardRequests: unknown[][] }).boardRequests)).toEqual([['account-a', '교환학생', 'https://www.skku.edu/board']]);
-  await expect(root.getByText('요청을 확인하고 있어요')).toBeVisible();
+  await expect(root.getByRole('paragraph').filter({ hasText: /^확인하고 있어요$/ })).toBeVisible();
   await root.getByRole('button', { name: '추가 요청', exact: true }).click();
   await root.getByRole('textbox', { name: '게시판 이름' }).fill('학과 공지');
   await root.getByRole('button', { name: '요청 보내기' }).click();
@@ -121,7 +124,7 @@ test('board request in notification settings', async ({ page }) => {
   await settingsAt(page, '&section=notifications');
   await withApp(page, { authUserId: 'account-a' });
   await checkBoardRequest(page, page.locator('platform-settings-screen'));
-  await expect(page.locator('.toast')).toContainText('요청을 접수했어요');
+  await expect(page.locator('.toast')).toContainText(/요청을 받았어요|요청을 개발자에게 보냈어요/);
 });
 
 test('settings hub opens each page in the app, back works and the theme can be changed', async ({ page }) => {
@@ -450,7 +453,7 @@ test('first-run setup: choices only, department list follows the college, double
   // 행 전체가 눌리는 영역이다: 스위치가 아니라 이름 글자, 설명 글자, 행의 왼쪽 끝을 눌러도 켜지고 꺼진다. 높이는 44px 이상이다.
   const etc = dialog.getByRole('group', { name: '기타 게시판' });
   await checkBoardRequest(page, etc);
-  await expect(dialog.locator('.toast')).toContainText('요청을 접수했어요');
+  await expect(dialog.locator('.toast')).toContainText(/요청을 받았어요|요청을 개발자에게 보냈어요/);
   await expect(dialog.getByRole('button', { name: '다음' })).toBeEnabled();
   const fab = etc.getByRole('switch', { name: /^지능형팹테크융합전공 공지/ });
   await etc.scrollIntoViewIfNeeded();
@@ -1749,6 +1752,42 @@ test('selection mode click order: enter → tick → count → action → toast 
   await expect(trigger).toBeFocused();
 });
 
+for (const width of [412, 1440]) {
+  test(`board controls align with the card edge at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/?api=sample/api/v1');
+    await page.locator('notice-rows-screen a.row').first().waitFor();
+    await page.evaluate(() => {
+      const app = document.querySelector('notice-app') as unknown as Record<string, any>;
+      app.authUserId = 'account-a'; app.profileStatus = 'ready';
+      app.profile = { ...app.profile, programs: [{ college: '경영대학', department: '경영학과' }], year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false, onboardedAt: 'x' };
+      app.sources = [...app.sources, { ...app.sources.find((s: { external?: boolean }) => !s.external), id: 'test-extra-board' }];
+      app.subscriptions = app.sources.filter((s: { external?: boolean }) => !s.external).slice(0, 2).map((s: { id: string }) => s.id);
+      app.openSettings('notifications');
+    });
+    const screen = page.locator('platform-settings-screen');
+    const right = async (locator: import('@playwright/test').Locator) => { const box = await locator.boundingBox(); expect(box).not.toBeNull(); return box!.x + box!.width; };
+    const card = await right(screen.locator('.order-list li').first());
+    await expect.poll(async () => Math.abs(await right(screen.locator('.board-more-list summary svg')) - card)).toBeLessThanOrEqual(1);
+    const chevron = await right(screen.locator('.board-more-list summary svg'));
+    const reorder = await right(screen.getByRole('button', { name: '순서 바꾸기' }));
+    const request = await right(screen.getByRole('button', { name: '추가 요청', exact: true }));
+    await screen.getByRole('button', { name: '추가 요청', exact: true }).click();
+    const close = await right(screen.getByRole('button', { name: '접기', exact: true }));
+    console.log(`board edges ${width}: card=${card}, chevron=${chevron}, reorder=${reorder}, request=${request}, close=${close}`);
+    for (const edge of [chevron, reorder, request, close]) expect(Math.abs(edge - card)).toBeLessThanOrEqual(1);
+    if (!(await screen.locator('.board-more-list').evaluate((el: HTMLDetailsElement) => el.open))) await screen.locator('.board-more-list summary').click();
+    const expanded = screen.locator('.board-more-list > div');
+    await expect(expanded).toBeVisible();
+    const gap = await expanded.evaluate((el) => {
+      const last = el.lastElementChild!;
+      const divider = el.parentElement!.nextElementSibling!;
+      return divider.getBoundingClientRect().top - last.getBoundingClientRect().bottom;
+    });
+    expect(gap).toBeGreaterThanOrEqual(12);
+  });
+}
+
 test('board order: edit mode shows drag handles only, the keyboard can lift, move and drop a board, and the new order is kept', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
@@ -1769,7 +1808,6 @@ test('board order: edit mode shows drag handles only, the keyboard can lift, mov
   const first = screen.locator('.order-handle').first();
   await first.focus();
   await page.keyboard.press('Space');
-  await page.waitForTimeout(200);                                                 // 집는 동작이 자리를 계산할 시간
   await page.keyboard.press('ArrowDown');
   await page.waitForTimeout(250);
   await page.keyboard.press('Space');

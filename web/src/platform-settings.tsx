@@ -13,13 +13,13 @@ import { COLLEGES, MAX_PROGRAMS, programKey, programLabel, type Program } from '
 import { ProgramPicker } from './onboarding';
 import { BOARD_CATALOG, OTHER_BOARDS, boardCollege } from './skku-boards';
 // 순서 바꾸기는 dnd-kit(MIT)을 쓴다: 손잡이로 끌기(마우스·터치)와 키보드(Space로 집고 방향키로 옮기고 Space로 놓기), 낭독기 안내가 들어 있다.
-import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { DndContext, KeyboardSensor, MeasuringStrategy, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
 import { FEEDBACK_KINDS, FEEDBACK_LIMIT, feedbackProblem, type FeedbackKind, type FeedbackResult } from './feedback';
-import { BADGE, CHEVRON_RIGHT, CHOICE, SWITCH, SWITCH_ONLY } from './cls';
+import { BADGE, CHEVRON_RIGHT, CHOICE, SETTINGS_ACTION, SETTINGS_INPUT, SWITCH, SWITCH_ONLY } from './cls';
 import { aiKeysLead, connectedAiKeys } from './ai-keys';
 import { BoardRequest, BOARD_TRAILING_ROW } from './board-request';
 import type { BoardRequestResult, BoardRequestState } from './shared-board-requests';
@@ -291,7 +291,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   // 접힌 "게시판 더 보기" 줄을 누르면 펼쳐진다. 받는 게시판이 하나도 없으면 처음부터 펼쳐 둔다.
   return <details className="connection-manual group board-more-list mt-[8px] border-t border-line [&>.input]:mb-[8px] [&>.input]:w-full" open={mine.length === 0}>
     <summary className={MORE_SUMMARY}>다른 게시판 {others.length}개 더 보기{chevron('M6 9l6 6 6-6', CHEVRON)}</summary>
-    <div className="flex flex-col gap-3 pt-3">
+    <div className="flex flex-col gap-3 pt-3 pb-3">
       <input className="input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink text-[15px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px]" type="search" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off" value={query}
         onChange={(event) => setQuery(event.currentTarget.value)} />
       {needle
@@ -492,8 +492,8 @@ function BoardsSection({ model }: { model: SettingsModel }) {
   const order = model.boardOrder;
   const canMove = order.boards.length >= 2;
   return <Section id="s-boards" title="받을 게시판"
-    description={editing ? '손잡이를 끌어 순서를 바꿔요. 바꾸면 바로 저장돼요' : '켠 게시판의 새 공지를 알림으로 받고, 목록에 이 순서로 보여요'}
-    action={canMove ? <button type="button" className="head-action rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] -my-[13px] min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent [font-family:inherit] [line-height:inherit] [&:hover]:underline [&:hover]:underline-offset-[3px] focus-visible:rounded-sm" onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : undefined}>
+    description={editing ? '끌어서 순서를 바꿔요. 바로 저장돼요' : '켠 게시판 순서대로 목록에 보이고, 새 공지는 알림으로 와요'}
+    action={canMove ? <button type="button" className={`head-action ${SETTINGS_ACTION} -ml-[8px] -my-[13px]`} onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : undefined}>
     {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <>
       {model.error ? <><p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.error}</p>
         <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.retry}>다시 불러오기</button></> : null}
@@ -532,6 +532,10 @@ function BoardRow({ board, editing, onToggle, busy }: { board: { id: string; lab
 function BoardOrderList({ order, editing, onToggle, busy = false }: { order: SettingsModel['boardOrder']; editing: boolean; onToggle?: (id: string) => void; busy?: boolean }) {
   const latest = useRef(order);
   latest.current = order;
+  const keyboardReady = useRef(true);
+  const pendingKeys = useRef<string[]>([]);
+  const readyTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(readyTimer.current), []);
   const ids = order.boards.map((board) => board.id);
   const labelOf = (id: unknown) => order.boards.find((board) => board.id === id)?.label ?? '';
   const sensors = useSensors(
@@ -547,7 +551,19 @@ function BoardOrderList({ order, editing, onToggle, busy = false }: { order: Set
   };
   const position = (id: unknown) => `${ids.indexOf(String(id)) + 1}번째`;
   return <div className="order-box py-[4px]">
-    <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis, restrictToParentElement]} onDragEnd={onDragEnd}
+    <DndContext measuring={{ droppable: { strategy: MeasuringStrategy.Always } }} sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+      onDragStart={({ activatorEvent }) => { keyboardReady.current = !(activatorEvent instanceof KeyboardEvent); pendingKeys.current = []; }}
+      onDragOver={() => {
+        if (keyboardReady.current || readyTimer.current !== undefined) return;
+        // dnd-kit installs its document keyboard listener in a later task; replay keys received while it initializes.
+        readyTimer.current = window.setTimeout(() => {
+          readyTimer.current = undefined;
+          keyboardReady.current = true;
+          for (const code of pendingKeys.current.splice(0)) document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { code, key: code, bubbles: true }));
+        }, 0);
+      }}
+      onDragCancel={() => { window.clearTimeout(readyTimer.current); readyTimer.current = undefined; keyboardReady.current = true; pendingKeys.current = []; }}
+      onDragEnd={(event) => { window.clearTimeout(readyTimer.current); readyTimer.current = undefined; keyboardReady.current = true; pendingKeys.current = []; onDragEnd(event); }}
       accessibility={{
         screenReaderInstructions: { draggable: '순서를 바꾸려면 Space를 눌러 집고, 위아래 방향키로 옮긴 뒤 Space로 놓으세요. 취소는 Esc예요.' },
         announcements: {
@@ -558,7 +574,11 @@ function BoardOrderList({ order, editing, onToggle, busy = false }: { order: Set
         },
       }}>
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-        <ul className="order-list m-0 flex list-none flex-col gap-[8px] p-0">
+        <ul className="order-list m-0 flex list-none flex-col gap-[8px] p-0" onKeyDownCapture={(event) => {
+          if (!keyboardReady.current && ['ArrowUp', 'ArrowDown'].includes(event.code)) {
+            event.preventDefault(); event.stopPropagation(); pendingKeys.current.push(event.code);
+          }
+        }}>
           {order.boards.map((board) => <BoardRow key={board.id} board={board} editing={editing} onToggle={onToggle} busy={busy} />)}
         </ul>
       </SortableContext>
@@ -820,7 +840,7 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
     {form ? <>
       <div className="flex items-center gap-2">
         <div className="relative min-w-0 flex-1">
-          <input className="input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink text-[15px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px] w-full pr-11" type={shown ? 'text' : 'password'} autoComplete="off" spellCheck={false} aria-label={name}
+          <input className={`${SETTINGS_INPUT} w-full pr-11`} type={shown ? 'text' : 'password'} autoComplete="off" spellCheck={false} aria-label={name}
             placeholder={placeholder} value={value} disabled={busy} onChange={(event) => setValue(event.currentTarget.value.trim())} />
           <button type="button" className="absolute right-0 top-0 grid h-full w-11 place-items-center border-0 bg-transparent p-0 text-ink-3 [@media(hover:hover)]:hover:text-ink active:text-ink" aria-label={shown ? '숨기기' : '보기'} aria-pressed={shown} disabled={busy} onClick={() => setShown(!shown)}>
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -923,7 +943,7 @@ function Feedback({ model }: { model: SettingsModel }) {
           <span id="fb-count" className={`counter [align-self:flex-end] text-[12px] tabular-nums ${over ? 'over text-danger' : body.length >= 450 ? 'text-ink-2' : 'text-ink-3'}`} aria-live="polite">{body.length}/{FEEDBACK_LIMIT}</span>
         </Setting>
         <Setting name="답장받을 메일" help="답장을 받으려면 적어 주세요. 적지 않아도 보낼 수 있어요">
-          <input className={`input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px] text-[15px] ${mailTouched && mailProblem ? 'border-danger' : ''}`} type="email" autoComplete="email" aria-label="답장받을 메일" placeholder="이메일 주소" value={email} aria-invalid={mailTouched && !!mailProblem}
+          <input className={`${SETTINGS_INPUT} ${mailTouched && mailProblem ? 'border-danger' : ''}`} type="email" autoComplete="email" aria-label="답장받을 메일" placeholder="이메일 주소" value={email} aria-invalid={mailTouched && !!mailProblem}
             onBlur={() => setMailTouched(true)} onChange={(event) => { setEmail(event.currentTarget.value); edited(); }} />
           {mailTouched && mailProblem ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">메일 주소 형식이 맞는지 확인해 주세요</p> : null}
         </Setting>

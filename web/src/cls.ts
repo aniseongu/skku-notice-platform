@@ -30,3 +30,7 @@ export const CHOICE_CHECK = 'choice-check grid size-[20px] flex-none place-items
 
 /** 기다리는 자리의 조용한 막대(움직이지 않는다). 목록 뼈대와 상세의 본문·요약 자리가 같이 쓴다. sunken은 면과 거의 같아 보여 한 단계 진한 line을 쓴다. */
 export const SKELETON_BAR = 'block h-[14px] rounded-sm bg-line';
+
+/** 설정 입력과 강조 텍스트 단추의 공통 모양. */
+export const SETTINGS_INPUT = 'input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink text-[15px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px]';
+export const SETTINGS_ACTION = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent [font-family:inherit] [line-height:inherit] [&:hover]:underline [&:hover]:underline-offset-[3px] focus-visible:rounded-sm';
