@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { AlertIcon } from './alert-icon';
 import type { FeedbackKind, FeedbackResult } from './feedback';
 
@@ -13,11 +13,15 @@ function validAddress(value: string): boolean {
 export function BoardRequest({ send, toast }: { send: (kind: FeedbackKind, body: string, email: string) => Promise<FeedbackResult>; toast: (message: string) => void }) {
   const addressHelpId = useId();
   const addressErrorId = useId();
+  const formRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  useEffect(() => {
+    if (open) formRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [open]);
   const invalid = !validAddress(address.trim());
   const submit = async () => {
     if (busy || !name.trim() || invalid) return;
@@ -37,7 +41,7 @@ export function BoardRequest({ send, toast }: { send: (kind: FeedbackKind, body:
       <span>원하는 게시판이 없나요?</span>
       <button type="button" aria-expanded={open} disabled={busy} onClick={() => setOpen(!open)} className="min-h-[44px] shrink-0 rounded-sm border-0 bg-transparent px-[8px] text-[14px] font-semibold text-accent [@media(hover:hover)]:hover:bg-hover active:bg-hover">{open ? '접기' : '추가 요청하기'}</button>
     </div>
-    {open ? <div className="grid w-full max-w-[600px] gap-[10px] pb-[16px]">
+    {open ? <div ref={formRef} className="grid w-full max-w-[600px] gap-[10px] pb-[16px]">
       <label className="grid gap-[4px] text-[14px] font-semibold">게시판 이름 (필수)<input className={input} value={name} maxLength={60} required disabled={busy} onChange={(e) => setName(e.currentTarget.value)} /></label>
       <div className="grid gap-[4px]">
         <label className="grid gap-[4px] text-[14px] font-semibold">주소 (선택)<input className={input} type="url" value={address} maxLength={400} disabled={busy} aria-invalid={invalid} aria-describedby={invalid ? `${addressHelpId} ${addressErrorId}` : addressHelpId} onChange={(e) => setAddress(e.currentTarget.value)} /></label>
