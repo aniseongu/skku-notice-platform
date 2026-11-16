@@ -103,7 +103,7 @@ def test_large_ocr_image_is_split_with_overlapping_bounded_tiles(monkeypatch):
     assert sizes == [(120, 1480), (120, 1560), (120, 480)]
 
 
-def test_ocr_rejects_extreme_dimensions_without_running_engine(monkeypatch):
+def test_ocr_downscales_large_images_instead_of_rejecting(monkeypatch):
     from io import BytesIO
 
     from PIL import Image
@@ -111,7 +111,30 @@ def test_ocr_rejects_extreme_dimensions_without_running_engine(monkeypatch):
     image = Image.new('RGB', (4000, 3100), 'white')
     payload = BytesIO()
     image.save(payload, format='PNG')
+    sizes = []
+
+    def engine(data):
+        with Image.open(BytesIO(data)) as tile:
+            sizes.append(tile.size)
+        return SimpleNamespace(txts=['공지'])
+
+    monkeypatch.setattr(ocr, '_engine', lambda: engine)
+    assert '공지' in ocr.read_images([payload.getvalue()])
+    assert sizes and all(w * h <= ocr.MAX_IMAGE_PIXELS for w, h in sizes)
+
+
+def test_ocr_rejects_extreme_dimensions_without_running_engine(monkeypatch):
+    from io import BytesIO
+
+    from PIL import Image
+
+    # 1비트 그림이라 시험 메모리는 작지만 화소 수는 OCR 상한을 넘는다.
+    image = Image.new('1', (8000, 6000), 1)
+    payload = BytesIO()
+    image.save(payload, format='PNG')
     calls = []
     monkeypatch.setattr(ocr, '_engine', lambda: lambda data: calls.append(data))
-    assert ocr.read_images([payload.getvalue()]) == ''
+    # 다시 해도 읽을 수 없는 크기라 영구 실패로 알려 대기열이 재시도하지 않게 한다.
+    with pytest.raises(ocr.PermanentImageError):
+        ocr.read_images([payload.getvalue()])
     assert not calls

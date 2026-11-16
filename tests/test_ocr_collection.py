@@ -47,9 +47,13 @@ class MemoryStore:
     def mark(self, notice_id, image_url, now, digest, *, was_ready):
         self.marked.append((notice_id, image_url, now, digest, was_ready))
 
+    def skip_permanently(self, notice_id, image_url, *, was_ready):
+        self.image = None
+
 
 def test_shared_ocr_is_cached_by_image_hash(monkeypatch):
     store = MemoryStore()
+    monkeypatch.setattr(job, "validate_image", lambda _: None)
     monkeypatch.setattr(job, "fetch_image", lambda *_, **__: SimpleNamespace(data=b"image"))
     calls = []
     monkeypatch.setattr(job, "read_images", lambda images: calls.append(images) or "한국어 공지")
@@ -62,6 +66,7 @@ def test_shared_ocr_is_cached_by_image_hash(monkeypatch):
 
 def test_user_added_board_ocr_uses_pinned_image_fetch_and_cache(monkeypatch):
     store = MemoryStore()
+    monkeypatch.setattr(job, "validate_image", lambda _: None)
     store.image["notice_id"] = "shared-123/1"
     def reject_unsafe(*_args, **_kwargs):
         raise AssertionError("unsafe fetch")
@@ -86,6 +91,7 @@ def test_stale_images_are_removed_without_fetching(monkeypatch):
 
 def test_attempt_is_recorded_before_a_worker_crash(monkeypatch):
     store = MemoryStore()
+    monkeypatch.setattr(job, "validate_image", lambda _: None)
     monkeypatch.setattr(job, "fetch_image", lambda *_, **__: SimpleNamespace(data=b"image"))
 
     def crash(_images):
@@ -97,6 +103,17 @@ def test_attempt_is_recorded_before_a_worker_crash(monkeypatch):
     with pytest.raises(RuntimeError, match="interrupted"):
         job.run_one(store, "test", NOW)
     assert store.started == [("school/1", "https://www.skku.edu/image.png", NOW)]
+
+
+def test_rejected_url_and_bad_image_are_permanent(monkeypatch):
+    store = MemoryStore()
+    store.image["image_url"] = "https://sticorp.recruiter.co.kr/a?token=secret"
+    assert job.run_one(store, "test", NOW) == "skipped"
+    assert job.run_one(store, "test", NOW) == "idle"
+    store = MemoryStore()
+    monkeypatch.setattr(job, "fetch_image", lambda *_, **__: SimpleNamespace(data=b"bad"))
+    assert job.run_one(store, "test", NOW) == "skipped"
+    assert job.run_one(store, "test", NOW) == "idle"
 
 
 def test_failed_refresh_preserves_last_good_result(monkeypatch):
@@ -193,7 +210,9 @@ def test_batch_reuses_worker_and_stops_when_queue_is_empty(monkeypatch):
         return next(results)
 
     monkeypatch.setattr(job, "run_one", run_one)
-    assert job.run_batch(store, "test", NOW) == {"processed": 1, "cached": 1, "failed": 1, "stale": 0}
+    assert job.run_batch(store, "test", NOW) == {
+        "processed": 1, "cached": 1, "failed": 1, "skipped": 0, "stale": 0,
+    }
     assert calls == [False, False, False, False]
 
 

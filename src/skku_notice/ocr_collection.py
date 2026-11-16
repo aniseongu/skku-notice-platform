@@ -6,13 +6,14 @@ import re
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import yaml
 
 from skku_notice.board_probe import BoardProbeError, fetch_shared_image
-from skku_notice.fetch import fetch_image
+from skku_notice.fetch import EXTERNAL_IMAGE_HOSTS, _external_source_hosts, _source_hosts, fetch_image
 from skku_notice.grad_intern_facts import lacks_key_facts, lacks_work_hours
-from skku_notice.ocr import read_images, read_until_complete
+from skku_notice.ocr import PermanentImageError, read_images, read_until_complete, validate_image
 from skku_notice.scheduled_collection import NoticeStore, StoreError
 
 _LETTERS = re.compile(r"[0-9A-Za-z가-힣]")
@@ -41,6 +42,20 @@ def wants_image_text(notice: dict, external_ids: set[str]) -> bool:
 
 
 ENGINE_VERSION = "rapidocr-3.10.0-ppocrv5-korean-tiled-v1"
+PERMANENT_ATTEMPT = datetime.max.replace(tzinfo=UTC)
+
+
+def allowed_image_url(url: str, *, shared: bool) -> bool:
+    try:
+        parsed = urlsplit(url)
+        host = parsed.hostname or ""
+        hosts = set() if shared else (_source_hosts() - _external_source_hosts()) | EXTERNAL_IMAGE_HOSTS
+        return (parsed.scheme == "https" and bool(host) and parsed.username is None
+                and parsed.password is None and parsed.port in (None, 443)
+                and (not shared or not parsed.fragment)
+                and (host.endswith(".skku.edu") or shared and host == "skku.edu" or host in hosts))
+    except ValueError:
+        return False
 
 
 def skips_as_duplicate(store: "OCRStore", notice: dict) -> bool:
@@ -210,6 +225,14 @@ class OCRStore(NoticeStore):
             json=values,
         )
 
+    def skip_permanently(self, notice_id: str, image_url: str, *, was_ready: bool) -> None:
+        values = {"last_attempt_at": PERMANENT_ATTEMPT.isoformat()}
+        if not was_ready:
+            values.update({"status": "failed", "content_sha256": None, "engine_version": None})
+        self._request("PATCH", "platform_notice_images", params={
+            "notice_id": f"eq.{notice_id}", "image_url": f"eq.{image_url}",
+        }, json=values)
+
 
 def deepen(store: "OCRStore", notice_id: str, images: list[bytes], text: str) -> str:
     """인턴 공고인데 회사·기간·업무나 근무 시간이 아직 안 읽혔으면 더 꼼꼼한 방법으로 놓친 줄을 보탠다."""
@@ -242,6 +265,9 @@ def run_one(store: OCRStore, user_agent: str, now: datetime, *, discover: bool =
         return "stale"
     # Record the attempt first so an OOM or timeout cannot block the queue forever.
     store.start_attempt(notice_id, image_url, now)
+    if not allowed_image_url(image_url, shared=notice_id.startswith("shared-")):
+        store.skip_permanently(notice_id, image_url, was_ready=was_ready)
+        return "skipped"
     # 외부 인턴 공고의 그림도 읽는다. 허용 목록의 공개 이미지 호스트만 열린다(fetch.EXTERNAL_IMAGE_HOSTS).
     if notice_id.startswith("shared-"):
         try:
@@ -258,7 +284,12 @@ def run_one(store: OCRStore, user_agent: str, now: datetime, *, discover: bool =
     if store.cached(digest):
         store.mark(notice_id, image_url, now, digest, was_ready=was_ready)
         return "cached"
-    text = read_images([image_data])
+    try:
+        validate_image(image_data)
+        text = read_images([image_data])
+    except PermanentImageError:
+        store.skip_permanently(notice_id, image_url, was_ready=was_ready)
+        return "skipped"
     if text:
         text = deepen(store, notice_id, [image_data], text)
     if not text or len(text.encode("utf-8")) > 1_000_000:
@@ -271,7 +302,7 @@ def run_one(store: OCRStore, user_agent: str, now: datetime, *, discover: bool =
 
 def run_batch(store: OCRStore, user_agent: str, now: datetime, *, limit: int = 5) -> dict[str, int]:
     """Process a bounded batch while reusing the initialized OCR engine."""
-    counts = {"processed": 0, "cached": 0, "failed": 0, "stale": 0}
+    counts = {"processed": 0, "cached": 0, "failed": 0, "skipped": 0, "stale": 0}
     store.discover()
     for index in range(min(5, max(0, limit))):
         if index:
@@ -291,7 +322,7 @@ def main() -> int:
             counts = run_batch(store, settings["user_agent"], datetime.now(UTC))
         finally:
             store.close()
-    except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError, StoreError) as exc:
+    except Exception as exc:
         print(f"OCR worker failed: {type(exc).__name__}", flush=True)
         return 1
     print(f"OCR worker: {counts}", flush=True)

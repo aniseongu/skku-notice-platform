@@ -1,6 +1,7 @@
 """Read text from public notice images with a lazy local OCR engine."""
 
 import logging
+import math
 from collections.abc import Iterator
 from functools import lru_cache
 from io import BytesIO
@@ -9,24 +10,63 @@ from PIL import Image, UnidentifiedImageError
 
 logger = logging.getLogger(__name__)
 MAX_IMAGE_PIXELS = 12_000_000
+# OCR 서비스 MemoryMax 512MiB에서 RGB로 풀어도(화소당 3바이트) 모델과 함께 들어가는 상한.
+MAX_DECODED_PIXELS = 40_000_000
 TILE_SIZE = 1400
 TILE_OVERLAP = 80
+
+
+class PermanentImageError(ValueError):
+    """The image cannot safely be processed on a later attempt either."""
+
+
+class UnsupportedImageError(PermanentImageError):
+    """Pillow cannot identify the image format."""
+
+
+def validate_image(data: bytes) -> None:
+    try:
+        with Image.open(BytesIO(data)) as image:
+            if image.width * image.height > MAX_DECODED_PIXELS:
+                raise PermanentImageError("image too large")
+    except UnidentifiedImageError as exc:
+        raise UnsupportedImageError("unreadable image") from exc
+    except (Image.DecompressionBombError, OSError, SyntaxError) as exc:
+        raise PermanentImageError("unreadable image") from exc
 
 
 def _image_tiles(data: bytes) -> Iterator[bytes]:
     """Bound inference input size while keeping adjacent text near a seam."""
     try:
-        image = Image.open(BytesIO(data))
-    except (UnidentifiedImageError, OSError):
-        # Let the engine report malformed inputs as before.
+        validate_image(data)
+    except UnsupportedImageError:
+        # Preserve the generic multi-image reader's engine fallback; the queue
+        # validates first and marks unsupported formats as permanent failures.
         yield data
         return
+    image = Image.open(BytesIO(data))
     with image:
         width, height = image.size
-        if width * height > MAX_IMAGE_PIXELS:
-            raise ValueError('image dimensions exceed OCR limit')
+        resized = width * height > MAX_IMAGE_PIXELS
+        if resized:
+            scale = math.sqrt(MAX_IMAGE_PIXELS / (width * height))
+            target = (max(1, int(width * scale)), max(1, int(height * scale)))
+            if target[0] * target[1] > MAX_IMAGE_PIXELS:
+                target = (min(target[0], MAX_IMAGE_PIXELS),
+                          min(target[1], MAX_IMAGE_PIXELS // min(target[0], MAX_IMAGE_PIXELS)))
+            image.draft('RGB', target)
+            factor = max(1, min(image.width // target[0], image.height // target[1]))
+            if factor > 1:
+                image = image.reduce(factor)
+            image = image.resize(target, Image.Resampling.LANCZOS)
+            width, height = image.size
         if width <= TILE_SIZE + TILE_OVERLAP and height <= TILE_SIZE + TILE_OVERLAP:
-            yield data
+            if not resized:
+                yield data
+            else:
+                buffer = BytesIO()
+                image.save(buffer, format='PNG')
+                yield buffer.getvalue()
             return
         image = image.convert('RGB')
         for top in range(0, height, TILE_SIZE):
@@ -128,7 +168,7 @@ def read_images(images: list[bytes], *, sensitive: bool = False) -> str:
     try:
         engine = _engine(True) if sensitive else _engine()
     except Exception as exc:
-        logger.warning("그림 글자 읽기 실패: %s", exc)
+        logger.warning("그림 글자 읽기 실패: %s", type(exc).__name__)
         return ""
     lines = []
     for image in images:
@@ -136,8 +176,10 @@ def read_images(images: list[bytes], *, sensitive: bool = False) -> str:
             for tile in _image_tiles(image):
                 result = engine(tile)
                 lines.extend(_tile_lines(result))
+        except PermanentImageError:
+            raise
         except Exception as exc:
-            logger.warning("그림 글자 읽기 실패: %s", exc)
+            logger.warning("그림 글자 읽기 실패: %s", type(exc).__name__)
     return "\n".join(lines)
 
 
@@ -165,7 +207,7 @@ def _tesseract(images: list[bytes]) -> str:
                 run = subprocess.run(["tesseract", handle.name, "-", "-l", "kor+eng", "--psm", "6"],
                                      capture_output=True, text=True, timeout=120, check=False)
             except (OSError, subprocess.SubprocessError) as exc:
-                logger.warning("tesseract 실패: %s", exc)
+                logger.warning("tesseract 실패: %s", type(exc).__name__)
                 continue
             out.append(run.stdout)
     return "\n".join(out)
@@ -187,7 +229,7 @@ def read_until_complete(images: list[bytes], text: str, complete) -> str:
         try:
             extra = step()
         except Exception as exc:
-            logger.warning("%s 실패: %s", name, exc)
+            logger.warning("%s 실패: %s", name, type(exc).__name__)
             continue
         text = _merge(text, extra)
     return text
