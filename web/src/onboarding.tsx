@@ -426,7 +426,7 @@ export function Onboarding({ app }: { app: AppController }) {
           <p className="m-0 text-center text-[14px] text-ink-2" role="alert"><span className="font-semibold text-ink">필수 선택이 남았어요</span><br /><span>{STEP_LABEL[blocked]}에서 골라 주세요</span></p>
           <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none]" onClick={() => go(blocked)}>{STEP_LABEL[blocked]}(으)로 돌아가기</button>
         </> : <>
-          {missingHint(step, draft, doubleAnswer) && !addingDouble ? <RequiredHint text={missingHint(step, draft, doubleAnswer)} /> : null}
+          {addingDouble ? (!pendingDouble ? <RequiredHint text="학과를 골라 주세요" /> : null) : missingHint(step, draft, doubleAnswer) ? <RequiredHint text={missingHint(step, draft, doubleAnswer)} /> : null}
           {foot}
         </>}</div></div> : null}
     </div>

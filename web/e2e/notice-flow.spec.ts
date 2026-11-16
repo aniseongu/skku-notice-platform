@@ -2518,7 +2518,7 @@ const EMPTY_PROFILE = { programs: [], year: null, semester: null, enrollmentStat
 const SAVED_NOT_DONE = { ...EMPTY_PROFILE, programs: [{ college: '경영대학', department: '경영학과' }], year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false };
 
 /** 누르기 전에 대상이 보이고, 켜져 있고, 중심점에서 맨 위 요소이며(가려지지 않음), 휴대폰이면 44px 이상인지 본다. 센 횟수를 돌려준다. */
-async function press(page: PageT, target: LocT, counter: { clicks: number }, mobile: boolean) {
+async function press(page: PageT, target: LocT, counter: { clicks: number }, mobile: boolean, tap = false) {
   await target.scrollIntoViewIfNeeded();
   await expect(target).toBeVisible();
   await expect(target).toBeEnabled();
@@ -2528,8 +2528,11 @@ async function press(page: PageT, target: LocT, counter: { clicks: number }, mob
     return { w: r.width, h: r.height, covered: !(top === el || el.contains(top)) };
   });
   expect(info.covered, `가려진 대상: ${await target.innerText().catch(() => '')}`).toBe(false);
-  if (mobile) expect(info.h, '눌리는 높이 44px').toBeGreaterThanOrEqual(44);
-  await target.click();
+  if (mobile) {
+    expect(info.h, '눌리는 높이 44px').toBeGreaterThanOrEqual(44);
+    expect(info.w, '눌리는 너비 44px').toBeGreaterThanOrEqual(44);
+  }
+  if (tap) await target.tap(); else await target.click();
   counter.clicks += 1;
 }
 const noOverflow = (page: PageT) => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
@@ -2678,4 +2681,150 @@ test('settings 알림 page: turn on and off with one press each and the test not
   expect((await calls(page)).map((x) => x[0])).toEqual(['test', 'disable']);
   expect(c.clicks).toBe(3);
   expect(await noOverflow(page)).toBe(true);
+});
+
+
+test('first-run disabled actions explain each missing choice including a double major picker', async ({ page }, info) => {
+  await openSetup(page, {});
+  const d = page.getByRole('dialog');
+  const c = { clicks: 0 };
+  const p = (t: LocT) => press(page, t, c, info.project.name === 'mobile');
+  const missing = async (hint: string) => {
+    await expect(d.getByRole('button', { name: '다음' })).toBeDisabled();
+    await expect(d.getByText(hint, { exact: true })).toBeVisible();
+  };
+  await missing('학과를 골라 주세요');
+  await p(d.getByRole('button', { name: '경영대학', exact: true }));
+  await p(d.getByRole('radio', { name: '경영학과', exact: true }));
+  await p(d.getByRole('button', { name: '다음' }));
+  await missing('있는지 없는지 골라 주세요');
+  await p(d.getByRole('radio', { name: '있어요', exact: true }));
+  await missing('학과를 골라 주세요');
+  await p(d.getByRole('button', { name: '이전 단계' }));
+  await p(d.getByRole('radio', { name: '없어요', exact: true }));
+  await missing('학년을 골라 주세요');
+  await p(d.getByRole('button', { name: '3학년' }));
+  await p(d.getByRole('button', { name: '다음' }));
+  await missing('3품 인턴십을 골라 주세요');
+  expect(c.clicks).toBe(8);
+});
+
+
+test('software original major completes first-run with internship answers in 12 clicks', async ({ page }, info) => {
+  await openSetup(page, {});
+  const d = page.getByRole('dialog'), c = { clicks: 0 };
+  const p = (t: LocT) => press(page, t, c, info.project.name === 'mobile');
+  await p(d.getByRole('button', { name: '소프트웨어융합대학', exact: true }));
+  await p(d.getByRole('radio', { name: '소프트웨어학과', exact: true }));
+  await p(d.getByRole('button', { name: '다음' }));
+  await p(d.getByRole('radio', { name: '없어요', exact: true }));
+  await p(d.getByRole('button', { name: '3학년' }));
+  await p(d.getByRole('button', { name: '다음' }));
+  await expect(d.getByRole('heading', { name: '인턴십 진행 상황을 알려 주세요' })).toBeVisible();
+  await expect(d.getByText('입학 연도를 골라 주세요')).toBeVisible();
+  await p(d.getByRole('button', { name: '2020', exact: true }));
+  await expect(d.getByText('3품 인턴십을 골라 주세요')).toBeVisible();
+  await p(d.getByRole('button', { name: '채웠어요' }));
+  await expect(d.getByText('솦 인턴십을 골라 주세요')).toBeVisible();
+  await p(d.getByRole('button', { name: '마쳤어요' }));
+  await p(d.getByRole('button', { name: '다음' }));
+  await p(d.getByRole('button', { name: '다음' }));
+  await p(d.getByRole('button', { name: '알림 받기' }));
+  await expect(d).toHaveCount(0);
+  expect(c.clicks).toBe(12);
+});
+
+test('unsupported iPhone Safari explains installation and continues in one click', async ({ browser }, info) => {
+  test.skip(info.project.name !== 'mobile', 'iPhone viewport');
+  const context = await browser.newContext({ baseURL: 'http://127.0.0.1:5173', viewport: { width: 390, height: 844 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' });
+  try {
+    const page = await context.newPage();
+    await openSetup(page, { profile: SAVED_NOT_DONE, pushStatus: 'unsupported' });
+    const d = page.getByRole('dialog'), c = { clicks: 0 };
+    await expect(d.getByText(/iPhone은 홈 화면에 추가한 앱에서만 알림/)).toBeVisible();
+    await press(page, d.getByRole('button', { name: '알림 없이 계속하기' }), c, true);
+    await expect(d).toHaveCount(0);
+    expect((await calls(page)).filter((x) => x[0] === 'complete')).toHaveLength(1);
+    expect(c.clicks).toBe(1);
+  } finally { await context.close(); }
+});
+
+test('touch mobile first-run completes in 10 taps', async ({ browser }, info) => {
+  test.skip(info.project.name !== 'mobile', 'dedicated touch context');
+  const context = await browser.newContext({ baseURL: 'http://127.0.0.1:5173', viewport: { width: 412, height: 891 }, hasTouch: true, isMobile: true });
+  try {
+    const page = await context.newPage();
+    await openSetup(page, {});
+    const d = page.getByRole('dialog'), c = { clicks: 0 };
+    const p = (t: LocT) => press(page, t, c, true, true);
+    await p(d.getByRole('button', { name: '경영대학', exact: true }));
+    await p(d.getByRole('radio', { name: '경영학과', exact: true }));
+    await p(d.getByRole('button', { name: '다음' }));
+    await p(d.getByRole('radio', { name: '없어요', exact: true }));
+    await p(d.getByRole('button', { name: '3학년' }));
+    await p(d.getByRole('button', { name: '다음' }));
+    await p(d.getByRole('button', { name: '채웠어요' }));
+    await p(d.getByRole('button', { name: '다음' }));
+    await p(d.getByRole('button', { name: '다음' }));
+    await p(d.getByRole('button', { name: '알림 받기' }));
+    await expect(d).toHaveCount(0);
+    expect(c.clicks).toBe(10);
+  } finally { await context.close(); }
+});
+
+test('keyboard-only first-run reaches notify and finishes in 10 activations', async ({ page }) => {
+  await openSetup(page, {});
+  const d = page.getByRole('dialog');
+  let activations = 0;
+  const activate = async (target: LocT, key: 'Enter' | 'Space' = 'Enter') => {
+    for (let i = 0; i < 100 && !(await target.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press('Tab');
+    await expect(target).toBeFocused();
+    await page.keyboard.press(key);
+    activations++;
+  };
+  await activate(d.getByRole('button', { name: '경영대학', exact: true }));
+  await activate(d.getByRole('radio', { name: '경영학과', exact: true }), 'Space');
+  await activate(d.getByRole('button', { name: '다음' }));
+  await activate(d.getByRole('radio', { name: '없어요', exact: true }), 'Space');
+  await activate(d.getByRole('button', { name: '3학년' }), 'Space');
+  await activate(d.getByRole('button', { name: '다음' }));
+  await activate(d.getByRole('button', { name: '채웠어요' }), 'Space');
+  await activate(d.getByRole('button', { name: '다음' }));
+  await expect(d.getByRole('heading', { name: '어떤 공지를 받을까요?' })).toBeFocused();
+  await activate(d.getByRole('button', { name: '다음' }));
+  await expect(d.getByRole('heading', { name: '알림을 켜 주세요' })).toBeFocused();
+  const notify = d.getByRole('button', { name: '알림 받기' });
+  for (let i = 0; i < 10 && !(await notify.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press('Tab');
+  await expect(notify).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(notify).not.toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(notify).toBeFocused();
+  await page.keyboard.press('Enter');
+  activations++;
+  await expect(d).toHaveCount(0);
+  expect(activations).toBe(10);
+});
+
+test('install banner buttons are unobstructed at 412 and dismiss in one click', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'install banner only appears on phones');
+  await page.setViewportSize({ width: 412, height: 891 });
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, pushStatus: 'on' });
+  await page.evaluate(() => { (document.querySelector('notice-app') as unknown as AppHandle).install = { prompt: () => Promise.resolve() }; });
+  const banner = page.getByRole('region', { name: '앱 설치' });
+  await expect(banner).toBeVisible();
+  await banner.evaluate(async (el) => { await Promise.all(el.getAnimations().map((animation) => animation.finished)); });
+  const install = banner.getByRole('button', { name: '홈 화면에 추가' });
+  await expect(install).toBeVisible();
+  await expect(install).toBeEnabled();
+  const metrics = await install.evaluate((el) => { const r = el.getBoundingClientRect(); const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return { width: r.width, height: r.height, top: top === el || el.contains(top) }; });
+  expect(metrics.width).toBeGreaterThanOrEqual(44);
+  expect(metrics.height).toBeGreaterThanOrEqual(44);
+  expect(metrics.top).toBe(true);
+  const c = { clicks: 0 };
+  await press(page, banner.getByRole('button', { name: '다음에 할게요' }), c, true);
+  await expect(banner).toHaveCount(0);
+  expect(c.clicks).toBe(1);
 });
