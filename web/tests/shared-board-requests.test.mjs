@@ -6,15 +6,15 @@ test('a changed session cannot submit a board request for the old account', asyn
   let called = false;
   const client = { auth: { getSession: async () => ({ data: { session: { user: { id: 'b' } } }, error: null }) },
     rpc: async () => { called = true; return { error: null }; } };
-  assert.equal(await submitBoardRequest(client, 'a', '공지', 'https://www.skku.edu/a.do'), 'error');
+  assert.deepEqual(await submitBoardRequest(client, 'a', '공지', 'https://www.skku.edu/a.do'), { status: 'error' });
   assert.equal(called, false);
 });
 
 test('submission binds the expected account for the database check', async () => {
   let sent;
   const client = { auth: { getSession: async () => ({ data: { session: { user: { id: 'a' } } }, error: null }) },
-    rpc: async (name, args) => { sent = { name, args }; return { error: null }; } };
-  assert.equal(await submitBoardRequest(client, 'a', '공지', 'https://www.skku.edu/a.do'), 'ok');
+    rpc: async (name, args) => { sent = { name, args }; return { data: 'r1', error: null }; } };
+  assert.deepEqual(await submitBoardRequest(client, 'a', '공지', 'https://www.skku.edu/a.do'), { status: 'ok', id: 'r1' });
   assert.deepEqual(sent, { name: 'submit_shared_board', args: { expected_user: 'a', request_name: '공지', request_url: 'https://www.skku.edu/a.do' } });
 });
 

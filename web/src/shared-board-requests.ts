@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type BoardRequestState = { id: string; name: string; status: 'pending' | 'added' | 'review' | 'failed'; source_id?: string | null };
-export type BoardRequestResult = 'ok' | 'limit' | 'error';
+export type BoardRequestResult = { status: 'ok'; id: string } | { status: 'limit' | 'error' };
 
 async function matchesSession(client: SupabaseClient, userId: string): Promise<boolean> {
   const { data, error } = await client.auth.getSession();
@@ -19,11 +19,11 @@ export async function listBoardRequests(client: SupabaseClient | null, userId: s
 export async function submitBoardRequest(
   client: SupabaseClient | null, userId: string, name: string, url: string,
 ): Promise<BoardRequestResult> {
-  if (!client || !await matchesSession(client, userId)) return 'error';
-  const { error } = await client.rpc('submit_shared_board', {
+  if (!client || !await matchesSession(client, userId)) return { status: 'error' };
+  const { data, error } = await client.rpc('submit_shared_board', {
     expected_user: userId, request_name: name, request_url: url,
   });
-  if (!await matchesSession(client, userId)) return 'error';
-  if (!error) return 'ok';
-  return /board_request_limit/.test(`${error.message} ${error.details ?? ''}`) ? 'limit' : 'error';
+  if (!await matchesSession(client, userId)) return { status: 'error' };
+  if (!error && typeof data === 'string') return { status: 'ok', id: data };
+  return { status: error && /board_request_limit/.test(`${error.message} ${error.details ?? ''}`) ? 'limit' : 'error' };
 }

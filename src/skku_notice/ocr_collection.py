@@ -59,15 +59,28 @@ class OCRStore(NoticeStore):
             return False
 
     def discover(self) -> None:
+        columns = "id,source_id,title,images,body,first_seen"
         notices = self._request(
             "GET",
             "platform_notices",
             params={
-                "select": "id,source_id,title,images,body,first_seen",
+                "select": columns,
                 "order": "posted_on.desc,id.desc",
                 "limit": "100",
             },
         ).json()
+        # A newly subscribed board can contain older posts outside the 100
+        # newest by posting date. Include recently fetched image notices too.
+        try:
+            recently_fetched = self._request("GET", "platform_notices", params={
+                "select": columns, "fetched_at": "not.is.null", "images": "neq.[]",
+                "order": "fetched_at.desc,id.desc", "limit": "100",
+            }).json()
+            by_id = {notice["id"]: notice for notice in notices}
+            by_id.update({notice["id"]: notice for notice in recently_fetched})
+            notices = list(by_id.values())
+        except StoreError:
+            pass
         external_ids = self.external_source_ids()
         rows = []
         for notice in notices:

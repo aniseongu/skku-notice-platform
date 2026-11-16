@@ -332,9 +332,10 @@ export function Onboarding({ app }: { app: AppController }) {
           <h3 className="m-0 pt-[14px] pb-[2px] text-[13px] font-semibold leading-[20px] text-ink-2 min-[720px]:pt-[16px]">함께 추가한 게시판</h3>
           {sources.filter((source) => source.shared_board).map(boardSwitch)}
         </div> : null}
-        <BoardRequest key={app.authUserId ?? 'guest'} send={(kind, body, email) => app.sendFeedback(kind, body, email)} toast={(message) => app.showToast(message)}
+        <BoardRequest key={app.authUserId ?? 'guest'} toast={(message) => app.showToast(message)}
           userId={app.authUserId} listRequests={(userId) => app.listBoardRequests(userId)}
-          submitRequest={(userId, name, url) => app.submitBoardRequest(userId, name, url)} />
+          submitRequest={(userId, name, url) => app.submitBoardRequest(userId, name, url)}
+          onAdded={(sourceId) => setDraft((current) => current.boards.includes(sourceId) ? current : { ...current, boards: [...current.boards, sourceId], boardsTouched: true })} />
       </div>
       <h2>관심 키워드</h2>
       <p className="card-note m-0 text-[14px] text-ink-2">고르지 않으면 켠 게시판의 공지를 모두 받아요</p>

@@ -44,5 +44,13 @@ test('shared board requests are private and publication subscribes only the requ
     await db.query('select request_shared_board_review($1)', [reviewId]);
     assert.equal((await db.query('select status from shared_board_requests where id=$1', [reviewId])).rows[0].status, 'review');
     assert.equal((await db.query('select count(*)::int as n from user_feedback where user_id=$1', [b])).rows[0].n, 1);
+    await db.exec(`reset role; insert into platform_sources(id,name,url,shared_board)
+      select 'shared-cap-' || i, '공지', 'https://www.skku.edu/cap' || i || '.do', true from generate_series(1, 49) i;
+      set role authenticated; set request.jwt.claim.sub = '${b}';
+      insert into shared_board_requests(name,url) values ('용량 초과', 'https://www.skku.edu/c.do');`);
+    const capId = (await db.query("select id from shared_board_requests where name='용량 초과'")).rows[0].id;
+    await db.exec('reset role; set role service_role');
+    await db.query('select publish_shared_board($1, $2, $3::jsonb)', [capId, 'https://www.skku.edu/c.do', initial]);
+    assert.equal((await db.query('select status from shared_board_requests where id=$1', [capId])).rows[0].status, 'review');
   } finally { await db.close(); }
 });

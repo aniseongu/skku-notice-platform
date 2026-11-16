@@ -42,6 +42,11 @@ test('duplicate notices: first seen wins, school needs the same body, external n
     const loser = async (id, user = null) => (await db.query('select dup_loser($1, $2) l', [id, user])).rows[0].l;
     assert.equal(await loser('skku/1'), false);                // 가장 먼저 본 글이 대표
     assert.equal(await loser('biz/9'), true);
+    // 사용자가 추가한 학교 게시판도 같은 본문이면 기존 공지와 동일하게 중복 처리한다.
+    await db.exec(`insert into platform_sources values ('shared-example', false);
+      insert into platform_notices (id, source_id, title, posted_on, first_seen, body)
+        values ('shared-example/1', 'shared-example', '같은 장학금 공지', '2026-11-11', '2026-11-11 02:00+00', '${long}');`);
+    assert.equal(await loser('shared-example/1'), true);
     assert.equal(await loser('cse/5'), false);                 // 제목이 같아도 본문이 다르면 다른 글
     assert.equal(await loser('skku/2'), false);                // 같은 게시판의 글은 본문이 같아도 합치지 않는다
     assert.equal(await loser('lk/2'), true);                   // 외부 공고는 사이트가 달라도 합친다

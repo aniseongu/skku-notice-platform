@@ -500,7 +500,7 @@ function BoardsSection({ model }: { model: SettingsModel }) {
       {order.boards.length ? <BoardOrderList order={order} editing={editing} onToggle={(id) => model.toggle(id, false)} busy={model.loading} />
         : <p className="field-note text-[14px] leading-[20px] text-ink-2">아직 받는 게시판이 없어요. 아래에서 골라 주세요</p>}
       <BoardGroups model={model} />
-      <BoardRequest key={model.userId ?? 'guest'} send={model.sendFeedback} toast={model.showToast} userId={model.userId}
+      <BoardRequest key={model.userId ?? 'guest'} toast={model.showToast} userId={model.userId}
         listRequests={model.listBoardRequests} submitRequest={model.submitBoardRequest} />
     </>}
   </Section>;

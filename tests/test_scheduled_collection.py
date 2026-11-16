@@ -91,6 +91,7 @@ def test_shared_board_uses_checked_fetch_and_preserves_images_for_ocr(monkeypatc
     assert job.run_collection(settings, store, NOW, set()) == (0, 0)
     assert job.run_collection(settings, store, NOW, {"school"}) == (1, 0)
     assert len(calls) == 2
+    assert store.sources["school"]["shared_board"] is True
     assert store.rows["school/123"]["images"] == ["https://www.skku.edu/image.png"]
 
 

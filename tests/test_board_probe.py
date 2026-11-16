@@ -71,6 +71,11 @@ def test_probe_stops_before_page_when_robots_disallows(monkeypatch):
     assert calls == ["/robots.txt"]
 
 
+@pytest.mark.parametrize("robots", ["<html>not a robots file</html>", "User-agent: *\nDisallow: /*/admin"])
+def test_unreadable_or_unsupported_robots_rules_fail_closed(robots):
+    assert not board_probe._robots_allows(robots, "https://www.skku.edu/notice.do")
+
+
 def test_shared_detail_cannot_change_host_or_execute_action(monkeypatch):
     monkeypatch.setattr(board_probe, "_get", lambda *_a, **_k: pytest.fail("request sent"))
     for url in ("https://evil.skku.edu/notice.do?mode=view&articleNo=1",

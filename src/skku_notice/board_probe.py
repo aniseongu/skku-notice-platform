@@ -93,6 +93,27 @@ def _get(host: str, target: str, *, limit: int = MAX_BODY) -> str:
     return _get_bytes(host, target, limit=limit).decode("utf-8", errors="replace")
 
 
+def _robots_allows(content: str, url: str) -> bool:
+    # Python's parser does not implement wildcard / end-anchor path rules.
+    # Fail closed for unsupported policies rather than misreading a disallow.
+    has_agent = False
+    for raw in content.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        key, separator, value = line.partition(":")
+        if not separator:
+            continue
+        key, value = key.strip().lower(), value.strip()
+        if key == "user-agent" and value:
+            has_agent = True
+        if key in {"allow", "disallow"} and ("*" in value or "$" in value):
+            return False
+    if not has_agent:
+        return False
+    parser = RobotFileParser()
+    parser.parse(content.splitlines())
+    return parser.can_fetch(AGENT, url)
+
+
 def fetch_shared_image(url: str) -> bytes:
     try:
         parsed = urlsplit(url)
@@ -104,9 +125,8 @@ def fetch_shared_image(url: str) -> bytes:
             raise BoardProbeError("unsupported image address")
         target = parsed.path or "/"
         target += f"?{parsed.query}" if parsed.query else ""
-        robots = RobotFileParser()
-        robots.parse(_get(host, "/robots.txt", limit=128 * 1024).splitlines())
-        if not robots.can_fetch(AGENT, url):
+        robots = _get(host, "/robots.txt", limit=128 * 1024)
+        if not _robots_allows(robots, url):
             raise BoardProbeError("collection not allowed")
         time.sleep(1.5)
         return _get_bytes(host, target, limit=5 * 1024 * 1024, image=True)
@@ -138,9 +158,8 @@ def fetch_shared_page(board_url: str, page_url: str) -> str:
             valid = False
         if not valid or query.get("mode") != ["view"]:
             raise BoardProbeError("unsupported detail address")
-    robots = RobotFileParser()
-    robots.parse(_get(board.host, "/robots.txt", limit=128 * 1024).splitlines())
-    if not robots.can_fetch(AGENT, page_url):
+    robots = _get(board.host, "/robots.txt", limit=128 * 1024)
+    if not _robots_allows(robots, page_url):
         raise BoardProbeError("collection not allowed")
     time.sleep(1.5)
     return _get(board.host, page.path + (f"?{page.query}" if page.query else ""))
@@ -148,9 +167,8 @@ def fetch_shared_page(board_url: str, page_url: str) -> str:
 
 def probe_board(url: str) -> tuple[Candidate, list[Notice]]:
     candidate = validate_candidate(url)
-    robots = RobotFileParser()
-    robots.parse(_get(candidate.host, "/robots.txt", limit=128 * 1024).splitlines())
-    if not robots.can_fetch(AGENT, candidate.url):
+    robots = _get(candidate.host, "/robots.txt", limit=128 * 1024)
+    if not _robots_allows(robots, candidate.url):
         raise BoardProbeError("collection not allowed")
     try:
         time.sleep(1.5)
@@ -161,7 +179,7 @@ def probe_board(url: str) -> tuple[Candidate, list[Notice]]:
         detail_url = urlsplit(detail)
         if detail_url.hostname != candidate.host or detail_url.scheme != "https":
             raise BoardProbeError("unsupported detail address")
-        if not robots.can_fetch(AGENT, detail):
+        if not _robots_allows(robots, detail):
             raise BoardProbeError("collection not allowed")
         target = detail_url.path + (f"?{detail_url.query}" if detail_url.query else "")
         time.sleep(1.5)

@@ -86,7 +86,7 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
     const w = window as unknown as { boardRequests: unknown[][] };
     w.boardRequests = [];
-    app.submitBoardRequest = (...args: unknown[]) => { w.boardRequests.push(args); return Promise.resolve('ok'); };
+    app.submitBoardRequest = (...args: unknown[]) => { w.boardRequests.push(args); return Promise.resolve({ status: 'ok', id: 'r1' }); };
     app.listBoardRequests = () => Promise.resolve([{ id: 'r1', name: '교환학생', status: 'pending' }]);
   });
   const button = root.getByRole('button', { name: '추가 요청하기' });
@@ -100,7 +100,7 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
   await expect(root.getByRole('button', { name: '요청 보내기' })).toBeDisabled();
   await name.fill('교환학생');
   const address = root.getByRole('textbox', { name: '주소 (선택)' });
-  await expect(address).toHaveAccessibleDescription('https로 시작하는 성균관대 주소를 적어 주세요');
+  await expect(address).toHaveAccessibleDescription('https로 시작하는 성균관대 주소를 적으면 자동으로 확인해요. 주소가 없으면 개발자에게 요청해요');
   await address.fill('https://skku.edu.example.com/');
   await expect(root.getByText('https로 시작하는 성균관대 주소인지 확인해 주세요')).toBeVisible();
   await expect(root.getByRole('button', { name: '요청 보내기' })).toBeDisabled();
@@ -108,14 +108,20 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
   await root.getByRole('button', { name: '요청 보내기' }).click();
   await expect(name).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { boardRequests: unknown[][] }).boardRequests)).toEqual([['account-a', '교환학생', 'https://www.skku.edu/board']]);
-  await expect(root.getByText('교환학생 · 게시판을 확인하고 있어요')).toBeVisible();
+  await expect(root.getByText('요청을 확인하고 있어요')).toBeVisible();
+  await root.getByRole('button', { name: '추가 요청하기' }).click();
+  await root.getByRole('textbox', { name: '게시판 이름 (필수)' }).fill('학과 공지');
+  await root.getByRole('button', { name: '요청 보내기' }).click();
+  expect(await page.evaluate(() => (window as unknown as { boardRequests: unknown[][] }).boardRequests)).toEqual([
+    ['account-a', '교환학생', 'https://www.skku.edu/board'], ['account-a', '학과 공지', ''],
+  ]);
 };
 
 test('board request in notification settings', async ({ page }) => {
   await settingsAt(page, '&section=notifications');
   await withApp(page, { authUserId: 'account-a' });
   await checkBoardRequest(page, page.locator('platform-settings-screen'));
-  await expect(page.locator('.toast')).toContainText('게시판을 확인하고 있어요');
+  await expect(page.locator('.toast')).toContainText('요청을 접수했어요');
 });
 
 test('settings hub opens each page in the app, back works and the theme can be changed', async ({ page }) => {
@@ -444,7 +450,7 @@ test('first-run setup: choices only, department list follows the college, double
   // 행 전체가 눌리는 영역이다: 스위치가 아니라 이름 글자, 설명 글자, 행의 왼쪽 끝을 눌러도 켜지고 꺼진다. 높이는 44px 이상이다.
   const etc = dialog.getByRole('group', { name: '기타 게시판' });
   await checkBoardRequest(page, etc);
-  await expect(dialog.locator('.toast')).toContainText('게시판을 확인하고 있어요');
+  await expect(dialog.locator('.toast')).toContainText('요청을 접수했어요');
   await expect(dialog.getByRole('button', { name: '다음' })).toBeEnabled();
   const fab = etc.getByRole('switch', { name: /^지능형팹테크융합전공 공지/ });
   await etc.scrollIntoViewIfNeeded();

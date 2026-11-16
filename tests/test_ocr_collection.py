@@ -129,6 +129,11 @@ def test_discovery_only_enqueues_public_image_strings_without_resetting_status()
 
     def respond(request):
         requests.append(request)
+        if request.method == "GET" and "fetched_at" in request.url.params:
+            return httpx.Response(200, json=[{
+                "id": "shared-123/1", "source_id": "shared-123", "images": ["https://www.skku.edu/old.png"],
+                "body": "", "first_seen": "2026-11-07T00:00:00Z",
+            }])
         if request.method == "GET":
             return httpx.Response(
                 200,
@@ -148,15 +153,21 @@ def test_discovery_only_enqueues_public_image_strings_without_resetting_status()
     client.client._transport = httpx.MockTransport(respond)
     try:
         client.discover()
-        assert json.loads(requests[2].content) == [
+        assert json.loads(requests[3].content) == [
             {
                 "notice_id": "school/1",
                 "image_url": "https://www.skku.edu/a.png",
                 "priority": 0,
                 "notice_seen_at": "2026-11-07T00:00:00Z",
-            }
+            },
+            {
+                "notice_id": "shared-123/1",
+                "image_url": "https://www.skku.edu/old.png",
+                "priority": 0,
+                "notice_seen_at": "2026-11-07T00:00:00Z",
+            },
         ]
-        assert "resolution=merge-duplicates" in requests[2].headers["prefer"]
+        assert "resolution=merge-duplicates" in requests[3].headers["prefer"]
     finally:
         client.close()
 

@@ -237,6 +237,8 @@ def run_collection(
                 "url": source["url"],
                 "last_success_at": previous_source.get("last_success_at"),
             }
+            if source.get("shared"):
+                source_row["shared_board"] = True
             store.upsert("platform_sources", [source_row])
             updates = []
             for notice in notices:

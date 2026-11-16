@@ -5,7 +5,7 @@ create table public.shared_board_requests (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   name text not null check (char_length(btrim(name)) between 1 and 60),
-  url text not null check (char_length(url) between 1 and 400),
+  url text not null check (char_length(url) <= 400),
   status text not null default 'pending' check (status in ('pending', 'added', 'review', 'failed')),
   source_id text references public.platform_sources(id),
   created_at timestamptz not null default now(),
@@ -24,12 +24,14 @@ create policy "Users create their board requests" on public.shared_board_request
 -- The browser supplies its expected account so a session change between
 -- checking the session and sending cannot submit on the new account's behalf.
 create function public.submit_shared_board(expected_user uuid, request_name text, request_url text)
-returns void language plpgsql security invoker set search_path = '' as $$
+returns uuid language plpgsql security invoker set search_path = '' as $$
+declare request_id uuid;
 begin
   if auth.uid() is null or auth.uid() <> expected_user then
     raise exception 'account_changed' using errcode = 'P0001';
   end if;
-  insert into public.shared_board_requests (name, url) values (request_name, request_url);
+  insert into public.shared_board_requests (name, url) values (request_name, request_url) returning id into request_id;
+  return request_id;
 end $$;
 revoke all on function public.submit_shared_board(uuid, text, text) from public, anon;
 grant execute on function public.submit_shared_board(uuid, text, text) to authenticated;
@@ -59,6 +61,13 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('shared_board_url:' || canonical_url, 0));
   select id into source from public.platform_sources where url = canonical_url and not external;
   if source is null then
+    -- Bound total automatic work on the 1 GB worker; overflow goes to the
+    -- existing developer request queue instead of silently increasing load.
+    perform pg_advisory_xact_lock(hashtextextended('shared_board_capacity', 0));
+    if (select count(*) from public.platform_sources where shared_board) >= 50 then
+      perform public.request_shared_board_review(request_id);
+      return null;
+    end if;
     source := 'shared-' || replace(request_row.id::text, '-', '');
     insert into public.platform_sources (id, name, url, shared_board)
       values (source, btrim(request_row.name), canonical_url, true);
