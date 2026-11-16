@@ -95,7 +95,7 @@ export function BoardRequest({ toast, userId, listRequests, submitRequest, onAdd
     </div>
     {requests.length ? <div className="grid gap-[6px] pb-[12px] text-[14px] leading-[20px] text-ink-2" aria-live="polite">
       <p className="m-0 font-semibold text-ink">요청한 게시판</p>
-      {requests.map((request) => <p key={request.id} className="m-0"><span className="font-medium text-ink">{request.name}</span><br />{request.status === 'added' ? '게시판이 추가됐어요. 받을 게시판에서 확인해 주세요' : request.status === 'review' ? '개발자에게 요청을 보냈어요' : request.status === 'failed' ? '요청을 보내지 못했어요. 나중에 다시 시도해 주세요' : '요청을 확인하고 있어요'}</p>)}
+      {requests.map((request) => <p key={request.id} className="m-0"><span className="font-medium text-ink">{request.name}</span><br />{request.status === 'added' ? '게시판이 추가됐어요. 받을 게시판에서 확인해 주세요' : request.status === 'review' ? '개발자 확인을 요청했어요' : request.status === 'failed' ? '요청을 보내지 못했어요. 나중에 다시 시도해 주세요' : '요청을 확인하고 있어요'}</p>)}
     </div> : null}
     {open ? <div ref={formRef} className="grid w-full max-w-[600px] gap-[10px] pb-[16px]">
       <p className="m-0 text-[14px] leading-[20px] text-ink-2">추가된 게시판은 다른 사람도 고를 수 있어요</p>
