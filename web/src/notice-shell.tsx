@@ -200,6 +200,8 @@ export function NoticeShell({ app }: { app: AppController }) {
 function BottomSheets({ app }: { app: AppController }) {
   const update = useSyncExternalStore(subscribeUpdate, updateAvailable, () => false);
   const [closed, setClosed] = useState(false);
+  // 알림 상태를 확인하는 동안에는 둘 다 보류한다(설치 배너가 떴다가 알림 패널로 바뀌지 않게).
+  if (app.pushStatus === 'checking') return null;
   return pushSheetShown(app, update, closed) ? <PushSheet app={app} onClose={() => setClosed(true)} /> : <InstallBanner app={app} />;
 }
 

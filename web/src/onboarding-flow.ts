@@ -137,12 +137,12 @@ export function savedBefore(profile: Pick<UserProfile, 'programs' | 'enrollmentS
   return profile.programs.length > 0 && profile.enrollmentStatus !== null;
 }
 
-/** 다시 열었을 때 시작할 단계. 저장까지 하고 AI 키 단계에서 나갔다면 이미 답한 질문을 다시 묻지 않고 AI 키 단계부터 잇는다.
+/** 다시 열었을 때 시작할 단계. 저장까지 하고 알림·AI 키 단계에서 나갔다면 이미 답한 질문을 다시 묻지 않고 알림 단계부터 잇는다(알림이 이미 켜져 있으면 화면이 바로 다음으로 넘긴다).
  * 그 사이 새 필수 질문이 생겨 답이 비어 있으면 처음부터 묻는다(그 단계로 돌아가는 일은 earlierMissing이 맡는다). */
 export function resumeStep(profile: Pick<UserProfile, 'programs' | 'enrollmentStatus'>, draft: Draft): Step {
   if (!savedBefore(profile)) return 'primary';
   const answer: DoubleAnswer = draft.programs.length > 1 ? 'yes' : 'no';
-  return REQUIRED_STEPS.every((name) => canContinue(name, draft, answer)) ? 'ai' : 'primary';
+  return REQUIRED_STEPS.every((name) => canContinue(name, draft, answer)) ? 'notify' : 'primary';
 }
 
 export const stepIndex = (step: Step): number => STEPS.indexOf(step);

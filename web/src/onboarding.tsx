@@ -222,11 +222,13 @@ export function Onboarding({ app }: { app: AppController }) {
   // 알림 → AI 키 순서. 알림을 이미 켰거나 지원하지 않으면 알림 단계를 건너뛰고, 키가 이미 있으면 AI 단계를 건너뛴다.
   // 키 기능이 꺼져 있거나 확인하지 못했어도 키 없이 끝내지 않는다(예외 없음). 그때는 AI 단계에서 다시 확인하게 한다.
   const needAi = () => !app.byokStatus && app.aiKeys.length === 0;
-  const afterNotify = () => { if (needAi()) go('ai'); else app.closeOnboarding(); };
+  // 키가 이미 있으면 알림 단계가 마지막이라 여기서 완료를 저장한다(게시판 단계에서 미리 완료로 저장하면 새로고침으로 알림 단계를 건너뛸 수 있다).
+  const afterNotify = () => { if (needAi()) go('ai'); else if (app.profile.onboardedAt) app.closeOnboarding(); else void app.completeOnboarding(); };
   const finishWithKey = () => { void app.completeOnboarding(); };
-  const save = async () => { if (await app.finishOnboarding(draft, !needAi())) { setSaved(true); if (app.pushStatus !== 'on') go('notify'); else afterNotify(); } };
+  const save = async () => { if (await app.finishOnboarding(draft, !needAi() && app.pushStatus === 'on')) { setSaved(true); if (app.pushStatus !== 'on') go('notify'); else afterNotify(); } };
   // 허용 창을 늦게 눌러서 나중에 알림이 켜져도 이 단계에 머물지 않고 이어 간다.
-  useEffect(() => { if (!fillMode && step === 'notify' && app.pushStatus === 'on') afterNotify(); });   // eslint-disable-line react-hooks/exhaustive-deps
+  // 상태가 on으로 바뀐 때 한 번만 넘긴다(완료 저장이 실패해도 렌더마다 다시 저장하지 않고, 화면의 '끝내기'로 다시 시도한다).
+  useEffect(() => { if (!fillMode && step === 'notify' && app.pushStatus === 'on') afterNotify(); }, [step, app.pushStatus]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   let title = '', lead = '', body: React.ReactNode = null, foot: React.ReactNode = null;
   if (step === 'primary') {

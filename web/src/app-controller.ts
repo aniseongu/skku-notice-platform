@@ -1450,14 +1450,15 @@ export class AppController extends Reactive {
       });
       const [registration, config] = await Promise.all([
         ready,
-        fetch(new URL('push-config.json', document.baseURI), { cache: 'no-store' }).then((r) => r.ok ? r.json() as Promise<{ vapidPublicKey?: string }> : null).catch(() => null),
+        withTimeout(fetch(new URL('push-config.json', document.baseURI), { cache: 'no-store' }).then((r) => r.ok ? r.json() as Promise<{ vapidPublicKey?: string }> : null), PUSH_CHECK_MS).catch(() => null),
       ]);
       if (epoch !== this.subscriptionsEpoch) return;
       this.pushRegistration = registration;
       this.pushVapidKey = config?.vapidPublicKey ?? null;
       // 켜 둔 기기인데 앱 업데이트 등으로 브라우저가 구독을 잃었으면 여기서 조용히 다시 등록한다.
-      const on = await inspectDevicePush(authClient, userId, registration, localStorage,
-        { vapidKey: this.pushVapidKey, permission: Notification.permission });
+      // 서버 조회가 응답하지 않아도 "확인하고 있어요"에 멈추지 않게 끊는다(첫 설정 알림 단계가 이 상태를 기다린다).
+      const on = await withTimeout(inspectDevicePush(authClient, userId, registration, localStorage,
+        { vapidKey: this.pushVapidKey, permission: Notification.permission }), PUSH_CHECK_MS);
       if (epoch !== this.subscriptionsEpoch) { if (on) void this.releasePush(userId); return; }
       this.pushStatus = on ? 'on' : Notification.permission === 'denied' ? 'denied' : 'off';
     } catch (error) {
@@ -1511,7 +1512,10 @@ export class AppController extends Reactive {
     if (!userId || typeof Notification === 'undefined') return;
     if (Notification.permission === 'denied') { this.pushError = '아직 허용되지 않았어요. 브라우저 설정에서 알림을 허용해 주세요.'; return; }
     this.pushError = '';
-    await this.refreshPush(userId, this.subscriptionsEpoch);
+    const epoch = this.subscriptionsEpoch;
+    await this.refreshPush(userId, epoch);
+    // 기다리는 사이 계정이 바뀌었으면 이전 계정의 누름을 새 계정에 적용하지 않는다.
+    if (this.authUserId !== userId || epoch !== this.subscriptionsEpoch) return;
     if (this.pushStatus === 'off') await this.enablePush();
   }
 
@@ -2191,3 +2195,12 @@ export class AppController extends Reactive {
 }
 
 defineReactive(AppController, Object.keys(AppController.properties));
+
+/** 알림 상태 확인 단계 하나가 이 시간 안에 끝나지 않으면 실패로 본다. */
+const PUSH_CHECK_MS = 10_000;
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    promise.then((value) => { clearTimeout(timer); resolve(value); }, (error: unknown) => { clearTimeout(timer); reject(error); });
+  });
+}

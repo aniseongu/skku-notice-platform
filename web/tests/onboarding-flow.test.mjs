@@ -130,7 +130,7 @@ test('저장까지 하고 AI 키 단계에서 나간 사람은 다시 열면 AI 
   assert.equal(resumeStep(EMPTY_PROFILE, initialDraft(EMPTY_PROFILE, [], [])), 'primary');
   // 경영학과 3학년 재학, 3품 인턴십까지 저장했다(게시판 단계의 저장). 복수전공이 없다는 답은 저장된 전공 하나로 안다.
   const saved = { ...EMPTY_PROFILE, programs: [biz], year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false };
-  assert.equal(resumeStep(saved, initialDraft(saved, ['skku-notice01'], [])), 'ai');
+  assert.equal(resumeStep(saved, initialDraft(saved, ['skku-notice01'], [])), 'notify');
   // 소프트웨어학과 원전공인데 입학 연도가 비어 있으면(새로 생긴 필수 질문) 처음부터 묻는다
   const missing = { ...saved, programs: [sw] };
   assert.equal(resumeStep(missing, initialDraft(missing, [], [])), 'primary');

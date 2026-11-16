@@ -2141,7 +2141,7 @@ test('when every 현장실습 posting has closed, the menu hides it and a rememb
 
 test('install banner: one tap installs on phones, closing keeps it away, PC never shows it', async ({ page }) => {
   const inject = async () => {
-    await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true });
+    await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, pushStatus: 'on' });
     await page.evaluate(() => { ((document.querySelector('notice-app') as unknown) as AppHandle).install = { prompt: () => Promise.resolve() }; });
   };
   await page.setViewportSize({ width: 412, height: 891 });
@@ -2189,7 +2189,7 @@ test('install banner keeps the last notice and temporary messages accessible', a
   await page.setViewportSize({ width: 360, height: 780 });
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
-  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, subscriptions: ['skku-notice01'], subscriptionsLoading: false });
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, pushStatus: 'on', subscriptions: ['skku-notice01'], subscriptionsLoading: false });
   await page.evaluate(() => { (document.querySelector('notice-app') as unknown as AppHandle).install = { prompt: () => Promise.resolve() }; });
   const banner = page.getByRole('region', { name: '앱 설치' });
   await expect(banner).toBeVisible();
@@ -2250,7 +2250,7 @@ test('install signal received before the app loads is retained and used once', a
   });
   resume();
   await page.locator('notice-rows-screen a.row').first().waitFor();
-  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true });
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, pushStatus: 'on' });
   const banner = page.getByRole('region', { name: '앱 설치' });
   await banner.getByRole('button', { name: '홈 화면에 추가' }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { installCalls: number }).installCalls)).toBe(1);
