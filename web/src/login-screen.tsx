@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { APP_NAME } from './brand';
 import type { AppController } from './app-controller';
 import { InstallBanner } from './install-banner';
+import { NoticeExample } from './notice-example';
 
 // 출처: https://developers.google.com/identity/branding-guidelines
 const GoogleG = () => <svg className="flex-none w-[20px] h-[20px]" width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
@@ -29,19 +30,7 @@ export function LoginScreen({ app }: { app: AppController }) {
       <div className="flex flex-1 flex-col pt-[calc(48px_+_env(safe-area-inset-top))] min-[720px]:flex-none min-[720px]:pt-0">
         {/* 맨 위에 앱 아이콘과 이름(사용자 요청: 아이콘은 보여야 한다), 그 아래 TDS Top의 그림 자리에 알림 예시를 둔다. */}
         <div className="flex items-center gap-[10px] mb-[28px] text-[22px] leading-[30px] font-bold text-ink"><svg className="w-[48px] h-[48px] flex-none" aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg><span>{APP_NAME}</span></div>
-        <div className="pointer-events-none">
-          <p className="m-0 mb-[8px] text-[13px] leading-[18px] font-semibold text-ink-2" id="login-preview-label">알림 예시</p>
-          <div className="w-full px-[16px] py-[14px] border border-line rounded-lg bg-surface" role="img" aria-labelledby="login-preview-label" aria-describedby="login-note-text">
-            <div className="flex items-center gap-[6px] text-[13px] leading-[18px] text-ink-2">
-              <svg className="w-[18px] h-[18px] flex-none" aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg>
-              <span className="font-semibold text-ink">{APP_NAME}</span>
-              <span className="ml-auto text-ink-2">지금</span>
-            </div>
-            <div id="login-note-text"><p className="m-0 mt-[8px] text-[15px] leading-[22px] font-semibold text-ink">[소프트웨어학과] 겨울방학 소프트웨어 인턴 모집 안내</p>
-            <p className="m-0 mt-[2px] text-[14px] leading-[20px] font-medium text-ink break-keep">소프트웨어학과 학생이 지원할 수 있는 개발 인턴이에요</p>
-            <p className="m-0 text-[14px] leading-[20px] text-ink-2">관심 키워드 인턴, <span className="whitespace-nowrap">12월 5일(토) 마감이에요</span></p></div>
-          </div>
-        </div>
+        <NoticeExample idPrefix="login" />
         <div className="pt-[32px]">
           <h1 className="m-0 text-[28px] leading-[38px] font-bold tracking-[-0.02em] overflow-visible text-clip whitespace-normal break-keep min-[720px]:text-[30px] min-[720px]:leading-[40px]">필요한 성균관대 공지만<br />알려 줘요</h1>
           <p className="m-0 mt-[8px] text-[17px] leading-[26px] font-medium text-ink-2 break-keep text-balance">AI가 내 학과에 맞는지 확인하고 이유와 마감일을 함께 알려 줘요</p>

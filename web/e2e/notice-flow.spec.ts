@@ -157,7 +157,7 @@ test('notification settings show each device state and call the right actions', 
   await expect(screen.getByRole('button', { name: '확인하고 있어요' })).toBeDisabled();
   await withApp(page, { pushStatus: 'denied' });
   await expect(screen.getByText('브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요')).toBeVisible();
-  await withApp(page, { pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요. 다시 시도하면 이어서 진행해요.' });
+  await withApp(page, { pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요. 다시 시도해 주세요' });
   await expect(screen.getByRole('alert')).toContainText('다시 시도');
   await screen.getByRole('button', { name: '다시 시도하기' }).click();
   expect(await calls(page)).toEqual([['enable']]);
@@ -446,7 +446,7 @@ test('first-run setup: choices only, department list follows the college, double
   // 알림은 꼭 켠다: 건너뛰는 단추가 없고, 알림 받기를 눌러 켜지면 이어진다.
   await expect(dialog.getByRole('heading', { name: '알림을 켜 둘까요?' })).toBeFocused();
   await expect(dialog.getByRole('button', { name: /나중에/ })).toHaveCount(0);
-  await expect(dialog.getByText('알림을 켜야 다음으로 넘어가요')).toBeVisible();
+  await expect(dialog.getByText('알림을 켜면 다음으로 넘어가요')).toBeVisible();
   await dialog.getByRole('button', { name: '알림 받기' }).click();
   expect((await calls(page)).filter((c) => c[0] === 'push')).toHaveLength(1);
   await expect(dialog).toHaveCount(0);
@@ -2470,7 +2470,7 @@ test('first-run notify step: no skip when off, escape only after a failure, deni
   const set = (state: Record<string, unknown>) => page.evaluate((patch) => Object.assign(document.querySelector('notice-app') as object, patch), state);
   await expect(dialog.getByRole('button', { name: '알림 받기' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: /나중에/ })).toHaveCount(0);
-  await set({ pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요. 다시 시도하면 이어서 진행해요.' });
+  await set({ pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요. 다시 시도해 주세요' });
   await expect(dialog.getByRole('button', { name: '다시 시도하기' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: '이 기기에서는 나중에 켤게요' })).toBeVisible();
   await set({ pushStatus: 'denied', pushRetry: false, pushError: '' });
