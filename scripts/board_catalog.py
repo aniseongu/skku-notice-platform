@@ -76,6 +76,7 @@ BOARDS: list[tuple[str, str, str]] = [
     ("energy-notice", "에너지학과 공지", "https://energy.skku.edu/energy/notice.do"),
     ("ssbat-notice", "배터리학과 공지", "https://ssbat.skku.edu/ssbat/notice.do"),
     ("aiuniv-notice", "AI중심대학사업단 공지", "https://aiuniv.skku.edu/aiuniv/notice.do"),
+    ("skku-exchange-notice", "교환학생 공지", "https://www.skku.edu/skku/international/globalComm/international01.do"),
     ("fabtech-notice", "지능형팹테크융합전공 공지", "https://skb.skku.edu/FabTech/notice.do"),
     ("ase-notice", "차세대반도체공학연계전공 공지", "https://skb.skku.edu/ase/notice.do"),
 ]
@@ -123,8 +124,9 @@ DEPARTMENT_BOARD = {
 OTHER_BOARDS: list[tuple[str, str, str, tuple[str, ...]]] = [
     ("futurecar-notice", "부트캠프", "수강 모집과 행사 안내", ()),
     ("aiuniv-notice", "사업단", "AI 교육, 챌린지 안내", ("소프트웨어융합대학",)),
-    ("fabtech-notice", "융합·연계전공", "반도체 공정과 팹 교육, 학위 안내", ("정보통신대학/반도체시스템공학과", "정보통신대학/반도체융합공학과", "정보통신대학/전자전기공학부", "공과대학/화학공학부", "공과대학/신소재공학부")),
+    ("skku-exchange-notice", "국제교류", "교환학생 선발·설명회·장학 안내", ()),
     ("ase-notice", "융합·연계전공", "차세대 반도체 교육과 인턴 안내", ("정보통신대학/반도체시스템공학과", "정보통신대학/반도체융합공학과", "정보통신대학/전자전기공학부", "공과대학/화학공학부", "공과대학/신소재공학부")),
+    ("fabtech-notice", "융합·연계전공", "반도체 공정과 팹 교육, 학위 안내", ("정보통신대학/반도체시스템공학과", "정보통신대학/반도체융합공학과", "정보통신대학/전자전기공학부", "공과대학/화학공학부", "공과대학/신소재공학부")),
 ]
 
 # 이미 운영 중인 기본 게시판(모든 사용자에게 추천). sources.yaml의 앞쪽 4개는 이 스크립트가 건드리지 않는다.
@@ -177,6 +179,7 @@ def typescript() -> str:
         "",
         "/** 전공과 상관없이 고르는 게시판(부트캠프 등). */",
         "export interface OtherBoard { id: string; name: string; group: string; help: string; recommendFor: readonly string[] }",
+        "// 같은 묶음 안에서는 이 순서대로 보인다(융합·연계전공은 차세대반도체가 팹테크보다 위, 사용자 지시 2026-11-12).",
         "export const OTHER_BOARDS: readonly OtherBoard[] = [",
         *[f"  {{ id: '{i}', name: '{BOARD_NAMES[i]}', group: '{g}', help: '{h}', recommendFor: [{', '.join(repr(c) for c in cs)}] }}," for i, g, h, cs in OTHER_BOARDS],
         "];",
@@ -199,6 +202,14 @@ def typescript() -> str:
         "    for (const other of OTHER_BOARDS) if (other.recommendFor.some((key) => key === program.college || key === `${program.college}/${program.department}`) && !ids.includes(other.id)) ids.push(other.id);",
         "  }",
         "  return ids;",
+        "}",
+        "",
+        "/** 게시판이 속한 단과대(단과대 게시판이면 그 단과대, 학과 게시판이면 학과의 단과대). 없으면 null.",
+        " * 첫 설정과 설정의 \"게시판 더 보기\"가 같은 묶음으로 보이도록 둘 다 이 함수를 쓴다. */",
+        "export function boardCollege(id: string): string | null {",
+        "  for (const [college, board] of Object.entries(COLLEGE_BOARD)) if (board === id) return college;",
+        "  for (const [key, board] of Object.entries(DEPARTMENT_BOARD)) if (board === id) return key.split('/')[0];",
+        "  return null;",
         "}",
         "",
     ])

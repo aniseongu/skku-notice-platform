@@ -86,3 +86,15 @@ def test_aiuniv_notice_board_2026_11_12() -> None:
     notices = parse_list(html, "aiuniv-notice", url)
     assert len(notices) == 10
     assert all(notice.url.startswith(f"{url}?mode=view&articleNo=") for notice in notices)
+
+
+def test_exchange_notice_table() -> None:
+    url = "https://www.skku.edu/skku/international/globalComm/international01.do"
+    html = Path("tests/fixtures/skku_exchange_notice_list.html").read_text(encoding="utf-8")
+    notices = parse_list(html, "skku-exchange-notice", url)
+    assert len(notices) == 2
+    assert notices[0].title == "2027학년도 2학기 해외파견 교환학생 설명회 자료 게시"
+    assert notices[0].url == f"{url}?mode=view&articleNo=141784"
+    assert notices[0].posted_on == date(2026, 11, 11)
+    assert notices[1].article_no == "141091"
+    assert notices[1].posted_on == date(2026, 10, 29)

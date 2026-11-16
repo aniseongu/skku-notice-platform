@@ -91,6 +91,31 @@ def _parse_row(row: LexborNode, source_id: str, board_url: str) -> Notice:
 def parse_list(html: str, source_id: str, board_url: str) -> list[Notice]:
     tree = LexborHTMLParser(html)
     if tree.css_first("ul.board-list-wrap") is None:
+        table = tree.css_first("table.board_list")
+        if table is not None:
+            notices = []
+            for row in table.css("tbody tr"):
+                cells = row.css("td")
+                link = cells[1].css_first("a[href]") if len(cells) >= 3 else None
+                if link is None:
+                    raise ParseError("table row without title link or date")
+                query = parse_qs(urlsplit(urljoin(board_url, link.attributes.get("href", ""))).query)
+                article_no = query.get("articleNo", [""])[0]
+                title = _clean(link)
+                found = DATE_RE.search(_clean(cells[2]))
+                if not article_no.isdecimal() or not title or not found:
+                    raise ParseError("table row without articleNo, title or date")
+                try:
+                    posted_on = date.fromisoformat(found.group())
+                except ValueError as exc:
+                    raise ParseError("table row with invalid date") from exc
+                base = board_url.split("?", 1)[0]
+                notices.append(Notice(source_id, article_no, title, None,
+                                      f"{base}?mode=view&articleNo={article_no}", posted_on,
+                                      "공지" in _clean(cells[0])))
+            if not notices:
+                raise ParseError("board table has no articles")
+            return notices
         raise ParseError("ul.board-list-wrap not found")
     rows = [row for row in tree.css(ROW_SELECTOR) if row.css_first("dl.board-list-content-wrap")]
     if not rows:

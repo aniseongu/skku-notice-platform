@@ -408,6 +408,12 @@ sources:
     url: https://aiuniv.skku.edu/aiuniv/notice.do
     on_demand: true
 
+  - id: skku-exchange-notice
+    name: 교환학생 공지
+    kind: skku-cms
+    url: https://www.skku.edu/skku/international/globalComm/international01.do
+    on_demand: true
+
   - id: fabtech-notice
     name: 지능형팹테크융합전공 공지
     kind: skku-cms
