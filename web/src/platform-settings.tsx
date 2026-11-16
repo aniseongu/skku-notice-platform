@@ -12,10 +12,10 @@ import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR, PROFILE_TEXT
 import { COLLEGES, MAX_PROGRAMS, programKey, programLabel, type Program } from './skku-programs';
 import { ProgramPicker } from './onboarding';
 import { BOARD_CATALOG, OTHER_BOARDS, boardCollege } from './skku-boards';
-// 순서 바꾸기는 dnd-kit(MIT)을 쓴다: 손잡이로 끌기(마우스·터치)와 키보드(Space로 집고 방향키로 옮기고 Space로 놓기), 낭독기 안내가 들어 있다.
-import { DndContext, KeyboardSensor, MeasuringStrategy, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+// 마우스·터치 끌기는 dnd-kit(MIT), 키보드 순서 바꾸기는 손잡이에서 처리한다.
+import { DndContext, MeasuringStrategy, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
-import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
 import { FEEDBACK_KINDS, FEEDBACK_LIMIT, feedbackProblem, type FeedbackKind, type FeedbackResult } from './feedback';
@@ -516,12 +516,12 @@ function chevron(d: string, className?: string) {
 
 /** 게시판 한 줄. 줄마다 테두리가 있는 따로 떨어진 칸이다. 오른쪽 끝에서 받기를 켜고 끄고(평소), 순서를 바꾸는 중에는 같은 자리의 손잡이로 끈다.
  *  손잡이를 스위치와 같은 오른쪽에 둔 이유: 마우스가 단추 근처에 있는 채로 바로 옮길 수 있게 하려는 것이다(.claude/rules/usability.md). */
-function BoardRow({ board, editing, onToggle, busy }: { board: { id: string; label: string }; editing: boolean; onToggle?: (id: string) => void; busy: boolean }) {
+function BoardRow({ board, editing, onToggle, busy, keyboardIndex, onKeyboard, onKeyboardBlur }: { board: { id: string; label: string }; editing: boolean; onToggle?: (id: string) => void; busy: boolean; keyboardIndex?: number; onKeyboard: (id: string, event: React.KeyboardEvent<HTMLButtonElement>) => void; onKeyboardBlur: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: board.id, disabled: !editing });
-  return <li ref={setNodeRef} data-board-id={board.id} style={{ transform: CSS.Transform.toString(transform), transition }}
+  return <li ref={setNodeRef} data-board-id={board.id} style={{ transform: CSS.Transform.toString(transform), transition, order: keyboardIndex }}
     className={`flex min-h-[56px] items-center gap-[12px] rounded-md border bg-surface pr-[6px] pl-[16px] ${isDragging ? 'relative z-10 border-accent shadow-pop' : 'border-line'}`}>
     <span className="order-name min-w-0 flex-1 text-[15px] font-medium [overflow-wrap:anywhere]">{board.label}</span>
-    {editing ? <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} aria-label={`${board.label} 순서 옮기기`}
+    {editing ? <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} onKeyDown={(event) => onKeyboard(board.id, event)} onBlur={() => onKeyboardBlur(board.id)} aria-label={`${board.label} 순서 옮기기`}
       className="order-handle grid size-[44px] flex-none cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent text-ink-3 [@media(hover:hover)]:hover:bg-hover active:bg-hover active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-accent">
       <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">{[7, 12, 17].flatMap((y) => [9, 15].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.7" />))}</svg></button> : null}
     {onToggle && !editing ? <button type="button" role="switch" className={SWITCH_ONLY} aria-checked="true" aria-label={`${board.label} 받기`} disabled={busy}
@@ -532,16 +532,16 @@ function BoardRow({ board, editing, onToggle, busy }: { board: { id: string; lab
 function BoardOrderList({ order, editing, onToggle, busy = false }: { order: SettingsModel['boardOrder']; editing: boolean; onToggle?: (id: string) => void; busy?: boolean }) {
   const latest = useRef(order);
   latest.current = order;
-  const keyboardReady = useRef(true);
-  const pendingKeys = useRef<string[]>([]);
-  const readyTimer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(readyTimer.current), []);
+  const [picked, setPicked] = useState<{ id: string; ids: string[] } | null>(null);
+  const pickedRef = useRef(picked);
+  const [announcement, setAnnouncement] = useState('');
+  const updatePicked = (value: typeof picked) => { pickedRef.current = value; setPicked(value); };
+  useEffect(() => { if (!editing) updatePicked(null); }, [editing]);
   const ids = order.boards.map((board) => board.id);
   const labelOf = (id: unknown) => order.boards.find((board) => board.id === id)?.label ?? '';
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return;
@@ -550,20 +550,35 @@ function BoardOrderList({ order, editing, onToggle, busy = false }: { order: Set
     latest.current.move(arrayMove(ids, from, to));
   };
   const position = (id: unknown) => `${ids.indexOf(String(id)) + 1}번째`;
+  const onKeyboard = (id: string, event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const current = pickedRef.current;
+    if (event.code === 'Space' || event.code === 'Enter') {
+      event.preventDefault();
+      if (!current) {
+        updatePicked({ id, ids });
+        setAnnouncement(`${labelOf(id)}을 집었어요. 지금 ${position(id)}예요`);
+      } else if (current.id === id) {
+        updatePicked(null);
+        if (current.ids.some((value, index) => value !== ids[index])) latest.current.move(current.ids);
+        setAnnouncement(`${labelOf(id)}을 ${current.ids.indexOf(id) + 1}번째로 옮겼어요`);
+      }
+    } else if (current?.id === id && event.code === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      updatePicked(null);
+      setAnnouncement(`${labelOf(id)} 옮기기를 취소했어요`);
+    } else if (current?.id === id && (event.code === 'ArrowUp' || event.code === 'ArrowDown')) {
+      event.preventDefault();
+      const from = current.ids.indexOf(id);
+      const to = Math.max(0, Math.min(current.ids.length - 1, from + (event.code === 'ArrowDown' ? 1 : -1)));
+      updatePicked({ id, ids: arrayMove(current.ids, from, to) });
+      setAnnouncement(`${labelOf(id)}이 ${to + 1}번째 자리예요`);
+    }
+  };
   return <div className="order-box py-[4px]">
+    <span className="sr-only" aria-live="assertive" aria-atomic="true">{announcement}</span>
     <DndContext measuring={{ droppable: { strategy: MeasuringStrategy.Always } }} sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis, restrictToParentElement]}
-      onDragStart={({ activatorEvent }) => { keyboardReady.current = !(activatorEvent instanceof KeyboardEvent); pendingKeys.current = []; }}
-      onDragOver={() => {
-        if (keyboardReady.current || readyTimer.current !== undefined) return;
-        // dnd-kit installs its document keyboard listener in a later task; replay keys received while it initializes.
-        readyTimer.current = window.setTimeout(() => {
-          readyTimer.current = undefined;
-          keyboardReady.current = true;
-          for (const code of pendingKeys.current.splice(0)) document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { code, key: code, bubbles: true }));
-        }, 0);
-      }}
-      onDragCancel={() => { window.clearTimeout(readyTimer.current); readyTimer.current = undefined; keyboardReady.current = true; pendingKeys.current = []; }}
-      onDragEnd={(event) => { window.clearTimeout(readyTimer.current); readyTimer.current = undefined; keyboardReady.current = true; pendingKeys.current = []; onDragEnd(event); }}
+      onDragEnd={onDragEnd}
       accessibility={{
         screenReaderInstructions: { draggable: '순서를 바꾸려면 Space를 눌러 집고, 위아래 방향키로 옮긴 뒤 Space로 놓으세요. 취소는 Esc예요.' },
         announcements: {
@@ -574,12 +589,10 @@ function BoardOrderList({ order, editing, onToggle, busy = false }: { order: Set
         },
       }}>
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-        <ul className="order-list m-0 flex list-none flex-col gap-[8px] p-0" onKeyDownCapture={(event) => {
-          if (!keyboardReady.current && ['ArrowUp', 'ArrowDown'].includes(event.code)) {
-            event.preventDefault(); event.stopPropagation(); pendingKeys.current.push(event.code);
-          }
-        }}>
-          {order.boards.map((board) => <BoardRow key={board.id} board={board} editing={editing} onToggle={onToggle} busy={busy} />)}
+        <ul className="order-list m-0 flex list-none flex-col gap-[8px] p-0">
+          {order.boards.map((board) => <BoardRow key={board.id} board={board} editing={editing} onToggle={onToggle} busy={busy}
+            keyboardIndex={picked ? picked.ids.indexOf(board.id) : undefined} onKeyboard={onKeyboard}
+            onKeyboardBlur={(id) => { if (pickedRef.current?.id === id) { updatePicked(null); setAnnouncement(`${labelOf(id)} 옮기기를 취소했어요`); } }} />)}
         </ul>
       </SortableContext>
     </DndContext>

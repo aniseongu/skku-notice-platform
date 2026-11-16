@@ -87,7 +87,7 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
     const w = window as unknown as { boardRequests: unknown[][] };
     w.boardRequests = [];
     app.submitBoardRequest = (...args: unknown[]) => { w.boardRequests.push(args); return Promise.resolve({ status: 'ok', id: 'r1' }); };
-    app.listBoardRequests = () => Promise.resolve([{ id: 'r1', name: '교환학생', status: 'pending' }]);
+    app.listBoardRequests = () => Promise.resolve([{ id: 'r1', name: '교환학생', status: 'pending' }, { id: 'r2', name: '장학', status: 'added' }, { id: 'r3', name: '학과', status: 'review' }, { id: 'r4', name: '행사', status: 'failed' }]);
   });
   const button = root.getByRole('button', { name: '추가 요청', exact: true });
   await button.scrollIntoViewIfNeeded();
@@ -101,9 +101,11 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
   expect(Math.round(inputStyle.height)).toBe(45);
   expect(inputStyle.weight).toBe('400');
   await expect(root.getByRole('button', { name: '요청 보내기' })).toBeDisabled();
+  await expect(root.getByText('게시판 이름을 적어 주세요')).toBeVisible();
   await name.fill('교환학생');
+  await expect(root.getByText('게시판 이름을 적어 주세요')).toHaveCount(0);
   const address = root.getByRole('textbox', { name: '주소 (선택)' });
-  await expect(address).toHaveAccessibleDescription('성균관대 게시판 주소를 적으면 보통 30분 안에 확인해서 모두가 고를 수 있게 추가해요. 주소가 없거나 확인하지 못하면 개발자가 살펴봐요');
+  await expect(address).toHaveAccessibleDescription('주소를 적으면 보통 30분 안에 확인해서 모두가 고를 수 있게 추가해요. 주소가 없거나 확인이 안 되면 개발자가 살펴봐요');
   await address.fill('https://skku.edu.example.com/');
   await expect(root.getByText('https로 시작하는 성균관대 주소인지 확인해 주세요')).toBeVisible();
   await expect(root.getByRole('button', { name: '요청 보내기' })).toBeDisabled();
@@ -111,7 +113,9 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
   await root.getByRole('button', { name: '요청 보내기' }).click();
   await expect(name).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { boardRequests: unknown[][] }).boardRequests)).toEqual([['account-a', '교환학생', 'https://www.skku.edu/board']]);
-  await expect(root.getByRole('paragraph').filter({ hasText: /^확인하고 있어요$/ })).toBeVisible();
+  for (const [board, status] of [['교환학생', '확인 중'], ['장학', '추가됨'], ['학과', '개발자 확인 중'], ['행사', '보내지 못함']]) {
+    await expect(root.getByRole('listitem').filter({ hasText: board })).toHaveText(`${board}${status}`);
+  }
   await root.getByRole('button', { name: '추가 요청', exact: true }).click();
   await root.getByRole('textbox', { name: '게시판 이름' }).fill('학과 공지');
   await root.getByRole('button', { name: '요청 보내기' }).click();
@@ -1809,11 +1813,23 @@ test('board order: edit mode shows drag handles only, the keyboard can lift, mov
   await first.focus();
   await page.keyboard.press('Space');
   await page.keyboard.press('ArrowDown');
-  await page.waitForTimeout(250);
   await page.keyboard.press('Space');
   await expect.poll(async () => (await names())[1]).toBe(before[0]);              // 첫 줄이 둘째 줄로 내려갔다
+  const movedHandle = screen.getByRole('button', { name: `${before[0]} 순서 옮기기` });
+  await movedHandle.focus();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Escape');
+  expect((await names())[1]).toBe(before[0]);
+  await page.keyboard.press('Space');
+  await page.keyboard.press('ArrowDown');
+  await screen.getByRole('button', { name: '완료' }).focus();
   await screen.getByRole('button', { name: '완료' }).click();
   expect((await names())[1]).toBe(before[0]);                                     // 끝낸 뒤에도 순서가 남는다
+  await screen.getByRole('button', { name: '추가 요청', exact: true }).click();
+  const requestName = screen.getByRole('textbox', { name: '게시판 이름' });
+  await requestName.pressSequentially('교환학생 공지');
+  await expect(requestName).toHaveValue('교환학생 공지');
 });
 
 test('first-run setup keeps answers when going back and forward, and a stored "no double major" shows as chosen', async ({ page }) => {
