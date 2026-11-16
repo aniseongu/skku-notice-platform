@@ -64,7 +64,7 @@ export default defineConfig({
       },
       workbox: {
         importScripts: ['push-handler.js', 'purge-legacy-cache.js'],
-        globPatterns: ['**/*.{html,js,css,svg,png}'],
+        globPatterns: ['**/*.{html,js,css,svg,png}', 'fonts/*.woff2'],
         // 암호화 라이브러리(약 420KB)는 설정에서 키를 저장할 때만 불러오므로 미리 저장하지 않는다.
         globIgnores: ['**/libsodium*.js', '**/*-dark.png', '**/icons/notify/**', '**/screenshots/**'],
         navigateFallback: 'index.html',

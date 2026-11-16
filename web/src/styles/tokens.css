@@ -1,3 +1,10 @@
+@font-face {
+  font-family: "Pretendard Common";
+  src: url('/fonts/pretendard-common.woff2') format('woff2-variations'), url('/fonts/pretendard-common.woff2') format('woff2');
+  font-weight: 45 920;
+  font-display: swap;
+}
+
 @layer tokens {
   :root {
     color-scheme: light dark;
@@ -30,7 +37,7 @@
     --r-md: 10px;
     --r-lg: 14px;
     --r-pill: 999px;
-    --font: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font: "Pretendard Common", "Pretendard Variable", Pretendard, system-ui, -apple-system, "Segoe UI", sans-serif;
     --gutter: 16px;
     --head-h: 64px;
     --tabbar-h: 64px;
