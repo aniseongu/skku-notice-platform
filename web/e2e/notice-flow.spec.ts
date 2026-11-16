@@ -444,9 +444,9 @@ test('first-run setup: choices only, department list follows the college, double
   expect(saved.boards).toEqual(expect.arrayContaining(['skku-notice01', 'cse-notice', 'futurecar-notice', 'aiuniv-notice']));
   expect(saved).not.toHaveProperty('joinedPrograms');
   // 알림은 꼭 켠다: 건너뛰는 단추가 없고, 알림 받기를 눌러 켜지면 이어진다.
-  await expect(dialog.getByRole('heading', { name: '알림을 켜 둘까요?' })).toBeFocused();
+  await expect(dialog.getByRole('heading', { name: '알림을 켜 주세요' })).toBeFocused();
   await expect(dialog.getByRole('button', { name: /나중에/ })).toHaveCount(0);
-  await expect(dialog.getByText('알림을 켜면 다음으로 넘어가요')).toBeVisible();
+  await expect(dialog.getByText('설정에서 언제든 끌 수 있어요')).toBeVisible();
   await dialog.getByRole('button', { name: '알림 받기' }).click();
   expect((await calls(page)).filter((c) => c[0] === 'push')).toHaveLength(1);
   await expect(dialog).toHaveCount(0);
@@ -2161,13 +2161,13 @@ test('install banner: one tap installs on phones, closing keeps it away, PC neve
   });
   expect(movement).toBeGreaterThan(50);
   // 설치 단추와 닫기 단추는 모두 44px 이상이다.
-  for (const name of ['홈 화면에 추가', '닫기']) {
+  for (const name of ['홈 화면에 추가', '다음에 할게요']) {
     const box = await banner.getByRole('button', { name }).boundingBox();
     expect(box!.height).toBeGreaterThanOrEqual(44);
     expect(box!.width).toBeGreaterThanOrEqual(44);
   }
   // 닫으면 사라지고 새로 열어도 다시 뜨지 않는다.
-  await banner.getByRole('button', { name: '닫기' }).click();
+  await banner.getByRole('button', { name: /다음에 할게요|확인했어요/ }).click();
   await expect(banner).toHaveCount(0);
   await page.getByRole('button', { name: /^인턴 공고/ }).first().click();
   await expect(page.getByRole('heading', { name: '인턴 공고' })).toBeVisible();
@@ -2209,8 +2209,8 @@ test('install banner keeps the last notice and temporary messages accessible', a
   await expect(banner).toHaveCount(0);
   await withApp(page, { toast: '' });
   await expect(banner).toBeVisible();
-  await banner.getByRole('button', { name: '닫기' }).focus();
-  await expect(banner.getByRole('button', { name: '닫기' })).toBeFocused();
+  await banner.getByRole('button', { name: '다음에 할게요' }).focus();
+  await expect(banner.getByRole('button', { name: '다음에 할게요' })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(banner).toHaveCount(0);
 });
@@ -2465,20 +2465,20 @@ test('first-run notify step: no skip when off, escape only after a failure, deni
   await dialog.getByRole('button', { name: '채웠어요' }).click();
   await next();
   await next();
-  const heading = dialog.getByRole('heading', { name: '알림을 켜 둘까요?' });
+  const heading = dialog.getByRole('heading', { name: '알림을 켜 주세요' });
   await expect(heading).toBeVisible();
   const set = (state: Record<string, unknown>) => page.evaluate((patch) => Object.assign(document.querySelector('notice-app') as object, patch), state);
   await expect(dialog.getByRole('button', { name: '알림 받기' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: /나중에/ })).toHaveCount(0);
   await set({ pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요. 다시 시도해 주세요' });
   await expect(dialog.getByRole('button', { name: '다시 시도하기' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '이 기기에서는 나중에 켤게요' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '나중에 켤게요' })).toBeVisible();
   await set({ pushStatus: 'denied', pushRetry: false, pushError: '' });
   await expect(dialog.getByRole('button', { name: '다시 확인하기' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '이 기기에서는 나중에 켤게요' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '나중에 켤게요' })).toBeVisible();
   await set({ pushStatus: 'unsupported' });
   await expect(dialog.getByText(/지원하지 않아요|홈 화면에 추가한 앱/)).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '끝내기' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '알림 없이 계속하기' })).toBeVisible();
   await set({ pushStatus: 'checking' });
   await expect(dialog.getByRole('button', { name: '확인하고 있어요' })).toBeDisabled();
 });
@@ -2492,6 +2492,11 @@ test('push sheet: asks on a device with notifications off, snoozes with a record
   const sheet = page.getByRole('region', { name: '알림 켜기' });
   await expect(sheet).toBeVisible();
   await expect(page.getByRole('region', { name: '앱 설치' })).toHaveCount(0);
+  // 막힌 기기는 설명을 안내로 바꾸고 다시 확인하기를 보인다.
+  await withApp(page, { pushStatus: 'denied' });
+  await expect(sheet.getByRole('button', { name: '다시 확인하기' })).toBeVisible();
+  await expect(sheet.getByText(/브라우저가 알림을 막아 두었어요/)).toBeVisible();
+  await withApp(page, { pushStatus: 'off' });
   await sheet.getByRole('button', { name: '알림 받기' }).click();
   expect(await calls(page)).toEqual([['enable']]);
   await sheet.getByRole('button', { name: '다음에 할게요' }).click();

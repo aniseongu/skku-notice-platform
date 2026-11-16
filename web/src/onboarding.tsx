@@ -14,6 +14,7 @@ import {
 } from './onboarding-flow';
 import { APP_NAME } from './brand';
 import { NoticeExample } from './notice-example';
+import { AlertIcon } from './alert-icon';
 import { installMode, isStandalone, MANUAL_INSTALL_HINT } from './install-hint';
 import { BackToGroups, Card, ChipGroup, ChoiceList, GroupGrid, Segmented, SwitchRow } from './ui';
 
@@ -354,22 +355,24 @@ export function Onboarding({ app }: { app: AppController }) {
     const waiting = status === 'checking' || status === 'busy';
     const mode = installMode(navigator.userAgent, isStandalone(), !!app.install);
     const iosHint = mode === 'ios' || mode === 'ios-browser' || mode === 'ios-open-safari' ? MANUAL_INSTALL_HINT[mode] : null;
-    title = '알림을 켜 둘까요?';
-    lead = '새 공지가 올라오면 이 기기로 알려드려요. 키워드와 맞지 않는 공지는 조용히 보여드려요.';
+    title = '알림을 켜 주세요';
+    lead = '새 공지가 올라오면 이 기기로 알려드려요';
     body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]">
       <NoticeExample idPrefix="onb" />
-      {app.pushError ? <p className="error-text text-[14px] font-medium text-danger" role="alert">{app.pushError}</p> : null}
-      {status === 'denied' ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2">브라우저 설정에서 이 사이트의 알림을 허용한 뒤 ‘다시 확인하기’를 눌러 주세요</p> : null}
+      {app.pushError || (failed && app.sendPushReport) ? <div className="grid">
+        {app.pushError ? <p className="error-text m-0 text-[14px] font-medium text-danger" role="alert"><AlertIcon />{app.pushError}</p> : null}
+        {failed && app.sendPushReport ? <button type="button" className="text-button [@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] inline-flex min-h-[44px] w-fit items-center rounded-sm border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent" onClick={() => { void app.sendPushReport(); }}>문제 알려 주기</button> : null}
+      </div> : null}
+      {status === 'denied' ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2">브라우저 설정에서 이 사이트의 알림을 허용한 뒤 다시 확인해 주세요</p> : null}
       {status === 'unsupported' ? (iosHint
-        ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2">iPhone에서는 홈 화면에 추가한 앱에서만 알림을 켤 수 있어요. {iosHint.lead}<b className="font-semibold text-ink">{iosHint.action}</b>{iosHint.tail}.</p>
+        ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2">iPhone은 홈 화면에 추가한 앱에서만 알림을 켤 수 있어요.<br />{iosHint.lead}<b className="font-semibold text-ink">{iosHint.action}</b>{iosHint.tail}.</p>
         : <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2">이 브라우저는 알림을 지원하지 않아요. 크롬 같은 다른 브라우저에서 열면 켤 수 있어요.</p>) : null}
-      {failed && app.sendPushReport ? <button type="button" className="text-button [@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] inline-flex min-h-[44px] w-fit items-center rounded-sm border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent" onClick={() => { void app.sendPushReport(); }}>진단 정보 보내기</button> : null}
     </div>;
-    const skip = <button type="button" className={GHOST} onClick={afterNotify}>이 기기에서는 나중에 켤게요</button>;
+    const skip = <button type="button" className={GHOST} onClick={afterNotify}>나중에 켤게요</button>;
     foot = <>
-      {status === 'off' && !failed || waiting ? <RequiredHint text="알림을 켜면 다음으로 넘어가요" /> : null}
+      {status === 'off' && !failed || waiting ? <p className="m-0 text-center text-[14px] text-ink-2">설정에서 언제든 끌 수 있어요</p> : null}
       {status === 'on' || status === 'unsupported'
-        ? <button type="button" className={SOLID} onClick={afterNotify}>{status === 'unsupported' ? (needAi() ? '알림 없이 다음' : '알림 없이 끝내기') : needAi() ? '다음' : '끝내기'}</button>
+        ? <button type="button" className={SOLID} onClick={afterNotify}>{status === 'unsupported' ? '알림 없이 계속하기' : needAi() ? '다음' : '끝내기'}</button>
         : status === 'denied'
           ? <button type="button" className={SOLID} onClick={() => { void app.recheckPush(); }}>다시 확인하기</button>
           : <button type="button" className={SOLID} disabled={waiting} onClick={() => { void app.enablePush(); }}>

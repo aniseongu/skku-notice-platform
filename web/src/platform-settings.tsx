@@ -453,7 +453,7 @@ function Notifications({ model }: { model: SettingsModel }) {
           {model.pushStatus === 'unsupported' ? <p className="field-note text-[14px] leading-[20px] text-ink-2">이 브라우저는 알림을 지원하지 않아요. 최신 브라우저에서 열어 주세요</p> : null}
           {model.pushStatus === 'denied' ? <p className="field-note text-[14px] leading-[20px] text-ink-2">브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요</p> : null}
           {model.pushError ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.pushError}</p> : null}
-          {model.pushError && model.sendPushReport ? <button type="button" className="text-button [@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] inline-flex min-h-[44px] w-fit items-center rounded-sm border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent" onClick={model.sendPushReport}>진단 정보 보내기</button> : null}
+          {model.pushError && model.sendPushReport ? <button type="button" className="text-button [@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] inline-flex min-h-[44px] w-fit items-center rounded-sm border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent" onClick={model.sendPushReport}>문제 알려 주기</button> : null}
           {on && model.subscriptions.length === 0 ? <p className="field-note text-[14px] leading-[20px] text-ink-2">받을 게시판을 고르면 새 공지를 알려드려요</p> : null}
         </>}
       </Setting>

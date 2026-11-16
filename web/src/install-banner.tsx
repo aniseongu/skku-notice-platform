@@ -21,9 +21,6 @@ export function InstallBanner({ app }: { app: AppController }) {
         <p className="m-0 text-[18px] leading-[25px] font-bold text-ink break-keep">홈 화면에 성공 추가하기</p>
         <p className="m-0 mt-[4px] text-[15px] leading-[22px] text-ink-2 break-keep">앱처럼 바로 열어 공지와 알림을 확인해요</p>
       </div>
-      <button type="button" className="-mt-[8px] -mr-[8px] inline-flex min-h-[44px] min-w-[44px] flex-none items-center justify-center rounded-md border-0 bg-transparent text-ink-2 [@media(hover:hover)]:hover:bg-hover active:bg-hover" aria-label="닫기" onClick={close}>
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-      </button>
     </div>
     {hint ? <p className="install-hint m-0 mt-[16px] rounded-md bg-sunken px-[16px] py-[14px] text-[15px] leading-[22px] text-ink-2 break-keep">{hint.lead}<b className="font-semibold text-ink">{hint.action}</b>{hint.tail}</p> : null}
     {hint ? null : <button type="button" className="mt-[16px] inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 bg-accent px-[16px] text-[16px] font-semibold text-on-accent active:opacity-80" onClick={() => { void app.runInstall(); }}>홈 화면에 추가</button>}
