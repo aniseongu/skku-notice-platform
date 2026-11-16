@@ -89,7 +89,7 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
     app.submitBoardRequest = (...args: unknown[]) => { w.boardRequests.push(args); return Promise.resolve({ status: 'ok', id: 'r1' }); };
     app.listBoardRequests = () => Promise.resolve([{ id: 'r1', name: '교환학생', status: 'pending' }]);
   });
-  const button = root.getByRole('button', { name: '추가 요청하기' });
+  const button = root.getByRole('button', { name: '추가 요청', exact: true });
   await button.scrollIntoViewIfNeeded();
   const metrics = await button.evaluate((el) => { const r = el.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return { height: r.height, top: !!hit && el.contains(hit) }; });
   expect(metrics.height).toBeGreaterThanOrEqual(44);
@@ -109,7 +109,7 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
   await expect(name).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { boardRequests: unknown[][] }).boardRequests)).toEqual([['account-a', '교환학생', 'https://www.skku.edu/board']]);
   await expect(root.getByText('요청을 확인하고 있어요')).toBeVisible();
-  await root.getByRole('button', { name: '추가 요청하기' }).click();
+  await root.getByRole('button', { name: '추가 요청', exact: true }).click();
   await root.getByRole('textbox', { name: '게시판 이름 (필수)' }).fill('학과 공지');
   await root.getByRole('button', { name: '요청 보내기' }).click();
   expect(await page.evaluate(() => (window as unknown as { boardRequests: unknown[][] }).boardRequests)).toEqual([

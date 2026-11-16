@@ -142,7 +142,7 @@ function Section({ id, title, action, children }: { id: string; title: string; a
 
 export function Setting({ name, help, children, className = '' }: { name: string; help?: ReactNode; children?: ReactNode; className?: string }) {
   return <div className={`${SETTING_ROW_CLASS} ${className}`}>
-    <div className="setting-text"><p className="setting-name text-[15px] leading-[22px] font-semibold">{name}</p>{help ? <p className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{help}</p> : null}</div>
+    <div className="setting-text"><p className="setting-name text-[15px] leading-[22px] font-medium">{name}</p>{help ? <p className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{help}</p> : null}</div>
     {children ? <div className="setting-control flex min-w-0 flex-col items-stretch gap-[8px] [&>:first-child]:mt-0 [&>.ghost-button]:self-start [&>.solid-button]:self-start min-[720px]:[&>.ghost-button]:self-end min-[720px]:[&>.solid-button]:self-end min-[720px]:[&_.segmented]:self-end min-[720px]:[&>.time-control]:self-end min-[720px]:[&>.inline-row]:justify-end min-[720px]:[&>.field-note]:text-right min-[720px]:[&>.setting-state]:text-right min-[720px]:[&>.connection-summary]:justify-end">{children}</div> : null}
   </div>;
 }
@@ -167,7 +167,7 @@ function SettingsLink({ model, label, help, section }: { model: SettingsModel; l
     model.openSection(section);
   };
   return <a className="settings-link [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href={href} onClick={open}>
-    <span><span className="setting-name text-[15px] leading-[22px] font-semibold">{label}</span><span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{help}</span></span>
+    <span><span className="setting-name text-[15px] leading-[22px] font-medium">{label}</span><span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{help}</span></span>
     <span className={`settings-chevron ${CHEVRON_RIGHT}`} aria-hidden="true" />
   </a>;
 }
@@ -201,7 +201,7 @@ function Overview({ model }: { model: SettingsModel }) {
       {model.userId ? <>
         <div className="account-row flex items-center gap-[14px] py-[16px] [&_.setting-name]:block [&_.setting-help]:block [&_.setting-name]:[overflow-wrap:anywhere] [&_.setting-help]:[overflow-wrap:anywhere]">
           <Avatar src={model.avatar} size={56} />
-          <div><span className="setting-name text-[15px] leading-[22px] font-semibold">{model.name ?? model.email ?? '로그인됨'}</span>
+          <div><span className="setting-name text-[15px] leading-[22px] font-medium">{model.name ?? model.email ?? '로그인됨'}</span>
             {model.name && model.email ? <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{model.email}</span> : null}</div>
         </div>
         <SettingsLink model={model} label="프로필 설정" help={profileSummary(model.profile)} section="profile" />
@@ -237,14 +237,14 @@ function Overview({ model }: { model: SettingsModel }) {
     </Section>
     <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0 mt-[24px]">
         <a className="settings-link [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href="privacy.html">
-        <span><span className="setting-name text-[15px] leading-[22px] font-semibold">개인정보 처리방침</span>
+        <span><span className="setting-name text-[15px] leading-[22px] font-medium">개인정보 처리방침</span>
           <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">어떤 정보를 어디에 쓰고 어떻게 지우는지 알려 드려요</span></span>
         <span className={`settings-chevron ${CHEVRON_RIGHT}`} aria-hidden="true" />
       </a>
       {/* 문의하기는 앱 안 양식(꺾쇠), 오픈소스는 GitHub로 나가므로 나가는 표시와 낭독용 안내를 따로 둔다. */}
       <SettingsLink model={model} label="문의하기" help="궁금한 점이나 바라는 점을 남겨 주세요" section="feedback" />
       <a className="settings-link [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href="https://github.com/aniseongu/skku-notice-platform" target="_blank" rel="noopener noreferrer">
-        <span><span className="setting-name text-[15px] leading-[22px] font-semibold">오픈소스</span>
+        <span><span className="setting-name text-[15px] leading-[22px] font-medium">오픈소스</span>
           <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">GitHub에서 코드를 볼 수 있어요 · 버전 {__APP_VERSION__}<span className="visually-hidden"> (새 창으로 열려요)</span></span></span>
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mr-[2px] flex-none text-ink-3"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>
       </a>
@@ -290,7 +290,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   if (others.length === 0) return <p className="field-note text-[14px] leading-[20px] text-ink-2">모든 게시판을 받고 있어요</p>;
   // 접힌 "게시판 더 보기" 줄을 누르면 펼쳐진다. 받는 게시판이 하나도 없으면 처음부터 펼쳐 둔다.
   return <details className="connection-manual group board-more-list mt-[8px] border-t border-line [&>.input]:mb-[8px] [&>.input]:w-full" open={mine.length === 0}>
-    <summary className={SUMMARY}>게시판 더 보기 ({others.length}개){chevron('M6 9l6 6 6-6', CHEVRON)}</summary>
+    <summary className={MORE_SUMMARY}>다른 게시판 {others.length}개 더 보기{chevron('M6 9l6 6 6-6', CHEVRON)}</summary>
     <div className="flex flex-col gap-3 pt-3">
       <input className="input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink text-[15px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px]" type="search" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off" value={query}
         onChange={(event) => setQuery(event.currentTarget.value)} />
@@ -420,8 +420,8 @@ function Canvas({ model }: { model: SettingsModel }) {
     {open ? <>
       <Section id="s-canvas-time" title="하루 요약">
         <Setting name="요약 시간" help={hasToken ? '모든 기기에 같은 시간을 적용해요. 할 일이 없어도 알려요' : '토큰을 연결하면 바꿀 수 있어요'}>
-          <p className="setting-name text-[15px] leading-[22px] font-semibold visually-hidden" id="summary-time-label">하루 요약 시간</p>
-          <div className={hasToken ? '' : 'opacity-50'}><SummaryTime info={info} /></div>
+          <p className="setting-name text-[15px] leading-[22px] font-medium visually-hidden" id="summary-time-label">하루 요약 시간</p>
+          <div className={hasToken ? 'min-[720px]:self-end' : 'opacity-50 min-[720px]:self-end'}><SummaryTime info={info} /></div>
           {hasToken ? <p className="field-note text-[14px] leading-[20px] text-ink-2">확인이 늦어지면 알림도 늦어져요</p> : null}
           {info.error ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{info.error}</p> : null}
         </Setting>
@@ -493,7 +493,7 @@ function BoardsSection({ model }: { model: SettingsModel }) {
   const canMove = order.boards.length >= 2;
   return <Section id="s-boards" title="받을 게시판"
     action={canMove ? <button type="button" className="head-action rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] -my-[13px] min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent [font-family:inherit] [line-height:inherit] [&:hover]:underline [&:hover]:underline-offset-[3px] focus-visible:rounded-sm" onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : undefined}>
-    <p className="settings-lead m-0 mb-[4px] pt-[12px] text-[13px] leading-[19px] text-ink-2">{editing ? '손잡이를 끌어 순서를 바꿔요. 바꾸면 바로 저장돼요' : '알림을 받고 목록에 모아 볼 게시판이에요. 이 순서로 보여요'}</p>
+    <p className="settings-lead m-0 mb-[4px] pt-[12px] text-[13px] leading-[19px] text-ink-2">{editing ? '손잡이를 끌어 순서를 바꿔요. 바꾸면 바로 저장돼요' : '켠 게시판의 새 공지를 알림으로 받고, 목록에 이 순서로 보여요'}</p>
     {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <>
       {model.error ? <><p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.error}</p>
         <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.retry}>다시 불러오기</button></> : null}
@@ -508,6 +508,7 @@ function BoardsSection({ model }: { model: SettingsModel }) {
 
 // 펼치는 줄(details)은 브라우저 기본 삼각형 대신 다른 곳과 같은 쉐브론을 쓴다. 열리면 위를 향한다.
 const SUMMARY = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[44px] cursor-pointer list-none items-center justify-between py-[12px] text-[14px] text-ink-2 [&::-webkit-details-marker]:hidden';
+const MORE_SUMMARY = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[52px] cursor-pointer list-none items-center justify-between py-[12px] text-[15px] font-medium text-ink [&::-webkit-details-marker]:hidden';
 const CHEVRON = 'text-ink-3 transition-transform group-open:rotate-180';
 function chevron(d: string, className?: string) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" className={className}><path d={d} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg>;
@@ -519,7 +520,7 @@ function BoardRow({ board, editing, onToggle, busy }: { board: { id: string; lab
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: board.id, disabled: !editing });
   return <li ref={setNodeRef} data-board-id={board.id} style={{ transform: CSS.Transform.toString(transform), transition }}
     className={`flex min-h-[56px] items-center gap-[12px] rounded-md border bg-surface pr-[6px] pl-[16px] ${isDragging ? 'relative z-10 border-accent shadow-pop' : 'border-line'}`}>
-    <span className="order-name min-w-0 flex-1 text-[15px] font-semibold [overflow-wrap:anywhere]">{board.label}</span>
+    <span className="order-name min-w-0 flex-1 text-[15px] font-medium [overflow-wrap:anywhere]">{board.label}</span>
     {editing ? <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} aria-label={`${board.label} 순서 옮기기`}
       className="order-handle grid size-[44px] flex-none cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent text-ink-3 [@media(hover:hover)]:hover:bg-hover active:bg-hover active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-accent">
       <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">{[7, 12, 17].flatMap((y) => [9, 15].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.7" />))}</svg></button> : null}
@@ -585,7 +586,7 @@ function Keywords({ model }: { model: SettingsModel }) {
           : model.userId ? null : <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0">로그인하면 다른 기기와 같은 키워드를 써요</p>}
       </div>
       <div className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch">
-        <p className="setting-name text-[15px] leading-[22px] font-semibold m-0">내 키워드 {model.keywords.length}개</p>
+        <p className="setting-name text-[15px] leading-[22px] font-medium m-0">내 키워드 {model.keywords.length}개</p>
         {model.keywords.length
           ? <ul className="keyword-list m-0 list-none border-t-0 p-0 [&>li]:flex [&>li]:min-h-[44px] [&>li]:items-center [&>li]:justify-between [&>li]:border-b [&>li]:border-line [&>li]:text-[15px] [&>li:last-child]:border-b-0">{model.keywords.map((word) => <li key={word}><span className="flex min-w-0 flex-col py-[10px]"><span>{word}</span>{GENERIC_INTERN_WORD.test(word) ? <span className="field-note text-[14px] leading-[20px] text-ink-2">{INTERN_KEYWORD_NOTE}</span> : null}</span>
             <button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" aria-label={`${word} 삭제`} onClick={() => model.removeKeyword(word)}>삭제</button></li>)}</ul>
@@ -695,7 +696,7 @@ function ProgramEditor({ programs, ready, onChange }: { programs: Program[]; rea
   useEffect(() => { if (editing) pickerRef.current?.scrollIntoView({ block: 'nearest' }); }, [editing]);
   const picker = <div ref={pickerRef} className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch">
     <div className="flex items-center justify-between gap-2">
-      <p className="setting-name text-[15px] leading-[22px] font-semibold m-0">{editing === 'main' ? '주전공을 골라 주세요' : '복수전공을 골라 주세요'}</p>
+      <p className="setting-name text-[15px] leading-[22px] font-medium m-0">{editing === 'main' ? '주전공을 골라 주세요' : '복수전공을 골라 주세요'}</p>
       <button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px] min-h-[44px] px-2" onClick={() => setEditing(null)}>닫기</button>
     </div>
     <ProgramPicker current={editing === 'main' ? main : null} onPick={pick} lead={false} listClass="max-h-[min(55vh,420px)] overflow-y-auto" />
@@ -927,7 +928,7 @@ function Feedback({ model }: { model: SettingsModel }) {
           {mailTouched && mailProblem ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0" role="alert">메일 주소 형식이 맞는지 확인해 주세요</p> : null}
         </Setting>
         {/* 보내기도 다른 설정 줄과 같은 모양이다: 이름과 설명은 왼쪽, 단추는 오른쪽. 안내(한도, 막힌 이유, 결과)는 단추 위아래가 아니라 이 줄의 설명 한 곳에서만 말한다. */}
-        <Setting name="운영자에게 보내기" className="min-[720px]:items-center!" help={<span className={`${state === 'ok' ? 'font-semibold text-accent' : state === 'error' ? 'text-danger' : ''}`} role={state === 'error' ? 'alert' : 'status'}>{message}</span>}>
+        <Setting name="운영자에게 보내기" help={<span className={`${state === 'ok' ? 'font-semibold text-accent' : state === 'error' ? 'text-danger' : ''}`} role={state === 'error' ? 'alert' : 'status'}>{message}</span>}>
           <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2 min-h-[44px] px-4" disabled={blocked} onClick={() => { void submit(); }}>{state === 'sending' ? '보내고 있어요' : '보내기'}</button>
         </Setting>
       </div>

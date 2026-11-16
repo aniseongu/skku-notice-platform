@@ -89,9 +89,9 @@ export function BoardRequest({ toast, userId, listRequests, submitRequest, onAdd
   };
   const input = 'min-h-[44px] w-full rounded-md border border-line bg-surface px-[12px] text-[15px] text-ink';
   return <div className="border-t border-line">
-    <div className="flex min-h-[52px] items-center justify-between gap-[8px] text-[15px] text-ink">
-      <span>원하는 게시판이 없나요?</span>
-      <button type="button" aria-expanded={open} disabled={busy} onClick={() => setOpen(!open)} className="min-h-[44px] shrink-0 rounded-sm border-0 bg-transparent px-[8px] text-[14px] font-semibold text-accent [@media(hover:hover)]:hover:bg-hover active:bg-hover">{open ? '접기' : '추가 요청하기'}</button>
+    <div className="flex min-h-[52px] items-center justify-between gap-[8px]">
+      <span className="text-[15px] font-normal text-ink-2">찾는 게시판이 없나요?</span>
+      <button type="button" aria-expanded={open} disabled={busy} onClick={() => setOpen(!open)} className="min-h-[44px] shrink-0 rounded-sm border-0 bg-transparent px-[8px] text-[15px] font-medium text-accent [@media(hover:hover)]:hover:bg-hover active:bg-hover">{open ? '접기' : '추가 요청'}</button>
     </div>
     {requests.length ? <div className="grid gap-[6px] pb-[12px] text-[14px] leading-[20px] text-ink-2" aria-live="polite">
       <p className="m-0 font-semibold text-ink">요청한 게시판</p>
