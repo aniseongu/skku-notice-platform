@@ -21,7 +21,9 @@ test('shared board requests are private and publication subscribes only the requ
     }
     await db.exec(`set role authenticated; set request.jwt.claim.sub = '${a}';
       insert into shared_board_requests(name,url) values ('교환학생', 'https://www.skku.edu/a.do');`);
-    const req = (await db.query('select id from shared_board_requests')).rows[0].id;
+    const viaRpc = await db.query('select submit_shared_board($1,$2,$3) as id', [a, '주소 없는 게시판', '']);
+    assert.ok(viaRpc.rows[0].id);
+    const req = (await db.query("select id from shared_board_requests where name='교환학생'")).rows[0].id;
     await assert.rejects(db.exec(`update shared_board_requests set status='added'`), /permission denied/);
     await assert.rejects(db.query(`select publish_shared_board('${req}', 'https://www.skku.edu/a.do', '[]')`), /permission denied/);
     await db.exec(`set request.jwt.claim.sub = '${b}'`);

@@ -11,6 +11,8 @@ create table public.shared_board_requests (
   created_at timestamptz not null default now(),
   processed_at timestamptz
 );
+create index shared_board_requests_owner_time on public.shared_board_requests (user_id, created_at desc);
+create index shared_board_requests_pending_time on public.shared_board_requests (created_at) where status = 'pending';
 alter table public.shared_board_requests enable row level security;
 revoke all on public.shared_board_requests from public, anon, authenticated;
 grant select on public.shared_board_requests to authenticated;
