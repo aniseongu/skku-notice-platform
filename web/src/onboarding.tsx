@@ -359,6 +359,7 @@ export function Onboarding({ app }: { app: AppController }) {
     // 알림은 첫 설정에서 꼭 켠다(사용자 지시 2026-11-16). 켤 수 없는 기기(지원 안 함, 브라우저가 막음, 반복 실패)만 이 기기에서 건너뛸 수 있고, 건너뛴 기기에는 알림 패널이 다시 권한다.
     const SOLID = 'solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60';
     const GHOST = 'ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60';
+    const HINT = 'hint m-0 rounded-md bg-sunken px-[12px] py-[10px] text-left text-[14px] leading-[20px] text-ink-2 break-keep text-pretty';
     const status = app.pushStatus;
     const failed = status === 'off' && (!!app.pushError || app.pushRetry);
     const waiting = status === 'checking' || status === 'busy';
@@ -367,14 +368,14 @@ export function Onboarding({ app }: { app: AppController }) {
     title = '새 공지를 알림으로 받을까요?';
     body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]">
       <NoticeExample idPrefix="onb" />
-      {app.pushError || (failed && app.sendPushReport) ? <div className="grid">
-        {app.pushError ? <p className="error-text m-0 text-[14px] font-medium text-danger break-keep text-pretty" role="alert"><AlertIcon />{app.pushError}</p> : null}
+      {status === 'denied' || status === 'unsupported' || failed ? <div className="grid gap-[2px]">
+        {status === 'denied' ? <p className={HINT}><AlertIcon />브라우저가 알림을 막아 두었어요. 주소창 옆 자물쇠에서 알림을 허용하고 다시 확인해 주세요</p>
+          : status === 'unsupported' ? (iosHint
+            ? <p className={HINT}><AlertIcon />홈 화면에 추가한 앱에서만 알림을 켤 수 있어요.<br />{mode === 'ios' ? <>공유 버튼에서 <b className="font-semibold text-ink">‘홈 화면에 추가’</b>를 눌러 주세요.</> : <>{iosHint.lead.replace(/\([^)]*\)/g, '')}<b className="font-semibold text-ink">{iosHint.action}</b>{iosHint.tail.replace(/\([^)]*\)/g, '')}.</>}</p>
+            : <p className={HINT}><AlertIcon />이 브라우저는 알림을 지원하지 않아요. 크롬 같은 다른 브라우저에서 열면 켤 수 있어요.</p>)
+          : <p className={HINT} role="alert"><AlertIcon />알림을 켜지 못했어요<br />다시 시도해도 안 되면 문제 알려 주기를 눌러 주세요</p>}
         {failed && app.sendPushReport ? <button type="button" className="text-button [@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] inline-flex min-h-[44px] w-fit items-center rounded-sm border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent" onClick={() => { void app.sendPushReport(); }}>문제 알려 주기</button> : null}
       </div> : null}
-      {status === 'denied' ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2 break-keep text-pretty"><AlertIcon />브라우저가 알림을 막아 두었어요. 주소창 옆 자물쇠에서 알림을 허용하고 다시 확인해 주세요</p> : null}
-      {status === 'unsupported' ? (iosHint
-        ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2 break-keep text-pretty">홈 화면에 추가한 앱에서만 알림을 켤 수 있어요.<br />{mode === 'ios' ? <>공유 버튼에서 <b className="font-semibold text-ink">‘홈 화면에 추가’</b>를 눌러 주세요.</> : <>{iosHint.lead.replace(/\([^)]*\)/g, '')}<b className="font-semibold text-ink">{iosHint.action}</b>{iosHint.tail.replace(/\([^)]*\)/g, '')}.</>}</p>
-        : <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2 break-keep text-pretty">이 브라우저는 알림을 지원하지 않아요. 크롬 같은 다른 브라우저에서 열면 켤 수 있어요.</p>) : null}
     </div>;
     const skip = <button type="button" className={GHOST} onClick={afterNotify}>다음에 할게요</button>;
     foot = <>

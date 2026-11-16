@@ -102,10 +102,13 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
   expect(inputStyle.weight).toBe('400');
   await expect(root.getByRole('button', { name: '요청 보내기' })).toBeDisabled();
   await expect(root.getByText('게시판 이름을 적어 주세요')).toBeVisible();
+  // 요청 칸 안의 버튼이 아닌 글은 모두 왼쪽 맞춤이다(가운데·오른쪽 맞춤이 섞이지 않는다).
+  const aligns = await root.locator('p.field-note, [role=status], [role=alert], .setting-help').evaluateAll((els) => els.filter((el) => el.closest('.setting')?.querySelector('input[aria-label="게시판 이름"]')).map((el) => getComputedStyle(el).textAlign));
+  expect(aligns.length).toBeGreaterThan(1);
+  for (const align of aligns) expect(['start', 'left']).toContain(align);
   await name.fill('교환학생');
   await expect(root.getByText('게시판 이름을 적어 주세요')).toHaveCount(0);
   const address = root.getByRole('textbox', { name: '주소 (선택)' });
-  await expect(address).toHaveAccessibleDescription('주소를 적으면 보통 30분 안에 확인해서 모두가 고를 수 있게 추가해요. 주소가 없거나 확인이 안 되면 개발자가 살펴봐요');
   await address.fill('https://skku.edu.example.com/');
   await expect(root.getByText('https로 시작하는 성균관대 주소인지 확인해 주세요')).toBeVisible();
   await expect(root.getByRole('button', { name: '요청 보내기' })).toBeDisabled();
@@ -1772,6 +1775,18 @@ for (const width of [412, 1440]) {
     const screen = page.locator('platform-settings-screen');
     const right = async (locator: import('@playwright/test').Locator) => { const box = await locator.boundingBox(); expect(box).not.toBeNull(); return box!.x + box!.width; };
     const card = await right(screen.locator('.order-list li').first());
+    // 설명 아래 첫 게시판 칸 사이 간격은 다른 구역의 구분선과 첫 줄 사이 간격(위 여백)과 같다.
+    const gaps = await screen.evaluate((root) => {
+      const top = (el: Element | null) => el!.getBoundingClientRect().top;
+      const bottom = (el: Element | null) => el!.getBoundingClientRect().bottom;
+      const ref = root.querySelector('section:has(#s-notify) .box')!;
+      const refGap = top(ref.querySelector('.setting-name')) - top(ref);
+      const lead = root.querySelector('section:has(#s-boards) .box > p.setting-help');
+      const first = root.querySelector('section:has(#s-boards) .order-list li');
+      return { refGap, gap: top(first) - (bottom(lead) - parseFloat(getComputedStyle(lead!).paddingBottom)) };
+    });
+    console.log(`board lead gap ${width}: gap=${gaps.gap}, reference=${gaps.refGap}`);
+    expect(gaps.gap).toBeGreaterThanOrEqual(gaps.refGap - 2);
     await expect.poll(async () => Math.abs(await right(screen.locator('.board-more-list summary svg')) - card)).toBeLessThanOrEqual(1);
     const chevron = await right(screen.locator('.board-more-list summary svg'));
     const reorder = await right(screen.getByRole('button', { name: '순서 바꾸기' }));

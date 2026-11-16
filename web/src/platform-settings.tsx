@@ -134,9 +134,9 @@ const SEMESTERS = [1, 2];
 
 const SETTING_ROW_CLASS = 'setting flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:grid min-[720px]:grid-cols-[minmax(0,1fr)_minmax(0,520px)] min-[720px]:[align-items:start] min-[720px]:gap-[24px] min-[720px]:has-[>.setting-control>.rule-list]:grid-cols-[minmax(0,1fr)] min-[720px]:has-[>.setting-control>.rule-list]:gap-[8px] min-[720px]:has-[>.setting-control>.connection-summary]:[&>.setting-text]:pt-[11px]';
 
-function Section({ id, title, action, description, children }: { id: string; title: string; action?: ReactNode; description?: string; children: ReactNode }) {
+function Section({ id, title, action, children }: { id: string; title: string; action?: ReactNode; children: ReactNode }) {
   return <section aria-labelledby={id}>
-    {action || description ? <div className="mt-[28px] mb-[8px]"><div className="settings-head-row flex items-center justify-between gap-[12px] pr-[var(--gutter)] min-[720px]:pr-0"><h2 id={id} className="settings-head m-0 text-[14px] leading-[20px] font-semibold text-ink-2">{title}</h2>{action}</div>{description ? <p className="settings-lead m-0 mt-[4px] text-[13px] leading-[19px] text-ink-2">{description}</p> : null}</div> : <h2 id={id} className="settings-head mt-[28px] mb-[8px] text-[14px] leading-[20px] font-semibold text-ink-2">{title}</h2>}
+    {action ? <div className="settings-head-row mt-[28px] mb-[8px] flex items-center justify-between gap-[12px] pr-[var(--gutter)] min-[720px]:pr-0"><h2 id={id} className="settings-head m-0 text-[14px] leading-[20px] font-semibold text-ink-2">{title}</h2>{action}</div> : <h2 id={id} className="settings-head mt-[28px] mb-[8px] text-[14px] leading-[20px] font-semibold text-ink-2">{title}</h2>}
     <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0">{children}</div></section>;
 }
 
@@ -292,6 +292,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   return <details className="connection-manual group board-more-list mt-[8px] border-t border-line [&>.input]:mb-[8px] [&>.input]:w-full" open={mine.length === 0}>
     <summary className={MORE_SUMMARY}>다른 게시판 {others.length}개 더 보기{chevron('M6 9l6 6 6-6', CHEVRON)}</summary>
     <div className="flex flex-col gap-3 pt-3 pb-3">
+      <p className="setting-help m-0 text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">단과대를 골라 게시판을 추가해요</p>
       <input className="input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink text-[15px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px]" type="search" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off" value={query}
         onChange={(event) => setQuery(event.currentTarget.value)} />
       {needle
@@ -492,9 +493,9 @@ function BoardsSection({ model }: { model: SettingsModel }) {
   const order = model.boardOrder;
   const canMove = order.boards.length >= 2;
   return <Section id="s-boards" title="받을 게시판"
-    description={editing ? '끌어서 순서를 바꿔요. 바로 저장돼요' : '켠 게시판 순서대로 목록에 보이고, 새 공지는 알림으로 와요'}
     action={canMove ? <button type="button" className={`head-action ${SETTINGS_ACTION} -ml-[8px] -my-[13px]`} onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : undefined}>
     {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <>
+      <p className="setting-help m-0 pt-[16px] pb-[12px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{editing ? '끌어서 순서를 바꿔요. 바로 저장돼요' : '켠 게시판 순서대로 목록에 보이고, 새 공지는 알림으로 와요'}</p>
       {model.error ? <><p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.error}</p>
         <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.retry}>다시 불러오기</button></> : null}
       {order.boards.length ? <BoardOrderList order={order} editing={editing} onToggle={(id) => model.toggle(id, false)} busy={model.loading} />
