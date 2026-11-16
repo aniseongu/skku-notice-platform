@@ -35,6 +35,7 @@ import type { Subscription } from '@supabase/supabase-js';
 import { dropDuplicates, groupMates } from './dup-notices';
 import { orderNotices, type Sort } from './notice-order';
 import { Reactive, defineReactive } from './reactive';
+import { clearListCache, loadListCache, saveListCache } from './list-cache';
 
 const COOP_KIND_ORDER = ['대기업', '중견기업', '중소기업', '스타트업', '기업', '공공기관', '연구기관', '협회/기타', '기타 기관'];
 /** 기관 구분이 비어 있는 현장실습은 '기타 기관'으로 묶는다. */
@@ -226,6 +227,9 @@ export class AppController extends Reactive {
   subscriptionsLoading = false;
   subscriptionsError = '';
   subscriptionsEpoch = 0;
+  private cacheReady = false;
+  private liveFeedReady = false;
+  private liveAccountReady = false;
   seenAddedBoardRequests = new Set<string>();
   pushStatus: 'unsupported' | 'checking' | 'off' | 'on' | 'busy' | 'denied' = 'checking';
   pushError = '';
@@ -412,6 +416,8 @@ export class AppController extends Reactive {
         const loggedIn = !!userId && userId !== this.authUserId && this.authReady;
         if (!this.authReady || userId !== this.authUserId) {
           const previousUserId = this.authUserId;
+          if (previousUserId && !userId) void clearListCache(previousUserId);
+          this.cacheReady = false; this.liveFeedReady = false; this.liveAccountReady = false;
           this.notices = []; this.sources = []; this.generatedAt = null; this.bodies.clear();
           const kept = savedSelection(); this.selectionReady = false;   // 아래에서 계정을 바꾸는 동안 저장된 선택을 덮어쓰지 않는다
           this.authUserId = userId;
@@ -431,17 +437,27 @@ export class AppController extends Reactive {
           this.preferencesError = '';
           this.preferencesUnavailable = false;
           this.accountDataLoaded = !userId; this.aiStateLoaded = !userId; this.settingsCapped = !userId;
-          if (userId) setTimeout(() => {
+          if (userId) setTimeout(() => { void (async () => {
+            const cached = await Promise.race([loadListCache(userId), new Promise<null>((resolve) => setTimeout(() => resolve(null), 150))]);
             if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
+            if (cached && !this.liveFeedReady) {
+              const bySource = new Map(cached.sources.map((source) => [source.id, source]));
+              this.sources = cached.sources; this.notices = cached.notices.filter((notice) => !isExpired(notice, bySource.get(notice.source_id)));
+              this.generatedAt = cached.generatedAt; this.subscriptions = cached.subscriptions; this.subscriptionsLoading = false;
+              this.keywords = cached.keywords; this.boardOrder = cached.boardOrder;
+              this.myDeadlines = cached.deadlines; this.myJudgments = cached.judgments; this.myInterests = cached.interests;
+              this.myTranslations = cached.translations; this.graduationStatuses = cached.graduation;
+              this.cacheReady = true; this.requestUpdate();
+            }
             // 첫 목록에 필요한 계정 정보를 모두 받으면 한꺼번에 그린다(userDataReady). 너무 늦으면 상한 시간에 그냥 그린다.
             // 구독·키워드·게시판 순서도 목록과 왼쪽 메뉴의 모양을 바꾸므로 같이 기다린다.
             const first = [this.refreshMyDeadlines(userId, epoch), this.refreshMyTranslations(userId, epoch), this.refreshMine(userId, epoch),
               this.refreshSubscriptions(userId, epoch), this.refreshPreferences(userId, epoch), this.refreshBoardOrder(userId, epoch)];
-            void Promise.allSettled(first).then(() => { if (epoch === this.subscriptionsEpoch) this.accountDataLoaded = true; });
+            void Promise.allSettled(first).then(() => { if (epoch === this.subscriptionsEpoch && userId === this.authUserId) { this.accountDataLoaded = true; this.liveAccountReady = true; this.saveCurrentListCache(userId, epoch); } });
             setTimeout(() => { if (epoch === this.subscriptionsEpoch) { this.accountDataLoaded = true; this.aiStateLoaded = true; this.settingsCapped = true; } }, AppController.FIRST_LOAD_LIMIT_MS);
             void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch);
             void this.refreshDevices();   // 알림 설정을 열 때 기기 구역이 뒤늦게 끼어들지 않게 미리 받는다
-          }, 0);
+          })(); }, 0);
           setLocalOwner(userId);
           this.saved = loadSaved();
           this.keywords = loadKeywords();
@@ -517,6 +533,8 @@ export class AppController extends Reactive {
       this.notices = notices!.notices.filter((notice) => !isExpired(notice, bySource.get(notice.source_id)));
       this.sources = notices!.sources;
       this.generatedAt = notices!.generated_at;
+      this.liveFeedReady = true;
+      if (userId) this.saveCurrentListCache(userId, epoch);
       remember('has-coop', this.hasCoop() ? '1' : '0');
       if (userId && !initial) {
         void this.refreshMyDeadlines(userId, epoch);
@@ -580,6 +598,13 @@ export class AppController extends Reactive {
     } catch {
       this.authError = '로그아웃을 완료하지 못했어요. 다시 확인해 주세요.';
     } finally { this.authBusy = false; }
+  }
+
+  private saveCurrentListCache(userId: string, epoch: number): void {
+    if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId || !this.liveFeedReady || !this.liveAccountReady || !this.generatedAt) return;
+    void saveListCache(userId, { generatedAt: this.generatedAt, sources: this.sources, notices: this.notices,
+      subscriptions: this.subscriptions, keywords: this.keywords, boardOrder: this.boardOrder, deadlines: this.myDeadlines,
+      judgments: this.myJudgments, interests: this.myInterests, translations: this.myTranslations, graduation: this.graduationStatuses });
   }
 
   /** 직접 누른 새로고침은 따로 진행 표시를 두지 않는다(받는 동안 단추만 흐려진다). 목록이 그대로여도 끝났는지 알 수 있게 결과를 토스트로 알린다(실패 안내는 refresh가 한다).
@@ -721,7 +746,7 @@ export class AppController extends Reactive {
   graduationOnly = remember('view-grad') === '1';
   /** 목록에 졸업요건 표지를 보여 줄 수 있는 사용자인지: 로그인했고 아직 채우지 않은 요건이 있다. */
   /** 첫 목록을 그려도 되는지. 로그인하지 않았으면 기다릴 계정 정보가 없다. */
-  userDataReady(): boolean { return !this.authUserId || (this.accountDataLoaded && this.aiStateLoaded); }
+  userDataReady(): boolean { return !this.authUserId || this.cacheReady || (this.accountDataLoaded && this.aiStateLoaded); }
   /** 설정 화면은 이 기기 알림 상태, 기기 목록, 프로필까지 받은 뒤 한 번에 그린다. 먼저 그리면 새로고침 때 "확인하고 있어요"→"켜져 있어요",
    * "아직 받는 게시판이 없어요"→목록처럼 문구가 차례로 바뀌며 아래가 밀린다. */
   settingsReady(): boolean {
@@ -1371,7 +1396,12 @@ export class AppController extends Reactive {
     this.accountBusy = true; this.accountError = '';
     try {
       await deleteMyAccount(authClient);
+      const sameAccount = this.authUserId === userId;
+      const epoch = sameAccount ? ++this.subscriptionsEpoch : this.subscriptionsEpoch;
+      await clearListCache(userId);
+      if (!sameAccount || epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
       await this.releasePush(userId);          // 이 기기의 알림 등록도 풀어 둔다
+      if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
       await authClient.auth.signOut({ scope: 'local' }).catch(() => undefined);
       this.showToast('계정과 저장된 정보를 모두 지웠어요');
     } catch (error) {
