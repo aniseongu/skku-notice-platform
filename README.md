@@ -19,7 +19,7 @@
 
 </div>
 
-Google 계정으로 로그인한 사람마다 구독한 게시판, 관심 키워드, 저장과 읽음 상태를 따로 가집니다. 공지를 가져오고 이미지 속 글자를 읽는 일은 Oracle Cloud 무료 서버가 맡고, 웹은 Cloudflare Pages에서 서비스합니다. 혼자 쓰던 [개인용 성공](https://github.com/aniseongu/skku-notice-alert)을 여러 사람이 쓰도록 새로 만든 프로젝트입니다.
+Google 계정으로 로그인한 사람마다 구독한 게시판, 관심 키워드, 저장과 읽음 상태를 따로 가집니다. 공지를 가져오고 이미지 속 글자를 읽는 일은 Oracle Cloud 서버가 맡고, 웹은 Cloudflare Pages에서 서비스합니다. 혼자 쓰던 [개인용 성공](https://github.com/aniseongu/skku-notice-alert)을 여러 사람이 쓰도록 새로 만든 프로젝트입니다.
 
 ## 사용 화면
 
@@ -85,7 +85,7 @@ AI 판정과 인턴십 요건 안내는 참고용이며, 최종 인정 여부는
 [![Deno](https://img.shields.io/badge/Deno-000000?style=flat-square&logo=deno&logoColor=white)](https://deno.com/)
 [![Gemini](https://img.shields.io/badge/Gemini-8E75B2?style=flat-square&logo=googlegemini&logoColor=white)](https://ai.google.dev/)
 [![Cloudflare Pages](https://img.shields.io/badge/Cloudflare_Pages-F38020?style=flat-square&logo=cloudflarepages&logoColor=white)](https://pages.cloudflare.com/)
-[![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-F80000?style=flat-square&logo=data:image/svg%2Bxml;base64,PHN2ZyBmaWxsPSJ3aGl0ZSIgcm9sZT0iaW1nIiB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI%2BPHBhdGggZD0iTTE2LjQxMiA0LjQxMmgtOC44MmE3LjU4OCA3LjU4OCAwIDAgMC0uMDA4IDE1LjE3Nmg4LjgyOGE3LjU4OCA3LjU4OCAwIDAgMCAwLTE1LjE3NnptLS4xOTMgMTIuNTAySDcuNzg2YTQuOTE1IDQuOTE1IDAgMCAxIDAtOS44MjhoOC40MzNhNC45MTQgNC45MTQgMCAxIDEgMCA5LjgyOHoiLz48L3N2Zz4%3D)](https://www.oracle.com/cloud/free/)
+[![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-F80000?style=flat-square&logo=data:image/svg%2Bxml;base64,PHN2ZyBmaWxsPSJ3aGl0ZSIgcm9sZT0iaW1nIiB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI%2BPHBhdGggZD0iTTE2LjQxMiA0LjQxMmgtOC44MmE3LjU4OCA3LjU4OCAwIDAgMC0uMDA4IDE1LjE3Nmg4LjgyOGE3LjU4OCA3LjU4OCAwIDAgMCAwLTE1LjE3NnptLS4xOTMgMTIuNTAySDcuNzg2YTQuOTE1IDQuOTE1IDAgMCAxIDAtOS44MjhoOC40MzNhNC45MTQgNC45MTQgMCAxIDEgMCA5LjgyOHoiLz48L3N2Zz4%3D)](https://www.oracle.com/cloud/)
 [![Playwright](https://img.shields.io/badge/Playwright-2EAD33?style=flat-square&logo=data:image/svg%2Bxml;base64,PHN2ZyBmaWxsPSJ3aGl0ZSIgcm9sZT0iaW1nIiB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI%2BPHBhdGggZD0iTTIzLjk5NiA3LjQ2MmMtLjA1Ni44MzctLjI1NyAyLjEzNS0uNzE2IDMuODUtLjk5NSAzLjcxNS00LjI3IDEwLjg3NC0xMC40MiA5LjIyNy02LjE1LTEuNjUtNS40MDctOS40ODctNC40MTItMTMuMjAxLjQ2LTEuNzE2LjkzNC0yLjk0IDEuMzA1LTMuNjk0LjQyLS44NTMuODQ2LS4yODkgMS44MTUuNTIzLjY4NC41NzMgMi40MSAxLjc5MSA1LjAxMSAyLjQ4OCAyLjYwMS42OTcgNC43MDYuNTA2IDUuNTgzLjM1MiAxLjI0NS0uMjE5IDEuODk3LS40OTQgMS44MzQuNDU1Wm0tOS44MDcgMy44NjNzLS4xMjctMS44MTktMS43NzMtMi4yODZjLTEuNjQ0LS40NjctMi42MTMgMS4wNC0yLjYxMyAxLjA0Wm00LjA1OCA0LjUzOS03Ljc2OS0yLjE3MnMuNDQ2IDIuMzA2IDMuMzM4IDMuMTUzYzIuODYyLjgzNiA0LjQzLS45OCA0LjQzLS45ODFabTIuNzAxLTIuNTFzLS4xMy0xLjgxOC0xLjc3My0yLjI4NmMtMS42NDQtLjQ2OS0yLjYxMiAxLjAzOC0yLjYxMiAxLjAzOFpNOC41NyAxOC4yM2MtNC43NDkgMS4yNzktNy4yNjEtNC4yMjQtOC4wMjEtNy4wOEMuMTk3IDkuODMxLjA0NCA4LjgzMi4wMDMgOC4xODhjLS4wNDctLjczLjQ1NS0uNTIgMS40MTUtLjM1NC42NzcuMTE4IDIuMy4yNjEgNC4zMDgtLjI4YTExLjI4IDExLjI4IDAgMCAwIDIuNDEtLjk1NmMtLjA1OC4xOTctLjExNC40LS4xNy42MS0uNDMzIDEuNjE4LS44MjcgNC4wNTUtLjYzMiA2LjQyNi0xLjk3Ni43MzItMi4yNjcgMi40MjMtMi4yNjcgMi40MjNsMi41MjQtLjcxNWMuMjI3IDEuMDAyLjYgMS45ODcgMS4xNSAyLjgzOGE1LjkxNCA1LjkxNCAwIDAgMS0uMTcxLjA0OVptLTQuMTg4LTYuMjk4YzEuMjY1LS4zMzMgMS4zNjMtMS42MzEgMS4zNjMtMS42MzFsLTMuMzc0Ljg4OHMuNzQ1IDEuMDc2IDIuMDEuNzQzWiIvPjwvc3ZnPg%3D%3D)](https://playwright.dev/)
 [![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/aniseongu/skku-notice-platform/actions)
 
@@ -94,7 +94,7 @@ AI 판정과 인턴십 요건 안내는 참고용이며, 최종 인정 여부는
 | 웹 | TypeScript, React 19, Vite, Tailwind CSS v4, vite-plugin-pwa(Workbox), supabase-js, dnd-kit, DOMPurify, Pretendard |
 | 워커 | Python 3.12, httpx, selectolax, nh3, RapidOCR·ONNX Runtime, Google Gen AI SDK(Gemini), Groq API, pywebpush |
 | DB·인증 | Supabase(PostgreSQL, Auth, RLS), Edge Function(Deno) |
-| 서버 | Oracle Cloud 무료 VM, systemd 타이머 6개, NestJS 내부 API |
+| 서버 | Oracle Cloud VM, systemd 타이머 6개, NestJS 내부 API |
 | 배포·검증 | Cloudflare Pages(main 푸시 시 자동 배포), GitHub Actions CI, Playwright, PGlite, pytest, ruff |
 
 ## 로컬 실행
