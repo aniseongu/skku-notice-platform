@@ -295,7 +295,7 @@ def test_school_notice_with_ai_deadline_reads_like_the_login_example():
 class RequiredStore:
     def __init__(self, rows, devices):
         self.rows, self.device_list = rows, devices
-        self.marked, self.removed = [], []
+        self.marked, self.removed, self.touched = [], [], []
 
     def required_reminders(self):
         return self.rows
@@ -305,6 +305,9 @@ class RequiredStore:
 
     def mark_required(self, user_id, missing_key):
         self.marked.append((user_id, missing_key))
+
+    def touch_required(self, user_id, missing_key):
+        self.touched.append((user_id, missing_key))
 
     def remove_expired(self, subscription_id, user_id):
         self.removed.append((subscription_id, user_id))
@@ -317,7 +320,8 @@ def _device(device_id):
 
 def test_required_message_names_missing_items():
     title = "필요한 정보를 채워 주세요"
-    assert worker.required_message(["AI 키"]) == (title, "AI 키를 연결하면 공지를 다시 골라 드려요")
+    assert worker.required_message(["AI 키"]) == ("AI 키를 다시 연결해 주세요", worker.AI_KEY_BODY)
+    assert worker.required_message(["학교 정보", "인턴십"])[0] == title
     assert worker.required_message(["학교 정보", "인턴십"])[1] == "앱을 열고 학교 정보, 인턴십만 고르면 돼요"
 
 
@@ -351,3 +355,12 @@ def test_required_batch_without_devices_or_rows_does_nothing(monkeypatch):
     store = RequiredStore([{"user_id": "u", "missing": ["AI 키"], "missing_key": "AI 키"}], {})
     assert worker.run_required_batch(store, "k", "s", NOW) == {"required_sent": 0, "required_failed": 1}
     assert store.marked == []
+
+
+def test_required_batch_failed_send_only_records_the_attempt(monkeypatch):
+    row = {"user_id": "u1", "missing": ["AI 키"], "missing_key": "AI 키"}
+    store = RequiredStore([row], {"u1": [_device("d1")]})
+    monkeypatch.setattr(worker, "send_one", lambda *args, **kwargs: "retry")
+    counts = worker.run_required_batch(store, "key", "mailto:x@example.com", datetime.now(UTC))
+    assert counts == {"required_sent": 0, "required_failed": 1}
+    assert store.marked == [] and store.touched == [("u1", "AI 키")]

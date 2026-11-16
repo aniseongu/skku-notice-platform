@@ -94,7 +94,7 @@ test('reminder schedule: up to 3 per missing set, 3 then 7 days apart, new set r
     const noDevice = await addUser(db, 2, profile, 'none', false);
     const complete = await addUser(db, 3, profile, 'ok');
     const list = async () => (await db.query('select user_id, missing, missing_key from public.list_required_info_reminders(20)')).rows;
-    const age = (days) => db.exec(`update public.user_required_reminders set last_sent_at = now() - interval '${days} days' where user_id = '${id}'`);
+    const age = (days) => db.exec(`update public.user_required_reminders set last_sent_at = now() - interval '${days} days', last_tried_at = now() - interval '${days} days' where user_id = '${id}'`);
     const mark = (key) => db.query('select public.mark_required_reminder($1, $2)', [id, key]);
 
     let rows = await list();
@@ -112,6 +112,15 @@ test('reminder schedule: up to 3 per missing set, 3 then 7 days apart, new set r
     assert.equal((await db.query('select sends from public.user_required_reminders where user_id = $1', [id])).rows[0].sends, 3);
     await age(365); assert.equal((await list()).length, 0);  // 세 번이면 끝
 
+    // 모두 실패한 시도는 보낸 횟수를 세지 않고 1시간 쉰 뒤 목록 뒤쪽에서 다시 나온다(실패한 계정이 앞자리를 계속 차지하지 않게).
+    const other = await addUser(db, 4, profile, 'none');
+    await db.query('select public.touch_required_reminder($1, $2)', [other, 'AI 키']);
+    assert.equal((await list()).some((r) => r.user_id === other), false);
+    await db.exec(`update public.user_required_reminders set last_tried_at = now() - interval '2 hours' where user_id = '${other}'`);
+    assert.equal((await db.query('select sends from public.user_required_reminders where user_id = $1', [other])).rows[0].sends, 0);
+    assert.equal((await list()).some((r) => r.user_id === other), true);
+    await db.exec(`delete from public.user_push_subscriptions where user_id = '${other}'`);
+
     // 빈 항목이 달라지면 새 묶음이라 처음부터 다시 보낸다.
     await db.exec(`update public.user_profiles set university_3p_internship_selected = null where user_id = '${id}'`);
     rows = await list();
@@ -127,7 +136,7 @@ test('reminder schedule: up to 3 per missing set, 3 then 7 days apart, new set r
 test('only the service role can run the reminder functions and read the reminder table', async () => {
   const db = await setup();
   try {
-    const fns = ['required_info_missing(uuid)', 'list_required_info_reminders(integer)', 'mark_required_reminder(uuid, text)'];
+    const fns = ['required_info_missing(uuid)', 'list_required_info_reminders(integer)', 'mark_required_reminder(uuid, text)', 'touch_required_reminder(uuid, text)'];
     for (const role of ['anon', 'authenticated']) {
       for (const fn of fns) {
         const ok = (await db.query(`select has_function_privilege('${role}', 'public.${fn}', 'execute') as ok`)).rows[0].ok;

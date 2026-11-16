@@ -62,6 +62,10 @@ class PushStore(NoticeStore):
         payload = {"p_user": user_id, "p_missing_key": missing_key}
         self._request("POST", "rpc/mark_required_reminder", json=payload)
 
+    def touch_required(self, user_id: str, missing_key: str) -> None:
+        payload = {"p_user": user_id, "p_missing_key": missing_key}
+        self._request("POST", "rpc/touch_required_reminder", json=payload)
+
     def feedback_pending(self) -> list[dict]:
         return self._request(
             "GET",
@@ -267,13 +271,14 @@ def run_canvas_batch(store: PushStore, private_key: str, subject: str, now: date
 
 
 APP_URL = "https://skku-notice-platform.pages.dev/"
+AI_KEY_BODY = "공지를 골라 드리려면 AI 키가 필요해요. 앱을 열면 바로 연결할 수 있어요"
 
 
 def required_message(missing: list[str]) -> tuple[str, str]:
     """채워야 할 필수 정보를 알리는 알림 문구."""
     items = [str(item) for item in missing][:5]
     if items == ["AI 키"]:
-        return "필요한 정보를 채워 주세요", "AI 키를 연결하면 공지를 다시 골라 드려요"
+        return "AI 키를 다시 연결해 주세요", AI_KEY_BODY
     return "필요한 정보를 채워 주세요", f"앱을 열고 {', '.join(items)}만 고르면 돼요"
 
 
@@ -299,6 +304,8 @@ def run_required_batch(
             store.mark_required(row["user_id"], row["missing_key"])
             counts["required_sent"] += 1
         else:
+            # 실패도 시도 시각을 남겨 같은 계정이 매번 앞자리를 차지하지 않게 한다.
+            store.touch_required(row["user_id"], row["missing_key"])
             counts["required_failed"] += 1
     return counts
 
@@ -376,7 +383,11 @@ def main() -> int:
             counts = run_batch(store, private_key, subject, now)
             canvas = run_canvas_batch(store, private_key, subject, now)
             app_url = os.environ.get("APP_URL") or APP_URL
-            required = run_required_batch(store, private_key, subject, now, app_url)
+            try:
+                required = run_required_batch(store, private_key, subject, now, app_url)
+            except Exception:
+                # 필수 정보 알림이 실패해도(예: DB 함수 미적용) 공지 알림 결과와 문의 메일은 이어서 처리한다.
+                required = {"required_sent": 0, "required_failed": -1}
             feedback = run_feedback_batch(
                 store, os.environ.get("RESEND_API_KEY", ""), os.environ.get("FEEDBACK_NOTIFY_EMAIL", ""),
                 os.environ.get("FEEDBACK_MAIL_FROM", "성공 <onboarding@resend.dev>"), now,

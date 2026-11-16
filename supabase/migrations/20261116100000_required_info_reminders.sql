@@ -7,8 +7,11 @@ create table if not exists public.user_required_reminders (
   missing_key text not null check (length(missing_key) between 1 and 200),
   sends integer not null default 0 check (sends >= 0),
   last_sent_at timestamptz,
+  -- 보내기를 시도한 마지막 시각(실패 포함). 실패한 계정이 목록 앞자리를 계속 차지해 다른 계정이 밀리지 않게 한다.
+  last_tried_at timestamptz,
   primary key (user_id, missing_key)
 );
+alter table public.user_required_reminders add column if not exists last_tried_at timestamptz;
 alter table public.user_required_reminders enable row level security;
 revoke all on public.user_required_reminders from public, anon, authenticated;
 grant all on public.user_required_reminders to service_role;
@@ -53,12 +56,14 @@ language sql stable security definer set search_path to '' as $$
   where profile.onboarded_at is not null
     and cardinality(m.missing) > 0
     and exists (select 1 from public.user_push_subscriptions device where device.user_id = profile.user_id)
+    and (reminder.last_tried_at is null or reminder.last_tried_at <= now() - interval '1 hour')
     and (
       reminder.user_id is null
+      or reminder.sends = 0
       or (reminder.sends = 1 and reminder.last_sent_at <= now() - interval '3 days')
       or (reminder.sends = 2 and reminder.last_sent_at <= now() - interval '7 days')
     )
-  order by profile.user_id
+  order by reminder.last_tried_at nulls first, profile.user_id
   limit greatest(least(coalesce(p_limit, 20), 100), 1);
 $$;
 revoke all on function public.list_required_info_reminders(integer) from public, anon, authenticated;
@@ -66,9 +71,20 @@ grant execute on function public.list_required_info_reminders(integer) to servic
 
 create or replace function public.mark_required_reminder(p_user uuid, p_missing_key text) returns void
 language sql security definer set search_path to '' as $$
-  insert into public.user_required_reminders(user_id, missing_key, sends, last_sent_at)
-  values (p_user, p_missing_key, 1, now())
-  on conflict (user_id, missing_key) do update set sends = public.user_required_reminders.sends + 1, last_sent_at = now();
+  insert into public.user_required_reminders(user_id, missing_key, sends, last_sent_at, last_tried_at)
+  values (p_user, p_missing_key, 1, now(), now())
+  on conflict (user_id, missing_key) do update
+    set sends = public.user_required_reminders.sends + 1, last_sent_at = now(), last_tried_at = now();
 $$;
 revoke all on function public.mark_required_reminder(uuid, text) from public, anon, authenticated;
 grant execute on function public.mark_required_reminder(uuid, text) to service_role;
+
+-- 모든 기기에서 실패한 시도. 보낸 횟수는 그대로 두고 시도 시각만 남겨 1시간 뒤 목록 뒤쪽에서 다시 시도한다.
+create or replace function public.touch_required_reminder(p_user uuid, p_missing_key text) returns void
+language sql security definer set search_path to '' as $$
+  insert into public.user_required_reminders(user_id, missing_key, sends, last_tried_at)
+  values (p_user, p_missing_key, 0, now())
+  on conflict (user_id, missing_key) do update set last_tried_at = now();
+$$;
+revoke all on function public.touch_required_reminder(uuid, text) from public, anon, authenticated;
+grant execute on function public.touch_required_reminder(uuid, text) to service_role;
