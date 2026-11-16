@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { AlertIcon } from './alert-icon';
-import { SETTINGS_ACTION, SETTINGS_INPUT, SOLID_BUTTON } from './cls';
+import { SETTINGS_ACTION, SETTINGS_INPUT, SOLID_BUTTON, GHOST_BUTTON } from './cls';
 import { Setting } from './platform-settings';
 import type { BoardRequestResult, BoardRequestState } from './shared-board-requests';
 
@@ -99,9 +99,12 @@ export function BoardRequest({ toast, userId, listRequests, submitRequest, onAdd
         {invalid ? <p id={addressErrorId} className="field-note m-0 text-left text-[14px] leading-[20px] text-danger" role="alert">https로 시작하는 성균관대 주소인지 확인해 주세요</p> : null}
         {error ? <p className="field-note m-0 text-left text-[14px] leading-[20px] text-danger" role="alert"><AlertIcon />{error}</p> : null}
         {!name.trim() ? <p className="field-note m-0 text-left text-[14px] leading-[20px] text-ink-2" role="status">게시판 이름을 적어 주세요</p> : null}
-        <button type="button" disabled={busy || !name.trim() || invalid} onClick={() => { void submit(); }} className={`${SOLID_BUTTON} self-start min-[720px]:self-end`}>{busy ? '보내고 있어요' : '요청 보내기'}</button>
+        <div className="flex gap-[8px] min-[720px]:justify-end">
+          <button type="button" disabled={busy} onClick={() => setOpen(false)} className={GHOST_BUTTON}>취소</button>
+          <button type="button" disabled={busy || !name.trim() || invalid} onClick={() => { void submit(); }} className={SOLID_BUTTON}>{busy ? '보내고 있어요' : '요청 보내기'}</button>
+        </div>
       </div> : null}
-      <button type="button" aria-expanded={open} disabled={busy} onClick={() => setOpen(!open)} className={`${SETTINGS_ACTION} shrink-0 self-end`}>{open ? '접기' : '추가 요청'}</button>
+      {open ? null : <button type="button" aria-expanded={false} disabled={busy} onClick={() => setOpen(true)} className={`${SETTINGS_ACTION} shrink-0 self-end`}>추가 요청</button>}
     </Setting>
     {(open || requests.some((request) => request.status === 'pending' || request.status === 'added')) && requests.length ? <ul className="m-0 list-none border-t border-line p-0 pb-[12px] [&>li]:flex [&>li]:min-h-[44px] [&>li]:items-center [&>li]:justify-between [&>li]:gap-[12px] [&>li]:border-b [&>li]:border-line [&>li]:text-[15px] [&>li:last-child]:border-b-0" aria-live="polite">
       {requests.map((request) => <li key={request.id}><span className="min-w-0 py-[10px] font-normal text-ink">{request.name}</span><span className="shrink-0 text-[14px] leading-[20px] text-ink-2">{request.status === 'added' ? '추가됨' : request.status === 'review' ? '개발자 확인 중' : request.status === 'failed' ? '보내지 못함' : '확인 중'}</span></li>)}

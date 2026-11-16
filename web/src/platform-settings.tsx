@@ -287,7 +287,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   const current = group && groups.has(group) ? group : null;   // 묶음의 게시판을 모두 추가했으면 단과대 고르기로 돌아간다
   const row = (source: (typeof others)[number]) => <button key={source.id} type="button" className={CHOICE} disabled={busy} aria-label={`${source.label} 추가`} onClick={() => model.toggle(source.id, true)}>
     <span>{source.label}</span><span className="text-[14px] font-semibold text-accent" aria-hidden="true">추가</span></button>;
-  if (others.length === 0) return <p className="field-note text-[14px] leading-[20px] text-ink-2">모든 게시판을 받고 있어요</p>;
+  if (others.length === 0) return <div className={`${BOARD_TRAILING_ROW} mt-[8px] border-t border-line py-[12px] text-[15px] font-medium text-ink-2`}>모든 게시판을 받고 있어요</div>;
   // 접힌 "게시판 더 보기" 줄을 누르면 펼쳐진다. 받는 게시판이 하나도 없으면 처음부터 펼쳐 둔다.
   return <details className="connection-manual group board-more-list mt-[8px] border-t border-line [&>.input]:mb-[8px] [&>.input]:w-full" open={mine.length === 0}>
     <summary className={MORE_SUMMARY}>다른 게시판 {others.length}개 더 보기{chevron('M6 9l6 6 6-6', CHEVRON)}</summary>
