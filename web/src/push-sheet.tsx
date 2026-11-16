@@ -6,11 +6,13 @@ const KEY = 'push-sheet';
 
 /** 이 기기의 알림이 꺼져 있으면 화면 아래에서 올라와 켜기를 권한다(사전 안내 후 브라우저 허용 창, 규칙은 push-sheet-rule.ts). */
 export function pushSheetShown(app: AppController, update: boolean, closed: boolean): boolean {
-  return !closed && !app.toast && !update && (app.pushStatus === 'off' || app.pushStatus === 'denied') && pushSheetDue(remember(KEY), Date.now());
+  return !closed && !app.toast && !update && (app.pushStatus === 'off' || app.pushStatus === 'denied' || app.pushStatus === 'busy') && pushSheetDue(remember(KEY), Date.now());
 }
 
 export function PushSheet({ app, onClose }: { app: AppController; onClose: () => void }) {
   const denied = app.pushStatus === 'denied';
+  // 켜는 동안(busy)에도 패널을 두어 실패하면 같은 자리에서 이유와 다시 시도를 보인다(busy는 사용자가 누른 뒤에만 생긴다).
+  const busy = app.pushStatus === 'busy';
   const close = () => { remember(KEY, pushSheetDismissed(remember(KEY), Date.now())); onClose(); };
   return <section className="push-sheet fixed inset-x-0 bottom-0 z-[4] max-h-[75dvh] overflow-y-auto rounded-t-lg border border-line bg-surface px-[20px] pt-[20px] pb-[calc(20px+env(safe-area-inset-bottom))] shadow-lg [animation:install-rise_240ms_ease-out_both] motion-reduce:animate-none min-[720px]:bottom-[24px] min-[720px]:mx-auto min-[720px]:w-[420px] min-[720px]:max-w-[calc(100%-32px)] min-[720px]:rounded-lg min-[720px]:pb-[20px]" aria-label="알림 켜기">
     <div className="flex items-start gap-[12px]">
@@ -24,7 +26,8 @@ export function PushSheet({ app, onClose }: { app: AppController; onClose: () =>
       </button>
     </div>
     {denied ? <p className="push-hint m-0 mt-[16px] rounded-md bg-sunken px-[16px] py-[14px] text-[15px] leading-[22px] text-ink-2 break-keep">브라우저가 알림을 막아 두었어요. 주소창 옆 자물쇠나 브라우저 설정에서 <b className="font-semibold text-ink">이 사이트의 알림을 허용</b>한 뒤 설정에서 켜 주세요</p> : null}
-    {denied ? null : <button type="button" className="mt-[16px] inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 bg-accent px-[16px] text-[16px] font-semibold text-on-accent active:opacity-80" onClick={() => { void app.enablePush(); }}>알림 받기</button>}
+    {app.pushError && !denied ? <p className="error-text m-0 mt-[12px] text-[14px] leading-[20px] text-danger break-keep" role="alert">{app.pushError}</p> : null}
+    {denied ? null : <button type="button" className="mt-[16px] inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 bg-accent px-[16px] text-[16px] font-semibold text-on-accent active:opacity-80 disabled:opacity-60" disabled={busy} onClick={() => { void app.enablePush(); }}>{busy ? '확인하고 있어요' : app.pushRetry ? '다시 시도하기' : '알림 받기'}</button>}
     <button type="button" className={`inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 px-[16px] text-[16px] font-semibold ${denied ? 'mt-[16px] bg-accent text-on-accent active:opacity-80' : 'mt-[8px] bg-sunken text-ink [@media(hover:hover)]:hover:bg-line active:bg-line'}`} onClick={close}>{denied ? '확인했어요' : '다음에 할게요'}</button>
   </section>;
 }

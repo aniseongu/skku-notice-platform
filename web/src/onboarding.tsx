@@ -368,7 +368,7 @@ export function Onboarding({ app }: { app: AppController }) {
         ? <button type="button" className={SOLID} onClick={afterNotify}>{needAi() ? '다음' : '끝내기'}</button>
         : status === 'denied'
           ? <button type="button" className={SOLID} onClick={() => { void app.recheckPush(); }}>다시 확인하기</button>
-          : <button type="button" className={SOLID} disabled={waiting} onClick={() => { void app.enablePush().then(() => { if (app.pushStatus === 'on') afterNotify(); }); }}>
+          : <button type="button" className={SOLID} disabled={waiting} onClick={() => { void app.enablePush(); }}>
             {waiting ? '확인하고 있어요' : app.pushRetry ? '다시 시도하기' : '알림 받기'}</button>}
       {failed || status === 'denied' ? skip : null}
     </>;
