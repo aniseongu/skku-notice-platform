@@ -293,8 +293,10 @@ def run_one(store: OCRStore, user_agent: str, now: datetime, *, discover: bool =
     if text:
         text = deepen(store, notice_id, [image_data], text)
     if not text or len(text.encode("utf-8")) > 1_000_000:
-        store.mark(notice_id, image_url, now, None, was_ready=was_ready)
-        return "failed"
+        # 같은 그림은 다시 읽어도 결과가 같다(글자 없는 사진, 지나치게 긴 결과).
+        # 일시 실패가 아니라 영구 건너뛰기다.
+        store.skip_permanently(notice_id, image_url, was_ready=was_ready)
+        return "skipped"
     store.save_cache(digest, text)
     store.mark(notice_id, image_url, now, digest, was_ready=was_ready)
     return "processed"

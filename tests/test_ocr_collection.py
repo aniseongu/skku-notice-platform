@@ -116,6 +116,20 @@ def test_rejected_url_and_bad_image_are_permanent(monkeypatch):
     assert job.run_one(store, "test", NOW) == "idle"
 
 
+def test_image_without_text_is_permanent_skip(monkeypatch):
+    from io import BytesIO
+
+    from PIL import Image
+
+    payload = BytesIO()
+    Image.new("RGB", (20, 20), "white").save(payload, format="PNG")
+    store = MemoryStore()
+    monkeypatch.setattr(job, "fetch_image", lambda *_, **__: SimpleNamespace(data=payload.getvalue()))
+    monkeypatch.setattr(job, "read_images", lambda _images: "")
+    assert job.run_one(store, "test", NOW) == "skipped"
+    assert job.run_one(store, "test", NOW) == "idle"
+
+
 def test_failed_refresh_preserves_last_good_result(monkeypatch):
     store = MemoryStore()
     store.image["status"] = "ready"
