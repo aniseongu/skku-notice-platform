@@ -1505,6 +1505,16 @@ export class AppController extends Reactive {
     }
   }
 
+  /** 브라우저 설정에서 허용한 뒤 다시 확인한다. 허용돼 있으면 이어서 켠다. */
+  async recheckPush(): Promise<void> {
+    const userId = this.authUserId;
+    if (!userId || typeof Notification === 'undefined') return;
+    if (Notification.permission === 'denied') { this.pushError = '아직 허용되지 않았어요. 브라우저 설정에서 알림을 허용해 주세요.'; return; }
+    this.pushError = '';
+    await this.refreshPush(userId, this.subscriptionsEpoch);
+    if (this.pushStatus === 'off') await this.enablePush();
+  }
+
   /** 알림 켜기 실패 진단을 문의(버그)로 보낸다. 사용자가 단추를 누를 때만 보낸다. */
   async sendPushReport(): Promise<void> {
     const registration = this.pushRegistration ?? await navigator.serviceWorker?.getRegistration().catch(() => undefined) ?? null;

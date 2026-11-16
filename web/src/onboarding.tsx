@@ -13,6 +13,7 @@ import {
   resumeStep, savedBefore, stepIndex, toggleValue, withPrograms, type Draft, type DoubleAnswer, type Step,
 } from './onboarding-flow';
 import { APP_NAME } from './brand';
+import { installMode, isStandalone, MANUAL_INSTALL_HINT } from './install-hint';
 import { BackToGroups, Card, ChipGroup, ChoiceList, GroupGrid, Segmented, SwitchRow } from './ui';
 
 const STEP_LABELS = ['주전공', '복수전공', '학교 정보', '인턴십', '받을 공지', '알림', 'AI 키'] as const;
@@ -198,7 +199,7 @@ export function Onboarding({ app }: { app: AppController }) {
     if (step === 'primary' && !changingPrimary) { setChangingPrimary(true); return; }
     // 앞으로 갈 때 알림이 이미 켜져 있어 건너뛴 단계는 뒤로 갈 때도 건너뛴다.
     if (fillMode) { if (index > 0) setStep(fill[index - 1]); return; }
-    if (step === 'ai' && app.pushStatus !== 'off') { go('boards'); return; }
+    if (step === 'ai' && app.pushStatus === 'on') { go('boards'); return; }
     go(previousStep(step));
   };
   const sources = app.sources.filter((source) => !source.external);
@@ -216,14 +217,15 @@ export function Onboarding({ app }: { app: AppController }) {
   const boardSwitch = (source: (typeof mainSources)[number]) => <SwitchRow key={source.id} label={source.name}
     checked={draft.boards.includes(source.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, source.id), boardsTouched: true })} />;
   const keywordOptions = [...KEYWORD_SUGGESTIONS, ...draft.keywords.filter((word) => !(KEYWORD_SUGGESTIONS as readonly string[]).includes(word))];
-  const pushAsk = app.pushStatus === 'off';
 
   // 알림 → AI 키 순서. 알림을 이미 켰거나 지원하지 않으면 알림 단계를 건너뛰고, 키가 이미 있으면 AI 단계를 건너뛴다.
   // 키 기능이 꺼져 있거나 확인하지 못했어도 키 없이 끝내지 않는다(예외 없음). 그때는 AI 단계에서 다시 확인하게 한다.
   const needAi = () => !app.byokStatus && app.aiKeys.length === 0;
   const afterNotify = () => { if (needAi()) go('ai'); else app.closeOnboarding(); };
   const finishWithKey = () => { void app.completeOnboarding(); };
-  const save = async () => { if (await app.finishOnboarding(draft, !needAi())) { setSaved(true); if (app.pushStatus === 'off') go('notify'); else afterNotify(); } };
+  const save = async () => { if (await app.finishOnboarding(draft, !needAi())) { setSaved(true); if (app.pushStatus !== 'on') go('notify'); else afterNotify(); } };
+  // 허용 창을 늦게 눌러서 나중에 알림이 켜져도 이 단계에 머물지 않고 이어 간다.
+  useEffect(() => { if (!fillMode && step === 'notify' && app.pushStatus === 'on') afterNotify(); });   // eslint-disable-line react-hooks/exhaustive-deps
 
   let title = '', lead = '', body: React.ReactNode = null, foot: React.ReactNode = null;
   if (step === 'primary') {
@@ -341,18 +343,34 @@ export function Onboarding({ app }: { app: AppController }) {
         {app.onboardingBusy ? '저장하고 있어요' : '끝내기'}</button>
     </>;
   } else {
+    // 알림은 첫 설정에서 꼭 켠다(사용자 지시 2026-11-16). 켤 수 없는 기기(지원 안 함, 브라우저가 막음, 반복 실패)만 이 기기에서 건너뛸 수 있고, 건너뛴 기기에는 알림 패널이 다시 권한다.
+    const SOLID = 'solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60';
+    const GHOST = 'ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60';
+    const status = app.pushStatus;
+    const failed = status === 'off' && (!!app.pushError || app.pushRetry);
+    const waiting = status === 'checking' || status === 'busy';
+    const mode = installMode(navigator.userAgent, isStandalone(), !!app.install);
+    const iosHint = mode === 'ios' || mode === 'ios-browser' || mode === 'ios-open-safari' ? MANUAL_INSTALL_HINT[mode] : null;
     title = '알림을 켜 둘까요?';
     lead = '새 공지가 올라오면 이 기기로 알려드려요. 키워드와 맞지 않는 공지는 조용히 보여드려요.';
     body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]">
       {app.pushError ? <p className="error-text text-[14px] text-danger" role="alert">{app.pushError}</p> : null}
-      {app.pushStatus === 'denied' ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2">브라우저 설정에서 알림을 허용하면 나중에 켤 수 있어요.</p> : null}
+      {status === 'denied' ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2">브라우저 설정에서 이 사이트의 알림을 허용한 뒤 ‘다시 확인하기’를 눌러 주세요.</p> : null}
+      {status === 'unsupported' ? (iosHint
+        ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2">iPhone에서는 홈 화면에 추가한 앱에서만 알림을 켤 수 있어요. 먼저 설치한 뒤 앱에서 켜 주세요. {iosHint.lead}<b className="font-semibold text-ink">{iosHint.action}</b>{iosHint.tail}</p>
+        : <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2">이 브라우저는 알림을 지원하지 않아요. 크롬 같은 다른 브라우저에서 열면 켤 수 있어요.</p>) : null}
+      {failed && app.sendPushReport ? <button type="button" className="text-button [@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] inline-flex min-h-[44px] w-fit items-center rounded-sm border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent" onClick={() => { void app.sendPushReport(); }}>진단 정보 보내기</button> : null}
     </div>;
+    const skip = <button type="button" className={GHOST} onClick={afterNotify}>이 기기에서는 나중에 켤게요</button>;
     foot = <>
-      {pushAsk || app.pushStatus === 'busy'
-        ? <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={app.pushStatus === 'busy'} onClick={() => { void app.enablePush().then(() => { if (app.pushStatus === 'on') afterNotify(); }); }}>
-          {app.pushStatus === 'busy' ? '확인하고 있어요' : app.pushRetry ? '다시 시도하기' : '알림 받기'}</button>
-        : <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={afterNotify}>{needAi() ? '다음' : '끝내기'}</button>}
-      {pushAsk ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={afterNotify}>나중에 할게요</button> : null}
+      {status === 'off' && !failed || waiting ? <RequiredHint text="알림을 켜야 다음으로 넘어가요" /> : null}
+      {status === 'on' || status === 'unsupported'
+        ? <button type="button" className={SOLID} onClick={afterNotify}>{needAi() ? '다음' : '끝내기'}</button>
+        : status === 'denied'
+          ? <button type="button" className={SOLID} onClick={() => { void app.recheckPush(); }}>다시 확인하기</button>
+          : <button type="button" className={SOLID} disabled={waiting} onClick={() => { void app.enablePush().then(() => { if (app.pushStatus === 'on') afterNotify(); }); }}>
+            {waiting ? '확인하고 있어요' : app.pushRetry ? '다시 시도하기' : '알림 받기'}</button>}
+      {failed || status === 'denied' ? skip : null}
     </>;
   }
 

@@ -3,7 +3,7 @@
 import { UpdateBar } from './update-bar';
 import { aiConnectModel } from './ai-connect';
 import { visibleTracks } from './graduation-assessment';
-import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { applyBoardOrder } from './board-order';
 import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, deadlinePassed, postedGroup, safeUrl, todayKst } from './data';
 import { APP_NAME } from './brand';
@@ -17,6 +17,8 @@ import type { UserProfile } from './profile';
 import { Avatar } from './ui';
 import { Onboarding } from './onboarding';
 import { InstallBanner } from './install-banner';
+import { PushSheet, pushSheetShown } from './push-sheet';
+import { subscribeUpdate, updateAvailable } from './app-update';
 import { LoginScreen, LoginStatus } from './login-screen';
 import type { CanvasMode } from './devices';
 import { bodyInterests, withMyDeadline } from './notice-view';
@@ -121,7 +123,7 @@ export function NoticeShell({ app }: { app: AppController }) {
         </div>
       </aside>
 
-      <main className={`list-pane min-[720px]:min-h-0 min-[720px]:overflow-y-auto min-[720px]:bg-surface min-[720px]:pb-[32px] ${app.selecting ? 'max-[719px]:pb-[calc(88px+env(safe-area-inset-bottom))]' : 'max-[719px]:pb-[calc(var(--tabbar-h)+24px+env(safe-area-inset-bottom))] max-[719px]:[notice-app:has(.install-banner)_&]:pb-[calc(380px+env(safe-area-inset-bottom))]'} ${noDetail ? '' : 'min-[1080px]:border-r min-[1080px]:border-line'}`}>
+      <main className={`list-pane min-[720px]:min-h-0 min-[720px]:overflow-y-auto min-[720px]:bg-surface min-[720px]:pb-[32px] ${app.selecting ? 'max-[719px]:pb-[calc(88px+env(safe-area-inset-bottom))]' : 'max-[719px]:pb-[calc(var(--tabbar-h)+24px+env(safe-area-inset-bottom))] max-[719px]:[notice-app:has(.install-banner)_&]:pb-[calc(380px+env(safe-area-inset-bottom))] max-[719px]:[notice-app:has(.push-sheet)_&]:pb-[calc(300px+env(safe-area-inset-bottom))]'} ${noDetail ? '' : 'min-[1080px]:border-r min-[1080px]:border-line'}`}>
         {reading ? <ReadingView app={app} notice={reading} /> : <>
           <div className="navigation-head contents">
             <header className={`${TOPBAR} ${settings ? TOPBAR_SETTINGS : TOPBAR_FEED}`}>
@@ -184,7 +186,7 @@ export function NoticeShell({ app }: { app: AppController }) {
         onClick={() => app.openTab(t.id)}><Icon name={t.icon} /><span>{t.label}</span></button>)}
     </nav>
     <UpdateBar />
-    {app.authUserId && !onboarding && !settings && !reading && !app.selecting ? <InstallBanner app={app} /> : null}
+    {app.authUserId && !onboarding && !settings && !reading && !app.selecting ? <BottomSheets app={app} /> : null}
     {/* 토스트는 모든 화면 폭에서 아래 가운데(TDS Toast의 아래 위치: 동작 단추를 둘 수 있다). 휴대폰은 탭 바 위, 넓은 화면은 바닥에서 24px. */}
     <div className="toast fixed bottom-[calc(var(--tabbar-h)+16px+env(safe-area-inset-bottom))] left-1/2 min-[720px]:bottom-[24px] z-[4] w-max max-w-[calc(100%-32px)] [transform:translateX(-50%)] rounded-lg bg-toast px-[20px] py-[14px] text-[15px] leading-[22px] font-medium text-on-toast [box-shadow:var(--shadow-pop)]" role="status" hidden={!app.toast}>{app.toast}{app.toastLink ? <div className="toast-actions flex items-center justify-between gap-[12px]">
       <a className={`${TOAST_ACTION} underline`} href={app.toastLink} target={app.toastLink.startsWith('?') ? '_self' : '_blank'} rel="noopener noreferrer">{app.toastLinkLabel}</a>
@@ -192,6 +194,13 @@ export function NoticeShell({ app }: { app: AppController }) {
     {app.shortcutsOpen ? <ShortcutsDialog app={app} /> : null}
     {onboarding ? <Onboarding app={app} /> : null}
   </>;
+}
+
+/** 알림 패널이 먼저, 켜져 있거나 쉬는 중이면 설치 배너. 둘을 함께 보이지 않는다. */
+function BottomSheets({ app }: { app: AppController }) {
+  const update = useSyncExternalStore(subscribeUpdate, updateAvailable, () => false);
+  const [closed, setClosed] = useState(false);
+  return pushSheetShown(app, update, closed) ? <PushSheet app={app} onClose={() => setClosed(true)} /> : <InstallBanner app={app} />;
 }
 
 /** 원문 링크 글자. 현장실습은 톨게이트 로그인이 필요한 페이지라서 그 사실이 보이게 한다. */

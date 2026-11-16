@@ -330,7 +330,7 @@ test('first-run setup: choices only, department list follows the college, double
     w.calls = [];
     app.finishOnboarding = (draft: unknown) => { w.calls.push(['finish', draft]); (app.applyOnboardingSaved as (profile: unknown) => void)({ ...(app.profile as object), programs: [{ college: '경영대학', department: '경영학과' }], year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false, onboardedAt: 'x' }); return Promise.resolve(true); };
     app.closeOnboarding = () => { w.calls.push(['close']); app.onboardingOpen = false; app.profile = { ...(app.profile as object), programs: [{ college: '경영대학', department: '경영학과' }], year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false, onboardedAt: 'x' }; };
-    app.enablePush = () => { w.calls.push(['push']); return Promise.resolve(); };
+    app.enablePush = () => { w.calls.push(['push']); app.pushStatus = 'on'; return Promise.resolve(); };
     app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
     app.profileStatus = 'ready';
     app.pushStatus = 'off';
@@ -443,9 +443,12 @@ test('first-run setup: choices only, department list follows the college, double
   });
   expect(saved.boards).toEqual(expect.arrayContaining(['skku-notice01', 'cse-notice', 'futurecar-notice', 'aiuniv-notice']));
   expect(saved).not.toHaveProperty('joinedPrograms');
-  // 알림은 나중에 해도 된다.
+  // 알림은 꼭 켠다: 건너뛰는 단추가 없고, 알림 받기를 눌러 켜지면 이어진다.
   await expect(dialog.getByRole('heading', { name: '알림을 켜 둘까요?' })).toBeFocused();
-  await dialog.getByRole('button', { name: '나중에 할게요' }).click();
+  await expect(dialog.getByRole('button', { name: /나중에/ })).toHaveCount(0);
+  await expect(dialog.getByText('알림을 켜야 다음으로 넘어가요')).toBeVisible();
+  await dialog.getByRole('button', { name: '알림 받기' }).click();
+  expect((await calls(page)).filter((c) => c[0] === 'push')).toHaveLength(1);
   await expect(dialog).toHaveCount(0);
   await expect(page.locator('.app')).not.toHaveAttribute('inert', '');
 });
@@ -2440,4 +2443,64 @@ test('reload keeps the phone window scroll without shifting the layout', async (
   await page.waitForTimeout(1200);
   expect(Math.abs((await page.evaluate(() => scrollY)) - saved)).toBeLessThan(3);
   expect(await page.evaluate(() => (window as unknown as { shifts: number }).shifts)).toBeLessThan(0.02);
+});
+
+test('first-run notify step: no skip when off, escape only after a failure, denied or unsupported', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    app.profile = { programs: [], year: null, semester: null, enrollmentStatus: null, militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: null, deptInternshipDone: null, university3pInternshipDone: null };
+    app.profileStatus = 'ready'; app.authUserId = 'account-a'; app.pushStatus = 'off'; app.byokOn = true; app.byokLoading = false; app.byokStatus = { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 }; app.aiKeys = [];
+    app.finishOnboarding = () => { (app.applyOnboardingSaved as (p: unknown) => void)({ ...(app.profile as object) }); return Promise.resolve(true); };
+  });
+  const dialog = page.getByRole('dialog');
+  const next = () => dialog.getByRole('button', { name: '다음' }).click();
+  await dialog.getByRole('button', { name: '경영대학', exact: true }).click();
+  await dialog.getByRole('radio', { name: '경영학과', exact: true }).click();
+  await next();
+  await dialog.getByRole('radio', { name: '없어요', exact: true }).click();
+  await dialog.getByRole('button', { name: '3학년' }).click();
+  await next();
+  await dialog.getByRole('button', { name: '채웠어요' }).click();
+  await next();
+  await next();
+  const heading = dialog.getByRole('heading', { name: '알림을 켜 둘까요?' });
+  await expect(heading).toBeVisible();
+  const set = (state: Record<string, unknown>) => page.evaluate((patch) => Object.assign(document.querySelector('notice-app') as object, patch), state);
+  await expect(dialog.getByRole('button', { name: '알림 받기' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /나중에/ })).toHaveCount(0);
+  await set({ pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요. 다시 시도하면 이어서 진행해요.' });
+  await expect(dialog.getByRole('button', { name: '다시 시도하기' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '이 기기에서는 나중에 켤게요' })).toBeVisible();
+  await set({ pushStatus: 'denied', pushRetry: false, pushError: '' });
+  await expect(dialog.getByRole('button', { name: '다시 확인하기' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '이 기기에서는 나중에 켤게요' })).toBeVisible();
+  await set({ pushStatus: 'unsupported' });
+  await expect(dialog.getByText(/지원하지 않아요|홈 화면에 추가한 앱/)).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '끝내기' })).toBeVisible();
+  await set({ pushStatus: 'checking' });
+  await expect(dialog.getByRole('button', { name: '확인하고 있어요' })).toBeDisabled();
+});
+
+test('push sheet: asks on a device with notifications off, snoozes with a record, and never shares the screen with the install banner', async ({ page }) => {
+  await page.setViewportSize({ width: 412, height: 891 });
+  await page.goto('/?api=sample/api/v1');
+  await expect(page.getByRole('button', { name: /^인턴 공고/ }).first()).toBeVisible();
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, pushStatus: 'off', enablePush: 'fn:enable' });
+  await page.evaluate(() => { ((document.querySelector('notice-app') as unknown) as AppHandle).install = { prompt: () => Promise.resolve() }; });
+  const sheet = page.getByRole('region', { name: '알림 켜기' });
+  await expect(sheet).toBeVisible();
+  await expect(page.getByRole('region', { name: '앱 설치' })).toHaveCount(0);
+  await sheet.getByRole('button', { name: '알림 받기' }).click();
+  expect(await calls(page)).toEqual([['enable']]);
+  await sheet.getByRole('button', { name: '다음에 할게요' }).click();
+  await expect(sheet).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('push-sheet'))).toMatch(/^1:\d+$/);
+  // 쉬는 동안은 설치 배너가 대신 보인다.
+  await expect(page.getByRole('region', { name: '앱 설치' })).toBeVisible();
+  // 꺼져 있지 않으면(켜짐) 보이지 않는다.
+  await page.evaluate(() => localStorage.removeItem('push-sheet'));
+  await withApp(page, { pushStatus: 'on' });
+  await expect(sheet).toHaveCount(0);
 });
