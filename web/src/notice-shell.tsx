@@ -519,7 +519,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
   app.autoSummary(notice);
   const mine = app.myInfo(notice);
   const body = app.body(notice);
-  const translation = app.myTranslations.get(notice.id);
+  const translation = app.detailTranslation(notice);
   const shownBody = body && body !== 'loading' && translation ? { ...body, translation } : body;
   const gradDetail = app.gradPartsFor(notice, (judgement?.ai ?? mine?.ai)?.verdict);
   const hasGrad = gradDetail.length > 0;

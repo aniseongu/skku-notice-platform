@@ -21,7 +21,7 @@ import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, googleRetur
 import { AI_PROVIDERS, DEFAULT_AI_PREFERENCES, loadAiKeyStatuses, loadAiPreferences, registerAiKey, removeAiKey, saveAiPreferences, type AiKeyStatus, type AiPreferences, type AiProvider } from './ai-providers';
 import { sendFeedback, type FeedbackKind, type FeedbackResult } from './feedback';
 import { listBoardRequests, submitBoardRequest } from './shared-board-requests';
-import { byokAvailable, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
+import { byokAvailable, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, loadMyTranslation, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, type MyTranslationTitle, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
 import { keywordMatchesNotice } from './keyword-match';
 import { loadGraduation, loadGraduationStatuses, badgeOf, gradParts, requestGraduation, isInternshipNotice, type GradPart, type GraduationBadge, type GraduationStatuses, isSoftwareOriginal, visibleTracks, type GraduationAssessment } from './graduation-assessment';
@@ -372,7 +372,8 @@ export class AppController extends Reactive {
   summaries = new Map<string, MyNoticeInfo | null | 'loading'>();
   myDeadlines = new Map<string, Pick<MyNoticeInfo, 'deadline' | 'deadlineKind'>>();
   private deadlineRequest = 0;
-  myTranslations = new Map<string, MyTranslation>();
+  myTranslations = new Map<string, MyTranslationTitle>();
+  private detailTranslations = new Map<string, MyTranslation | null | 'loading'>();
   private translationRequest = 0;
   toastTimer = 0;
   /** 링크를 복사한 직후 잠깐 true: 공유 단추가 체크로 바뀌어 누른 자리에서 결과를 보여 준다 */
@@ -408,12 +409,13 @@ export class AppController extends Reactive {
       this.checkCalendarReturn();
       this.authSubscription = authClient.auth.onAuthStateChange((_event, session) => {
         const userId = session?.user.id ?? null;
-        const loggedIn = !!userId && !this.authUserId && this.authReady;
+        const loggedIn = !!userId && userId !== this.authUserId && this.authReady;
         if (!this.authReady || userId !== this.authUserId) {
           const previousUserId = this.authUserId;
+          this.notices = []; this.sources = []; this.generatedAt = null; this.bodies.clear();
           const kept = savedSelection(); this.selectionReady = false;   // 아래에서 계정을 바꾸는 동안 저장된 선택을 덮어쓰지 않는다
           this.authUserId = userId;
-          this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); ++this.translationRequest;
+          this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); this.detailTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
           this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.devicesLoaded = false; this.thisDeviceId = null; this.devicesError = ''; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
@@ -430,6 +432,7 @@ export class AppController extends Reactive {
           this.preferencesUnavailable = false;
           this.accountDataLoaded = !userId; this.aiStateLoaded = !userId; this.settingsCapped = !userId;
           if (userId) setTimeout(() => {
+            if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
             // 첫 목록에 필요한 계정 정보를 모두 받으면 한꺼번에 그린다(userDataReady). 너무 늦으면 상한 시간에 그냥 그린다.
             // 구독·키워드·게시판 순서도 목록과 왼쪽 메뉴의 모양을 바꾸므로 같이 기다린다.
             const first = [this.refreshMyDeadlines(userId, epoch), this.refreshMyTranslations(userId, epoch), this.refreshMine(userId, epoch),
@@ -472,8 +475,8 @@ export class AppController extends Reactive {
         const name = meta.full_name ?? meta.name;
         this.authName = typeof name === 'string' && name.trim() ? name.trim().slice(0, 60) : null;
         this.authAvatar = safeAvatarUrl(meta.avatar_url ?? meta.picture);
-        if (!this.authReady) { this.authReady = true; void this.refresh(); }
-        else if (loggedIn) void this.refresh();
+        if (!this.authReady) { this.authReady = true; void this.refresh(true); }
+        else if (loggedIn) void this.refresh(true);
       }).data.subscription;
     } else { void this.refresh(); }
     wide.addEventListener('change', () => { this.isWide = wide.matches; });
@@ -500,11 +503,13 @@ export class AppController extends Reactive {
   /** 로그인 전에는 앱 어느 데이터도 받지 않는다. 로그인 화면만 보인다. */
   get gated() { return !!authClient && this.authReady && !this.authUserId; }
 
-  async refresh() {
+  async refresh(initial = false) {
     if (this.gated) return;
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     this.loading = true;
     try {
       const notices = await fetchJson<NoticesFile>('notices.json');
+      if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
       // 뒤늦게 채운 본문도 새 수집 결과와 함께 다시 받는다.
       if (this.generatedAt !== notices!.generated_at) this.bodies.clear();
       // 기한이 지난 공지는 어느 목록에도 두지 않는다(저장·검색 포함). 서버가 나중에 지운다. 숨기는 곳은 여기 한 곳이다.
@@ -513,9 +518,11 @@ export class AppController extends Reactive {
       this.sources = notices!.sources;
       this.generatedAt = notices!.generated_at;
       remember('has-coop', this.hasCoop() ? '1' : '0');
-      if (this.authUserId) void this.refreshMyDeadlines(this.authUserId, this.subscriptionsEpoch);
-      if (this.authUserId) this.mineSync = this.refreshMine(this.authUserId, this.subscriptionsEpoch);
-      if (this.authUserId) void this.refreshMyTranslations(this.authUserId, this.subscriptionsEpoch);
+      if (userId && !initial) {
+        void this.refreshMyDeadlines(userId, epoch);
+        this.mineSync = this.refreshMine(userId, epoch);
+        void this.refreshMyTranslations(userId, epoch);
+      }
       // 개인용 서비스의 판정 결과는 플랫폼에서 읽지 않는다.
       this.matched = null;
       this.failed = false;
@@ -530,11 +537,12 @@ export class AppController extends Reactive {
       if (this.board !== 'all' && !this.sources.some((s) => s.id === this.board)) this.board = 'all';
       void this.syncStates();
     } catch (error) {
+      if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
       console.error(error);
       this.failed = true;
       if (this.notices.length) this.showToast('새 목록을 받지 못했어요. 잠시 뒤 새로고침해 주세요');
     } finally {
-      this.loading = false;
+      if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.loading = false;
     }
     // 현장실습이 모두 마감돼 메뉴에서 사라졌는데 그 보기에 있으면 성대 공지로 옮긴다.
     if (!this.failed && this.tab() === 'coop' && !this.hasCoop()) {
@@ -701,12 +709,10 @@ export class AppController extends Reactive {
   /** 내 판정과 관심 키워드를 다시 읽는다. 로그인할 때와 공지를 새로 불러올 때 부른다. */
   async refreshMine(userId: string, epoch: number): Promise<void> {
     if (!authClient) return;
-    const [judgments, interests] = await Promise.all([loadMyJudgments(authClient, userId).catch(() => null), loadMyInterests(authClient).catch(() => null)]);
+    const [judgments, interests, statuses] = await Promise.all([loadMyJudgments(authClient, userId).catch(() => null), loadMyInterests(authClient).catch(() => null), loadGraduationStatuses(authClient, userId).catch(() => null)]);
     if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
     if (judgments) this.myJudgments = judgments;
     if (interests) this.myInterests = interests;
-    const statuses = await loadGraduationStatuses(authClient, userId).catch(() => null);
-    if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
     if (statuses) this.graduationStatuses = statuses;
   }
 
@@ -1037,11 +1043,9 @@ export class AppController extends Reactive {
   async refreshByok(userId: string, epoch: number): Promise<void> {
     if (!authClient || !this.byokOn) { if (epoch === this.subscriptionsEpoch) { this.byokLoading = false; if (!authClient || this.byokChecked) this.aiStateLoaded = true; } return; }
     try {
-      const [status, canvas] = await Promise.all([loadByokStatus(authClient, userId), loadCanvasStatus(authClient, userId).catch(() => null)]);
+      const [status, canvas, aiKeys, aiPrefs] = await Promise.all([loadByokStatus(authClient, userId), loadCanvasStatus(authClient, userId).catch(() => null), loadAiKeyStatuses(authClient, userId), loadAiPreferences(authClient, userId)]);
       if (epoch !== this.subscriptionsEpoch) return;
       this.byokStatus = status; this.canvasStatus = canvas; this.byokError = '';
-      const [aiKeys, aiPrefs] = await Promise.all([loadAiKeyStatuses(authClient, userId), loadAiPreferences(authClient, userId)]);
-      if (epoch !== this.subscriptionsEpoch) return;
       this.aiKeys = aiKeys; this.aiPrefs = aiPrefs;
       this.aiStateLoaded = true;   // 판정 대기(judgePending)는 키와 AI 설정만 보면 정해진다. 채우기 작업은 기다리지 않는다
       await this.refreshByokBackfill(userId, epoch);
@@ -2196,6 +2200,21 @@ export class AppController extends Reactive {
     } finally {
       if (epoch === this.subscriptionsEpoch) this.summarizing = null;
     }
+  }
+
+  detailTranslation(notice: Notice): MyTranslation | null {
+    const userId = this.authUserId;
+    if (!authClient || !userId || !this.myTranslations.has(notice.id)) return null;
+    const cached = this.detailTranslations.get(notice.id);
+    if (cached !== undefined) return cached === 'loading' ? null : cached;
+    this.detailTranslations.set(notice.id, 'loading');
+    const epoch = this.subscriptionsEpoch;
+    loadMyTranslation(authClient, userId, notice.id).catch(() => null).then((translation) => {
+      if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
+      this.detailTranslations.set(notice.id, translation);
+      this.requestUpdate();
+    });
+    return null;
   }
 
   body(notice: Notice): NoticeBody | null | 'loading' {

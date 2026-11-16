@@ -1340,7 +1340,8 @@ test('personal English translation is shown automatically with the original body
   const id = await row.getAttribute('data-id');
   await page.evaluate((noticeId) => {
     const app = (document.querySelector('notice-app') as any).controller;
-    app.myTranslations = new Map([[noticeId, { title: '번역된 공지 제목', body: '번역된 본문입니다.', model: 'm' }]]);
+    app.myTranslations = new Map([[noticeId, { title: '번역된 공지 제목' }]]);
+    app.detailTranslation = () => ({ title: '번역된 공지 제목', body: '번역된 본문입니다.', model: 'm' });
     app.requestUpdate();
   }, id);
   await expect(page.locator(`notice-rows-screen a.row[data-id="${id}"] .title`)).toHaveText('번역된 공지 제목');

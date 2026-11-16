@@ -41,13 +41,13 @@ test('client accepts the AQ. key format', () => {
   assert.equal(looksLikeGeminiKey(`AQ.Ab8RN6J${'x'.repeat(40)}`), true);
 });
 
-import { loadMyDeadlines, loadMyNoticeInfo, loadMyTranslations } from '../src/byok.ts';
+import { loadMyDeadlines, loadMyNoticeInfo, loadMyTranslations, loadMyTranslation } from '../src/byok.ts';
 
 test('translation query is bound to the current owner', async () => {
   const filters = [];
   const client = { from: (table) => {
     assert.equal(table, 'user_notice_translations');
-    const q = { select: () => q, eq: (name, value) => { filters.push([name, value]); return q; },
+    const q = { select: (columns) => { assert.equal(columns, 'notice_id,title'); return q; }, eq: (name, value) => { filters.push([name, value]); return q; },
       not: () => q, order: () => q, range: async () => ({ data: [
         { notice_id: 'a/1', title: '한국어 제목', body: '한국어 본문', model: 'm' },
       ], error: null }) };
@@ -55,7 +55,19 @@ test('translation query is bound to the current owner', async () => {
   } };
   const translations = await loadMyTranslations(client, 'user-a');
   assert.deepEqual(filters, [['user_id', 'user-a']]);
-  assert.equal(translations.get('a/1').body, '한국어 본문');
+  assert.deepEqual(translations.get('a/1'), { title: '한국어 제목' });
+});
+
+test('translation detail fetches only the selected notice for its owner', async () => {
+  const filters = [];
+  const client = { from: () => {
+    const q = { select: (columns) => { assert.equal(columns, 'title,body,model'); return q; },
+      eq: (key, value) => { filters.push([key, value]); return q; },
+      maybeSingle: async () => ({ data: { title: '제목', body: '본문', model: 'm' }, error: null }) };
+    return q;
+  } };
+  assert.equal((await loadMyTranslation(client, 'user-a', 'a/1')).body, '본문');
+  assert.deepEqual(filters, [['user_id', 'user-a'], ['notice_id', 'a/1']]);
 });
 
 test('deadline list is owner scoped, paginated, and favors an explicitly requested summary', async () => {
