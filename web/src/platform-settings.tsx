@@ -21,7 +21,7 @@ import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
 import { FEEDBACK_KINDS, FEEDBACK_LIMIT, feedbackProblem, type FeedbackKind, type FeedbackResult } from './feedback';
 import { BADGE, CHEVRON_RIGHT, CHOICE, SWITCH, SWITCH_ONLY } from './cls';
 import { aiKeysLead, connectedAiKeys } from './ai-keys';
-import { BoardRequest } from './board-request';
+import { BoardRequest, BOARD_TRAILING_ROW } from './board-request';
 import type { BoardRequestResult, BoardRequestState } from './shared-board-requests';
 
 export interface SettingsModel {
@@ -134,9 +134,9 @@ const SEMESTERS = [1, 2];
 
 const SETTING_ROW_CLASS = 'setting flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:grid min-[720px]:grid-cols-[minmax(0,1fr)_minmax(0,520px)] min-[720px]:[align-items:start] min-[720px]:gap-[24px] min-[720px]:has-[>.setting-control>.rule-list]:grid-cols-[minmax(0,1fr)] min-[720px]:has-[>.setting-control>.rule-list]:gap-[8px] min-[720px]:has-[>.setting-control>.connection-summary]:[&>.setting-text]:pt-[11px]';
 
-function Section({ id, title, action, children }: { id: string; title: string; action?: ReactNode; children: ReactNode }) {
+function Section({ id, title, action, description, children }: { id: string; title: string; action?: ReactNode; description?: string; children: ReactNode }) {
   return <section aria-labelledby={id}>
-    {action ? <div className="settings-head-row mt-[28px] mb-[8px] flex items-center justify-between gap-[12px] pr-[var(--gutter)] min-[720px]:pr-0"><h2 id={id} className="settings-head m-0 text-[14px] leading-[20px] font-semibold text-ink-2">{title}</h2>{action}</div> : <h2 id={id} className="settings-head mt-[28px] mb-[8px] text-[14px] leading-[20px] font-semibold text-ink-2">{title}</h2>}
+    {action || description ? <div className="mt-[28px] mb-[8px]"><div className="settings-head-row flex items-center justify-between gap-[12px] pr-[var(--gutter)] min-[720px]:pr-0"><h2 id={id} className="settings-head m-0 text-[14px] leading-[20px] font-semibold text-ink-2">{title}</h2>{action}</div>{description ? <p className="settings-lead m-0 mt-[4px] text-[13px] leading-[19px] text-ink-2">{description}</p> : null}</div> : <h2 id={id} className="settings-head mt-[28px] mb-[8px] text-[14px] leading-[20px] font-semibold text-ink-2">{title}</h2>}
     <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0">{children}</div></section>;
 }
 
@@ -492,8 +492,8 @@ function BoardsSection({ model }: { model: SettingsModel }) {
   const order = model.boardOrder;
   const canMove = order.boards.length >= 2;
   return <Section id="s-boards" title="받을 게시판"
+    description={editing ? '손잡이를 끌어 순서를 바꿔요. 바꾸면 바로 저장돼요' : '켠 게시판의 새 공지를 알림으로 받고, 목록에 이 순서로 보여요'}
     action={canMove ? <button type="button" className="head-action rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] -my-[13px] min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent [font-family:inherit] [line-height:inherit] [&:hover]:underline [&:hover]:underline-offset-[3px] focus-visible:rounded-sm" onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : undefined}>
-    <p className="settings-lead m-0 mb-[4px] pt-[12px] text-[13px] leading-[19px] text-ink-2">{editing ? '손잡이를 끌어 순서를 바꿔요. 바꾸면 바로 저장돼요' : '켠 게시판의 새 공지를 알림으로 받고, 목록에 이 순서로 보여요'}</p>
     {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <>
       {model.error ? <><p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.error}</p>
         <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.retry}>다시 불러오기</button></> : null}
@@ -508,7 +508,7 @@ function BoardsSection({ model }: { model: SettingsModel }) {
 
 // 펼치는 줄(details)은 브라우저 기본 삼각형 대신 다른 곳과 같은 쉐브론을 쓴다. 열리면 위를 향한다.
 const SUMMARY = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[44px] cursor-pointer list-none items-center justify-between py-[12px] text-[14px] text-ink-2 [&::-webkit-details-marker]:hidden';
-const MORE_SUMMARY = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[52px] cursor-pointer list-none items-center justify-between py-[12px] text-[15px] font-medium text-ink [&::-webkit-details-marker]:hidden';
+const MORE_SUMMARY = `${BOARD_TRAILING_ROW} rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover cursor-pointer list-none py-[12px] text-[15px] font-medium text-ink [&::-webkit-details-marker]:hidden`;
 const CHEVRON = 'text-ink-3 transition-transform group-open:rotate-180';
 function chevron(d: string, className?: string) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" className={className}><path d={d} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg>;

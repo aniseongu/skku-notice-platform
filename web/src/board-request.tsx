@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { AlertIcon } from './alert-icon';
 import type { BoardRequestResult, BoardRequestState } from './shared-board-requests';
 
+export const BOARD_TRAILING_ROW = 'flex min-h-[52px] items-center justify-between gap-[8px] px-0';
+
 function validAddress(value: string): boolean {
   if (!value) return true;
   try {
@@ -89,24 +91,22 @@ export function BoardRequest({ toast, userId, listRequests, submitRequest, onAdd
   };
   const input = 'min-h-[44px] w-full rounded-md border border-line bg-surface px-[12px] text-[15px] text-ink';
   return <div className="border-t border-line">
-    <div className="flex min-h-[52px] items-center justify-between gap-[8px]">
+    <div className={BOARD_TRAILING_ROW}>
       <span className="text-[15px] font-normal text-ink-2">찾는 게시판이 없나요?</span>
-      <button type="button" aria-expanded={open} disabled={busy} onClick={() => setOpen(!open)} className="min-h-[44px] shrink-0 rounded-sm border-0 bg-transparent px-[8px] text-[15px] font-medium text-accent [@media(hover:hover)]:hover:bg-hover active:bg-hover">{open ? '접기' : '추가 요청'}</button>
+      <button type="button" aria-expanded={open} disabled={busy} onClick={() => setOpen(!open)} className="min-h-[44px] shrink-0 rounded-sm border-0 bg-transparent pl-[8px] pr-0 text-[15px] font-medium text-accent [@media(hover:hover)]:hover:bg-hover active:bg-hover">{open ? '접기' : '추가 요청'}</button>
     </div>
-    {requests.length ? <div className="grid gap-[6px] pb-[12px] text-[14px] leading-[20px] text-ink-2" aria-live="polite">
-      <p className="m-0 font-semibold text-ink">요청한 게시판</p>
-      {requests.map((request) => <p key={request.id} className="m-0"><span className="font-medium text-ink">{request.name}</span><br />{request.status === 'added' ? '게시판이 추가됐어요. 받을 게시판에서 확인해 주세요' : request.status === 'review' ? '개발자 확인을 요청했어요' : request.status === 'failed' ? '요청을 보내지 못했어요. 나중에 다시 시도해 주세요' : '요청을 확인하고 있어요'}</p>)}
-    </div> : null}
-    {open ? <div ref={formRef} className="grid w-full max-w-[600px] gap-[10px] pb-[16px]">
-      <p className="m-0 text-[14px] leading-[20px] text-ink-2">추가된 게시판은 다른 사람도 고를 수 있어요</p>
-      <label className="grid gap-[4px] text-[14px] font-semibold">게시판 이름 (필수)<input className={input} value={name} maxLength={60} required disabled={busy} onChange={(e) => setName(e.currentTarget.value)} /></label>
+    {open ? <div ref={formRef} className="grid w-full gap-[10px] pb-[16px]">
+      <label className="grid gap-[4px] text-[14px] font-semibold">게시판 이름<input className={input} value={name} maxLength={60} required disabled={busy} onChange={(e) => setName(e.currentTarget.value)} /></label>
       <div className="grid gap-[4px]">
-        <label className="grid gap-[4px] text-[14px] font-semibold">주소 (선택)<input className={input} type="url" value={address} maxLength={400} disabled={busy} aria-invalid={invalid} aria-describedby={invalid ? `${addressHelpId} ${addressErrorId}` : addressHelpId} onChange={(e) => setAddress(e.currentTarget.value)} /></label>
-        <p id={addressHelpId} className="m-0 text-[14px] leading-[20px] text-ink-2">https로 시작하는 성균관대 주소를 적으면 자동으로 확인해요. 주소가 없으면 개발자에게 요청해요</p>
-        {invalid ? <p id={addressErrorId} className="m-0 text-[14px] leading-[20px] text-danger" role="alert">https로 시작하는 성균관대 주소인지 확인해 주세요</p> : null}
+        <label className="grid gap-[4px] text-[14px] font-semibold">주소 (선택)<input className={input} type="url" value={address} maxLength={400} disabled={busy} aria-invalid={invalid} aria-describedby={invalid ? addressErrorId : addressHelpId} onChange={(e) => setAddress(e.currentTarget.value)} /></label>
+        {invalid ? <p id={addressErrorId} className="m-0 text-[14px] leading-[20px] text-danger" role="alert">https로 시작하는 성균관대 주소인지 확인해 주세요</p> : <p id={addressHelpId} className="m-0 text-[14px] leading-[20px] text-ink-2">성균관대 주소를 적으면 바로 확인해서 모두가 고를 수 있게 추가해요. 주소가 없으면 개발자가 확인해요</p>}
       </div>
       {error ? <p className="m-0 text-[14px] text-danger" role="alert"><AlertIcon />{error}</p> : null}
-      <button type="button" disabled={busy || !name.trim() || invalid} onClick={() => { void submit(); }} className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex min-h-[44px] items-center justify-center rounded-md border-0 bg-accent px-[16px] text-[15px] font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60">{busy ? '보내고 있어요' : '요청 보내기'}</button>
+      <button type="button" disabled={busy || !name.trim() || invalid} onClick={() => { void submit(); }} className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex min-h-[44px] w-full items-center justify-center rounded-md border-0 bg-accent px-[16px] text-[15px] font-semibold text-on-accent disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60">{busy ? '보내고 있어요' : '요청 보내기'}</button>
+    </div> : null}
+    {requests.length ? <div className="grid gap-[6px] pb-[12px] text-[14px] leading-[20px] text-ink-2" aria-live="polite">
+      <p className="m-0 font-semibold">요청한 게시판</p>
+      {requests.map((request) => <p key={request.id} className="m-0">{request.name} · {request.status === 'added' ? '게시판이 추가됐어요. 받을 게시판에서 확인해 주세요' : request.status === 'review' ? '개발자 확인을 요청했어요' : request.status === 'failed' ? '요청을 보내지 못했어요. 나중에 다시 시도해 주세요' : '요청을 확인하고 있어요'}</p>)}
     </div> : null}
   </div>;
 }

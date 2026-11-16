@@ -95,12 +95,12 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
   expect(metrics.height).toBeGreaterThanOrEqual(44);
   expect(metrics.top).toBe(true);
   await button.click();
-  const name = root.getByRole('textbox', { name: '게시판 이름 (필수)' });
+  const name = root.getByRole('textbox', { name: '게시판 이름' });
   await expect(name).toHaveAttribute('required', '');
   await expect(root.getByRole('button', { name: '요청 보내기' })).toBeDisabled();
   await name.fill('교환학생');
   const address = root.getByRole('textbox', { name: '주소 (선택)' });
-  await expect(address).toHaveAccessibleDescription('https로 시작하는 성균관대 주소를 적으면 자동으로 확인해요. 주소가 없으면 개발자에게 요청해요');
+  await expect(address).toHaveAccessibleDescription('성균관대 주소를 적으면 바로 확인해서 모두가 고를 수 있게 추가해요. 주소가 없으면 개발자가 확인해요');
   await address.fill('https://skku.edu.example.com/');
   await expect(root.getByText('https로 시작하는 성균관대 주소인지 확인해 주세요')).toBeVisible();
   await expect(root.getByRole('button', { name: '요청 보내기' })).toBeDisabled();
@@ -110,7 +110,7 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
   expect(await page.evaluate(() => (window as unknown as { boardRequests: unknown[][] }).boardRequests)).toEqual([['account-a', '교환학생', 'https://www.skku.edu/board']]);
   await expect(root.getByText('요청을 확인하고 있어요')).toBeVisible();
   await root.getByRole('button', { name: '추가 요청', exact: true }).click();
-  await root.getByRole('textbox', { name: '게시판 이름 (필수)' }).fill('학과 공지');
+  await root.getByRole('textbox', { name: '게시판 이름' }).fill('학과 공지');
   await root.getByRole('button', { name: '요청 보내기' }).click();
   expect(await page.evaluate(() => (window as unknown as { boardRequests: unknown[][] }).boardRequests)).toEqual([
     ['account-a', '교환학생', 'https://www.skku.edu/board'], ['account-a', '학과 공지', ''],
