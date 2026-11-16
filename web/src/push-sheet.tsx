@@ -18,8 +18,8 @@ export function PushSheet({ app, onClose }: { app: AppController; onClose: () =>
     <div className="flex items-start gap-[12px]">
       <img src="icon-192.png" alt="" className="size-[48px] flex-none rounded-md border border-line" />
       <div className="min-w-0 flex-1 pt-[2px]">
-        <p className="m-0 text-[18px] leading-[25px] font-bold text-ink break-keep">새 공지를 알림으로 받아 보세요</p>
-        <p className="m-0 mt-[4px] text-[15px] leading-[22px] text-ink-2 break-keep">앱을 닫아도 새 공지를 바로 알려드려요. 설정에서 언제든 끌 수 있어요</p>
+        <p className="m-0 text-[18px] leading-[25px] font-bold text-ink break-keep text-pretty">새 공지를 알림으로 받아요</p>
+        <p className="m-0 mt-[4px] text-[15px] leading-[22px] text-ink-2 break-keep text-pretty">앱을 닫아도 바로 알려드려요. 설정에서 언제든 끌 수 있어요</p>
       </div>
       <button type="button" className="-mt-[8px] -mr-[8px] inline-flex min-h-[44px] min-w-[44px] flex-none items-center justify-center rounded-md border-0 bg-transparent text-ink-2 [@media(hover:hover)]:hover:bg-hover active:bg-hover" aria-label="닫기" onClick={close}>
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>

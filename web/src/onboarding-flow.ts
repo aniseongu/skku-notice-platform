@@ -100,7 +100,7 @@ export interface RequiredContext { draft: Draft; doubleAnswer: DoubleAnswer; key
 export interface RequiredItem { step: Step; label: string; missing: (ctx: RequiredContext) => boolean }
 
 /** 계정이 반드시 채워야 하는 정보의 목록. 순서가 화면 순서다.
- * 업데이트로 새 필수 정보가 생기면 여기 항목 하나를 더한다(단계 화면, 확인 함수, 이름). 기존 사용자는 다음 접속 때 그 항목만 채우는 화면을 본다.
+ * 업데이트로 새 필수 정보가 생기면 여기 항목 하나를 더한다(단계 화면, 확인 함수, 이름). 항목을 더하거나 바꾸면 서버의 알림 기준 DB 함수 required_info_missing(supabase/migrations/20261116100000_required_info_reminders.sql, 새 migration으로 교체)과 web/tests/required-info-reminders-db.test.mjs도 같이 고친다. 기존 사용자는 다음 접속 때 그 항목만 채우는 화면을 본다.
  * 왼쪽 단계 목록, 진행 막대, 시작 단계, 건너뛰는 단계, 앞을 막는 판단이 모두 이 배열에서 나온다. */
 export const REQUIRED_ITEMS: readonly RequiredItem[] = [
   { step: 'primary', label: '주전공', missing: ({ draft, doubleAnswer }) => !canContinue('primary', draft, doubleAnswer) },

@@ -55,6 +55,13 @@ class PushStore(NoticeStore):
             params={"select": "id,endpoint,p256dh,auth_secret,canvas_mode", "user_id": f"eq.{user_id}"},
         ).json()
 
+    def required_reminders(self) -> list[dict]:
+        return self._request("POST", "rpc/list_required_info_reminders", json={"p_limit": 20}).json()
+
+    def mark_required(self, user_id: str, missing_key: str) -> None:
+        payload = {"p_user": user_id, "p_missing_key": missing_key}
+        self._request("POST", "rpc/mark_required_reminder", json=payload)
+
     def feedback_pending(self) -> list[dict]:
         return self._request(
             "GET",
@@ -259,6 +266,43 @@ def run_canvas_batch(store: PushStore, private_key: str, subject: str, now: date
     return counts
 
 
+APP_URL = "https://skku-notice-platform.pages.dev/"
+
+
+def required_message(missing: list[str]) -> tuple[str, str]:
+    """채워야 할 필수 정보를 알리는 알림 문구."""
+    items = [str(item) for item in missing][:5]
+    if items == ["AI 키"]:
+        return "필요한 정보를 채워 주세요", "AI 키를 연결하면 공지를 다시 골라 드려요"
+    return "필요한 정보를 채워 주세요", f"앱을 열고 {', '.join(items)}만 고르면 돼요"
+
+
+def run_required_batch(
+    store: PushStore, private_key: str, subject: str, now: datetime, url: str = APP_URL,
+) -> dict[str, int]:
+    """필수 정보가 빈 계정의 모든 기기에 알린다. 한 기기라도 받으면 그 묶음의 한 번으로 센다."""
+    counts = {"required_sent": 0, "required_failed": 0}
+    for row in store.required_reminders():
+        missing = row.get("missing") or []
+        outcomes = []
+        title, body = required_message(missing)
+        for device in store.devices(row["user_id"]):
+            keys = {"p256dh": device["p256dh"], "auth": device["auth_secret"]}
+            outcome = send_one(
+                {"endpoint": device["endpoint"], "keys": keys},
+                private_key, subject, title=title, body=body, url=url, tag="required",
+            )
+            if outcome == "expired":
+                store.remove_expired(device["id"], row["user_id"])
+            outcomes.append(outcome)
+        if "sent" in outcomes:
+            store.mark_required(row["user_id"], row["missing_key"])
+            counts["required_sent"] += 1
+        else:
+            counts["required_failed"] += 1
+    return counts
+
+
 FEEDBACK_KIND_LABEL = {"question": "문의", "bug": "버그", "idea": "바라는 점"}
 RESEND_URL = "https://api.resend.com/emails"
 # 운영자 주소와 답장 메일 모두 이 모양만 받는다(DB의 user_feedback 검사와 같은 기준).
@@ -331,6 +375,8 @@ def main() -> int:
             now = datetime.now(UTC)
             counts = run_batch(store, private_key, subject, now)
             canvas = run_canvas_batch(store, private_key, subject, now)
+            app_url = os.environ.get("APP_URL") or APP_URL
+            required = run_required_batch(store, private_key, subject, now, app_url)
             feedback = run_feedback_batch(
                 store, os.environ.get("RESEND_API_KEY", ""), os.environ.get("FEEDBACK_NOTIFY_EMAIL", ""),
                 os.environ.get("FEEDBACK_MAIL_FROM", "성공 <onboarding@resend.dev>"), now,
@@ -344,6 +390,7 @@ def main() -> int:
     print(
         f"Push worker: sent={counts['sent']} expired={counts['expired']} retry={counts['retry']} "
         f"canvas_sent={canvas['canvas_sent']} canvas_failed={canvas['canvas_failed']} "
+        f"required_sent={required['required_sent']} required_failed={required['required_failed']} "
         f"feedback_sent={feedback['feedback_sent']} feedback_retry={feedback['feedback_retry']} "
         f"feedback_dropped={feedback['feedback_dropped']}",
         flush=True,

@@ -290,3 +290,64 @@ def test_school_notice_with_ai_deadline_reads_like_the_login_example():
         "deadline": "2026-12-05T14:59:00+00:00", "deadline_kind": "마감"})
     assert title == "[소프트웨어학과] 겨울방학 소프트웨어 인턴 모집 안내"
     assert body == f"{reason}\n관심 키워드 인턴, 12월 5일(토) 마감이에요"
+
+
+class RequiredStore:
+    def __init__(self, rows, devices):
+        self.rows, self.device_list = rows, devices
+        self.marked, self.removed = [], []
+
+    def required_reminders(self):
+        return self.rows
+
+    def devices(self, user_id):
+        return self.device_list.get(user_id, [])
+
+    def mark_required(self, user_id, missing_key):
+        self.marked.append((user_id, missing_key))
+
+    def remove_expired(self, subscription_id, user_id):
+        self.removed.append((subscription_id, user_id))
+
+
+def _device(device_id):
+    endpoint = "https://fcm.googleapis.com/fcm/send/x"
+    return {"id": device_id, "endpoint": endpoint, "p256dh": "p", "auth_secret": "a"}
+
+
+def test_required_message_names_missing_items():
+    title = "필요한 정보를 채워 주세요"
+    assert worker.required_message(["AI 키"]) == (title, "AI 키를 연결하면 공지를 다시 골라 드려요")
+    assert worker.required_message(["학교 정보", "인턴십"])[1] == "앱을 열고 학교 정보, 인턴십만 고르면 돼요"
+
+
+def test_required_batch_sends_to_every_device_marks_once_and_removes_expired(monkeypatch):
+    rows = [
+        {"user_id": "u1", "missing": ["AI 키"], "missing_key": "AI 키"},
+        {"user_id": "u2", "missing": ["인턴십"], "missing_key": "인턴십"},
+        {"user_id": "u3", "missing": ["주전공"], "missing_key": "주전공"},
+    ]
+    devices = {"u1": [_device("d1"), _device("d2")], "u2": [_device("d3")], "u3": [_device("d4")]}
+    store = RequiredStore(rows, devices)
+    results = {"d1": "sent", "d2": "expired", "d3": "retry", "d4": "expired"}
+    sent = []
+
+    def fake(subscription, *_args, **kwargs):
+        sent.append((kwargs["tag"], kwargs["url"]))
+        return results[f"d{len(sent)}"]
+
+    monkeypatch.setattr(worker, "send_one", fake)
+    counts = worker.run_required_batch(store, "key", "https://example.com", NOW)
+    assert counts == {"required_sent": 1, "required_failed": 2}
+    assert store.marked == [("u1", "AI 키")]  # 실패한 계정은 표시하지 않아 다음 실행에서 다시 시도한다
+    assert store.removed == [("d2", "u1"), ("d4", "u3")]
+    assert all(item == ("required", worker.APP_URL) for item in sent) and len(sent) == 4
+
+
+def test_required_batch_without_devices_or_rows_does_nothing(monkeypatch):
+    monkeypatch.setattr(worker, "send_one", lambda *a, **k: pytest.fail("no send"))
+    none = {"required_sent": 0, "required_failed": 0}
+    assert worker.run_required_batch(RequiredStore([], {}), "k", "s", NOW) == none
+    store = RequiredStore([{"user_id": "u", "missing": ["AI 키"], "missing_key": "AI 키"}], {})
+    assert worker.run_required_batch(store, "k", "s", NOW) == {"required_sent": 0, "required_failed": 1}
+    assert store.marked == []
