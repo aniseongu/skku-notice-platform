@@ -6,7 +6,7 @@ export async function loadPublicFeed(client: SupabaseClient): Promise<NoticesFil
   // external, coop 컬럼이 아직 없는 데이터베이스에서도 피드가 깨지지 않게 한 칸씩 줄여 다시 읽는다.
   const readSources = async () => {
     const read = (columns: string) => client.from('platform_sources').select(columns).order('id');
-    for (const columns of ['id,name,url,last_success_at,external,coop', 'id,name,url,last_success_at,external']) {
+    for (const columns of ['id,name,url,last_success_at,external,coop,shared_board', 'id,name,url,last_success_at,external,coop', 'id,name,url,last_success_at,external']) {
       const result = await read(columns);
       if (!result.error) return result;
     }
@@ -23,13 +23,13 @@ export async function loadPublicFeed(client: SupabaseClient): Promise<NoticesFil
   };
   const [sourceResult, noticeResult] = await Promise.all([readSources(), readNotices()]);
   if (sourceResult.error || noticeResult.error || !sourceResult.data?.length || !noticeResult.data?.length) return null;
-  const sourceRows = sourceResult.data as unknown as { id: string; name: string; url: string; last_success_at: string | null; external?: boolean; coop?: boolean }[];
+  const sourceRows = sourceResult.data as unknown as { id: string; name: string; url: string; last_success_at: string | null; external?: boolean; coop?: boolean; shared_board?: boolean }[];
   const successes = sourceRows.map((source) => source.last_success_at).filter((v): v is string => Boolean(v));
   if (!successes.length) return null;
   // The oldest successful source prevents a failing board from looking freshly updated.
   const generatedAt = successes.reduce((a, b) => Date.parse(a) < Date.parse(b) ? a : b);
   return { version: 1, generated_at: generatedAt,
-    sources: sourceRows.map(({ id, name, url, external, coop }) => ({ id, name, url, ...(external === true ? { external: true } : {}), ...(coop === true ? { coop: true } : {}) })),
+    sources: sourceRows.map(({ id, name, url, external, coop, shared_board }) => ({ id, name, url, ...(external === true ? { external: true } : {}), ...(coop === true ? { coop: true } : {}), ...(shared_board === true ? { shared_board: true } : {}) })),
     notices: noticeResult.data as unknown as NoticesFile['notices'] };
 }
 

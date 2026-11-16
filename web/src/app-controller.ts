@@ -20,6 +20,7 @@ import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from '
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, googleReturnDenied, hasCalendarPending, markCalendarPending, syncCalendar, takeCalendarPending } from './google-calendar';
 import { AI_PROVIDERS, DEFAULT_AI_PREFERENCES, loadAiKeyStatuses, loadAiPreferences, registerAiKey, removeAiKey, saveAiPreferences, type AiKeyStatus, type AiPreferences, type AiProvider } from './ai-providers';
 import { sendFeedback, type FeedbackKind, type FeedbackResult } from './feedback';
+import { listBoardRequests, submitBoardRequest } from './shared-board-requests';
 import { byokAvailable, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
 import { keywordMatchesNotice } from './keyword-match';
@@ -225,6 +226,7 @@ export class AppController extends Reactive {
   subscriptionsLoading = false;
   subscriptionsError = '';
   subscriptionsEpoch = 0;
+  seenAddedBoardRequests = new Set<string>();
   pushStatus: 'unsupported' | 'checking' | 'off' | 'on' | 'busy' | 'denied' = 'checking';
   pushError = '';
   // 클릭 안에서 권한 요청을 바로 부르려면 등록과 공개키를 미리 받아 둔다.
@@ -1342,6 +1344,22 @@ export class AppController extends Reactive {
   /** 계정과 모든 정보를 지우고 이 기기에서도 로그아웃한다. 화면에서 두 번 확인한 뒤에만 부른다. */
   /** 앱 안 문의를 보낸다. 화면(설정의 문의하기)이 결과를 문구로 바꿔 보여 준다. */
   sendFeedback(kind: FeedbackKind, body: string, email: string): Promise<FeedbackResult> { return sendFeedback(authClient, kind, body, email); }
+  async listBoardRequests(userId: string) {
+    const epoch = this.subscriptionsEpoch;
+    const rows = await listBoardRequests(authClient, userId);
+    if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return null;
+    const unseen = rows?.filter((row) => row.status === 'added' && row.source_id && !this.seenAddedBoardRequests.has(`${userId}:${row.id}`)) ?? [];
+    if (unseen.length) {
+      const feed = await fetchJson<NoticesFile>('notices.json');
+      if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return null;
+      if (feed) this.sources = feed.sources;
+      await this.refreshSubscriptions(userId, epoch);
+      if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return null;
+      unseen.forEach((row) => this.seenAddedBoardRequests.add(`${userId}:${row.id}`));
+    }
+    return rows;
+  }
+  submitBoardRequest(userId: string, name: string, url: string) { return submitBoardRequest(authClient, userId, name, url); }
 
   async deleteAccount(): Promise<void> {
     const userId = this.authUserId;

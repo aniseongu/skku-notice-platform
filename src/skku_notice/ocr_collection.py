@@ -9,6 +9,7 @@ from pathlib import Path
 
 import yaml
 
+from skku_notice.board_probe import BoardProbeError, fetch_shared_image
 from skku_notice.fetch import fetch_image
 from skku_notice.grad_intern_facts import lacks_key_facts, lacks_work_hours
 from skku_notice.ocr import read_images, read_until_complete
@@ -229,17 +230,24 @@ def run_one(store: OCRStore, user_agent: str, now: datetime, *, discover: bool =
     # Record the attempt first so an OOM or timeout cannot block the queue forever.
     store.start_attempt(notice_id, image_url, now)
     # 외부 인턴 공고의 그림도 읽는다. 허용 목록의 공개 이미지 호스트만 열린다(fetch.EXTERNAL_IMAGE_HOSTS).
-    image = fetch_image(image_url, user_agent, allow_external=True)
-    if image is None:
+    if notice_id.startswith("shared-"):
+        try:
+            image_data = fetch_shared_image(image_url)
+        except BoardProbeError:
+            image_data = None
+    else:
+        image = fetch_image(image_url, user_agent, allow_external=True)
+        image_data = image.data if image else None
+    if image_data is None:
         store.mark(notice_id, image_url, now, None, was_ready=was_ready)
         return "failed"
-    digest = hashlib.sha256(image.data).hexdigest()
+    digest = hashlib.sha256(image_data).hexdigest()
     if store.cached(digest):
         store.mark(notice_id, image_url, now, digest, was_ready=was_ready)
         return "cached"
-    text = read_images([image.data])
+    text = read_images([image_data])
     if text:
-        text = deepen(store, notice_id, [image.data], text)
+        text = deepen(store, notice_id, [image_data], text)
     if not text or len(text.encode("utf-8")) > 1_000_000:
         store.mark(notice_id, image_url, now, None, was_ready=was_ready)
         return "failed"

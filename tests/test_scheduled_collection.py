@@ -75,6 +75,25 @@ def test_collect_once_per_board_and_skip_unchanged_details(monkeypatch):
     assert store.sources["school"]["last_success_at"] == NOW.isoformat()
 
 
+def test_shared_board_uses_checked_fetch_and_preserves_images_for_ocr(monkeypatch):
+    store = MemoryStore()
+    shared = {**SOURCES[0], "shared": True, "on_demand": True}
+    settings = {**SETTINGS, "sources": [shared]}
+    calls = []
+    monkeypatch.setattr(job.time, "sleep", lambda _: None)
+    monkeypatch.setattr(job, "fetch_list", lambda *_: pytest.fail("unchecked list fetch"))
+    monkeypatch.setattr(job, "fetch_detail", lambda *_: pytest.fail("unchecked detail fetch"))
+    monkeypatch.setattr(job, "fetch_shared_page", lambda board, url: calls.append((board, url)) or "html")
+    monkeypatch.setattr(job, "parse_list", lambda *_: [NOTICE])
+    monkeypatch.setattr(job, "parse_detail", lambda *_: SimpleNamespace(
+        body_text="본문", body_html="<p>본문</p>", attachments=(),
+        images=("https://www.skku.edu/image.png",)))
+    assert job.run_collection(settings, store, NOW, set()) == (0, 0)
+    assert job.run_collection(settings, store, NOW, {"school"}) == (1, 0)
+    assert len(calls) == 2
+    assert store.rows["school/123"]["images"] == ["https://www.skku.edu/image.png"]
+
+
 def test_failed_board_does_not_replace_last_success(monkeypatch):
     store = MemoryStore()
     store.sources["school"] = {**SOURCES[0], "last_success_at": "2026-11-01T00:00:00+09:00"}

@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 import httpx
 import yaml
 
+from skku_notice.board_probe import BoardProbeError, fetch_shared_page, probe_board
 from skku_notice.deadline import KST, extract_deadline
 from skku_notice.fetch import FetchError, fetch_detail, fetch_json_post, fetch_list
 from skku_notice.jobs import (
@@ -111,6 +112,30 @@ class NoticeStore:
         ).json()
         return {row["source_id"] for row in rows}
 
+    def shared_sources(self) -> list[dict]:
+        rows = self._request("GET", "platform_sources", params={
+            "select": "id,name,url", "shared_board": "eq.true", "external": "eq.false", "limit": "1000"
+        }).json()
+        return [{**row, "kind": "skku-cms", "on_demand": True, "shared": True} for row in rows]
+
+    def process_board_requests(self) -> None:
+        requests = self._request("GET", "shared_board_requests", params={
+            "select": "id,name,url", "status": "eq.pending", "order": "created_at.asc", "limit": "3"
+        }).json()
+        for request in requests:
+            try:
+                if not re.fullmatch(r"[가-힣A-Za-z0-9 ·&()_-]{1,60}", request["name"].strip()):
+                    raise BoardProbeError("unsupported name")
+                candidate, notices = probe_board(request["url"])
+                initial = [{"article_no": n.article_no, "title": n.title, "category": n.category,
+                            "url": n.url, "posted_on": n.posted_on.isoformat(), "pinned": n.pinned}
+                           for n in notices]
+                self._request("POST", "rpc/publish_shared_board", json={
+                    "request_id": request["id"], "canonical_url": candidate.url, "initial_notices": initial
+                })
+            except BoardProbeError:
+                self._request("POST", "rpc/request_shared_board_review", json={"request_id": request["id"]})
+
     def register_sources(self, rows: list[dict]) -> None:
         """Make catalog boards subscribable without touching boards that already have a collection history."""
         if rows:
@@ -199,7 +224,9 @@ def run_collection(
     for source in sources:
         try:
             pace()
-            notices = parse_list(fetch_list(source["url"], agent, timeout), source["id"], source["url"])
+            html = (fetch_shared_page(source["url"], source["url"]) if source.get("shared")
+                    else fetch_list(source["url"], agent, timeout))
+            notices = parse_list(html, source["id"], source["url"])
             # A pinned notice can also appear in the regular list. Keep it only once.
             notices = list({n.article_no: n for n in reversed(notices)}.values())
             previous = store.notices(source["id"], [n.article_no for n in notices])
@@ -258,7 +285,9 @@ def run_collection(
                     details_left -= 1
                     try:
                         pace()
-                        detail = parse_detail(fetch_detail(notice.url, agent, timeout), notice.url)
+                        html = (fetch_shared_page(source["url"], notice.url) if source.get("shared")
+                                else fetch_detail(notice.url, agent, timeout))
+                        detail = parse_detail(html, notice.url)
                         new_attachments = [
                             {"name": n, "url": u, "type": t, "size": s} for n, u, t, s in detail.attachments
                         ]
@@ -359,10 +388,14 @@ def run_recheck(sources: list[dict], store: NoticeStore, settings: dict, now: da
     agent, timeout = settings["user_agent"], float(settings["timeout_seconds"])
     gap = max(1.5, float(settings.get("request_gap_seconds", 1.5)))
     done = 0
+    source_by_id = {source["id"]: source for source in sources}
     for row in recheck_candidates(rows, important, now):
         time.sleep(gap)
         try:
-            detail = parse_detail(fetch_detail(row["url"], agent, timeout), row["url"])
+            source = source_by_id[row["source_id"]]
+            html = (fetch_shared_page(source["url"], row["url"]) if source.get("shared")
+                    else fetch_detail(row["url"], agent, timeout))
+            detail = parse_detail(html, row["url"])
         except (FetchError, ParseError, ValueError):
             continue
         attachments = [{"name": n, "url": u, "type": t, "size": s} for n, u, t, s in detail.attachments]
@@ -546,6 +579,15 @@ def main() -> int:
         try:
             now = datetime.now(KST)
             register_catalog(settings, store)
+            try:
+                store.process_board_requests()
+            except StoreError:
+                print("게시판 요청 확인을 건너뛰었어요", flush=True)
+            try:
+                settings["sources"].extend(store.shared_sources())
+            except StoreError:
+                # Backward compatible until the database migration is installed.
+                print("공유 게시판 목록을 불러오지 못했어요", flush=True)
             subscribed = store.subscribed_source_ids()
             if recently_collected(settings, store, now, subscribed=subscribed):
                 print("최근에 모든 게시판을 확인해 이번 중복 요청을 건너뛰어요.", flush=True)

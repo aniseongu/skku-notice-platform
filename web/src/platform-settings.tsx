@@ -22,6 +22,7 @@ import { FEEDBACK_KINDS, FEEDBACK_LIMIT, feedbackProblem, type FeedbackKind, typ
 import { BADGE, CHEVRON_RIGHT, CHOICE, SWITCH, SWITCH_ONLY } from './cls';
 import { aiKeysLead, connectedAiKeys } from './ai-keys';
 import { BoardRequest } from './board-request';
+import type { BoardRequestResult, BoardRequestState } from './shared-board-requests';
 
 export interface SettingsModel {
   configured: boolean;
@@ -41,6 +42,8 @@ export interface SettingsModel {
   setTheme: (theme: 'auto' | 'light' | 'dark') => void;
   canInstall: boolean;
   sendFeedback: (kind: FeedbackKind, body: string, email: string) => Promise<FeedbackResult>;
+  listBoardRequests: (userId: string) => Promise<BoardRequestState[] | null>;
+  submitBoardRequest: (userId: string, name: string, url: string) => Promise<BoardRequestResult>;
   showToast: (message: string) => void;
   /** iOS Safari: 설치 창이 없어 홈 화면 추가 방법만 알려 준다. */
   /** 설치 창이 없는 브라우저(iOS Safari, 삼성인터넷)에서 홈 화면 추가 방법을 알려 준다. */
@@ -49,7 +52,7 @@ export interface SettingsModel {
   showShortcuts: () => void;
   // 게시판
   boardOrder: { boards: { id: string; label: string }[]; status: '' | 'saved' | 'failed'; move: (ids: string[]) => void };
-  sources: { id: string; label: string }[];
+  sources: { id: string; label: string; shared_board?: boolean }[];
   subscriptions: string[];
   loading: boolean;
   error: string;
@@ -269,7 +272,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   const others = model.sources.filter((source) => !model.subscriptions.includes(source.id));
   const groups = new Map<string, typeof others>();
   for (const source of others) {
-    const name = otherGroup.get(source.id) ?? boardCollege(source.id) ?? (known.has(source.id) ? '기타' : '학교 공통');
+    const name = source.shared_board ? '기타 · 함께 추가한 게시판' : otherGroup.get(source.id) ?? boardCollege(source.id) ?? (known.has(source.id) ? '기타' : '학교 공통');
     groups.set(name, [...(groups.get(name) ?? []), source]);
   }
   // 단과대는 학교의 단과대학 순서로, 그 뒤에 학교 공통·부트캠프 같은 묶음을 둔다.
@@ -497,7 +500,8 @@ function BoardsSection({ model }: { model: SettingsModel }) {
       {order.boards.length ? <BoardOrderList order={order} editing={editing} onToggle={(id) => model.toggle(id, false)} busy={model.loading} />
         : <p className="field-note text-[14px] leading-[20px] text-ink-2">아직 받는 게시판이 없어요. 아래에서 골라 주세요</p>}
       <BoardGroups model={model} />
-      <BoardRequest send={model.sendFeedback} toast={model.showToast} />
+      <BoardRequest key={model.userId ?? 'guest'} send={model.sendFeedback} toast={model.showToast} userId={model.userId}
+        listRequests={model.listBoardRequests} submitRequest={model.submitBoardRequest} />
     </>}
   </Section>;
 }

@@ -211,7 +211,7 @@ export function Onboarding({ app }: { app: AppController }) {
   const orderedSources = [...sources].sort((a, b) => boardRank(a) - boardRank(b) || Number(recommended.includes(b.id)) - Number(recommended.includes(a.id)));
   // 켜 둔 게시판(고른 전공에 맞는 것과 이미 고른 것)만 먼저 보이고, 나머지는 "게시판 더 보기"에 접어 둔다. 기타 게시판과 키워드가 길게 스크롤하지 않아도 보이게 한다.
   const [initialBoards] = useState(() => draft.boards);
-  const mainSources = orderedSources.filter((source) => !OTHER_BOARDS.some((board) => board.id === source.id));
+  const mainSources = orderedSources.filter((source) => !source.shared_board && !OTHER_BOARDS.some((board) => board.id === source.id));
   const shownBoards = new Set([...recommended, ...initialBoards]);
   // 남은 게시판이 몇 개뿐이면 "더 보기"로 접지 않고 위 목록에 꺼진 채로 바로 둔다(한 번 더 누르게 하지 않는다).
   const restSources = mainSources.filter((source) => !shownBoards.has(source.id));
@@ -328,7 +328,13 @@ export function Onboarding({ app }: { app: AppController }) {
             {OTHER_BOARDS.filter((board) => board.group === group).sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id))).map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
                   checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
           </div>)}
-        <BoardRequest send={(kind, body, email) => app.sendFeedback(kind, body, email)} toast={(message) => app.showToast(message)} />
+        {sources.some((source) => source.shared_board) ? <div role="group" aria-label="함께 추가한 게시판" className="border-t border-line [&>h3+button]:border-t-0">
+          <h3 className="m-0 pt-[14px] pb-[2px] text-[13px] font-semibold leading-[20px] text-ink-2 min-[720px]:pt-[16px]">함께 추가한 게시판</h3>
+          {sources.filter((source) => source.shared_board).map(boardSwitch)}
+        </div> : null}
+        <BoardRequest key={app.authUserId ?? 'guest'} send={(kind, body, email) => app.sendFeedback(kind, body, email)} toast={(message) => app.showToast(message)}
+          userId={app.authUserId} listRequests={(userId) => app.listBoardRequests(userId)}
+          submitRequest={(userId, name, url) => app.submitBoardRequest(userId, name, url)} />
       </div>
       <h2>관심 키워드</h2>
       <p className="card-note m-0 text-[14px] text-ink-2">고르지 않으면 켠 게시판의 공지를 모두 받아요</p>

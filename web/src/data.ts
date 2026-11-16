@@ -4,7 +4,7 @@ import { loadPublicBody, loadPublicFeed } from './platform-data';
 
 // external: 외부 인턴 공고(링커리어, 자소설닷컴, D-026). 성대 공지 탭에는 넣지 않는다.
 // coop: 톨게이트 현장실습(학교 로그인이 필요한 공고). external이기도 하며 인턴 공고 탭이 아닌 현장실습 탭에 보인다.
-export interface Source { id: string; name: string; url: string; external?: boolean; coop?: boolean }
+export interface Source { id: string; name: string; url: string; external?: boolean; coop?: boolean; shared_board?: boolean }
 
 export interface Notice {
   id: string;

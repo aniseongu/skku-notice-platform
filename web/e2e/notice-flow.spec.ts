@@ -86,7 +86,8 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
     const w = window as unknown as { boardRequests: unknown[][] };
     w.boardRequests = [];
-    app.sendFeedback = (...args: unknown[]) => { w.boardRequests.push(args); return Promise.resolve('ok'); };
+    app.submitBoardRequest = (...args: unknown[]) => { w.boardRequests.push(args); return Promise.resolve('ok'); };
+    app.listBoardRequests = () => Promise.resolve([{ id: 'r1', name: '교환학생', status: 'pending' }]);
   });
   const button = root.getByRole('button', { name: '추가 요청하기' });
   await button.scrollIntoViewIfNeeded();
@@ -106,14 +107,15 @@ const checkBoardRequest = async (page: import('@playwright/test').Page, root: im
   await address.fill('https://www.skku.edu/board');
   await root.getByRole('button', { name: '요청 보내기' }).click();
   await expect(name).toHaveCount(0);
-  expect(await page.evaluate(() => (window as unknown as { boardRequests: unknown[][] }).boardRequests)).toEqual([['idea', '[게시판 추가 요청] 이름: 교환학생 / 주소: https://www.skku.edu/board', '']]);
+  expect(await page.evaluate(() => (window as unknown as { boardRequests: unknown[][] }).boardRequests)).toEqual([['account-a', '교환학생', 'https://www.skku.edu/board']]);
+  await expect(root.getByText('교환학생 · 게시판을 확인하고 있어요')).toBeVisible();
 };
 
 test('board request in notification settings', async ({ page }) => {
   await settingsAt(page, '&section=notifications');
   await withApp(page, { authUserId: 'account-a' });
   await checkBoardRequest(page, page.locator('platform-settings-screen'));
-  await expect(page.locator('.toast')).toContainText('요청을 보냈어요');
+  await expect(page.locator('.toast')).toContainText('게시판을 확인하고 있어요');
 });
 
 test('settings hub opens each page in the app, back works and the theme can be changed', async ({ page }) => {
@@ -442,7 +444,7 @@ test('first-run setup: choices only, department list follows the college, double
   // 행 전체가 눌리는 영역이다: 스위치가 아니라 이름 글자, 설명 글자, 행의 왼쪽 끝을 눌러도 켜지고 꺼진다. 높이는 44px 이상이다.
   const etc = dialog.getByRole('group', { name: '기타 게시판' });
   await checkBoardRequest(page, etc);
-  await expect(dialog.locator('.toast')).toContainText('요청을 보냈어요');
+  await expect(dialog.locator('.toast')).toContainText('게시판을 확인하고 있어요');
   await expect(dialog.getByRole('button', { name: '다음' })).toBeEnabled();
   const fab = etc.getByRole('switch', { name: /^지능형팹테크융합전공 공지/ });
   await etc.scrollIntoViewIfNeeded();
@@ -461,7 +463,7 @@ test('first-run setup: choices only, department list follows the college, double
   void row;
   // 스크롤: 맨 아래까지 내렸을 때 마지막 키워드 칩이 "다음" 단추에 가려지지 않는다.
   const lastChip = dialog.getByRole('button', { name: '등록금' });
-  await lastChip.scrollIntoViewIfNeeded();
+  await dialog.locator('.onb-main').evaluate((el) => { el.scrollTop = el.scrollHeight; });
   const chipBox = (await lastChip.boundingBox())!;
   const next = (await dialog.getByRole('button', { name: '다음' }).boundingBox())!;
   expect(chipBox.y + chipBox.height).toBeLessThanOrEqual(next.y);

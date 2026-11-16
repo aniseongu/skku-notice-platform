@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { AlertIcon } from './alert-icon';
 import type { FeedbackKind, FeedbackResult } from './feedback';
+import type { BoardRequestResult, BoardRequestState } from './shared-board-requests';
 
 function validAddress(value: string): boolean {
   if (!value) return true;
@@ -10,30 +11,73 @@ function validAddress(value: string): boolean {
   } catch { return false; }
 }
 
-export function BoardRequest({ send, toast }: { send: (kind: FeedbackKind, body: string, email: string) => Promise<FeedbackResult>; toast: (message: string) => void }) {
+export function BoardRequest({ send, toast, userId, listRequests, submitRequest }: {
+  send: (kind: FeedbackKind, body: string, email: string) => Promise<FeedbackResult>;
+  toast: (message: string) => void;
+  userId: string | null;
+  listRequests: (userId: string) => Promise<BoardRequestState[] | null>;
+  submitRequest: (userId: string, name: string, url: string) => Promise<BoardRequestResult>;
+}) {
   const addressHelpId = useId();
   const addressErrorId = useId();
   const formRef = useRef<HTMLDivElement>(null);
+  const ownerRef = useRef(userId);
+  ownerRef.current = userId;
+  const listRef = useRef(listRequests);
+  listRef.current = listRequests;
+  const refreshEpoch = useRef(0);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [requestState, setRequestState] = useState<{ owner: string | null; rows: BoardRequestState[] }>({ owner: userId, rows: [] });
+  const requests = requestState.owner === userId ? requestState.rows : [];
+  useEffect(() => {
+    let active = true;
+    ownerRef.current = userId;
+    setRequestState({ owner: userId, rows: [] }); setName(''); setAddress(''); setError(''); setOpen(false); setBusy(false);
+    refreshEpoch.current += 1;
+    if (!userId) return () => { active = false; ownerRef.current = null; };
+    const refresh = async () => {
+      const epoch = ++refreshEpoch.current;
+      try {
+        const rows = await listRef.current(userId);
+        if (active && ownerRef.current === userId && epoch === refreshEpoch.current && rows) setRequestState({ owner: userId, rows });
+      } catch { /* 이전 계정의 상태를 보여 주지 않는다. */ }
+    };
+    void refresh();
+    const timer = window.setInterval(() => { void refresh(); }, 30_000);
+    return () => { active = false; ownerRef.current = null; window.clearInterval(timer); };
+  }, [userId]);
   useEffect(() => {
     if (open) formRef.current?.scrollIntoView({ block: 'nearest' });
   }, [open]);
   const invalid = !validAddress(address.trim());
   const submit = async () => {
     if (busy || !name.trim() || invalid) return;
+    const owner = userId;
+    if (!owner) return;
     setBusy(true); setError('');
     try {
-      const result = await send('idea', `[게시판 추가 요청] 이름: ${name.trim()} / 주소: ${address.trim()}`, '');
+      const hasAddress = !!address.trim();
+      const result = hasAddress
+        ? await submitRequest(owner, name.trim(), address.trim())
+        : await send('idea', `[게시판 추가 요청] 이름: ${name.trim()} / 주소: `, '');
+      if (ownerRef.current !== owner) return;
       if (result === 'ok') {
         setName(''); setAddress(''); setOpen(false);
-        toast('요청을 보냈어요. 확인해 볼게요');
+        toast(hasAddress ? '게시판을 확인하고 있어요' : '개발자에게 요청을 보냈어요');
+        if (hasAddress) {
+          const epoch = ++refreshEpoch.current;
+          try {
+            const rows = await listRequests(owner);
+            if (ownerRef.current === owner && epoch === refreshEpoch.current && rows) setRequestState({ owner, rows });
+          } catch { /* 상태 조회는 다음 자동 조회에서 다시 시도한다. */ }
+        }
       } else setError(result === 'limit' ? '오늘은 5번까지 보낼 수 있어요. 내일 다시 보내 주세요' : '보내지 못했어요. 잠시 뒤 다시 시도해 주세요');
     } catch { setError('보내지 못했어요. 잠시 뒤 다시 시도해 주세요'); }
-    finally { setBusy(false); }
+    finally { if (ownerRef.current === owner) setBusy(false); }
   };
   const input = 'min-h-[44px] w-full rounded-md border border-line bg-surface px-[12px] text-[15px] text-ink';
   return <div className="border-t border-line">
@@ -41,7 +85,11 @@ export function BoardRequest({ send, toast }: { send: (kind: FeedbackKind, body:
       <span>원하는 게시판이 없나요?</span>
       <button type="button" aria-expanded={open} disabled={busy} onClick={() => setOpen(!open)} className="min-h-[44px] shrink-0 rounded-sm border-0 bg-transparent px-[8px] text-[14px] font-semibold text-accent [@media(hover:hover)]:hover:bg-hover active:bg-hover">{open ? '접기' : '추가 요청하기'}</button>
     </div>
+    {requests.length ? <div className="grid gap-[4px] pb-[12px] text-[14px] leading-[20px] text-ink-2" aria-live="polite">
+      {requests.map((request) => <p key={request.id} className="m-0">{request.name} · {request.status === 'added' ? '게시판이 추가됐어요' : request.status === 'review' ? '개발자에게 요청을 보냈어요' : request.status === 'failed' ? '요청을 보내지 못했어요. 나중에 다시 시도해 주세요' : '게시판을 확인하고 있어요'}</p>)}
+    </div> : null}
     {open ? <div ref={formRef} className="grid w-full max-w-[600px] gap-[10px] pb-[16px]">
+      <p className="m-0 text-[14px] leading-[20px] text-ink-2">추가된 게시판은 다른 사람도 고를 수 있어요</p>
       <label className="grid gap-[4px] text-[14px] font-semibold">게시판 이름 (필수)<input className={input} value={name} maxLength={60} required disabled={busy} onChange={(e) => setName(e.currentTarget.value)} /></label>
       <div className="grid gap-[4px]">
         <label className="grid gap-[4px] text-[14px] font-semibold">주소 (선택)<input className={input} type="url" value={address} maxLength={400} disabled={busy} aria-invalid={invalid} aria-describedby={invalid ? `${addressHelpId} ${addressErrorId}` : addressHelpId} onChange={(e) => setAddress(e.currentTarget.value)} /></label>

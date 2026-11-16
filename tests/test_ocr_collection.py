@@ -60,6 +60,20 @@ def test_shared_ocr_is_cached_by_image_hash(monkeypatch):
     assert store.cutoff == NOW - timedelta(hours=24)
 
 
+def test_user_added_board_ocr_uses_pinned_image_fetch_and_cache(monkeypatch):
+    store = MemoryStore()
+    store.image["notice_id"] = "shared-123/1"
+    def reject_unsafe(*_args, **_kwargs):
+        raise AssertionError("unsafe fetch")
+
+    monkeypatch.setattr(job, "fetch_image", reject_unsafe)
+    monkeypatch.setattr(job, "fetch_shared_image", lambda _url: b"image")
+    monkeypatch.setattr(job, "read_images", lambda _images: "한국어 공지")
+    assert job.run_one(store, "test", NOW) == "processed"
+    assert list(store.cache.values()) == ["한국어 공지"]
+    assert job.run_one(store, "test", NOW) == "cached"
+
+
 def test_stale_images_are_removed_without_fetching(monkeypatch):
     store = MemoryStore()
     store.present = False
