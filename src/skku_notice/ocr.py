@@ -2,6 +2,7 @@
 
 import logging
 import math
+import os
 from collections.abc import Iterator
 from functools import lru_cache
 from io import BytesIO
@@ -14,6 +15,17 @@ MAX_IMAGE_PIXELS = 12_000_000
 MAX_DECODED_PIXELS = 40_000_000
 TILE_SIZE = 1400
 TILE_OVERLAP = 80
+
+
+def _max_width_from_env() -> int | None:
+    try:
+        width = int(os.environ.get("SKKU_OCR_MAX_WIDTH", ""))
+        return width if width > 0 else None
+    except ValueError:
+        return None
+
+
+OCR_MAX_WIDTH = _max_width_from_env()
 
 
 class PermanentImageError(ValueError):
@@ -47,9 +59,17 @@ def _image_tiles(data: bytes) -> Iterator[bytes]:
     image = Image.open(BytesIO(data))
     with image:
         width, height = image.size
-        resized = width * height > MAX_IMAGE_PIXELS
+        scale = min(1.0, math.sqrt(MAX_IMAGE_PIXELS / (width * height)))
+        if OCR_MAX_WIDTH is not None and width > OCR_MAX_WIDTH:
+            scale = min(scale, OCR_MAX_WIDTH / width)
+        resized = scale < 1
         if resized:
-            scale = math.sqrt(MAX_IMAGE_PIXELS / (width * height))
+            # RapidOCR has Global.max_side_len/min_side_len, Det.limit_side_len/
+            # limit_type and Rec.rec_img_shape; these act inside the engine:
+            # https://rapidai.github.io/RapidOCRDocs/main/en/install_usage/rapidocr/usage/
+            # Tesseract's FAQ warns that x-height under 10px has little chance of
+            # accuracy; this is a caution, not a RapidOCR threshold:
+            # https://tesseract-ocr.github.io/tessdoc/tess3/FAQ-Old.html
             target = (max(1, int(width * scale)), max(1, int(height * scale)))
             if target[0] * target[1] > MAX_IMAGE_PIXELS:
                 target = (min(target[0], MAX_IMAGE_PIXELS),

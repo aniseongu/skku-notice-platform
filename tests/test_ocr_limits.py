@@ -22,6 +22,39 @@ def test_large_poster_is_scaled_before_tiling():
         assert 800 <= tile.width < 1200
 
 
+def test_width_limit_scales_poster_before_tiling(monkeypatch):
+    monkeypatch.setattr(ocr, "OCR_MAX_WIDTH", 1600)
+    # Isolate the width rule; the ordinary 12MP rule is tested separately.
+    monkeypatch.setattr(ocr, "MAX_IMAGE_PIXELS", 40_000_000)
+    tiles = list(ocr._image_tiles(image_bytes((2400, 8000))))
+    sizes = []
+    for data in tiles:
+        with Image.open(BytesIO(data)) as tile:
+            sizes.append(tile.size)
+    assert len(sizes) == 8
+    assert sizes[:2] == [(1480, 1480), (280, 1480)]
+    assert sizes[-2:] == [(1480, 1213), (280, 1213)]
+
+
+def test_unset_width_preserves_existing_tiles(monkeypatch):
+    monkeypatch.delenv("SKKU_OCR_MAX_WIDTH", raising=False)
+    assert ocr._max_width_from_env() is None
+    monkeypatch.setattr(ocr, "OCR_MAX_WIDTH", None)
+    data = image_bytes((2400, 8000))
+    tiles = list(ocr._image_tiles(data))
+    assert len(tiles) == 10
+    with Image.open(BytesIO(tiles[0])) as tile:
+        assert tile.size == (1480, 1480)
+    with Image.open(BytesIO(tiles[1])) as tile:
+        assert tile.size == (577, 1480)
+
+
+@pytest.mark.parametrize("value,expected", [("1600", 1600), ("0", None), ("-1", None), ("x", None)])
+def test_width_environment_validation(monkeypatch, value, expected):
+    monkeypatch.setenv("SKKU_OCR_MAX_WIDTH", value)
+    assert ocr._max_width_from_env() == expected
+
+
 def test_safety_ceiling_and_bad_format():
     with pytest.raises(ocr.PermanentImageError):
         list(ocr._image_tiles(image_bytes((9000, 9000))))
