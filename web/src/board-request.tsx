@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { AlertIcon } from './alert-icon';
-import { SETTINGS_ACTION, SETTINGS_INPUT, SOLID_BUTTON, GHOST_BUTTON } from './cls';
+import { SETTINGS_INPUT, SOLID_BUTTON, GHOST_BUTTON } from './cls';
 import { Setting } from './platform-settings';
 import type { BoardRequestResult, BoardRequestState } from './shared-board-requests';
 
@@ -104,10 +104,10 @@ export function BoardRequest({ toast, userId, listRequests, submitRequest, onAdd
           <button type="button" disabled={busy || !name.trim() || invalid} onClick={() => { void submit(); }} className={SOLID_BUTTON}>{busy ? '보내고 있어요' : '요청 보내기'}</button>
         </div>
       </div> : null}
-      {open ? null : <button type="button" aria-expanded={false} disabled={busy} onClick={() => setOpen(true)} className={`${SETTINGS_ACTION} shrink-0 self-end`}>추가 요청</button>}
+      {open ? null : <button type="button" aria-expanded={false} disabled={busy} onClick={() => setOpen(true)} className={GHOST_BUTTON}>추가 요청</button>}
     </Setting>
     {(open || requests.some((request) => request.status === 'pending' || request.status === 'added')) && requests.length ? <ul className="m-0 list-none border-t border-line p-0 pb-[12px] [&>li]:flex [&>li]:min-h-[44px] [&>li]:items-center [&>li]:justify-between [&>li]:gap-[12px] [&>li]:border-b [&>li]:border-line [&>li]:text-[15px] [&>li:last-child]:border-b-0" aria-live="polite">
-      {requests.map((request) => <li key={request.id}><span className="min-w-0 py-[10px] font-normal text-ink">{request.name}</span><span className="shrink-0 text-[14px] leading-[20px] text-ink-2">{request.status === 'added' ? '추가됨' : request.status === 'review' ? '개발자 확인 중' : request.status === 'failed' ? '보내지 못함' : '확인 중'}</span></li>)}
+      {requests.map((request) => <li key={request.id}><span className="min-w-0 py-[10px] font-normal text-ink">{request.name}</span><span className={`shrink-0 text-[14px] leading-[20px] ${request.status === 'added' ? 'font-semibold text-accent' : 'text-ink-2'}`}>{request.status === 'added' ? '추가됨' : request.status === 'review' ? '개발자 확인 중' : request.status === 'failed' ? '보내지 못함' : '확인 중'}</span></li>)}
     </ul> : null}
   </div>;
 }

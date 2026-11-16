@@ -1794,7 +1794,7 @@ for (const width of [412, 1440]) {
     await screen.getByRole('button', { name: '추가 요청', exact: true }).click();
     const close = await right(screen.getByRole('button', { name: '요청 보내기' }));
     console.log(`board edges ${width}: card=${card}, chevron=${chevron}, reorder=${reorder}, request=${request}, close=${close}`);
-    for (const edge of width >= 720 ? [chevron, reorder, request, close] : [chevron, reorder, request]) expect(Math.abs(edge - card)).toBeLessThanOrEqual(1);   // 펼친 요청 단추는 PC에서만 오른쪽 끝(휴대폰은 다른 입력 줄처럼 왼쪽)
+    for (const edge of width >= 720 ? [chevron, reorder, request, close] : [chevron, reorder]) expect(Math.abs(edge - card)).toBeLessThanOrEqual(1);   // 추가 요청·요청 보내기는 설정 줄의 단추라 PC에서만 오른쪽 끝(휴대폰은 다른 설정 줄 단추처럼 왼쪽)
     if (!(await screen.locator('.board-more-list').evaluate((el: HTMLDetailsElement) => el.open))) await screen.locator('.board-more-list summary').click();
     const expanded = screen.locator('.board-more-list > div');
     await expect(expanded).toBeVisible();
