@@ -873,7 +873,8 @@ export class AppController extends Reactive {
   // 병합 → 저장 업로드 → 읽음 업로드 순서의 체인이며, 업로드가 일부 실패하면 다음 새로고침에서 실패한 단계부터 이어 간다.
   async syncStates(): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
-    if (!authClient || !userId || !this.notices.length || this.stateSyncedEpoch === epoch) return;
+    // 저장해 둔 목록(캐시)에는 서버에서 이미 지운 공지가 남아 있을 수 있어, 새로 받은 목록이 온 뒤에만 맞춘다.
+    if (!authClient || !userId || !this.liveFeedReady || !this.notices.length || this.stateSyncedEpoch === epoch) return;
     if (!this.stateChain || this.stateChain.epoch !== epoch) {
       const client = authClient;
       let plan: StatePlan | null = null;
@@ -898,8 +899,8 @@ export class AppController extends Reactive {
       await current.run();
       if (epoch === this.subscriptionsEpoch) this.stateSyncedEpoch = epoch;
     } catch {
-      if (epoch === this.subscriptionsEpoch) this.showToast('저장과 읽음을 계정과 맞추지 못했어요. 잠시 뒤 이어서 시도할게요');
-      else if (this.stateChain === current) this.stateChain = null;
+      // 사용자가 할 일이 없는 뒤쪽 동기화라 토스트로 알리지 않는다(토스 규칙: 행동할 수 없는 오류는 띄우지 않는다). 다음 새로고침에서 실패한 단계부터 잇는다.
+      if (epoch !== this.subscriptionsEpoch && this.stateChain === current) this.stateChain = null;
     }
   }
 
