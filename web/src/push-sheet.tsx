@@ -20,11 +20,11 @@ export function PushSheet({ app, onClose }: { app: AppController; onClose: () =>
       <img src="icon-192.png" alt="" className="size-[48px] flex-none rounded-md border border-line" />
       <div className="min-w-0 flex-1 pt-[2px]">
         <p className="m-0 text-[18px] leading-[25px] font-bold text-ink break-keep text-pretty">새 공지를 알림으로 받아요</p>
-        <p className="m-0 mt-[4px] text-[15px] leading-[22px] text-ink-2 break-keep text-pretty min-[720px]:text-balance">{denied ? '브라우저가 알림을 막아 두었어요. 주소창 옆 자물쇠나 브라우저 설정에서 이 사이트의 알림을 허용한 뒤 다시 확인해 주세요' : '앱을 닫아도 바로 알려드려요. 설정에서 언제든 끌 수 있어요'}</p>
+        <p className="m-0 mt-[4px] text-[15px] leading-[22px] text-ink-2 break-keep text-balance">{denied ? '브라우저가 알림을 막아 두었어요. 주소창 옆 자물쇠에서 알림을 허용하고 다시 확인해 주세요' : '앱을 닫아도 바로 알려드려요. 설정에서 언제든 끌 수 있어요'}</p>
         {app.pushError && !denied ? <p className="error-text m-0 mt-[8px] text-[14px] leading-[21px] font-medium text-danger break-keep text-pretty" role="alert"><AlertIcon />{app.pushError}</p> : null}
       </div>
     </div>
     <button type="button" className="mt-[16px] inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 bg-accent px-[16px] text-[16px] font-semibold text-on-accent active:opacity-80 disabled:opacity-60" disabled={busy} onClick={() => { void (denied ? app.recheckPush() : app.enablePush()); }}>{busy ? '확인하고 있어요' : denied ? '다시 확인하기' : app.pushRetry ? '다시 시도하기' : '알림 받기'}</button>
-    <button type="button" className="mt-[8px] inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 bg-sunken px-[16px] text-[16px] font-semibold text-ink [@media(hover:hover)]:hover:bg-line active:bg-line" onClick={close}>{denied ? '닫기' : '다음에 할게요'}</button>
+    <button type="button" className="mt-[8px] inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 bg-sunken px-[16px] text-[16px] font-semibold text-ink [@media(hover:hover)]:hover:bg-line active:bg-line" onClick={close}>다음에 할게요</button>
   </section>;
 }

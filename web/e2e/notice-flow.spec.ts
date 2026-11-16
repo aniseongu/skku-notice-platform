@@ -157,8 +157,8 @@ test('notification settings show each device state and call the right actions', 
   await expect(screen.getByRole('button', { name: '확인하고 있어요' })).toBeDisabled();
   await withApp(page, { pushStatus: 'denied' });
   await expect(screen.getByText('브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요')).toBeVisible();
-  await withApp(page, { pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요. 다시 시도해 주세요' });
-  await expect(screen.getByRole('alert')).toContainText('다시 시도');
+  await withApp(page, { pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요' });
+  await expect(screen.getByRole('alert')).toContainText('알림을 켜지 못했어요');
   await screen.getByRole('button', { name: '다시 시도하기' }).click();
   expect(await calls(page)).toEqual([['enable']]);
 });
@@ -444,8 +444,8 @@ test('first-run setup: choices only, department list follows the college, double
   expect(saved.boards).toEqual(expect.arrayContaining(['skku-notice01', 'cse-notice', 'futurecar-notice', 'aiuniv-notice']));
   expect(saved).not.toHaveProperty('joinedPrograms');
   // 알림은 꼭 켠다: 건너뛰는 단추가 없고, 알림 받기를 눌러 켜지면 이어진다.
-  await expect(dialog.getByRole('heading', { name: '알림을 켜 주세요' })).toBeFocused();
-  await expect(dialog.getByRole('button', { name: /나중에/ })).toHaveCount(0);
+  await expect(dialog.getByRole('heading', { name: '새 공지를 알림으로 받을까요?' })).toBeFocused();
+  await expect(dialog.getByRole('button', { name: '다음에 할게요' })).toHaveCount(0);
   await expect(dialog.getByText('설정에서 언제든 끌 수 있어요')).toBeVisible();
   await dialog.getByRole('button', { name: '알림 받기' }).click();
   expect((await calls(page)).filter((c) => c[0] === 'push')).toHaveLength(1);
@@ -2465,20 +2465,21 @@ test('first-run notify step: no skip when off, escape only after a failure, deni
   await dialog.getByRole('button', { name: '채웠어요' }).click();
   await next();
   await next();
-  const heading = dialog.getByRole('heading', { name: '알림을 켜 주세요' });
+  const heading = dialog.getByRole('heading', { name: '새 공지를 알림으로 받을까요?' });
   await expect(heading).toBeVisible();
   const set = (state: Record<string, unknown>) => page.evaluate((patch) => Object.assign(document.querySelector('notice-app') as object, patch), state);
   await expect(dialog.getByRole('button', { name: '알림 받기' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: /나중에/ })).toHaveCount(0);
-  await set({ pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요. 다시 시도해 주세요' });
+  await expect(dialog.getByRole('button', { name: '다음에 할게요' })).toHaveCount(0);
+  await set({ pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요' });
   await expect(dialog.getByRole('button', { name: '다시 시도하기' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '나중에 켤게요' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '다음에 할게요' })).toBeVisible();
   await set({ pushStatus: 'denied', pushRetry: false, pushError: '' });
   await expect(dialog.getByRole('button', { name: '다시 확인하기' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '나중에 켤게요' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '다음에 할게요' })).toBeVisible();
   await set({ pushStatus: 'unsupported' });
   await expect(dialog.getByText(/지원하지 않아요|홈 화면에 추가한 앱/)).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '알림 없이 계속하기' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '계속하기' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '다음에 할게요' })).toHaveCount(0);
   await set({ pushStatus: 'checking' });
   await expect(dialog.getByRole('button', { name: '확인하고 있어요' })).toBeDisabled();
 });
@@ -2591,7 +2592,7 @@ test('first-run click budget: a normal major finishes in 10 clicks, focus follow
   await step('어떤 공지를 받을까요?', '3품 인턴십 영역을 채웠나요?');
   // 받을 공지는 추천이 켜져 있어 고르지 않고 바로 넘어간다. 마지막 단추는 가려지지 않는다.
   await p(dialog.getByRole('button', { name: '다음' }));
-  await step('알림을 켜 주세요', '어떤 공지를 받을까요?');
+  await step('새 공지를 알림으로 받을까요?', '어떤 공지를 받을까요?');
   expect((await calls(page)).filter((x) => x[0] === 'finish')).toEqual([['finish', false]]);
   await p(dialog.getByRole('button', { name: '알림 받기' }));
   await expect(dialog).toHaveCount(0);
@@ -2602,9 +2603,9 @@ test('first-run click budget: a normal major finishes in 10 clicks, focus follow
 test('first-run setup resumes at the notify step after a reload and never skips it', async ({ page }) => {
   await openSetup(page, { profile: SAVED_NOT_DONE, pushStatus: 'off' });
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: '알림을 켜 주세요' })).toBeFocused();
+  await expect(dialog.getByRole('heading', { name: '새 공지를 알림으로 받을까요?' })).toBeFocused();
   await expect(dialog.getByRole('button', { name: '알림 받기' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: /나중에|건너/ })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: /나중에|다음에 할게요|건너/ })).toHaveCount(0);
   expect(await noOverflow(page)).toBe(true);
   // 이전 단계로 가면 이미 한 답이 남아 있다.
   await dialog.getByRole('button', { name: '이전 단계' }).click();
@@ -2614,7 +2615,7 @@ test('first-run setup resumes at the notify step after a reload and never skips 
 test('first-run notify step is finishable with the keyboard alone and Shift+Tab goes back', async ({ page }) => {
   await openSetup(page, { profile: SAVED_NOT_DONE, pushStatus: 'off' });
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: '알림을 켜 주세요' })).toBeFocused();
+  await expect(dialog.getByRole('heading', { name: '새 공지를 알림으로 받을까요?' })).toBeFocused();
   // 제목에서 Tab 몇 번 안에 알림 받기에 닿는다.
   let tabs = 0;
   while (tabs < 6) {
@@ -2638,8 +2639,8 @@ test('first-run notify step: denied shows 다시 확인하기 on top and big eno
   const c = { clicks: 0 };
   await press(page, dialog.getByRole('button', { name: '다시 확인하기' }), c, mobile);
   expect((await calls(page)).filter((x) => x[0] === 'recheck')).toHaveLength(1);
-  // 실패 상태에서도 다시 시도하기와 나중에 켤게요가 눌린다.
-  await page.evaluate(() => Object.assign(document.querySelector('notice-app') as object, { pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요. 다시 시도해 주세요' }));
+  // 실패 상태에서도 다시 시도하기와 다음에 할게요가 눌린다.
+  await page.evaluate(() => Object.assign(document.querySelector('notice-app') as object, { pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요' }));
   await press(page, dialog.getByRole('button', { name: '다시 시도하기' }), c, mobile);
   expect((await calls(page)).filter((x) => x[0] === 'push')).toHaveLength(1);
 });
@@ -2649,7 +2650,7 @@ test('push sheet: 알림 받기, 다시 확인하기 and 다음에 할게요 are
   await page.setViewportSize(mobile ? { width: 412, height: 891 } : { width: 1440, height: 900 });
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
-  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요. 다시 시도해 주세요', enablePush: 'fn:enable', recheckPush: 'fn:recheck' });
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요', enablePush: 'fn:enable', recheckPush: 'fn:recheck' });
   const sheet = page.getByRole('region', { name: '알림 켜기' });
   await expect(sheet).toBeVisible();
   const c = { clicks: 0 };
@@ -2663,7 +2664,7 @@ test('push sheet: 알림 받기, 다시 확인하기 and 다음에 할게요 are
   const box = (await sheet.boundingBox())!;
   expect(box.y).toBeGreaterThanOrEqual(0);
   expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize()!.height + 1);
-  await press(page, sheet.getByRole('button', { name: '닫기' }), c, true);
+  await press(page, sheet.getByRole('button', { name: '다음에 할게요' }), c, true);
   await expect(sheet).toHaveCount(0);
 });
 
@@ -2741,8 +2742,10 @@ test('unsupported iPhone Safari explains installation and continues in one click
     const page = await context.newPage();
     await openSetup(page, { profile: SAVED_NOT_DONE, pushStatus: 'unsupported' });
     const d = page.getByRole('dialog'), c = { clicks: 0 };
-    await expect(d.getByText(/iPhone은 홈 화면에 추가한 앱에서만 알림/)).toBeVisible();
-    await press(page, d.getByRole('button', { name: '알림 없이 계속하기' }), c, true);
+    await expect(d.getByText(/홈 화면에 추가한 앱에서만 알림/)).toBeVisible();
+    await expect(d.locator('.hint')).toContainText('공유 버튼에서 ‘홈 화면에 추가’를 눌러 주세요.');
+    await expect(d.locator('.hint b')).toHaveText('‘홈 화면에 추가’');
+    await press(page, d.getByRole('button', { name: '계속하기' }), c, true);
     await expect(d).toHaveCount(0);
     expect((await calls(page)).filter((x) => x[0] === 'complete')).toHaveLength(1);
     expect(c.clicks).toBe(1);
@@ -2792,7 +2795,7 @@ test('keyboard-only first-run reaches notify and finishes in 10 activations', as
   await activate(d.getByRole('button', { name: '다음' }));
   await expect(d.getByRole('heading', { name: '어떤 공지를 받을까요?' })).toBeFocused();
   await activate(d.getByRole('button', { name: '다음' }));
-  await expect(d.getByRole('heading', { name: '알림을 켜 주세요' })).toBeFocused();
+  await expect(d.getByRole('heading', { name: '새 공지를 알림으로 받을까요?' })).toBeFocused();
   const notify = d.getByRole('button', { name: '알림 받기' });
   for (let i = 0; i < 10 && !(await notify.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press('Tab');
   await expect(notify).toBeFocused();

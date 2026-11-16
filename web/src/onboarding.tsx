@@ -355,24 +355,23 @@ export function Onboarding({ app }: { app: AppController }) {
     const waiting = status === 'checking' || status === 'busy';
     const mode = installMode(navigator.userAgent, isStandalone(), !!app.install);
     const iosHint = mode === 'ios' || mode === 'ios-browser' || mode === 'ios-open-safari' ? MANUAL_INSTALL_HINT[mode] : null;
-    title = '알림을 켜 주세요';
-    lead = '새 공지가 올라오면 이 기기로 알려드려요';
+    title = '새 공지를 알림으로 받을까요?';
     body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]">
       <NoticeExample idPrefix="onb" />
       {app.pushError || (failed && app.sendPushReport) ? <div className="grid">
-        {app.pushError ? <p className="error-text m-0 text-[14px] font-medium text-danger" role="alert"><AlertIcon />{app.pushError}</p> : null}
+        {app.pushError ? <p className="error-text m-0 text-[14px] font-medium text-danger break-keep text-pretty" role="alert"><AlertIcon />{app.pushError}</p> : null}
         {failed && app.sendPushReport ? <button type="button" className="text-button [@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] inline-flex min-h-[44px] w-fit items-center rounded-sm border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent" onClick={() => { void app.sendPushReport(); }}>문제 알려 주기</button> : null}
       </div> : null}
-      {status === 'denied' ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2">브라우저 설정에서 이 사이트의 알림을 허용한 뒤 다시 확인해 주세요</p> : null}
+      {status === 'denied' ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2 break-keep text-pretty"><AlertIcon />브라우저가 알림을 막아 두었어요. 주소창 옆 자물쇠에서 알림을 허용하고 다시 확인해 주세요</p> : null}
       {status === 'unsupported' ? (iosHint
-        ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2">iPhone은 홈 화면에 추가한 앱에서만 알림을 켤 수 있어요.<br />{iosHint.lead}<b className="font-semibold text-ink">{iosHint.action}</b>{iosHint.tail}.</p>
-        : <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2">이 브라우저는 알림을 지원하지 않아요. 크롬 같은 다른 브라우저에서 열면 켤 수 있어요.</p>) : null}
+        ? <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2 break-keep text-pretty">홈 화면에 추가한 앱에서만 알림을 켤 수 있어요.<br />{mode === 'ios' ? <>공유 버튼에서 <b className="font-semibold text-ink">‘홈 화면에 추가’</b>를 눌러 주세요.</> : <>{iosHint.lead.replace(/\([^)]*\)/g, '')}<b className="font-semibold text-ink">{iosHint.action}</b>{iosHint.tail.replace(/\([^)]*\)/g, '')}.</>}</p>
+        : <p className="hint rounded-md bg-sunken px-[12px] py-[10px] text-[14px] text-ink-2 break-keep text-pretty">이 브라우저는 알림을 지원하지 않아요. 크롬 같은 다른 브라우저에서 열면 켤 수 있어요.</p>) : null}
     </div>;
-    const skip = <button type="button" className={GHOST} onClick={afterNotify}>나중에 켤게요</button>;
+    const skip = <button type="button" className={GHOST} onClick={afterNotify}>다음에 할게요</button>;
     foot = <>
-      {status === 'off' && !failed || waiting ? <p className="m-0 text-center text-[14px] text-ink-2">설정에서 언제든 끌 수 있어요</p> : null}
+      {status === 'off' && !failed || waiting ? <p className="m-0 text-center text-[14px] text-ink-2 break-keep text-pretty">설정에서 언제든 끌 수 있어요</p> : null}
       {status === 'on' || status === 'unsupported'
-        ? <button type="button" className={SOLID} onClick={afterNotify}>{status === 'unsupported' ? '알림 없이 계속하기' : needAi() ? '다음' : '끝내기'}</button>
+        ? <button type="button" className={SOLID} onClick={afterNotify}>{status === 'unsupported' ? '계속하기' : needAi() ? '다음' : '끝내기'}</button>
         : status === 'denied'
           ? <button type="button" className={SOLID} onClick={() => { void app.recheckPush(); }}>다시 확인하기</button>
           : <button type="button" className={SOLID} disabled={waiting} onClick={() => { void app.enablePush(); }}>

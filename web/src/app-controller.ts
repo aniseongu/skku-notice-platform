@@ -1492,7 +1492,7 @@ export class AppController extends Reactive {
         this.pushStatus = denied ? 'denied' : 'off';
         this.pushRetry = !denied;
         if (denied && this.pushChain === current) { this.pushChain = null; void current.chain.discard(); }
-        this.pushError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '알림을 켜지 못했어요. 다시 시도해 주세요';
+        this.pushError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '알림을 켜지 못했어요';
         if (!denied) this.watchPermission(userId, epoch);
         pushNote(`failed ${error instanceof Error ? `${error.name}:${error.message.slice(0, 40)}` : String(error)}`);
       } else {
