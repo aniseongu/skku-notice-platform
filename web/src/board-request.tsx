@@ -106,8 +106,8 @@ export function BoardRequest({ toast, userId, listRequests, submitRequest, onAdd
       </div> : null}
       {open ? null : <button type="button" aria-expanded={false} disabled={busy} onClick={() => setOpen(true)} className={GHOST_BUTTON}>추가 요청</button>}
     </Setting>
-    {(open || requests.some((request) => request.status === 'pending' || request.status === 'added')) && requests.length ? <ul className="m-0 list-none border-t border-line p-0 pb-[12px] [&>li]:flex [&>li]:min-h-[44px] [&>li]:items-center [&>li]:justify-between [&>li]:gap-[12px] [&>li]:border-b [&>li]:border-line [&>li]:text-[15px] [&>li:last-child]:border-b-0" aria-live="polite">
+    {(open || requests.some((request) => request.status === 'pending' || request.status === 'added')) && requests.length ? <><p className="m-0 pt-[12px] pb-[6px] text-[14px] leading-[20px] text-ink-2">요청한 게시판</p><ul className="m-0 list-none border-t border-line p-0 pb-[12px] [&>li]:flex [&>li]:min-h-[44px] [&>li]:items-center [&>li]:justify-between [&>li]:gap-[12px] [&>li]:border-b [&>li]:border-line [&>li]:text-[15px] [&>li:last-child]:border-b-0" aria-live="polite">
       {requests.map((request) => <li key={request.id}><span className="min-w-0 py-[10px] font-normal text-ink">{request.name}</span><span className={`shrink-0 text-[14px] leading-[20px] ${request.status === 'added' ? 'font-semibold text-accent' : 'text-ink-2'}`}>{request.status === 'added' ? '추가됨' : request.status === 'review' ? '개발자 확인 중' : request.status === 'failed' ? '보내지 못함' : '확인 중'}</span></li>)}
-    </ul> : null}
+    </ul></> : null}
   </div>;
 }

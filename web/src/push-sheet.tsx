@@ -20,7 +20,7 @@ export function PushSheet({ app, onClose }: { app: AppController; onClose: () =>
       <img src="icon-192.png" alt="" className="size-[48px] flex-none rounded-md border border-line" />
       <div className="min-w-0 flex-1 pt-[2px]">
         <p className="m-0 text-[18px] leading-[25px] font-bold text-ink break-keep text-pretty">새 공지를 알림으로 받아요</p>
-        <p className="m-0 mt-[4px] text-[15px] leading-[22px] text-ink-2 break-keep text-balance">{denied ? '브라우저가 알림을 막아 두었어요. 주소창 옆 자물쇠에서 알림을 허용하고 다시 확인해 주세요' : '앱을 닫아도 바로 알려드려요. 설정에서 언제든 끌 수 있어요'}</p>
+        <p className="m-0 mt-[4px] text-[15px] leading-[22px] text-ink-2 break-keep text-balance">{denied ? '브라우저가 알림을 막아 두었어요. 주소창 옆 자물쇠에서 알림을 허용한 뒤 아래 단추를 눌러 주세요' : '앱을 닫아도 바로 알려드려요. 설정에서 언제든 끌 수 있어요'}</p>
         {app.pushError && !denied ? <p className="error-text m-0 mt-[8px] text-[14px] leading-[21px] font-medium text-danger break-keep text-pretty" role="alert"><AlertIcon />{app.pushError}</p> : null}
       </div>
     </div>

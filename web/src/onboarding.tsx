@@ -369,7 +369,7 @@ export function Onboarding({ app }: { app: AppController }) {
     body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]">
       <NoticeExample idPrefix="onb" />
       {status === 'denied' || status === 'unsupported' || failed ? <div className="grid gap-[2px]">
-        {status === 'denied' ? <p className={HINT}><AlertIcon />브라우저가 알림을 막아 두었어요. 주소창 옆 자물쇠에서 알림을 허용하고 다시 확인해 주세요</p>
+        {status === 'denied' ? <p className={HINT}><AlertIcon />브라우저가 알림을 막아 두었어요. 주소창 옆 자물쇠에서 알림을 허용한 뒤 아래 단추를 눌러 주세요</p>
           : status === 'unsupported' ? (iosHint
             ? <p className={HINT}><AlertIcon />홈 화면에 추가한 앱에서만 알림을 켤 수 있어요.<br />{mode === 'ios' ? <>공유 버튼에서 <b className="font-semibold text-ink">‘홈 화면에 추가’</b>를 눌러 주세요.</> : <>{iosHint.lead.replace(/\([^)]*\)/g, '')}<b className="font-semibold text-ink">{iosHint.action}</b>{iosHint.tail.replace(/\([^)]*\)/g, '')}.</>}</p>
             : <p className={HINT}><AlertIcon />이 브라우저는 알림을 지원하지 않아요. 크롬 같은 다른 브라우저에서 열면 켤 수 있어요.</p>)
