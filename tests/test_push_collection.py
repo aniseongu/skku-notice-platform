@@ -364,3 +364,34 @@ def test_required_batch_failed_send_only_records_the_attempt(monkeypatch):
     counts = worker.run_required_batch(store, "key", "mailto:x@example.com", datetime.now(UTC))
     assert counts == {"required_sent": 0, "required_failed": 1}
     assert store.marked == [] and store.touched == [("u1", "AI 키")]
+
+
+def test_main_reports_required_batch_error_as_failure_but_finishes_other_batches(monkeypatch, capsys):
+    class Store:
+        def __init__(self, *args):
+            pass
+
+        def close(self):
+            pass
+
+    calls = []
+    monkeypatch.setattr(worker, "PushStore", Store)
+    monkeypatch.setattr(worker.Vapid, "from_string", lambda key: None)
+    monkeypatch.setattr(worker, "run_batch", lambda *a: {"sent": 0, "expired": 0, "retry": 0, "skipped": 0})
+    monkeypatch.setattr(worker, "run_canvas_batch", lambda *a: {"canvas_sent": 0, "canvas_failed": 0})
+
+    def broken(*args):
+        raise RuntimeError("secret endpoint https://fcm.example/abc")
+
+    def feedback(*args):
+        calls.append("feedback")
+        return {"feedback_sent": 0, "feedback_retry": 0, "feedback_dropped": 0}
+
+    monkeypatch.setattr(worker, "run_required_batch", broken)
+    monkeypatch.setattr(worker, "run_feedback_batch", feedback)
+    monkeypatch.setenv("VAPID_SUBJECT", "mailto:x@example.com")
+    assert worker.main() == 1
+    out = capsys.readouterr().out
+    assert calls == ["feedback"]
+    assert "Required reminder batch error: RuntimeError" in out and "fcm.example" not in out
+    assert "required_failed=-1" in out

@@ -385,8 +385,11 @@ def main() -> int:
             app_url = os.environ.get("APP_URL") or APP_URL
             try:
                 required = run_required_batch(store, private_key, subject, now, app_url)
-            except Exception:
-                # 필수 정보 알림이 실패해도(예: DB 함수 미적용) 공지 알림 결과와 문의 메일은 이어서 처리한다.
+            except Exception as error:
+                # 필수 정보 알림이 실패해도(예: DB 함수 미적용) 공지 알림 결과와 문의 메일은 이어서 처리하고,
+                # 끝에서 실패로 알린다.
+                # 예외 내용은 키나 기기 주소를 담을 수 있어 종류 이름만 남긴다.
+                print(f"Required reminder batch error: {type(error).__name__}", flush=True)
                 required = {"required_sent": 0, "required_failed": -1}
             feedback = run_feedback_batch(
                 store, os.environ.get("RESEND_API_KEY", ""), os.environ.get("FEEDBACK_NOTIFY_EMAIL", ""),
@@ -406,7 +409,9 @@ def main() -> int:
         f"feedback_dropped={feedback['feedback_dropped']}",
         flush=True,
     )
-    return int(counts["retry"] > 0)
+    # 공지 알림 재시도나 필수 정보 알림 실패(-1: 단계 오류, 1 이상: 모든 기기 실패)가 있으면
+    # 서비스 실패로 남겨 journal에서 보이게 한다.
+    return int(counts["retry"] > 0 or required["required_failed"] != 0)
 
 
 if __name__ == "__main__":
