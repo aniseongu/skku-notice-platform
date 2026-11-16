@@ -50,8 +50,10 @@ PC에서는 목록과 공지 상세를 함께 보고, 휴대폰에서는 아래 
 
 ## 주요 기능
 
-- **공지 모아 보기:** 학교 게시판 65곳(학과 게시판은 구독자가 있을 때만 수집), 외부 인턴 공고 3곳, 현장실습을 검색·저장하고 마감순으로 정렬합니다.
-- **내게 맞는 알림:** 구독한 게시판의 새 공지를 웹 푸시로 보내고, 관심 키워드에 맞지 않는 공지는 무음으로 보냅니다.
+- **공지 모아 보기:** 교환학생 공지를 비롯한 학교 게시판, 외부 인턴 공고, 현장실습을 검색·저장하고 마감순으로 정렬합니다.
+- **게시판 추가 요청:** 성균관대 공개 게시판 주소를 자동으로 확인해 추가할 수 있으면 모두의 기타 게시판에 보여 줍니다. 자동 확인이 어렵거나 주소가 없는 요청은 검토를 위해 전달합니다.
+- **내게 맞는 알림:** 구독한 게시판의 새 공지를 웹 푸시로 보내고, 관심 키워드에 맞지 않는 공지는 무음으로 보냅니다. 필수 정보가 빠지면 알림으로 안내합니다.
+- **첫 설정:** 알림을 켜고 시작하며, 기기에서 켤 수 없으면 건너뛸 수 있습니다. 알림이 꺼진 기기에는 화면 아래에서 다시 켜기를 안내합니다.
 - **AI 공지 확인:** 사용자가 직접 연결한 Gemini 또는 Groq 키로 공지가 나에게 해당하는지 판정하고 세 줄로 요약하며, 영어 공지는 번역합니다.
 - **인턴십 졸업요건:** 소프트웨어학과 원전공과 3품 인턴십 기준에 인턴 공고의 근무 기간·시간이 맞는지 근거와 함께 보여 줍니다.
 - **일정 연동:** 아이캠퍼스 과제·퀴즈 마감 알림과 저장한 공지의 Google 캘린더 동기화를 고를 수 있습니다.
@@ -63,13 +65,14 @@ AI 판정과 인턴십 요건 안내는 참고용이며, 최종 인정 여부는
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/readme/system-architecture-dark.svg">
-  <img src="assets/readme/system-architecture-light.svg" alt="성공 시스템 아키텍처: 학교 게시판과 외부 인턴 공고를 Oracle Cloud 서버의 타이머 워커가 수집, OCR, AI 판정, 푸시 순서로 처리해 Supabase에 저장합니다. 아이캠퍼스와 구글 캘린더 워커도 같은 서버에서 돌고, 현장실습은 운영자가 직접 올립니다. 웹앱은 Cloudflare Pages에서 Supabase로 로그인과 내 데이터를 읽고, Edge Function이 키 확인과 요약을 위해 AI 업체를 부릅니다. 웹 푸시는 브라우저 푸시 서비스를 거쳐 기기에 전달됩니다.">
+  <img src="assets/readme/system-architecture-light.svg" alt="성공 시스템 아키텍처: 학교 게시판과 외부 인턴 공고를 Oracle Cloud 서버의 워커가 수집하고 OCR과 AI 판정, 푸시를 처리하며 Supabase에 저장합니다. 아이캠퍼스와 구글 캘린더 워커도 같은 서버에서 돌고, 현장실습은 운영자가 직접 올립니다. 웹앱은 Cloudflare Pages에서 Supabase로 로그인과 내 데이터를 읽고, Edge Function이 키 확인과 요약을 위해 AI 업체를 부릅니다. 웹 푸시는 브라우저 푸시 서비스를 거쳐 기기에 전달됩니다.">
 </picture>
 
 - **이어지는 작업:** 수집이 끝나면 OCR과 AI 판정이, 판정이 끝나면 푸시가 바로 이어서 돕니다(systemd `OnSuccess`). 각 작업의 타이머는 밀린 일을 처리하는 보충용입니다.
 - **웹은 Supabase에 바로 연결:** 웹은 Supabase Auth로 로그인하고 행 수준 보안(RLS)이 걸린 표를 직접 읽고 씁니다. NestJS API는 서버 안에서만 실행되며 공개 주소가 없습니다.
 - **키와 토큰 보호:** AI 키, 아이캠퍼스 토큰, Google 갱신 토큰은 Edge Function이 받아 사용자 ID에 묶어 암호화해 저장합니다(AI 키와 아이캠퍼스 토큰은 먼저 실제로 쓸 수 있는지 확인). 서버에서는 이 값을 쓰는 판정·아이캠퍼스·캘린더 워커만 복호화 열쇠를 받고, 수집·푸시 워커는 받지 않습니다. 내 키는 내 계정의 공지에만 씁니다.
-- **서버를 따로 둔 이유:** 포스터 이미지 한 장을 OCR로 읽는 데 100초 넘게, 메모리를 500MB쯤 써서 실행 시간과 메모리에 제한이 있는 서버리스 함수에서 돌리기 어렵습니다. GitHub Actions는 수집에 쓰지 않고 CI에만 씁니다.
+- **서버를 따로 둔 이유:** 포스터 OCR은 실행 시간과 메모리를 많이 써서 서버리스 함수에서 돌리기 어렵습니다. GitHub Actions는 수집에 쓰지 않고 CI에만 씁니다.
+- **포스터 읽기:** OCR은 큰 이미지를 축소하고 나누어 긴 포스터의 글자도 읽습니다.
 
 ## 기술 구성
 
@@ -94,7 +97,7 @@ AI 판정과 인턴십 요건 안내는 참고용이며, 최종 인정 여부는
 | 웹 | TypeScript, React 19, Vite, Tailwind CSS v4, vite-plugin-pwa(Workbox), supabase-js, dnd-kit, DOMPurify, Pretendard |
 | 워커 | Python 3.12, httpx, selectolax, nh3, RapidOCR·ONNX Runtime, Google Gen AI SDK(Gemini), Groq API, pywebpush |
 | DB·인증 | Supabase(PostgreSQL, Auth, RLS), Edge Function(Deno) |
-| 서버 | Oracle Cloud VM, systemd 타이머 6개, NestJS 내부 API |
+| 서버 | Oracle Cloud VM, systemd 타이머, NestJS 내부 API |
 | 배포·검증 | Cloudflare Pages(main 푸시 시 자동 배포), GitHub Actions CI, Playwright, PGlite, pytest, ruff |
 
 ## 로컬 실행
@@ -131,8 +134,9 @@ uv run ruff check .
 | `infra/oracle/` | OCI 서비스와 타이머 설정 |
 | `config/`, `scripts/` | 게시판 목록과 생성·점검 스크립트 |
 
+웹 글꼴은 직접 제공하는 Pretendard 공통 서브셋이며 [SIL Open Font License](web/public/fonts/LICENSE-pretendard.txt)를 따릅니다.
+
 ## 참고 사항
 
 - 현장실습 정보는 운영자가 학교에 직접 로그인해 가져오며 자동 갱신되지 않습니다. 공지와 현장실습 정보는 로그인한 사용자에게만 보이지만, 학교 구성원 여부를 따로 확인하지는 않습니다.
-- 수동 테스트 푸시는 확인했지만 새 공지 자동 푸시의 전체 경로와 장기 부하는 계속 검증하고 있습니다. 모바일 브라우저별 실제 앱 설치 동작도 추가 확인이 필요합니다.
 - 외부 공고와 현장실습 수집에는 각 사이트의 이용 조건과 접근 정책에 따른 제약이 있습니다.
