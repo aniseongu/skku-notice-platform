@@ -81,6 +81,37 @@ const settingsAt = async (page: import('@playwright/test').Page, query = '') => 
   await page.waitForLoadState('networkidle');
 };
 
+const checkBoardRequest = async (page: import('@playwright/test').Page, root: import('@playwright/test').Locator) => {
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
+    const w = window as unknown as { boardRequests: unknown[][] };
+    w.boardRequests = [];
+    app.sendFeedback = (...args: unknown[]) => { w.boardRequests.push(args); return Promise.resolve('ok'); };
+  });
+  const button = root.getByRole('button', { name: '추가 요청하기' });
+  await button.scrollIntoViewIfNeeded();
+  const metrics = await button.evaluate((el) => { const r = el.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return { height: r.height, top: !!hit && el.contains(hit) }; });
+  expect(metrics.height).toBeGreaterThanOrEqual(44);
+  expect(metrics.top).toBe(true);
+  await button.click();
+  await root.getByRole('textbox', { name: '게시판 이름' }).fill('교환학생');
+  const address = root.getByRole('textbox', { name: '주소 (선택)' });
+  await address.fill('https://skku.edu.example.com/');
+  await expect(root.getByText('성균관대 사이트 주소만 받을 수 있어요')).toBeVisible();
+  await expect(root.getByRole('button', { name: '요청 보내기' })).toBeDisabled();
+  await address.fill('https://www.skku.edu/board');
+  await root.getByRole('button', { name: '요청 보내기' }).click();
+  await expect(root.getByRole('textbox', { name: '게시판 이름' })).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { boardRequests: unknown[][] }).boardRequests)).toEqual([['idea', '[게시판 추가 요청] 이름: 교환학생 / 주소: https://www.skku.edu/board', '']]);
+};
+
+test('board request in notification settings', async ({ page }) => {
+  await settingsAt(page, '&section=notifications');
+  await withApp(page, { authUserId: 'account-a' });
+  await checkBoardRequest(page, page.locator('platform-settings-screen'));
+  await expect(page.locator('.toast')).toContainText('요청을 보냈어요');
+});
+
 test('settings hub opens each page in the app, back works and the theme can be changed', async ({ page }) => {
   await settingsAt(page);
   const screen = page.locator('platform-settings-screen');
@@ -406,6 +437,9 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('group', { name: '기타 게시판' })).toBeVisible();
   // 행 전체가 눌리는 영역이다: 스위치가 아니라 이름 글자, 설명 글자, 행의 왼쪽 끝을 눌러도 켜지고 꺼진다. 높이는 44px 이상이다.
   const etc = dialog.getByRole('group', { name: '기타 게시판' });
+  await checkBoardRequest(page, etc);
+  await expect(dialog.locator('.toast')).toContainText('요청을 보냈어요');
+  await expect(dialog.getByRole('button', { name: '다음' })).toBeEnabled();
   const fab = etc.getByRole('switch', { name: /^지능형팹테크융합전공 공지/ });
   await etc.scrollIntoViewIfNeeded();
   const row = fab.locator('xpath=ancestor::*[contains(@class,"setting") or contains(@class,"switch-row")][1]');

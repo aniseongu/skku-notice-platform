@@ -21,6 +21,7 @@ import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
 import { FEEDBACK_KINDS, FEEDBACK_LIMIT, feedbackProblem, type FeedbackKind, type FeedbackResult } from './feedback';
 import { BADGE, CHEVRON_RIGHT, CHOICE, SWITCH, SWITCH_ONLY } from './cls';
 import { aiKeysLead, connectedAiKeys } from './ai-keys';
+import { BoardRequest } from './board-request';
 
 export interface SettingsModel {
   configured: boolean;
@@ -40,6 +41,7 @@ export interface SettingsModel {
   setTheme: (theme: 'auto' | 'light' | 'dark') => void;
   canInstall: boolean;
   sendFeedback: (kind: FeedbackKind, body: string, email: string) => Promise<FeedbackResult>;
+  showToast: (message: string) => void;
   /** iOS Safari: 설치 창이 없어 홈 화면 추가 방법만 알려 준다. */
   /** 설치 창이 없는 브라우저(iOS Safari, 삼성인터넷)에서 홈 화면 추가 방법을 알려 준다. */
   manualInstall?: ManualInstallMode | null;
@@ -495,6 +497,7 @@ function BoardsSection({ model }: { model: SettingsModel }) {
       {order.boards.length ? <BoardOrderList order={order} editing={editing} onToggle={(id) => model.toggle(id, false)} busy={model.loading} />
         : <p className="field-note text-[14px] leading-[20px] text-ink-2">아직 받는 게시판이 없어요. 아래에서 골라 주세요</p>}
       <BoardGroups model={model} />
+      <BoardRequest send={model.sendFeedback} toast={model.showToast} />
     </>}
   </Section>;
 }

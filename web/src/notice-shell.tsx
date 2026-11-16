@@ -222,6 +222,7 @@ function settingsModel(app: AppController) {
     authBusy: app.authBusy, authError: app.authError,
     signIn: () => { void app.signIn(); }, signOut: () => { void app.signOut(); },
     sendFeedback: (kind: FeedbackKind, body: string, email: string) => app.sendFeedback(kind, body, email),
+    showToast: (message: string) => app.showToast(message),
     section: app.settingsSection, openSection: (section: string | null) => app.openSettingsSection(section),
     theme: app.theme, setTheme: (theme: 'auto' | 'light' | 'dark') => app.setTheme(theme),
     canInstall: !!app.install && !isStandalone(), manualInstall: ((mode) => (mode === 'prompt' || mode === 'none' ? null : mode))(installMode(navigator.userAgent, isStandalone(), !!app.install)), install: () => { void app.runInstall(); }, showShortcuts: () => { app.shortcutsOpen = true; },

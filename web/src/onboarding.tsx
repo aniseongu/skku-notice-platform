@@ -15,6 +15,7 @@ import {
 import { APP_NAME } from './brand';
 import { NoticeExample } from './notice-example';
 import { AlertIcon } from './alert-icon';
+import { BoardRequest } from './board-request';
 import { installMode, isStandalone, MANUAL_INSTALL_HINT } from './install-hint';
 import { BackToGroups, Card, ChipGroup, ChoiceList, GroupGrid, Segmented, SwitchRow } from './ui';
 
@@ -327,6 +328,7 @@ export function Onboarding({ app }: { app: AppController }) {
             {OTHER_BOARDS.filter((board) => board.group === group).sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id))).map((board) => <SwitchRow key={board.id} label={nameOf(board.id)} description={board.help}
                   checked={draft.boards.includes(board.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, board.id), boardsTouched: true })} />)}
           </div>)}
+        <BoardRequest send={(kind, body, email) => app.sendFeedback(kind, body, email)} toast={(message) => app.showToast(message)} />
       </div>
       <h2>관심 키워드</h2>
       <p className="card-note m-0 text-[14px] text-ink-2">고르지 않으면 켠 게시판의 공지를 모두 받아요</p>
@@ -389,6 +391,7 @@ export function Onboarding({ app }: { app: AppController }) {
   }
   const showBack = fillMode ? index > 0 || addingDouble || (step === 'primary' && !changingPrimary) : index > 0 || addingDouble || (step === 'primary' && !changingPrimary);
   return <div className="onb fixed inset-0 z-[60] grid grid-cols-[minmax(0,1fr)] bg-bg text-ink min-[900px]:grid-cols-[minmax(320px,5fr)_minmax(0,7fr)] [&_.seg_button]:rounded-pill [&_.chip]:min-h-[44px] [&_.chip]:before:inset-0 [&_.text-button]:min-h-[44px] [&_.choice:focus-visible]:[outline-offset:-2px]" role="dialog" aria-modal="true" aria-labelledby="onb-title">
+    {app.toast ? <div className="toast fixed bottom-[calc(88px+env(safe-area-inset-bottom))] left-1/2 z-[70] w-max max-w-[calc(100%-32px)] [transform:translateX(-50%)] rounded-lg bg-toast px-[20px] py-[14px] text-[15px] leading-[22px] font-medium text-on-toast [box-shadow:var(--shadow-pop)]" role="status">{app.toast}</div> : null}
     {/* 넓은 화면에서만 보이는 왼쪽 칸: 앱 아이콘과 이름, 설명, 단계 목록. 진행 정보는 오른쪽 progressbar가 알리므로 낭독기에서는 건너뛴다. */}
     <aside className="onb-brand hidden min-[900px]:flex min-[900px]:flex-col min-[900px]:justify-between min-[900px]:gap-[32px] min-[900px]:border-r min-[900px]:border-line min-[900px]:bg-[color-mix(in_oklch,var(--accent)_8%,var(--bg))] min-[900px]:pt-[40px] min-[900px]:pr-[44px] min-[900px]:pb-[48px] min-[900px]:pl-[44px]" aria-hidden="true">
       <div className="onb-brand-lockup flex items-center gap-[10px] text-[17px] font-bold tracking-[-0.02em]"><svg className="brand-mark size-[32px] text-accent"><use href="icons/sprite.svg#brand" /></svg>{APP_NAME}</div>
