@@ -199,13 +199,13 @@ test('notification settings show each device state and call the right actions', 
   await withApp(page, { authUserId: 'account-a', pushStatus: 'off', subscriptions: [], enablePush: 'fn:enable', disablePush: 'fn:disable', testNotification: 'fn:test' });
   await expect(screen.getByText('꺼져 있어요', { exact: false }).first()).toContainText('꺼져 있어요');
   const sw = screen.getByRole('switch', { name: /이 기기 알림/ });
-  await expect(screen.getByRole('button', { name: '테스트 알림 띄우기' })).toHaveCount(0);   // 꺼져 있을 때는 테스트 동작이 없다
+  await expect(screen.getByRole('button', { name: /^테스트 알림/ })).toHaveCount(0);   // 꺼져 있을 때는 테스트 동작이 없다
   await sw.click();
   expect(await calls(page)).toEqual([['enable']]);
   await withApp(page, { pushStatus: 'on' });
   await expect(sw).toHaveAttribute('aria-checked', 'true');
   await expect(sw).toContainText('켜져 있어요');
-  await screen.getByRole('button', { name: '테스트 알림 띄우기' }).click();
+  await screen.getByRole('button', { name: /^테스트 알림/ }).click();
   await sw.click();
   expect(await calls(page)).toEqual([['test'], ['disable']]);
   await withApp(page, { pushStatus: 'checking' });
@@ -1419,15 +1419,16 @@ test('notifications page: this device and the device list, like the original set
     canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null },
     refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', removeDevice: 'fn:remove', renameDevice: 'fn:rename', setSummaryTime: 'fn:time', setDeviceAlertAll: 'fn:alertAll' });
   await expect(screen.getByRole('region', { name: '받을 게시판' })).toBeVisible();
-  // 위에서 아래로: 이 기기(스위치들) → 받을 게시판 → 알림 기기(마지막). 테스트 알림은 켜져 있을 때만, 모든 스위치 아래.
+  // 위에서 아래로: 이 기기(스위치들) → 받을 게시판 → 알림 기기(마지막). 테스트 알림은 켜져 있을 때만, 이 기기 알림 바로 아래 같은 모양의 줄.
   expect(await screen.locator('h2.settings-head').allInnerTexts()).toEqual(['이 기기', '받을 게시판', '알림 기기']);
   const switches = await screen.getByRole('region', { name: '이 기기' }).getByRole('switch').allInnerTexts();
   expect(switches.map((text) => text.split('\n')[0])).toEqual(['이 기기 알림', '모든 새 공지를 소리와 함께 알리기', '아이캠퍼스 알림']);
-  const power = await screen.getByRole('switch', { name: /이 기기 알림/ }).boundingBox(), test = await screen.getByRole('button', { name: '테스트 알림 띄우기' }).boundingBox();
-  const lastSwitch = await screen.getByRole('switch', { name: /아이캠퍼스 알림/ }).boundingBox();
-  expect(test!.y).toBeGreaterThan(lastSwitch!.y + lastSwitch!.height - 1);   // 테스트 알림은 이 기기 구역의 모든 스위치 아래
+  const power = await screen.getByRole('switch', { name: /이 기기 알림/ }).boundingBox(), test = await screen.getByRole('button', { name: /^테스트 알림/ }).boundingBox();
+  const nextSwitch = await screen.getByRole('switch', { name: /모든 새 공지를 소리와 함께/ }).boundingBox();
+  expect(test!.y).toBeGreaterThanOrEqual(power!.y + power!.height - 1);   // 이 기기 알림 바로 아래
+  expect(test!.y + test!.height).toBeLessThanOrEqual(nextSwitch!.y + 1);   // 다른 스위치보다 위
   expect(test!.height).toBeGreaterThanOrEqual(44);
-  expect(power!.y).toBeLessThan(test!.y);
+  expect(test!.width).toBeCloseTo(power!.width, 0);                         // 스위치 줄과 같은 폭
   // 아이캠퍼스를 연결했고 이 기기가 등록돼 있으면 이 기기의 아이캠퍼스 알림을 여기서도 바꾼다.
   const canvas = screen.getByRole('switch', { name: /아이캠퍼스 알림/ });
   await expect(canvas).toHaveAttribute('aria-checked', 'true');
@@ -2853,7 +2854,7 @@ test('settings 알림 page: turn on and off with one press each and the test not
   await press(page, power, c, mobile);
   expect((await calls(page)).map((x) => x[0])).toEqual(['enable']);
   await withApp(page, { pushStatus: 'on', disablePush: 'fn:disable', testNotification: 'fn:test' });
-  await press(page, screen.getByRole('button', { name: '테스트 알림 띄우기' }), c, mobile);
+  await press(page, screen.getByRole('button', { name: /^테스트 알림/ }), c, mobile);
   await press(page, power, c, mobile);
   expect((await calls(page)).map((x) => x[0])).toEqual(['test', 'disable']);
   expect(c.clicks).toBe(3);

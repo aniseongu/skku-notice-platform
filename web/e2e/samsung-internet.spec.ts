@@ -88,7 +88,7 @@ for (const shown of [true, false]) {
     }, shown);
     expect(await page.evaluate(() => Notification.permission)).toBe('granted');
     expect(await page.evaluate(async () => !!await navigator.serviceWorker.getRegistration())).toBe(true);
-    await page.locator('platform-settings-screen').getByRole('button', { name: '테스트 알림 띄우기' }).click();
+    await page.locator('platform-settings-screen').getByRole('button', { name: /^테스트 알림/ }).click();
     await expect(page.locator('.toast')).toContainText(shown ? '삼성 인터넷' : '테스트 알림을 확인하지 못했어요');
   });
 }
