@@ -33,3 +33,13 @@ export async function saveBoardOrderPreference(client: SupabaseClient, userId: s
   const { error } = await client.from('user_preferences').upsert({ user_id: userId, board_order: order }, { onConflict: 'user_id' });
   if (error) throw error;
 }
+
+export async function loadAlertAllPreference(client: SupabaseClient, userId: string): Promise<boolean | null> {
+  const { data, error } = await client.from('user_preferences').select('alert_all_new').eq('user_id', userId).maybeSingle();
+  return error ? null : data?.alert_all_new === true;
+}
+
+export async function saveAlertAllPreference(client: SupabaseClient, userId: string, enabled: boolean): Promise<void> {
+  const { error } = await client.from('user_preferences').upsert({ user_id: userId, alert_all_new: enabled }, { onConflict: 'user_id' });
+  if (error) throw error;
+}

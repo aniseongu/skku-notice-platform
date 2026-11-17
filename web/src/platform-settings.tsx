@@ -64,6 +64,9 @@ export interface SettingsModel {
   addKeyword: (word: string) => void;
   removeKeyword: (word: string) => void;
   // 알림
+  alertAllNew: boolean | null;
+  alertAllBusy: boolean;
+  setAlertAll: (enabled: boolean) => void;
   pushStatus: 'unsupported' | 'checking' | 'off' | 'on' | 'busy' | 'denied';
   pushError: string;
   pushRetry?: boolean;
@@ -457,6 +460,7 @@ function Notifications({ model }: { model: SettingsModel }) {
           </div>
           {/* 조작 먼저, 보조 안내는 그 아래(다른 행과 같은 순서). */}
           <span className="field-note text-[14px] leading-[20px] text-ink-2">{on ? '켜져 있어요' : '꺼져 있어요'} · 브라우저 권한 {permissionText(model.pushStatus)}</span>
+          {on ? <p className="field-note text-[14px] leading-[20px] text-ink-2">팝업 알림은 휴대폰의 알림 설정에 따라 표시돼요</p> : null}
           {model.pushStatus === 'unsupported' ? <p className="field-note text-[14px] leading-[20px] text-ink-2">이 브라우저는 알림을 지원하지 않아요. 최신 브라우저에서 열어 주세요</p> : null}
           {model.pushStatus === 'denied' ? <p className="field-note text-[14px] leading-[20px] text-ink-2">브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요</p> : null}
           {model.pushError ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.pushError}</p> : null}
@@ -464,10 +468,12 @@ function Notifications({ model }: { model: SettingsModel }) {
           {on && model.subscriptions.length === 0 ? <p className="field-note text-[14px] leading-[20px] text-ink-2">받을 게시판을 고르면 새 공지를 알려드려요</p> : null}
         </>}
       </Setting>
+      {/* 출처: https://ui.shadcn.com/docs/components/switch */}
+      {model.alertAllNew != null ? <SwitchRow label="모든 새 공지를 소리와 함께 알리기" description="끄면 관심 키워드와 맞거나 AI가 관련 있다고 판단한 공지를 소리와 함께 알려요" checked={model.alertAllNew} disabled={model.alertAllBusy} onChange={model.setAlertAll} /> : null}
       <Setting name="받을 공지" help="알림을 보내는 기준이에요">
         <ul className="rule-list m-0 grid gap-[4px] pl-[18px] text-[13px] leading-[19px] text-ink-2">
           <li>받는 게시판의 새 공지를 알려요</li>
-          <li>관심 키워드와 맞는 공지는 소리로, 나머지는 조용히 알려요</li>
+          <li>{model.alertAllNew ? '새 공지를 소리로 알려요' : '관심 키워드와 맞는 공지는 소리로, 나머지는 조용히 알려요'}</li>
           <li>학교가 고친 중요한 글은 한 번 더 알려요</li>
           <li>AI 키가 있으면 나와 맞는 공지도 소리로 알려요</li>
           <li>인턴 공고는 나와 맞는 것만 알려요</li>

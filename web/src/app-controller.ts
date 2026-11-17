@@ -1,3 +1,5 @@
+import { loadSaveCounts } from './save-counts';
+import { showTestNotification } from './test-notification';
 // 앱의 상태와 동작. 화면은 notice-shell.tsx가 이 컨트롤러를 구독해 그린다(그림자 DOM 없이 전역 토큰과 글꼴을 그대로 받는다).
 // 규칙은 docs/DESIGN.md, docs/design/ux-rules.md, docs/design/platforms.md.
 import {
@@ -8,10 +10,9 @@ import { type SavedNotice, loadSaved, orderSaved, storeSaved, toggleSaved } from
 import { initialReadState, isNoticeRead, loadReadState, mergeReadStates, parseReadState, readIds, setReadState, storeReadState } from './read-notices';
 import { keywordCounts } from './keyword-counts';
 import type { Theme } from './theme';
-import { APP_NAME } from './brand';
 import { authClient } from './auth';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
-import { loadBoardOrderPreference, loadKeywordsPreference, parseKeywords, saveBoardOrderPreference, saveKeywordsPreference } from './preferences';
+import { loadAlertAllPreference, saveAlertAllPreference, loadBoardOrderPreference, loadKeywordsPreference, parseKeywords, saveBoardOrderPreference, saveKeywordsPreference } from './preferences';
 import { applyBoardOrder, BOARD_ORDER_LIMIT, parseBoardOrder } from './board-order';
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
@@ -191,7 +192,9 @@ const qsel = (selector: string) => document.querySelector(selector);
 
 export class AppController extends Reactive {
   static properties = {
+    saveCounts: { state: true },
     notices: { state: true }, sources: { state: true }, matched: { state: true }, generatedAt: { state: true },
+    alertAllNew: { state: true }, alertAllBusy: { state: true },
     view: { state: true }, board: { state: true }, keyword: { state: true }, keywords: { state: true }, query: { state: true },
     loading: { state: true }, devicesLoaded: { state: true }, accountDataLoaded: { state: true }, aiStateLoaded: { state: true }, settingsCapped: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
     toast: { state: true }, linkCopied: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
@@ -227,6 +230,8 @@ export class AppController extends Reactive {
   subscriptionsLoading = false;
   subscriptionsError = '';
   subscriptionsEpoch = 0;
+  alertAllNew: boolean | null = null;
+  alertAllBusy = false;
   private cacheReady = false;
   private liveFeedReady = false;
   private liveAccountReady = false;
@@ -303,6 +308,10 @@ export class AppController extends Reactive {
   authBusy = false;
   authUserId: string | null = null;
   authSubscription: Subscription | null = null;
+  saveCounts = new Map<string, number>();
+  private saveCountRevision = 0;
+  // 수를 불러오는 동안 저장을 바꾼 글. 불러온 값 대신 화면에서 바꾼 값을 지킨다.
+  private saveCountTouched = new Set<string>();
   notices: Notice[] = [];
   sources: Source[] = [];
   matched: MatchedFile | null = null;
@@ -418,6 +427,7 @@ export class AppController extends Reactive {
           const previousUserId = this.authUserId;
           if (previousUserId && !userId) void clearListCache(previousUserId);
           this.cacheReady = false; this.liveFeedReady = false; this.liveAccountReady = false;
+          this.saveCounts = new Map(); ++this.saveCountRevision;
           this.notices = []; this.sources = []; this.generatedAt = null; this.bodies.clear();
           const kept = savedSelection(); this.selectionReady = false;   // 아래에서 계정을 바꾸는 동안 저장된 선택을 덮어쓰지 않는다
           this.authUserId = userId;
@@ -430,6 +440,7 @@ export class AppController extends Reactive {
           if (staleChain) void staleChain.chain.discard();
           if (previousUserId) setTimeout(() => { void this.releasePush(previousUserId); }, 0);
           const epoch = ++this.subscriptionsEpoch;
+          this.alertAllNew = null; this.alertAllBusy = false;
           this.subscriptions = [];
           this.subscriptionsError = '';
           this.subscriptionsLoading = !!userId;
@@ -455,7 +466,7 @@ export class AppController extends Reactive {
               this.refreshSubscriptions(userId, epoch), this.refreshPreferences(userId, epoch), this.refreshBoardOrder(userId, epoch)];
             void Promise.allSettled(first).then(() => { if (epoch === this.subscriptionsEpoch && userId === this.authUserId) { this.accountDataLoaded = true; this.liveAccountReady = true; this.saveCurrentListCache(userId, epoch); } });
             setTimeout(() => { if (epoch === this.subscriptionsEpoch) { this.accountDataLoaded = true; this.aiStateLoaded = true; this.settingsCapped = true; } }, AppController.FIRST_LOAD_LIMIT_MS);
-            void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch);
+            void this.refreshAlertAll(userId, epoch); void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch);
             void this.refreshDevices();   // 알림 설정을 열 때 기기 구역이 뒤늦게 끼어들지 않게 미리 받는다
           })(); }, 0);
           setLocalOwner(userId);
@@ -532,6 +543,7 @@ export class AppController extends Reactive {
       const bySource = new Map(notices!.sources.map((source) => [source.id, source]));
       this.notices = notices!.notices.filter((notice) => !isExpired(notice, bySource.get(notice.source_id)));
       this.sources = notices!.sources;
+      if (userId) void this.refreshSaveCounts(userId, epoch);
       this.generatedAt = notices!.generated_at;
       this.liveFeedReady = true;
       if (userId) this.saveCurrentListCache(userId, epoch);
@@ -678,6 +690,16 @@ export class AppController extends Reactive {
     return this.saved.some((item) => item.id === notice.id) || this.mates(notice.id).some((mate) => this.saved.some((item) => item.id === mate.id));
   }
 
+  async refreshSaveCounts(userId: string, epoch: number): Promise<void> {
+    if (!authClient) return;
+    const revision = ++this.saveCountRevision;
+    this.saveCountTouched = new Set();
+    const counts = await loadSaveCounts(authClient, this.notices.map((notice) => notice.id)).catch(() => null);
+    if (!counts || epoch !== this.subscriptionsEpoch || userId !== this.authUserId || revision !== this.saveCountRevision) return;
+    for (const id of this.saveCountTouched) if (this.saveCounts.has(id)) counts.set(id, this.saveCounts.get(id)!);
+    this.saveCounts = counts;
+  }
+
   toggleSave(notice: Notice) {
     // 저장은 공지 하나로 센다. 묶음 중 저장된 글이 있으면 모두 지우고, 없으면 지금 보이는 글을 저장한다.
     const savedMembers = [notice, ...this.mates(notice.id)].filter((member) => this.saved.some((item) => item.id === member.id));
@@ -686,6 +708,12 @@ export class AppController extends Reactive {
     else next = toggleSaved(this.saved, notice);
     if (!next) { this.showToast('저장할 수 있는 공지가 가득 찼어요. 안 쓰는 저장을 지워 주세요'); return; }
     const added = !savedMembers.length;
+    const counts = new Map(this.saveCounts);
+    for (const id of added ? [notice.id] : savedMembers.map((member) => member.id)) {
+      this.saveCountTouched.add(id);
+      if (counts.has(id)) counts.set(id, Math.max(0, counts.get(id)! + (added ? 1 : -1)));
+    }
+    this.saveCounts = counts;
     this.saved = next;
     storeSaved(next);
     this.showToast(added ? '저장했어요' : '저장을 지웠어요');
@@ -836,6 +864,25 @@ export class AppController extends Reactive {
     });
     if (report) this.boardOrderStatus = '';
     return this.boardOrderChain;
+  }
+
+  async refreshAlertAll(userId: string, epoch: number): Promise<void> {
+    if (!authClient) return;
+    const value = await loadAlertAllPreference(authClient, userId).catch(() => null);
+    if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.alertAllNew = value;
+  }
+
+  async setAlertAll(enabled: boolean): Promise<void> {
+    const client = authClient, userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!client || !userId || this.alertAllBusy || this.alertAllNew === null) return;
+    this.alertAllBusy = true;
+    try {
+      if (!(await sessionIs(client, userId)) || epoch !== this.subscriptionsEpoch) return;
+      await saveAlertAllPreference(client, userId, enabled);
+      if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.alertAllNew = enabled;
+    } catch {
+      if (epoch === this.subscriptionsEpoch) this.showToast('설정을 저장하지 못했어요. 다시 시도해 주세요');
+    } finally { if (epoch === this.subscriptionsEpoch) this.alertAllBusy = false; }
   }
 
   async refreshPreferences(userId: string, epoch: number): Promise<void> {
@@ -1060,7 +1107,7 @@ export class AppController extends Reactive {
     try {
       const registration = this.pushRegistration ?? await navigator.serviceWorker?.getRegistration() ?? null;
       if (!registration || Notification.permission !== 'granted') { this.showToast('알림을 먼저 켜 주세요'); return; }
-      await registration.showNotification(APP_NAME, { body: '이렇게 알림이 와요', icon: new URL('icon-192.png', registration.scope).href, tag: 'skku-notice-test' });
+      this.showToast(await showTestNotification(registration, navigator.userAgent), null, '', 10000);
     } catch {
       this.showToast('테스트 알림을 띄우지 못했어요');
     }
@@ -2018,12 +2065,12 @@ export class AppController extends Reactive {
     }
   }
 
-  showToast(text: string, link: string | null = null, linkLabel = '') {
+  showToast(text: string, link: string | null = null, linkLabel = '', duration = 3500) {
     this.toast = text;
     this.toastLink = link;
     this.toastLinkLabel = linkLabel;
     clearTimeout(this.toastTimer);
-    if (!link) this.toastTimer = window.setTimeout(() => { this.toast = ''; }, 3500);
+    if (!link) this.toastTimer = window.setTimeout(() => { this.toast = ''; }, duration);
   }
 
   async runInstall() {

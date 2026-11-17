@@ -48,3 +48,16 @@ test('AI users wait for the judgment even when a keyword matches, and the reason
     assert.equal(row.ai_reason, null);                        // 3시간이 지나면 판정 없이 보낸다
   } finally { await db.close(); }
 });
+
+test('all-new preference is owner scoped and excluded keywords stay silent', async () => {
+  const { db, user } = await setup();
+  const other = '00000000-0000-0000-0000-000000000002';
+  try {
+    await db.exec(`insert into auth.users values ('${other}'); insert into user_preferences(user_id,alert_all_new) values ('${other}',true)`);
+    assert.equal((await rows(db))[0].silent, true);
+    await db.exec(`insert into user_preferences(user_id,alert_all_new) values ('${user}',true)`);
+    assert.equal((await rows(db))[0].silent, false);
+    await db.exec(`update user_preferences set excluded_keywords=array['학교'] where user_id='${user}'`);
+    assert.equal((await rows(db))[0].silent, true);
+  } finally { await db.close(); }
+});

@@ -238,6 +238,7 @@ function settingsModel(app: AppController) {
     },
     keywords: app.keywords, keywordNote: app.keywordNote,
     addKeyword: (word: string) => app.addKeyword(word), removeKeyword: (word: string) => app.removeKeyword(word),
+    alertAllNew: app.alertAllNew, alertAllBusy: app.alertAllBusy, setAlertAll: (enabled: boolean) => { void app.setAlertAll(enabled); },
     pushStatus: app.pushStatus, pushError: app.pushError, pushRetry: app.pushRetry,
     enablePush: () => { void app.enablePush(); }, disablePush: () => { void app.disablePush(); }, sendPushReport: () => { void app.sendPushReport(); },
     testNotification: () => { void app.testNotification(); },
@@ -526,6 +527,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
   const interests = [...new Set([...app.shownInterests(notice, hasGrad), ...bodyInterests(app.keywords, body, keywordMatches).filter((word) => app.shownInterests(notice, hasGrad).includes(word) || !app.isExternal(notice) || !/^(인턴|인턴십|인턴쉽|intern|internship)$/i.test(word))])];
   const shown = withMyDeadline(notice, mine);
   return <notice-detail-screen model={{
+    saveCount: app.saveCounts.get(notice.id),
     notice: shown, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
     today: todayKst(), body: shownBody, mySummary: mine?.summary ?? null, summarizing: app.summarizing === notice.id, interests,
     ai: judgement?.ai ?? mine?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
