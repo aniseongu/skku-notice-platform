@@ -64,9 +64,6 @@ export interface SettingsModel {
   addKeyword: (word: string) => void;
   removeKeyword: (word: string) => void;
   // 알림
-  alertAllNew: boolean | null;
-  alertAllBusy: boolean;
-  setAlertAll: (enabled: boolean) => void;
   pushStatus: 'unsupported' | 'checking' | 'off' | 'on' | 'busy' | 'denied';
   pushError: string;
   pushRetry?: boolean;
@@ -93,6 +90,7 @@ export interface SettingsModel {
     error: string;
     refresh: () => void;
     setMode: (mode: string) => void;
+    setAlertAll: (enabled: boolean) => void;
     remove: (id: string) => void;
     rename: (id: string, name: string) => Promise<boolean>;
     setSummaryTime: (period: 'am' | 'pm', hour: number, minute: number) => void;
@@ -134,6 +132,11 @@ type Theme = SettingsModel['theme'];
 const THEMES: [Theme, string][] = [['auto', '자동'], ['light', '밝게'], ['dark', '어둡게']];
 const YEARS = [1, 2, 3, 4, 5];
 const SEMESTERS = [1, 2];
+
+// 아이캠퍼스 알림 스위치는 아이캠퍼스 페이지와 알림 페이지가 같은 이름·설명·동작을 쓴다.
+const CANVAS_SWITCH_LABEL = '아이캠퍼스 알림';
+const CANVAS_SWITCH_HELP = '과제 마감과 하루 요약을 이 기기로 받아요';
+function canvasModeAfterToggle(next: boolean, current: CanvasMode): CanvasMode { return next ? (current === 'off' ? 'reminders' : current) : 'off'; }
 
 const SETTING_ROW_CLASS = 'setting flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[1280px]:grid min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,520px)] min-[1280px]:[align-items:start] min-[1280px]:gap-[24px] min-[1280px]:has-[>.setting-control>.rule-list]:grid-cols-[minmax(0,1fr)] min-[1280px]:has-[>.setting-control>.rule-list]:gap-[8px] min-[1280px]:has-[>.setting-control>.connection-summary]:[&>.setting-text]:pt-[11px] min-[1280px]:has-[>.setting-control>.segmented]:[&>.setting-text]:pt-[14px]';
 
@@ -409,12 +412,12 @@ function Canvas({ model }: { model: SettingsModel }) {
   const pushHelp: Record<string, string> = { unsupported: '이 브라우저는 알림을 지원하지 않아요. 최신 브라우저에서 열어 주세요', denied: '브라우저 설정에서 알림을 허용하면 켤 수 있어요', busy: '연결하고 있어요', checking: '확인하고 있어요', off: '알림을 켜면 이 기기로 받아요' };
   const toggle = (next: boolean) => {
     setOpen(next);
-    if (next && hasToken && mode === 'off') info.setMode('reminders');
-    if (!next && mode !== null && mode !== 'off') info.setMode('off');
+    if (next && hasToken && mode === 'off') info.setMode(canvasModeAfterToggle(true, mode));
+    if (!next && mode !== null && mode !== 'off') info.setMode(canvasModeAfterToggle(false, mode));
   };
   return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Section id="s-canvas" title="알림">
-      <SwitchRow label="아이캠퍼스 알림" description="과제 마감과 하루 요약을 이 기기로 받아요" checked={open} disabled={info.busy} onChange={toggle} />
+      <SwitchRow label={CANVAS_SWITCH_LABEL} description={CANVAS_SWITCH_HELP} checked={open} disabled={info.busy} onChange={toggle} />
       {/* 이 기기 알림이 꺼져 있어도 스위치와 설정은 열린다. 실제로 알림이 가려면 이 기기 알림이 필요해서 같은 자리에서 켜게 한다. */}
       {open && !pushOn ? <Setting name="이 기기 알림도 켜 주세요" help={pushHelp[model.pushStatus] ?? '알림을 켜면 이 기기로 받아요'}>
         {model.pushStatus === 'off' ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.enablePush}>{model.pushRetry ? '다시 시도하기' : '이 기기 알림 켜기'}</button> : null}
@@ -471,29 +474,15 @@ function Notifications({ model }: { model: SettingsModel }) {
           {model.pushError && model.sendPushReport ? <button type="button" className="text-button [@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] inline-flex min-h-[44px] w-fit items-center rounded-sm border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent" onClick={model.sendPushReport}>문제 알려 주기</button> : null}
         </>}
       </Setting>
-    </Section>
-    <Section id="s-notify-rules" title="알림 기준">
-      <p className="setting-help m-0 pt-[16px] pb-[4px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">내 계정에 적용돼요. 모든 기기가 같은 기준으로 받아요</p>
-      {/* 출처: https://ui.shadcn.com/docs/components/switch */}
-      {model.alertAllNew != null ? <SwitchRow label="모든 새 공지를 소리와 함께 알리기" description="끄면 관심 키워드와 맞거나 AI가 관련 있다고 판단한 공지를 소리와 함께 알려요" checked={model.alertAllNew} disabled={model.alertAllBusy} onChange={model.setAlertAll} /> : null}
-      <Setting name="받을 공지">
-        <ul className="rule-list m-0 grid gap-[4px] pl-[18px] text-[13px] leading-[19px] text-ink-2">
-          <li>받는 게시판의 새 공지를 알려요</li>
-          <li>학교가 고친 중요한 글은 한 번 더 알려요</li>
-          <li>인턴 공고는 나와 맞는 것만 알려요</li>
-        </ul>
-      </Setting>
+      {/* 이 기기에만 적용되는 값이라 이 기기 구역에 둔다. 아이캠퍼스 스위치는 아이캠퍼스 쪽과 같은 줄이다. */}
+      {model.userId && info && on && thisDevice?.alertAllNew != null ? <SwitchRow label="모든 새 공지를 소리와 함께 알리기" description="끄면 관심 키워드나 AI가 고른 공지만 소리가 나요" checked={thisDevice.alertAllNew} disabled={info.busy} onChange={info.setAlertAll} /> : null}
+      {model.userId && info && on && info.hasCanvasToken && thisDevice ? <>
+        <SwitchRow label={CANVAS_SWITCH_LABEL} description={CANVAS_SWITCH_HELP} checked={thisDevice.canvasMode !== 'off'} disabled={info.busy} onChange={(next) => info.setMode(canvasModeAfterToggle(next, thisDevice.canvasMode))} />
+        {info.error ? <p className="field-note error pb-[12px] text-[14px] leading-[20px] text-danger" role="alert">{info.error}</p> : null}
+      </> : null}
     </Section>
     {/* 기기 목록을 받기 전에는 기기 구역과 그 아래(받을 게시판)를 그리지 않는다. 기기 구역이 나중에 끼어들면 아래가 밀린다. 보통은 로그인 때 미리 받아 둔다. */}
     {waitDevices ? null : <>
-    {/* 아이캠퍼스를 연결했고 이 기기가 등록돼 있을 때만, 이 기기의 아이캠퍼스 알림을 알림 쪽에서도 바꾼다(아이캠퍼스 쪽 스위치와 같은 값).
-        출처: https://ui.shadcn.com/docs/components/radio-group (고르는 선택지는 한 묶음의 라디오, 이름과 설명은 위) */}
-    {model.userId && info && on && info.hasCanvasToken && thisDevice ? <Section id="s-notify-canvas" title="아이캠퍼스">
-      <Setting name="아이캠퍼스 알림" help="과제 마감과 하루 요약을 이 기기로 받을지 골라요. 이 기기에만 적용돼요">
-        <Choice label="이 기기의 아이캠퍼스 알림" value={thisDevice.canvasMode} disabled={info.busy} options={CANVAS_MODES} onPick={(next: CanvasMode) => info.setMode(next)} />
-        {info.error ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{info.error}</p> : null}
-      </Setting>
-    </Section> : null}
     {model.userId && info && info.devices.length > 0 ? <Section id="s-devices" title="알림 기기">
       <Setting name="등록된 기기" help="알림을 받도록 켜 둔 기기예요. 이 기기는 위에서 끄고, 다른 기기는 여기서 지워요">
         <ul className="device-list rule-list m-0 grid list-none gap-[4px] p-0 [&>li]:grid [&>li]:grid-cols-[1fr_auto] [&>li]:items-center [&>li]:gap-x-[12px] [&>li]:gap-y-[2px] [&>li]:border-t [&>li]:border-line [&>li]:py-[10px] [&>li:first-child]:border-t-0 [&_.field-note]:col-[1] [&_.field-note]:m-0 [&>li>.inline-row]:col-[1/-1]">

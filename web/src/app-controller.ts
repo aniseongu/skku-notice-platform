@@ -12,11 +12,11 @@ import { keywordCounts } from './keyword-counts';
 import type { Theme } from './theme';
 import { authClient } from './auth';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
-import { loadAlertAllPreference, saveAlertAllPreference, loadBoardOrderPreference, loadKeywordsPreference, parseKeywords, saveBoardOrderPreference, saveKeywordsPreference } from './preferences';
+import { loadBoardOrderPreference, loadKeywordsPreference, parseKeywords, saveBoardOrderPreference, saveKeywordsPreference } from './preferences';
 import { applyBoardOrder, BOARD_ORDER_LIMIT, parseBoardOrder } from './board-order';
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
-import { composeSummaryTime, deleteDevice, loadDevices, loadSummaryTime, saveCanvasMode, saveDeviceName, saveSummaryTime, suggestDeviceName, type CanvasMode, type Device } from './devices';
+import { composeSummaryTime, deleteDevice, loadDevices, loadSummaryTime, saveCanvasMode, saveDeviceAlertAll, saveDeviceName, saveSummaryTime, suggestDeviceName, type CanvasMode, type Device } from './devices';
 import { asJudgement, loadMyInterests, loadMyJudgments, type MyJudgment } from './my-notices';
 import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, googleReturnDenied, hasCalendarPending, markCalendarPending, syncCalendar, takeCalendarPending } from './google-calendar';
 import { AI_PROVIDERS, DEFAULT_AI_PREFERENCES, loadAiKeyStatuses, loadAiPreferences, registerAiKey, removeAiKey, saveAiPreferences, type AiKeyStatus, type AiPreferences, type AiProvider } from './ai-providers';
@@ -194,7 +194,6 @@ export class AppController extends Reactive {
   static properties = {
     saveCounts: { state: true },
     notices: { state: true }, sources: { state: true }, matched: { state: true }, generatedAt: { state: true },
-    alertAllNew: { state: true }, alertAllBusy: { state: true },
     view: { state: true }, board: { state: true }, keyword: { state: true }, keywords: { state: true }, query: { state: true },
     loading: { state: true }, devicesLoaded: { state: true }, accountDataLoaded: { state: true }, aiStateLoaded: { state: true }, settingsCapped: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
     toast: { state: true }, linkCopied: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
@@ -230,8 +229,6 @@ export class AppController extends Reactive {
   subscriptionsLoading = false;
   subscriptionsError = '';
   subscriptionsEpoch = 0;
-  alertAllNew: boolean | null = null;
-  alertAllBusy = false;
   private cacheReady = false;
   private liveFeedReady = false;
   private liveAccountReady = false;
@@ -440,7 +437,6 @@ export class AppController extends Reactive {
           if (staleChain) void staleChain.chain.discard();
           if (previousUserId) setTimeout(() => { void this.releasePush(previousUserId); }, 0);
           const epoch = ++this.subscriptionsEpoch;
-          this.alertAllNew = null; this.alertAllBusy = false;
           this.subscriptions = [];
           this.subscriptionsError = '';
           this.subscriptionsLoading = !!userId;
@@ -466,7 +462,7 @@ export class AppController extends Reactive {
               this.refreshSubscriptions(userId, epoch), this.refreshPreferences(userId, epoch), this.refreshBoardOrder(userId, epoch)];
             void Promise.allSettled(first).then(() => { if (epoch === this.subscriptionsEpoch && userId === this.authUserId) { this.accountDataLoaded = true; this.liveAccountReady = true; this.saveCurrentListCache(userId, epoch); } });
             setTimeout(() => { if (epoch === this.subscriptionsEpoch) { this.accountDataLoaded = true; this.aiStateLoaded = true; this.settingsCapped = true; } }, AppController.FIRST_LOAD_LIMIT_MS);
-            void this.refreshAlertAll(userId, epoch); void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch);
+            void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch);
             void this.refreshDevices();   // 알림 설정을 열 때 기기 구역이 뒤늦게 끼어들지 않게 미리 받는다
           })(); }, 0);
           setLocalOwner(userId);
@@ -866,25 +862,6 @@ export class AppController extends Reactive {
     return this.boardOrderChain;
   }
 
-  async refreshAlertAll(userId: string, epoch: number): Promise<void> {
-    if (!authClient) return;
-    const value = await loadAlertAllPreference(authClient, userId).catch(() => null);
-    if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.alertAllNew = value;
-  }
-
-  async setAlertAll(enabled: boolean): Promise<void> {
-    const client = authClient, userId = this.authUserId, epoch = this.subscriptionsEpoch;
-    if (!client || !userId || this.alertAllBusy || this.alertAllNew === null) return;
-    this.alertAllBusy = true;
-    try {
-      if (!(await sessionIs(client, userId)) || epoch !== this.subscriptionsEpoch) return;
-      await saveAlertAllPreference(client, userId, enabled);
-      if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.alertAllNew = enabled;
-    } catch {
-      if (epoch === this.subscriptionsEpoch) this.showToast('설정을 저장하지 못했어요. 다시 시도해 주세요');
-    } finally { if (epoch === this.subscriptionsEpoch) this.alertAllBusy = false; }
-  }
-
   async refreshPreferences(userId: string, epoch: number): Promise<void> {
     if (!authClient) return;
     try {
@@ -1229,6 +1206,21 @@ export class AppController extends Reactive {
       if (epoch === this.subscriptionsEpoch) this.devices = this.devices.map((device) => (device.id === id ? { ...device, canvasMode: mode } : device));
     } catch {
       if (epoch === this.subscriptionsEpoch) this.devicesError = '아이캠퍼스 알림을 바꾸지 못했어요. 잠시 뒤 다시 눌러 주세요';
+    } finally {
+      if (epoch === this.subscriptionsEpoch) this.devicesBusy = false;
+    }
+  }
+
+  /** 이 기기에서 모든 새 공지를 소리와 함께 알릴지(기기별). */
+  async setDeviceAlertAll(enabled: boolean): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch, id = this.thisDeviceId;
+    if (!authClient || !userId || !id || this.devicesBusy) return;
+    this.devicesBusy = true; this.devicesError = '';
+    try {
+      await saveDeviceAlertAll(authClient, userId, id, enabled);
+      if (epoch === this.subscriptionsEpoch) this.devices = this.devices.map((device) => (device.id === id ? { ...device, alertAllNew: enabled } : device));
+    } catch {
+      if (epoch === this.subscriptionsEpoch) this.devicesError = '설정을 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요';
     } finally {
       if (epoch === this.subscriptionsEpoch) this.devicesBusy = false;
     }

@@ -4,7 +4,7 @@ import { UAParser } from 'ua-parser-js';
 export type CanvasMode = 'off' | 'summary' | 'reminders';
 export const CANVAS_MODES: readonly (readonly [CanvasMode, string])[] = [['off', '끄기'], ['summary', '하루 요약'], ['reminders', '요약과 마감']];
 
-export interface Device { id: string; endpoint: string; name: string | null; canvasMode: CanvasMode; createdAt: string }
+export interface Device { id: string; endpoint: string; name: string | null; canvasMode: CanvasMode; createdAt: string; alertAllNew: boolean | null }
 
 // 출처: https://github.com/faisalman/ua-parser-js (원본 성공의 기기 이름 제안과 같은 방식)
 export function validDeviceName(value: string): boolean {
@@ -31,18 +31,26 @@ const MODES = new Set<string>(['off', 'summary', 'reminders']);
 
 /** 내 알림 기기 목록(본인 행만). 구독 주소는 열쇠라서 가져오지만 화면에는 보이지 않는다. */
 export async function loadDevices(client: SupabaseClient, userId: string): Promise<Device[]> {
-  const { data, error } = await client.from('user_push_subscriptions').select('id,endpoint,device_name,canvas_mode,created_at')
-    .eq('user_id', userId).order('created_at', { ascending: true });
+  const read = (cols: string) => client.from('user_push_subscriptions').select(cols).eq('user_id', userId).order('created_at', { ascending: true });
+  let { data, error } = await read('id,endpoint,device_name,canvas_mode,created_at,alert_all_new');
+  // alert_all_new 열이 아직 없으면 그 설정만 숨긴다(null).
+  if (error && /alert_all_new/.test(String(error.message ?? ''))) ({ data, error } = await read('id,endpoint,device_name,canvas_mode,created_at'));
   if (error) throw error;
-  return ((data ?? []) as Record<string, unknown>[]).filter((row) => typeof row.id === 'string' && typeof row.endpoint === 'string').map((row) => ({
+  return ((data ?? []) as unknown as Record<string, unknown>[]).filter((row) => typeof row.id === 'string' && typeof row.endpoint === 'string').map((row) => ({
     id: row.id as string, endpoint: row.endpoint as string, name: typeof row.device_name === 'string' ? row.device_name : null,
     canvasMode: (typeof row.canvas_mode === 'string' && MODES.has(row.canvas_mode) ? row.canvas_mode : 'reminders') as CanvasMode,
     createdAt: typeof row.created_at === 'string' ? row.created_at : '',
+    alertAllNew: typeof row.alert_all_new === 'boolean' ? row.alert_all_new : null,
   }));
 }
 
 export async function saveCanvasMode(client: SupabaseClient, userId: string, deviceId: string, mode: CanvasMode): Promise<void> {
   const { error } = await client.from('user_push_subscriptions').update({ canvas_mode: mode }).eq('id', deviceId).eq('user_id', userId);
+  if (error) throw error;
+}
+
+export async function saveDeviceAlertAll(client: SupabaseClient, userId: string, deviceId: string, enabled: boolean): Promise<void> {
+  const { error } = await client.from('user_push_subscriptions').update({ alert_all_new: enabled }).eq('id', deviceId).eq('user_id', userId);
   if (error) throw error;
 }
 

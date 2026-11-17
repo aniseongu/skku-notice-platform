@@ -49,15 +49,27 @@ test('AI users wait for the judgment even when a keyword matches, and the reason
   } finally { await db.close(); }
 });
 
-test('all-new preference is owner scoped and excluded keywords stay silent', async () => {
+test('all-new sound is a per-device setting, owner scoped, and excluded keywords stay silent', async () => {
   const { db, user } = await setup();
   const other = '00000000-0000-0000-0000-000000000002';
+  const sub = (u, endpoint, flag) => `insert into user_push_subscriptions(user_id,endpoint,p256dh,auth_secret,created_at,alert_all_new)
+    values ('${u}','${endpoint}','${'A'.repeat(87)}','${'A'.repeat(22)}',now()-interval '2 days',${flag})`;
+  const byEndpoint = async () => { await db.exec('set role service_role'); const r = (await db.query(`select s.endpoint, c.silent from public.list_notice_push_candidates(20) c join user_push_subscriptions s on s.id = c.subscription_id where c.notice_id = 'school/1'`)).rows; await db.exec('reset role'); return Object.fromEntries(r.map((x) => [x.endpoint, x.silent])); };
   try {
-    await db.exec(`insert into auth.users values ('${other}'); insert into user_preferences(user_id,alert_all_new) values ('${other}',true)`);
-    assert.equal((await rows(db))[0].silent, true);
-    await db.exec(`insert into user_preferences(user_id,alert_all_new) values ('${user}',true)`);
-    assert.equal((await rows(db))[0].silent, false);
-    await db.exec(`update user_preferences set excluded_keywords=array['학교'] where user_id='${user}'`);
-    assert.equal((await rows(db))[0].silent, true);
+    await db.exec(`insert into auth.users values ('${other}'); insert into user_source_subscriptions(user_id,source_id,created_at) values ('${other}','school',now()-interval '2 days');
+      ${sub(other, 'https://fcm.googleapis.com/other', true)};
+      ${sub(user, 'https://fcm.googleapis.com/b-off', false)};
+      update user_push_subscriptions set alert_all_new = true where endpoint = 'https://fcm.googleapis.com/fcm/send/test'`);
+    let r = await byEndpoint();
+    assert.equal(r['https://fcm.googleapis.com/fcm/send/test'], false);   // 켠 기기는 소리
+    assert.equal(r['https://fcm.googleapis.com/b-off'], true);            // 같은 사용자의 끈 기기는 무음
+    assert.equal(r['https://fcm.googleapis.com/other'], false);           // 다른 사용자는 자기 기기 설정
+    await db.exec(`update user_push_subscriptions set alert_all_new = false where user_id = '${user}'`);
+    r = await byEndpoint();
+    assert.equal(r['https://fcm.googleapis.com/other'], false);           // 내 기기 설정이 다른 사용자에게 번지지 않는다
+    assert.equal(r['https://fcm.googleapis.com/fcm/send/test'], true);
+    await db.exec(`update user_push_subscriptions set alert_all_new = true where user_id = '${user}'; insert into user_preferences(user_id,excluded_keywords) values ('${user}',array['학교'])`);
+    r = await byEndpoint();
+    assert.equal(r['https://fcm.googleapis.com/fcm/send/test'], true);    // 제외 키워드는 계속 무음
   } finally { await db.close(); }
 });

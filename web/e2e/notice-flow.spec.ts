@@ -1406,7 +1406,7 @@ test('notifications page: this device and the device list, like the original set
   await settingsAt(page, '&section=notifications');
   const screen = page.locator('platform-settings-screen');
   const devices = [
-    { id: 'd1', endpoint: 'https://fcm.googleapis.com/a', name: 'Windows · Whale', canvasMode: 'reminders', createdAt: '2026-11-07T10:00:00Z' },
+    { id: 'd1', endpoint: 'https://fcm.googleapis.com/a', name: 'Windows · Whale', canvasMode: 'reminders', createdAt: '2026-11-07T10:00:00Z', alertAllNew: false },
     { id: 'd2', endpoint: 'https://fcm.googleapis.com/b', name: 'Android · Chrome', canvasMode: 'summary', createdAt: '2026-11-08T01:00:00Z' },
   ];
   // 기기 목록을 받기 전에는 기기 구역과 그 아래(받을 게시판)를 그리지 않는다. 나중에 끼어들어 아래가 밀리지 않게.
@@ -1415,13 +1415,19 @@ test('notifications page: this device and the device list, like the original set
   await expect(screen.getByRole('region', { name: '받을 게시판' })).toHaveCount(0);
   await withApp(page, { authUserId: 'account-a', pushStatus: 'on', devices, devicesLoaded: true, thisDeviceId: 'd1', summaryTime: '21:05',
     canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null },
-    refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', removeDevice: 'fn:remove', renameDevice: 'fn:rename', setSummaryTime: 'fn:time' });
+    refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', removeDevice: 'fn:remove', renameDevice: 'fn:rename', setSummaryTime: 'fn:time', setDeviceAlertAll: 'fn:alertAll' });
   await expect(screen.getByRole('region', { name: '받을 게시판' })).toBeVisible();
   // 아이캠퍼스를 연결했고 이 기기가 등록돼 있으면 이 기기의 아이캠퍼스 알림을 여기서도 바꾼다.
-  const canvas = screen.getByRole('radiogroup', { name: '이 기기의 아이캠퍼스 알림' });
-  await expect(canvas.getByRole('radio', { name: '요약과 마감' })).toHaveAttribute('aria-checked', 'true');
-  await canvas.getByRole('radio', { name: '끄기' }).click();
+  const canvas = screen.getByRole('switch', { name: /아이캠퍼스 알림/ });
+  await expect(canvas).toHaveAttribute('aria-checked', 'true');
+  await canvas.click();
   expect((await calls(page)).filter((c) => c[0] === 'mode')).toEqual([['mode', 'off']]);
+  // 모든 새 공지 소리 알림은 이 기기 구역의 스위치 하나다(기기별).
+  const loud = screen.getByRole('region', { name: '이 기기' }).getByRole('switch', { name: /모든 새 공지/ });
+  await expect(loud).toHaveAttribute('aria-checked', 'false');
+  await loud.click();
+  expect((await calls(page)).filter((c) => c[0] === 'alertAll')).toEqual([['alertAll', true]]);
+  await expect(screen.getByRole('region', { name: '알림 기준' })).toHaveCount(0);
   // 알림 기기 목록: 이 기기에는 지우기가 없고 다른 기기는 지울 수 있다.
   const list = screen.getByRole('region', { name: '알림 기기' });
   await expect(list).toContainText('Windows · Whale');

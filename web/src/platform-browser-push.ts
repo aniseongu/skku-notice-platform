@@ -52,20 +52,24 @@ function forget(storage: Storage): void {
 
 // 이 주소의 줄이 이미 있으면(같은 주소로 다시 켬) 이름·아이캠퍼스 설정을 보내지 않아 그대로 둔다.
 // 새 주소면 옛 줄의 값을 이어 받는다. 읽지 못하면 등록을 멈춰(옛 줄을 지우지 않는다) 다음 시도에서 이어 받게 한다.
-type DeviceCarry = { exists: boolean; canvas_mode?: string; device_name?: string };
+type DeviceCarry = { exists: boolean; canvas_mode?: string; device_name?: string; alert_all_new?: boolean };
 async function carryOver(client: SupabaseClient, userId: string, previous: string | null, endpoint: string): Promise<DeviceCarry> {
   const fail = '서버에 이 기기를 등록하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.';
   const exists = await withTimeout(Promise.resolve(client.from('user_push_subscriptions').select('id').eq('user_id', userId).eq('endpoint', endpoint).maybeSingle()), SAVE_MS, fail);
   if (exists.error) throw exists.error;
   if (exists.data) return { exists: true };
   if (!previous || previous === endpoint) return { exists: false };
-  const { data, error } = await withTimeout(Promise.resolve(client.from('user_push_subscriptions').select('canvas_mode,device_name').eq('user_id', userId).eq('endpoint', previous).maybeSingle()), SAVE_MS, fail);
+  const read = (cols: string) => withTimeout(Promise.resolve(client.from('user_push_subscriptions').select(cols).eq('user_id', userId).eq('endpoint', previous).maybeSingle()), SAVE_MS, fail);
+  let { data, error } = await read('canvas_mode,device_name,alert_all_new');
+  // 열이 아직 없는 서버에서는 소리 설정 없이 이어 받는다(등록이 막히지 않게).
+  if (error && /alert_all_new/.test(String((error as { message?: unknown }).message ?? ''))) ({ data, error } = await read('canvas_mode,device_name'));
   if (error) throw error;
   if (!data) return { exists: false };
-  const row = data as { canvas_mode?: unknown; device_name?: unknown };
+  const row = data as { canvas_mode?: unknown; device_name?: unknown; alert_all_new?: unknown };
   return {
     exists: false,
     ...(typeof row.canvas_mode === 'string' && ['off', 'summary', 'reminders'].includes(row.canvas_mode) ? { canvas_mode: row.canvas_mode } : {}),
+    ...(typeof row.alert_all_new === 'boolean' ? { alert_all_new: row.alert_all_new } : {}),
     ...(typeof row.device_name === 'string' && row.device_name.trim() ? { device_name: row.device_name } : {}),
   };
 }
@@ -79,6 +83,7 @@ async function saveDevice(client: SupabaseClient, userId: string, subscription: 
     user_id: userId, endpoint: data.endpoint, p256dh: data.keys.p256dh, auth_secret: data.keys.auth,
     ...(carried.exists ? {} : { device_name: carried.device_name ?? await deviceName() }),
     ...(carried.canvas_mode ? { canvas_mode: carried.canvas_mode } : {}),
+    ...(carried.alert_all_new !== undefined ? { alert_all_new: carried.alert_all_new } : {}),
     updated_at: new Date().toISOString(),
   }, { onConflict: 'endpoint' })), SAVE_MS, '서버에 이 기기를 등록하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.');
   if (error) throw error;

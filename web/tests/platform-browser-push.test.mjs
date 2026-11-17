@@ -252,6 +252,13 @@ test('a replaced subscription keeps the iCampus mode that was turned off', async
   assert.equal(f.records[0].canvas_mode, 'off');
 });
 
+test('a replaced subscription keeps the all-new sound setting of the device', async () => {
+  const f = fixture();
+  await replaced(f, { alert_all_new: true });
+  assert.equal(f.records.length, 1);
+  assert.equal(f.records[0].alert_all_new, true);
+});
+
 test('a replaced subscription keeps the device name the user chose', async () => {
   const f = fixture();
   await replaced(f, { device_name: '내 태블릿' });
