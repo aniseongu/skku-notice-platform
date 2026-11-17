@@ -92,7 +92,8 @@ export function BoardRequest({ toast, userId, listRequests, submitRequest, onAdd
     finally { if (ownerRef.current === owner) setBusy(false); }
   };
   return <div className="border-t border-line">
-    <Setting name="찾는 게시판이 없나요?" help="주소를 적으면 보통 30분 안에 확인해서 모두가 고를 수 있게 추가해요. 주소가 없거나 확인이 안 되면 개발자가 살펴봐요">
+    <Setting name="찾는 게시판이 없나요?" help="학교 게시판 주소를 적으면 바로 확인해요"
+      className={open ? '' : 'min-[720px]:grid min-[720px]:grid-cols-[minmax(0,1fr)_auto] min-[720px]:[align-items:start] min-[720px]:gap-[24px] min-[720px]:[&>.setting-control]:w-auto min-[720px]:[&>.setting-control>.ghost-button]:self-end'}>
       {open ? <div ref={formRef} className="flex flex-col gap-[8px]">
         <input className={`${SETTINGS_INPUT} w-full font-normal`} aria-label="게시판 이름" placeholder="게시판 이름" value={name} maxLength={60} required disabled={busy} onChange={(e) => setName(e.currentTarget.value)} />
         <input className={`${SETTINGS_INPUT} w-full font-normal`} type="url" aria-label="주소 (선택)" placeholder="주소 (선택)" value={address} maxLength={400} disabled={busy} aria-invalid={invalid} aria-describedby={invalid ? addressErrorId : undefined} onChange={(e) => setAddress(e.currentTarget.value)} />
