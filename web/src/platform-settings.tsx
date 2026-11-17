@@ -1,7 +1,7 @@
 // 설정 화면. 구조와 문구는 원본(첫 쪽 → 하위 쪽)을 따르고, 계정·게시판·내 정보는 다중 사용자 구조에 맞췄다.
 // 스위치는 바로 반영되는 설정에만 쓰고(role="switch"), 켜짐·꺼짐을 글자로도 알린다(색에만 의존하지 않는다).
 import { createRoot, type Root } from 'react-dom/client';
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { MANUAL_INSTALL_HINT, type ManualInstallMode } from './install-hint';
 import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
 import { AiRows, StepGuide } from './ai-connect';
@@ -19,7 +19,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
 import { FEEDBACK_KINDS, FEEDBACK_LIMIT, feedbackProblem, type FeedbackKind, type FeedbackResult } from './feedback';
-import { BADGE, CHEVRON_RIGHT, CHOICE, DEVICE_ACTION, SETTINGS_ACTION, SETTINGS_INPUT, SWITCH, SWITCH_ONLY } from './cls';
+import { BADGE, CHEVRON_RIGHT, CHOICE, DANGER_BUTTON, GHOST_BUTTON, SETTINGS_ACTION, SETTINGS_INPUT, SOLID_BUTTON, SWITCH, SWITCH_ONLY } from './cls';
 import { aiKeysLead, connectedAiKeys } from './ai-keys';
 import { BoardRequest, BOARD_TRAILING_ROW } from './board-request';
 import type { BoardRequestResult, BoardRequestState } from './shared-board-requests';
@@ -83,6 +83,8 @@ export interface SettingsModel {
     devices: Device[];
     /** 기기 목록을 받았는지. 받기 전에는 기기 구역과 그 아래를 그리지 않는다. */
     loaded?: boolean;
+    /** 기기 목록을 받지 못했다. 알림 기기 구역에 다시 받기를 보인다. */
+    loadFailed?: boolean;
     thisId: string | null;
     summaryTime: string | null;
     hasCanvasToken: boolean;
@@ -140,16 +142,22 @@ function canvasModeAfterToggle(next: boolean, current: CanvasMode): CanvasMode {
 
 const SETTING_ROW_CLASS = 'setting flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[1280px]:grid min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,520px)] min-[1280px]:[align-items:start] min-[1280px]:gap-[24px] min-[1280px]:has-[>.setting-control>.rule-list]:grid-cols-[minmax(0,1fr)] min-[1280px]:has-[>.setting-control>.rule-list]:gap-[8px] min-[1280px]:has-[>.setting-control>.connection-summary]:[&>.setting-text]:pt-[11px] min-[1280px]:has-[>.setting-control>.segmented]:[&>.setting-text]:pt-[14px]';
 
-function Section({ id, title, action, children }: { id: string; title: string; action?: ReactNode; children: ReactNode }) {
+/** 구역 제목 바로 아래 한 줄 설명. 어느 설정 쪽이든 14px 한 가지이고 아래에 구분선을 두지 않는다. */
+const SECTION_NOTE = 'settings-lead m-0 pt-[16px] pb-[12px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]';
+const BOX = 'box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:bg-transparent min-[720px]:p-0';
+
+/** 설정의 한 구역. 쪽에 구역이 하나뿐이면 title을 비우고 label만 준다(쪽 제목과 같은 말을 다시 쓰지 않는다). 제목이 없으면 PC의 윗선도 두지 않는다. */
+function Section({ id, title, label, action, children }: { id: string; title?: string; label?: string; action?: ReactNode; children: ReactNode }) {
+  if (!title) return <section aria-label={label} className="mt-[24px]"><div className={BOX}>{children}</div></section>;
   return <section aria-labelledby={id}>
     {action ? <div className="settings-head-row mt-[28px] mb-[8px] flex items-center justify-between gap-[12px] pr-[var(--gutter)] min-[720px]:pr-0"><h2 id={id} className="settings-head m-0 text-[14px] leading-[20px] font-semibold text-ink-2">{title}</h2>{action}</div> : <h2 id={id} className="settings-head mt-[28px] mb-[8px] text-[14px] leading-[20px] font-semibold text-ink-2">{title}</h2>}
-    <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0">{children}</div></section>;
+    <div className={`${BOX} min-[720px]:border-t min-[720px]:border-line`}>{children}</div></section>;
 }
 
 export function Setting({ name, help, children, className = '' }: { name: string; help?: ReactNode; children?: ReactNode; className?: string }) {
   return <div className={`${SETTING_ROW_CLASS} ${className}`}>
     <div className="setting-text w-full min-w-0"><p className="setting-name text-[15px] leading-[22px] font-medium">{name}</p>{help ? <div className="setting-help mt-[2px] grid gap-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{help}</div> : null}</div>
-    {children ? <div className="setting-control flex w-full min-w-0 flex-col items-stretch gap-[8px] [&>:first-child]:mt-0 [&>.ghost-button]:self-start [&>.solid-button]:self-start min-[1280px]:[&>.ghost-button]:self-end min-[1280px]:[&>.solid-button]:self-end min-[1280px]:[&_.segmented]:self-end min-[1280px]:[&>.time-control]:self-end min-[1280px]:[&>.inline-row]:justify-end min-[1280px]:[&>.field-note]:text-right min-[1280px]:[&>.setting-state]:text-right min-[1280px]:[&>.connection-summary]:justify-end">{children}</div> : null}
+    {children ? <div className="setting-control flex w-full min-w-0 flex-col items-stretch gap-[8px] [&>:first-child]:mt-0 [&>.ghost-button]:self-start [&>.solid-button]:self-start min-[1280px]:[&>.ghost-button]:self-end min-[1280px]:[&>.solid-button]:self-end min-[1280px]:[&_.segmented]:self-end min-[1280px]:[&>.time-control]:self-end min-[1280px]:[&>.inline-row]:justify-end min-[1280px]:[&>.field-note]:text-right min-[1280px]:[&>.setting-state]:text-right min-[1280px]:[&>.connection-summary]:justify-end disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60">{children}</div> : null}
   </div>;
 }
 
@@ -197,6 +205,16 @@ function profileSummary(profile: UserProfile): string {
   return `${programLabel(main)}${rest.length ? ` 외 ${rest.length}개` : ''}${profile.year ? ` · ${profile.year >= 5 ? '5학년 이상' : `${profile.year}학년`}` : ''}`;
 }
 
+/** 홈 "AI 연결" 줄의 상태. 이미 불러온 연결 정보만 쓴다. */
+function aiConnectState(model: SettingsModel): string {
+  const byok = model.byok;
+  if (!model.userId) return '로그인하면 키를 연결할 수 있어요';
+  if (!byok?.available) return 'Gemini·Groq 키로 공지를 확인해요';
+  if (byok.loading) return '확인하고 있어요';
+  const names = [byok.status && !byok.status.disabled ? 'Gemini' : '', byok.ai?.keys.some((key) => key.provider === 'groq' && !key.disabled) ? 'Groq' : ''].filter(Boolean);
+  return names.length ? `${names.join('·')} 연결됨` : '연결 안 됨';
+}
+
 function Overview({ model }: { model: SettingsModel }) {
   return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px] settings-overview">
     <Section id="s-preferences" title="내 설정">
@@ -211,9 +229,8 @@ function Overview({ model }: { model: SettingsModel }) {
             {model.name && model.email ? <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{model.email}</span> : null}</div>
         </div>
         <SettingsLink model={model} label="프로필 설정" help={profileSummary(model.profile)} section="profile" />
-        <SettingsLink model={model} label="연결 키" help="Gemini·Groq 키" section="keys" />
         <Setting name="로그아웃" help="이 기기에서만 나가요. 구독과 저장은 계정에 남아요">
-          <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={model.authBusy} onClick={model.signOut}>이 기기에서 로그아웃</button>
+          <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={model.authBusy} onClick={model.signOut}>이 기기에서 로그아웃</button>
           {model.authError ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.authError}</p> : null}
         </Setting>
       </> : <Setting name="계정" help="로그인하면 구독과 저장이 계정에 남아요">
@@ -222,24 +239,25 @@ function Overview({ model }: { model: SettingsModel }) {
         {model.authError ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.authError}</p> : null}
       </Setting>}
     </Section>
+    {/* AI 키, 아이캠퍼스, 구글 캘린더는 모두 바깥 서비스와 잇는 설정이라 "연결" 한 묶음에 둔다. 줄마다 지금 상태를 보여 눌러 들어가지 않고도 읽게 한다. */}
+    <Section id="s-connect" title="연결">
+      <SettingsLink model={model} label="AI 연결" help={aiConnectState(model)} section="keys" />
+      <SettingsLink model={model} label="아이캠퍼스" help="과제 마감과 하루 요약 알림" section="canvas" />
+      <SettingsLink model={model} label="구글 캘린더" help={model.calendar?.id ? '저장한 공지의 마감을 캘린더에 넣고 있어요' : '저장한 공지의 마감을 구글 캘린더에 넣어요'} section="calendar" />
+    </Section>
     <Section id="s-view" title="화면">
       <Setting name="화면 모드" help="자동은 휴대폰과 PC 설정을 따라요">
         <Choice label="화면 모드" options={THEMES} value={model.theme} onPick={model.setTheme} />
       </Setting>
       {/* 컴퓨터(넓은 화면)는 주소창에 브라우저가 설치 단추를 이미 보여 주고, 설치 없이도 알림이 와서 설정에는 두지 않는다. 휴대폰에서만 보인다. */}
       {model.canInstall ? <Setting name="앱 설치" help="홈 화면에서 바로 열어요" className="min-[720px]:hidden">
-        <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.install}>앱으로 설치하기</button>
+        <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.install}>앱으로 설치하기</button>
       </Setting> : null}
       {/* 로그인 뒤에도 설치는 팝업이나 배너로 다시 묻지 않고, 설정의 "화면"에서 원할 때 찾게 한다. 설치한 앱으로 열면 두 줄 모두 보이지 않는다. */}
       {model.manualInstall && !model.canInstall ? <Setting name="앱 설치" help={`${MANUAL_INSTALL_HINT[model.manualInstall].lead}${MANUAL_INSTALL_HINT[model.manualInstall].action}${MANUAL_INSTALL_HINT[model.manualInstall].tail}`} className="min-[720px]:hidden" /> : null}
       <Setting name="단축키" help="키보드로 빠르게 이동해요" className="kbd-only">
-        <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" aria-keyshortcuts="?" onClick={model.showShortcuts}>단축키 보기</button>
+        <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" aria-keyshortcuts="?" onClick={model.showShortcuts}>단축키 보기</button>
       </Setting>
-    </Section>
-    {/* 자주 쓰지 않는 연결은 "기타"로 묶어 아래에 둔다(알림과 관심 키워드가 위쪽 "내 설정"에 남는다). */}
-    <Section id="s-etc" title="기타">
-      <SettingsLink model={model} label="아이캠퍼스" help="과제 마감과 하루 요약 알림" section="canvas" />
-      <SettingsLink model={model} label="구글 캘린더" help={model.calendar?.id ? '저장한 공지의 마감을 캘린더에 넣고 있어요' : '저장한 공지의 마감을 구글 캘린더에 넣어요'} section="calendar" />
     </Section>
     <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0 mt-[24px]">
         <a className="settings-link [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href="privacy.html">
@@ -296,7 +314,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
   // 더 고를 게시판이 없으면 눌리지 않는 안내 줄을 두지 않는다(누를 수 있는 줄처럼 보여 헷갈린다).
   if (others.length === 0) return null;
   // 접힌 "게시판 더 보기" 줄을 누르면 펼쳐진다. 받는 게시판이 하나도 없으면 처음부터 펼쳐 둔다.
-  return <details className="connection-manual group board-more-list mt-[8px] border-t border-line [&>.input]:mb-[8px] [&>.input]:w-full" open={mine.length === 0}>
+  return <details className={`connection-manual group board-more-list mt-[8px] ${mine.length ? 'border-t border-line' : ''} [&>.input]:mb-[8px] [&>.input]:w-full`} open={mine.length === 0}>
     <summary className={MORE_SUMMARY}>다른 게시판 {others.length}개 더 보기{chevron('M6 9l6 6 6-6', CHEVRON)}</summary>
     <div className="flex flex-col gap-3 pt-3 pb-3">
       <p className="setting-help m-0 text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">단과대를 골라 게시판을 추가해요</p>
@@ -359,40 +377,61 @@ function DeleteAccount({ model }: { model: SettingsModel }) {
       <p id="delete-account-title" className="delete-title m-0 text-[15px] leading-[22px] font-semibold text-ink">계정을 삭제할까요?</p>
       <p id="delete-account-help" className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">구독, 키워드, 저장한 공지까지 계정 정보가 모두 삭제돼요. 삭제한 뒤에는 되돌릴 수 없어요</p>
       <div className="inline-row flex flex-wrap gap-[8px] [&_.input]:min-w-0 [&_.input]:flex-[1_1_200px]">
-        <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" ref={closeRef} disabled={account.busy} onClick={() => setConfirming(false)}>닫기</button>
+        <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" ref={closeRef} disabled={account.busy} onClick={() => setConfirming(false)}>닫기</button>
         <button type="button" className="solid-button danger [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--danger-fill)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--danger-fill)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-danger-fill text-[oklch(0.99_0.005_25)] text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:opacity-60" disabled={account.busy} onClick={account.remove}>{account.busy ? '삭제하고 있어요' : '삭제하기'}</button>
       </div>
-    </div> : <button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" ref={triggerRef} onClick={() => setConfirming(true)}>계정 삭제</button>}
+    </div> : <button type="button" className={`${DANGER_BUTTON} self-start`} ref={triggerRef} onClick={() => setConfirming(true)}>계정 삭제</button>}
     {account.error ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{account.error}</p> : null}
   </div>;
 }
 
-/** 알림 기기 한 줄: 이름(모델이나 기기 종류), 등록일, 아캠 알림 모드. 이름은 바꿀 수 있고 이 기기가 아닌 기기는 지울 수 있다. */
+/** 알림 기기 한 줄: 이름(모델이나 기기 종류), 등록일, 아이캠퍼스 알림 모드. 줄을 누르면 그 자리에서 펼쳐져 이름 바꾸기와 지우기가 나온다(자주 하지 않는 일이라 평소에는 숨긴다). */
 function DeviceRow({ device, info }: { device: Device; info: NonNullable<SettingsModel['devicesInfo']> }) {
+  const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(device.name ?? '');
+  const panel = useId();
   const name = displayDeviceName(device, info.devices);
-  const save = async () => { if (validDeviceName(draft) && await info.rename(device.id, draft)) setEditing(false); };
-  return <li>
-    {editing
-      ? <div className="inline-row flex flex-wrap gap-[8px] [&_.input]:min-w-0 [&_.input]:flex-[1_1_200px]">
-        <input className="input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink text-[15px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px]" aria-label={`${name} 이름`} value={draft} maxLength={40} autoFocus onChange={(event) => setDraft(event.currentTarget.value)}
-          onKeyDown={(event) => { if (event.key === 'Enter') void save(); if (event.key === 'Escape') setEditing(false); }} />
-        <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={info.busy || !validDeviceName(draft)} onClick={() => void save()}>저장하기</button>
-        <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={info.busy} onClick={() => setEditing(false)}>닫기</button>
-      </div>
-      : <span className="device-name flex items-center gap-[8px] font-semibold">{name}{device.id === info.thisId ? <b className={BADGE}>이 기기</b> : null}</span>}
-    <span className="field-note text-[14px] leading-[20px] text-ink-2">{device.createdAt ? `${new Date(device.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}에 등록` : ''} · 아캠 알림 {CANVAS_MODES.find(([mode]) => mode === device.canvasMode)?.[1]}</span>
-    {editing ? null : <span className="device-actions flex gap-[8px] [grid-row:1/span_2] [grid-column:2]">
-      <button type="button" className={DEVICE_ACTION} disabled={info.busy} aria-label={`${name} 이름 바꾸기`} onClick={() => { setDraft(device.name ?? ''); setEditing(true); }}>이름 바꾸기</button>
-      {device.id === info.thisId ? null
-        : <button type="button" className={DEVICE_ACTION} disabled={info.busy} aria-label={`${name} 지우기`} onClick={() => info.remove(device.id)}>지우기</button>}
-    </span>}
+  const save = async () => { if (validDeviceName(draft) && await info.rename(device.id, draft)) { setEditing(false); setOpen(false); } };
+  return <li className="border-t border-line first:border-t-0">
+    <button type="button" className="flex min-h-[56px] w-full items-center justify-between gap-[12px] border-0 bg-transparent px-0 py-[10px] text-left text-ink [@media(hover:hover)]:hover:bg-hover active:bg-hover" aria-expanded={open} aria-controls={panel} aria-label={`${name} 관리하기`} onClick={() => setOpen(!open)}>
+      <span className="grid min-w-0 gap-[2px]">
+        <span className="device-name flex items-center gap-[8px] text-[15px] leading-[22px] font-medium">{name}{device.id === info.thisId ? <b className={BADGE}>이 기기</b> : null}</span>
+        <span className="field-note text-[14px] leading-[20px] text-ink-2">{device.createdAt ? `${new Date(device.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}에 등록` : ''} · 아이캠퍼스 알림 {CANVAS_MODES.find(([mode]) => mode === device.canvasMode)?.[1]}</span>
+      </span>
+      {chevron('M6 9l6 6 6-6', `flex-none text-ink-3 transition-transform ${open ? 'rotate-180' : ''}`)}
+    </button>
+    <div id={panel} hidden={!open} className="pb-[12px]">
+      {editing
+        ? <div className="inline-row flex flex-wrap gap-[8px] [&_.input]:min-w-0 [&_.input]:flex-[1_1_200px]">
+          <input className={SETTINGS_INPUT} aria-label={`${name} 이름`} value={draft} maxLength={40} autoFocus onChange={(event) => setDraft(event.currentTarget.value)}
+            onKeyDown={(event) => { if (event.key === 'Enter') void save(); if (event.key === 'Escape') setEditing(false); }} />
+          <button type="button" className={SOLID_BUTTON} disabled={info.busy || !validDeviceName(draft)} onClick={() => void save()}>저장하기</button>
+          <button type="button" className={GHOST_BUTTON} disabled={info.busy} onClick={() => setEditing(false)}>닫기</button>
+        </div>
+        : <div className="flex flex-wrap gap-[8px]">
+          <button type="button" className={GHOST_BUTTON} disabled={info.busy} aria-label={`${name} 이름 바꾸기`} onClick={() => { setDraft(device.name ?? ''); setEditing(true); }}>이름 바꾸기</button>
+          {device.id === info.thisId ? null
+            : <button type="button" className={DANGER_BUTTON} disabled={info.busy} aria-label={`${name} 지우기`} onClick={() => info.remove(device.id)}>지우기</button>}
+        </div>}
+    </div>
   </li>;
 }
 
-/** 아이캠퍼스 쪽: 알림 켜기 → 토큰 → 하루 요약 시간 순이고, 토큰은 켜기 전에도 넣을 수 있다. 요약 시간은 켜면 펼쳐진다. 구역마다 제목이 있다.
- * 스위치는 이 기기의 알림 모드(끔/켬)이고, 토큰이 저장돼 있어야 알림이 실제로 간다. 토큰을 지워도 입력칸이 닫히지 않게 펼침 상태는 따로 둔다. */
+/** 이 기기 알림의 한 줄 상태. 설정의 다른 스위치처럼 스위치 줄의 설명 한 곳에서만 말한다. */
+function pushLine(status: SettingsModel['pushStatus']): string {
+  switch (status) {
+    case 'unsupported': return '이 브라우저는 알림을 지원하지 않아요';
+    case 'denied': return '브라우저 설정에서 알림을 허용하면 켤 수 있어요';
+    case 'checking': return '확인하고 있어요';
+    case 'busy': return '연결하고 있어요';
+    case 'on': return '켜져 있어요';
+    default: return '꺼져 있어요';
+  }
+}
+
+/** 아이캠퍼스 쪽: 토큰 → 알림 켜기 → 하루 요약 시간 순이다. 토큰은 계정에 저장하는 값이라 먼저 넣고, 토큰이 없으면 스위치는 이유와 함께 막힌다.
+ * 스위치는 이 기기의 알림 모드(끔/켬)이다. 토큰을 지워도 입력칸이 닫히지 않게 펼침 상태는 따로 둔다. */
 function Canvas({ model }: { model: SettingsModel }) {
   const info = model.devicesInfo;
   const refresh = info?.refresh;
@@ -405,38 +444,41 @@ function Canvas({ model }: { model: SettingsModel }) {
   const [open, setOpen] = useState(active);
   // 서버에서 늦게 불러온 켜짐 상태도 펼침에 반영한다(한 방향만: 끄는 것은 사용자가 스위치로만 한다).
   useEffect(() => { if (active) setOpen(true); }, [active]);
-  // 펼친 채로 토큰을 저장했는데 이 기기 모드가 꺼짐이면 켜 준다. 스위치만 켜지고 알림은 안 가는 상태를 만들지 않는다.
+  // 토큰이 없어지면 스위치는 막히고 닫힌다(다시 연결하면 스위치를 직접 켠다).
+  useEffect(() => { if (!hasToken && info?.devices !== undefined) setOpen(false); }, [hasToken]);
+  // 펼친 상태에서 이 기기 모드가 꺼짐으로 남아 있으면 켜 준다. 스위치만 켜지고 알림은 안 가는 상태를 만들지 않는다.
   useEffect(() => { if (open && pushOn && hasToken && mode === 'off') info?.setMode('reminders'); }, [open, pushOn, hasToken, mode]);
-  if (!model.userId) return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]"><Section id="s-canvas" title="아이캠퍼스"><LoginNote model={model} what="아이캠퍼스 알림" /></Section></div>;
-  if (!info) return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]"><Section id="s-canvas" title="아이캠퍼스"><Setting name="아이캠퍼스 알림" help="지금은 설정할 수 없어요. 잠시 뒤 다시 열어 주세요" /></Section></div>;
+  if (!model.userId) return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]"><Section id="s-canvas" label="아이캠퍼스"><LoginNote model={model} what="아이캠퍼스 알림" /></Section></div>;
+  if (!info) return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]"><Section id="s-canvas" label="아이캠퍼스"><Setting name="아이캠퍼스 알림" help="지금은 설정할 수 없어요. 잠시 뒤 다시 열어 주세요" /></Section></div>;
+  const shown = open && hasToken;
   const pushHelp: Record<string, string> = { unsupported: '이 브라우저는 알림을 지원하지 않아요. 최신 브라우저에서 열어 주세요', denied: '브라우저 설정에서 알림을 허용하면 켤 수 있어요', busy: '연결하고 있어요', checking: '확인하고 있어요', off: '알림을 켜면 이 기기로 받아요' };
   const toggle = (next: boolean) => {
     setOpen(next);
-    if (next && hasToken && mode === 'off') info.setMode(canvasModeAfterToggle(true, mode));
+    if (next && hasToken && mode === 'off' && !pushOn) info.setMode(canvasModeAfterToggle(true, mode));   // 이 기기 알림이 켜져 있으면 위의 효과가 켠다
     if (!next && mode !== null && mode !== 'off') info.setMode(canvasModeAfterToggle(false, mode));
   };
   return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
+    {/* 토큰은 계정에 저장하는 값이라 알림을 켜기 전에도 넣을 수 있다. 입력 방식은 AI 연결 쪽과 같은 줄이다. */}
+    <Section id="s-canvas-token" title="토큰"><CanvasRow model={model} alignEnd /></Section>
     <Section id="s-canvas" title="알림">
-      <SwitchRow label={CANVAS_SWITCH_LABEL} description={CANVAS_SWITCH_HELP} checked={open} disabled={info.busy} onChange={toggle} />
+      <SwitchRow label={CANVAS_SWITCH_LABEL} description={hasToken ? CANVAS_SWITCH_HELP : '토큰을 연결하면 켤 수 있어요'} checked={shown} disabled={info.busy || !hasToken} onChange={toggle} />
       {/* 이 기기 알림이 꺼져 있어도 스위치와 설정은 열린다. 실제로 알림이 가려면 이 기기 알림이 필요해서 같은 자리에서 켜게 한다. */}
-      {open && !pushOn ? <Setting name="이 기기 알림도 켜 주세요" help={pushHelp[model.pushStatus] ?? '알림을 켜면 이 기기로 받아요'}>
-        {model.pushStatus === 'off' ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.enablePush}>{model.pushRetry ? '다시 시도하기' : '이 기기 알림 켜기'}</button> : null}
+      {shown && !pushOn ? <Setting name="이 기기 알림도 켜 주세요" help={pushHelp[model.pushStatus] ?? '알림을 켜면 이 기기로 받아요'}>
+        {model.pushStatus === 'off' ? <button type="button" className={GHOST_BUTTON} onClick={model.enablePush}>{model.pushRetry ? '다시 시도하기' : '알림 켜기'}</button> : null}
       </Setting> : null}
     </Section>
-    {/* 토큰은 계정에 저장하는 값이라 알림을 켜기 전에도 넣을 수 있다. 입력 방식은 연결 키 쪽과 같은 줄이다. */}
-    <Section id="s-canvas-token" title="토큰"><CanvasRow model={model} alignEnd /></Section>
-    {open ? <>
+    {shown ? <>
       <Section id="s-canvas-time" title="하루 요약">
-        <Setting name="요약 시간" help={hasToken ? '모든 기기에 같은 시간을 적용해요. 할 일이 없어도 알려요' : '토큰을 연결하면 바꿀 수 있어요'}>
+        <Setting name="요약 시간" help="모든 기기에 같은 시간을 적용해요. 할 일이 없어도 알려요">
           <p className="setting-name text-[15px] leading-[22px] font-medium visually-hidden" id="summary-time-label">하루 요약 시간</p>
-          <div className={hasToken ? 'min-[720px]:self-end' : 'opacity-50 min-[720px]:self-end'}><SummaryTime info={info} /></div>
-          {hasToken ? <p className="field-note text-[14px] leading-[20px] text-ink-2">확인이 늦어지면 알림도 늦어져요</p> : null}
+          <div className="min-[720px]:self-end"><SummaryTime info={info} /></div>
+          <p className="field-note text-[14px] leading-[20px] text-ink-2">확인이 늦어지면 알림도 늦어져요</p>
           {info.error ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{info.error}</p> : null}
         </Setting>
-        {hasToken ? <Setting name="받을 알림" help="요약과 마감을 고르면 하루 전과 3시간 전에도 알려요">
+        <Setting name="받을 알림" help="요약과 마감을 고르면 하루 전과 3시간 전에도 알려요">
           <Choice label="받을 아이캠퍼스 알림" value={mode === 'summary' ? 'summary' : 'reminders'} disabled={!thisDevice || info.busy}
             options={CANVAS_MODES.filter(([value]) => value !== 'off')} onPick={(next: CanvasMode) => info.setMode(next)} />
-        </Setting> : null}
+        </Setting>
       </Section>
     </> : null}
   </div>;
@@ -450,47 +492,39 @@ function Notifications({ model }: { model: SettingsModel }) {
   useEffect(() => { if (model.userId) refresh?.(); }, [model.userId, model.pushStatus]);
   const thisDevice = info?.devices.find((device) => device.id === info.thisId) ?? null;
   const waitDevices = !!model.userId && info?.loaded === false;
+  const canToggle = model.pushStatus === 'on' || model.pushStatus === 'off';
   return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Back model={model} />
     <Section id="s-notify" title="이 기기">
-      <Setting name="이 기기 알림" help={<>
-        <p>앱을 닫아도 브라우저가 켜져 있으면 알림으로 받아요</p>
-        {model.userId ? <>
-          <p>{on ? '켜져 있어요' : '꺼져 있어요'} · 브라우저 권한 {permissionText(model.pushStatus)}</p>
-          {model.pushStatus === 'unsupported' ? <p>이 브라우저는 알림을 지원하지 않아요. 최신 브라우저에서 열어 주세요</p> : null}
-          {model.pushStatus === 'denied' ? <p>브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요</p> : null}
-          {on && model.subscriptions.length === 0 ? <p>받을 게시판을 고르면 새 공지를 알려드려요</p> : null}
-        </> : null}
-      </>}>
-        {!model.userId ? <p className="field-note text-[14px] leading-[20px] text-ink-2">로그인하면 이 기기로 알림을 받을 수 있어요</p> : <>
-          <div className="inline-row flex flex-wrap gap-[8px] [&_.input]:min-w-0 [&_.input]:flex-[1_1_200px]">
-            {on
-              ? <><button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.disablePush}>알림 끄기</button>
-                <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.testNotification}>테스트 알림 띄우기</button></>
-              : <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={model.pushStatus !== 'off'} onClick={model.enablePush}>
-                {model.pushStatus === 'busy' ? '연결 중' : model.pushStatus === 'checking' ? '확인하고 있어요' : model.pushRetry ? '다시 시도하기' : '알림 받기'}</button>}
-          </div>
-          {model.pushError ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.pushError}</p> : null}
-          {model.pushError && model.sendPushReport ? <button type="button" className="text-button [@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] inline-flex min-h-[44px] w-fit items-center rounded-sm border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent" onClick={model.sendPushReport}>문제 알려 주기</button> : null}
-        </>}
-      </Setting>
-      {/* 이 기기에만 적용되는 값이라 이 기기 구역에 둔다. 아이캠퍼스 스위치는 아이캠퍼스 쪽과 같은 줄이다. */}
-      {model.userId && info && on && thisDevice?.alertAllNew != null ? <SwitchRow label="모든 새 공지를 소리와 함께 알리기" description="끄면 관심 키워드나 AI가 고른 공지만 소리가 나요" checked={thisDevice.alertAllNew} disabled={info.busy} onChange={info.setAlertAll} /> : null}
-      {model.userId && info && on && info.hasCanvasToken && thisDevice ? <>
-        <SwitchRow label={CANVAS_SWITCH_LABEL} description={CANVAS_SWITCH_HELP} checked={thisDevice.canvasMode !== 'off'} disabled={info.busy} onChange={(next) => info.setMode(canvasModeAfterToggle(next, thisDevice.canvasMode))} />
-        {info.error ? <p className="field-note error pb-[12px] text-[14px] leading-[20px] text-danger" role="alert">{info.error}</p> : null}
-      </> : null}
+      {!model.userId ? <Setting name="이 기기 알림" help="로그인하면 이 기기로 알림을 받을 수 있어요" /> : <>
+        {/* 켜기·끄기는 다른 설정과 같은 스위치다. 눌렀을 때의 흐름(허용 창, 등록)은 그대로이고, 상태는 설명 한 줄로만 말한다. */}
+        <SwitchRow label="이 기기 알림" description={pushLine(model.pushStatus)} checked={on} disabled={!canToggle} onChange={(next) => (next ? model.enablePush() : model.disablePush())} />
+        {on ? <div className="flex pb-[8px]"><button type="button" className={`${SETTINGS_ACTION} -ml-[8px]`} onClick={model.testNotification}>테스트 알림 띄우기</button></div> : null}
+        {model.pushError ? <p className="field-note error pb-[8px] text-[14px] leading-[20px] text-danger" role="alert">{model.pushError}</p> : null}
+        {model.pushError && model.sendPushReport ? <button type="button" className={`${SETTINGS_ACTION} -ml-[8px] mb-[8px] w-fit`} onClick={model.sendPushReport}>문제 알려 주기</button> : null}
+        {/* 이 기기에만 적용되는 값이라 이 기기 구역에 둔다. 아이캠퍼스 스위치는 아이캠퍼스 쪽과 같은 줄이다. */}
+        {info && on && thisDevice?.alertAllNew != null ? <SwitchRow label="모든 새 공지를 소리와 함께 알리기" description="끄면 관심 키워드나 AI가 고른 공지만 소리가 나요" checked={thisDevice.alertAllNew} disabled={info.busy} onChange={info.setAlertAll} /> : null}
+        {info && on && info.hasCanvasToken && thisDevice ? <SwitchRow label={CANVAS_SWITCH_LABEL} description={CANVAS_SWITCH_HELP} checked={thisDevice.canvasMode !== 'off'} disabled={info.busy} onChange={(next) => info.setMode(canvasModeAfterToggle(next, thisDevice.canvasMode))} /> : null}
+        {/* 기기 설정을 저장하지 못했을 때의 안내는 이 구역에서 한 번만 보인다. */}
+        {info?.error ? <p className="field-note error pb-[12px] text-[14px] leading-[20px] text-danger" role="alert">{info.error}</p> : null}
+      </>}
     </Section>
-    {/* 기기 목록을 받기 전에는 기기 구역과 그 아래(받을 게시판)를 그리지 않는다. 기기 구역이 나중에 끼어들면 아래가 밀린다. 보통은 로그인 때 미리 받아 둔다. */}
+    {/* 기기 목록을 받기 전에는 받을 게시판과 알림 기기 구역을 그리지 않는다. 이 기기 구역의 줄이 나중에 늘어 아래가 밀리지 않게. 보통은 로그인 때 미리 받아 둔다. */}
     {waitDevices ? null : <>
-    {model.userId && info && info.devices.length > 0 ? <Section id="s-devices" title="알림 기기">
-      <Setting name="등록된 기기" help="알림을 받도록 켜 둔 기기예요. 이 기기는 위에서 끄고, 다른 기기는 여기서 지워요">
-        <ul className="device-list rule-list m-0 grid list-none gap-[4px] p-0 [&>li]:grid [&>li]:grid-cols-[1fr_auto] [&>li]:items-center [&>li]:gap-x-[12px] [&>li]:gap-y-[2px] [&>li]:border-t [&>li]:border-line [&>li]:py-[10px] [&>li:first-child]:border-t-0 [&_.field-note]:col-[1] [&_.field-note]:m-0 [&>li>.inline-row]:col-[1/-1]">
-          {info.devices.map((device) => <DeviceRow key={device.id} device={device} info={info} />)}
-        </ul>
-      </Setting>
-    </Section> : null}
     <BoardsSection model={model} />
+    {model.userId && info && (info.devices.length > 0 || info.loadFailed) ? <Section id="s-devices" title="알림 기기">
+      {info.loadFailed
+        ? <div className="flex flex-col items-start gap-[8px] py-[16px]">
+          <p className="field-note error m-0 text-[14px] leading-[20px] text-danger" role="alert">기기 목록을 불러오지 못했어요</p>
+          <button type="button" className={GHOST_BUTTON} onClick={info.refresh}>다시 불러오기</button>
+        </div>
+        : <>
+          <p className={SECTION_NOTE}>이 기기는 위에서 끄고, 다른 기기는 눌러서 지워요</p>
+          <ul className="device-list rule-list m-0 grid list-none p-0">
+            {info.devices.map((device) => <DeviceRow key={device.id} device={device} info={info} />)}
+          </ul>
+        </>}
+    </Section> : null}
     </>}
   </div>;
 }
@@ -503,9 +537,9 @@ function BoardsSection({ model }: { model: SettingsModel }) {
   return <Section id="s-boards" title="받을 게시판"
     action={canMove ? <button type="button" className={`head-action ${SETTINGS_ACTION} -ml-[8px] -my-[13px]`} onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : undefined}>
     {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <>
-      <p className="setting-help m-0 pt-[16px] pb-[12px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{!order.boards.length ? '아직 받는 게시판이 없어요. 아래에서 골라 주세요' : editing ? '끌어서 순서를 바꿔요. 바로 저장돼요' : '켠 게시판 순서대로 목록에 보이고, 새 공지는 알림으로 와요'}</p>
+      <p className={SECTION_NOTE}>{!order.boards.length ? '아직 받는 게시판이 없어요. 아래에서 골라 주세요' : editing ? '끌어서 순서를 바꿔요. 바로 저장돼요' : '켠 게시판 순서대로 목록에 보이고, 새 공지는 알림으로 와요'}</p>
       {model.error ? <><p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.error}</p>
-        <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.retry}>다시 불러오기</button></> : null}
+        <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.retry}>다시 불러오기</button></> : null}
       {order.boards.length ? <BoardOrderList order={order} editing={editing} onToggle={(id) => model.toggle(id, false)} busy={model.loading} /> : null}
       <BoardGroups model={model} />
       <BoardRequest key={model.userId ?? 'guest'} toast={model.showToast} userId={model.userId}
@@ -614,7 +648,7 @@ function Keywords({ model }: { model: SettingsModel }) {
   const add = () => { if (!draft.trim()) return; model.addKeyword(draft); setDraft(''); };
   return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Back model={model} />
-    <Section id="s-keywords" title="관심 키워드">
+    <Section id="s-keywords" label="관심 키워드">
       <div className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch">
         <p className="setting-help text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty] m-0">학교 공지에 낱말이 모두 들어 있으면 관심으로 표시하고 소리로 알려요</p>
         <div className="inline-row flex flex-wrap gap-[8px] [&_.input]:min-w-0 [&_.input]:flex-[1_1_200px]">
@@ -626,11 +660,11 @@ function Keywords({ model }: { model: SettingsModel }) {
         {model.keywordNote ? <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0" role="status">{model.keywordNote}</p>
           : model.userId ? null : <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0">로그인하면 다른 기기와 같은 키워드를 써요</p>}
       </div>
-      <div className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch">
+      <div className="flex flex-col gap-[10px] pb-[16px]">
         <p className="setting-name text-[15px] leading-[22px] font-medium m-0">내 키워드 {model.keywords.length}개</p>
         {model.keywords.length
           ? <ul className="keyword-list m-0 list-none border-t-0 p-0 [&>li]:flex [&>li]:min-h-[44px] [&>li]:items-center [&>li]:justify-between [&>li]:border-b [&>li]:border-line [&>li]:text-[15px] [&>li:last-child]:border-b-0">{model.keywords.map((word) => <li key={word}><span className="flex min-w-0 flex-col py-[10px]"><span>{word}</span>{GENERIC_INTERN_WORD.test(word) ? <span className="field-note text-[14px] leading-[20px] text-ink-2">{INTERN_KEYWORD_NOTE}</span> : null}</span>
-            <button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" aria-label={`${word} 삭제`} onClick={() => model.removeKeyword(word)}>삭제</button></li>)}</ul>
+            <button type="button" className={DANGER_BUTTON} aria-label={`${word} 삭제`} onClick={() => model.removeKeyword(word)}>삭제</button></li>)}</ul>
           : <p className="field-note text-[14px] leading-[20px] text-ink-2 m-0">아직 키워드가 없어요. 위에 입력해서 추가해 보세요</p>}
       </div>
     </Section>
@@ -673,7 +707,7 @@ function AboutMe({ model }: { model: SettingsModel }) {
     })}
     {/* 이름과 단추가 한 줄뿐인 줄은 PC에서 세로 가운데로 맞춘다(이름이 위에 붙고 단추만 아래로 처지지 않게). */}
     <Setting name="저장" className="min-[720px]:items-center!">
-      <button type="button" className="solid-button [@media(hover:hover)]:hover:enabled:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:enabled:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:bg-sunken disabled:text-ink-3 disabled:opacity-100" disabled={!ready || !changed || over}
+      <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!ready || !changed || over}
         onClick={() => model.saveProfile({ ...profile, interests: drafts.interests.trim(), wants: drafts.wants.trim(), avoids: drafts.avoids.trim() })}>저장하기</button>
       {over ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{PROFILE_TEXT_LIMIT}자 이하로 적어 주세요</p> : null}
     </Setting>
@@ -682,7 +716,7 @@ function AboutMe({ model }: { model: SettingsModel }) {
 
 function CalendarPage({ model }: { model: SettingsModel }) {
   const calendar = model.calendar;
-  if (!model.userId) return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]"><Back model={model} /><Section id="s-calendar" title="구글 캘린더"><LoginNote model={model} what="구글 캘린더" /></Section></div>;
+  if (!model.userId) return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]"><Back model={model} /><Section id="s-calendar" label="구글 캘린더"><LoginNote model={model} what="구글 캘린더" /></Section></div>;
   if (!calendar) return null;
   const connected = !!calendar.id;
   const syncedAt = calendar.syncedAt ? new Date(calendar.syncedAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
@@ -690,7 +724,7 @@ function CalendarPage({ model }: { model: SettingsModel }) {
   const auto = calendar.auto;
   return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Back model={model} />
-    <Section id="s-calendar" title="구글 캘린더">
+    <Section id="s-calendar" label="구글 캘린더">
       <Setting name="성대 공지 캘린더" help={<>마감이 남은 저장 공지를 넣어요
         {connected ? <StatusText tone={auto.active ? 'ok' : 'bad'}>{auto.active ? '연결됨' : '연결이 끊겼어요'}</StatusText> : null}
         {connected && auto.active ? <span className="mt-[2px] block">30분마다 자동으로 반영해요{syncedAt ? ` · 마지막 ${syncedAt}` : ''}</span> : null}
@@ -698,11 +732,11 @@ function CalendarPage({ model }: { model: SettingsModel }) {
         <div className="flex flex-wrap items-center gap-2 min-[720px]:justify-end">
           <span className="flex shrink-0 gap-1">
             {!connected
-              ? <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-3 py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2" aria-label="구글 캘린더에 연결하기" disabled={calendar.busy} onClick={calendar.connect}>연결하기</button>
+              ? <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-3 py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" aria-label="구글 캘린더에 연결하기" disabled={calendar.busy} onClick={calendar.connect}>연결하기</button>
               : auto.active
-                ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 key-action min-h-[44px] px-3 py-0 text-ink" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '반영하는 중' : '지금 반영하기'}</button>
-                : <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-3 py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2" disabled={calendar.busy} onClick={calendar.connect}>다시 연결하기</button>}
-            {connected ? <button type="button" className="[@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex min-h-[44px] items-center justify-center rounded-md border-0 bg-transparent px-3 py-0 text-[15px] font-semibold text-ink-2 whitespace-nowrap select-none disabled:text-ink-3 disabled:opacity-60" disabled={calendar.busy} onClick={calendar.disconnect}>연결 끊기</button> : null}
+                ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] key-action min-h-[44px] px-3 py-0 text-ink disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={calendar.busy} onClick={calendar.sync}>{calendar.busy ? '반영하는 중' : '지금 반영하기'}</button>
+                : <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-3 py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={calendar.busy} onClick={calendar.connect}>다시 연결하기</button>}
+            {connected ? <button type="button" className={DANGER_BUTTON} disabled={calendar.busy} onClick={calendar.disconnect}>연결 끊기</button> : null}
           </span>
         </div>
         {calendar.message ? <p className="field-note ok text-[14px] leading-[20px] text-accent m-0" role="status">{calendar.message}</p> : null}
@@ -741,14 +775,14 @@ function ProgramEditor({ programs, ready, onChange }: { programs: Program[]; rea
   </div>;
   return <>
     <Setting name="주전공" help={main ? name(main) : '아직 없어요'}>
-      <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!ready} onClick={() => setEditing(editing === 'main' ? null : 'main')}>{main ? '바꾸기' : '고르기'}</button>
+      <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!ready} onClick={() => setEditing(editing === 'main' ? null : 'main')}>{main ? '바꾸기' : '고르기'}</button>
     </Setting>
     {editing === 'main' ? picker : null}
     <Setting name="복수전공" help={doubles.length ? doubles.map(name).join(', ') : '없어요'}>
       <div className="inline-row flex flex-wrap gap-[8px] [&_.input]:min-w-0 [&_.input]:flex-[1_1_200px]">
-        {doubles.map((program) => <button key={programKey(program)} type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!ready} aria-label={`${programLabel(program)} 빼기`}
+        {doubles.map((program) => <button key={programKey(program)} type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!ready} aria-label={`${programLabel(program)} 빼기`}
           onClick={() => onChange(programs.filter((p) => programKey(p) !== programKey(program)))}>{programLabel(program)} 빼기</button>)}
-        {main && programs.length < MAX_PROGRAMS ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!ready} onClick={() => setEditing(editing === 'double' ? null : 'double')}>추가하기</button> : null}
+        {main && programs.length < MAX_PROGRAMS ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!ready} onClick={() => setEditing(editing === 'double' ? null : 'double')}>추가하기</button> : null}
       </div>
     </Setting>
     {editing === 'double' ? picker : null}
@@ -863,7 +897,7 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
             </svg>
           </button>
         </div>
-        <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:opacity-60 min-h-[44px] min-w-[96px] shrink-0 px-4 disabled:border-line disabled:bg-sunken disabled:text-ink-2 disabled:opacity-100" aria-label={`${name} ${labels.save}`} disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인 중' : labels.save}</button>
+        <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] min-h-[44px] min-w-[96px] shrink-0 px-4 disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" aria-label={`${name} ${labels.save}`} disabled={busy || !value || (valid ? !valid(value) : false)} onClick={() => onRegister(value)}>{busy ? '확인 중' : labels.save}</button>
       </div>
       {extra}
       {error ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{error}</p> : null}
@@ -872,13 +906,13 @@ export function SecretRow({ name, help, placeholder, status, loading, busy, erro
     </> : confirming ? <>
       <p className={`m-0 text-[14px] text-ink ${alignEnd ? 'min-[720px]:text-right' : ''}`}>{name} 연결을 끊을까요?</p>
       <div className={`flex gap-2 ${alignEnd ? 'min-[720px]:justify-end' : ''}`}>
-        <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 key-action min-h-[44px] px-4 py-0 text-danger" aria-label={`${name} 연결 끊기 확인`} disabled={busy} onClick={onRemove}>끊기</button>
-        <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 key-action min-h-[44px] px-4 py-0" disabled={busy} onClick={() => setConfirming(false)}>취소</button>
+        <button type="button" className={`${DANGER_BUTTON} key-action`} aria-label={`${name} 연결 끊기 확인`} disabled={busy} onClick={onRemove}>끊기</button>
+        <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] key-action min-h-[44px] px-4 py-0 disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={busy} onClick={() => setConfirming(false)}>취소</button>
       </div>
     </> : <>
       <div className={`flex items-center gap-2 ${alignEnd ? 'min-[720px]:justify-end' : ''}`}>
-        <span className="flex shrink-0 gap-2"><button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 key-action min-h-[44px] px-3 py-0" aria-label={`${name} ${retry}`} disabled={loading} onClick={() => setEditing(true)}>{retry}</button>
-        {status && removable ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 key-action min-h-[44px] px-3 py-0 text-ink-2" aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={() => setConfirming(true)}>{labels.remove}</button> : null}</span>
+        <span className="flex shrink-0 gap-2"><button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] key-action min-h-[44px] px-3 py-0 disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" aria-label={`${name} ${retry}`} disabled={loading} onClick={() => setEditing(true)}>{retry}</button>
+        {status && removable ? <button type="button" className={`${DANGER_BUTTON} key-action`} aria-label={`${name} ${labels.remove}`} disabled={busy} onClick={() => setConfirming(true)}>{labels.remove}</button> : null}</span>
       </div>
       {status?.lastError && !labels.broken ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{status.lastError}</p> : null}
       {/* 안내는 위의 단추와 같은 쪽에 붙인다(부모의 field-note 오른쪽 정렬 규칙을 받지 않게 다른 이름을 쓴다). */}
@@ -905,15 +939,15 @@ function CanvasRow({ model, alignEnd }: { model: SettingsModel; alignEnd: boolea
 }
 
 function Keys({ model }: { model: SettingsModel }) {
-  if (!model.userId) return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]"><Back model={model} /><Section id="s-keys" title="연결 키"><LoginNote model={model} what="연결 키" /></Section></div>;
+  if (!model.userId) return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]"><Back model={model} /><Section id="s-keys" label="AI 연결"><LoginNote model={model} what="AI 연결" /></Section></div>;
   // Gemini와 Groq를 모두 연결했을 때만 칩과 버튼을 오른쪽 끝에 붙인다. 하나라도 비어 있으면 그대로 둔다.
   const ai = model.byok?.ai;
   const allConnected = !!model.byok?.status && !!ai && ai.keys.some((key) => key.provider === 'groq');
   return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Back model={model} />
-    <Section id="s-ai" title="AI 연결">
+    <Section id="s-ai" label="AI 연결">
       {/* 키를 몇 개 연결했느냐에 따라 달라지는 동작을 한 줄로 말한다(구역 제목 바로 아래, 구역마다 하나). */}
-      {model.byok?.available ? <p className="settings-lead m-0 mb-[4px] pt-[12px] text-[13px] leading-[19px] text-ink-2">{aiKeysLead(connectedAiKeys(model))}</p> : null}
+      {model.byok?.available ? <p className={SECTION_NOTE}>{aiKeysLead(connectedAiKeys(model))}</p> : null}
       <AiRows byok={model.byok} alignEnd={allConnected} />
     </Section>
   </div>;
@@ -928,7 +962,7 @@ function Feedback({ model }: { model: SettingsModel }) {
   const [mailTouched, setMailTouched] = useState(false);
   const [state, setState] = useState<'idle' | 'sending' | FeedbackResult>('idle');
   const wrap = 'settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]';
-  if (!model.userId) return <div className={wrap}><Back model={model} /><Section id="s-feedback" title="문의하기"><LoginNote model={model} what="문의하기" /></Section></div>;
+  if (!model.userId) return <div className={wrap}><Back model={model} /><Section id="s-feedback" label="문의하기"><LoginNote model={model} what="문의하기" /></Section></div>;
   const problem = feedbackProblem(body, email);
   const mailProblem = email.trim() ? feedbackProblem('x', email) : null;
   // 글을 고치면 이전 결과 문구는 지운다. 하루 한도는 고쳐도 풀리지 않으니 그대로 둔다.
@@ -947,8 +981,7 @@ function Feedback({ model }: { model: SettingsModel }) {
   const message = state === 'ok' ? '보냈어요. 남겨 주셔서 고마워요' : state === 'error' ? '보내지 못했어요. 잠시 뒤 다시 시도해 주세요' : reason || '운영자만 읽을 수 있어요. 하루 5번까지 보낼 수 있어요';
   return <div className={wrap}>
     <Back model={model} />
-    <section aria-label="문의 내용" className="mt-[24px]">
-      <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0">
+    <Section id="s-feedback-form" label="문의 내용">
         <Setting name="종류">
           <Choice label="종류" options={FEEDBACK_KINDS} value={kind} onPick={(next) => { setKind(next); edited(); }} grid columns={3} />
         </Setting>
@@ -964,10 +997,9 @@ function Feedback({ model }: { model: SettingsModel }) {
         </Setting>
         {/* 보내기도 다른 설정 줄과 같은 모양이다: 이름과 설명은 왼쪽, 단추는 오른쪽. 안내(한도, 막힌 이유, 결과)는 단추 위아래가 아니라 이 줄의 설명 한 곳에서만 말한다. */}
         <Setting name="운영자에게 보내기" help={<span className={`${state === 'ok' ? 'font-semibold text-accent' : state === 'error' ? 'text-danger' : ''}`} role={state === 'error' ? 'alert' : 'status'}>{message}</span>}>
-          <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-sunken disabled:text-ink-2 min-h-[44px] px-4" disabled={blocked} onClick={() => { void submit(); }}>{state === 'sending' ? '보내고 있어요' : '보내기'}</button>
+          <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] min-h-[44px] px-4 disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={blocked} onClick={() => { void submit(); }}>{state === 'sending' ? '보내고 있어요' : '보내기'}</button>
         </Setting>
-      </div>
-    </section>
+    </Section>
     <p className="m-0 mt-[8px] text-[14px] leading-[20px] text-ink-2"><a className="inline-flex min-h-[44px] items-center text-accent underline" href="https://github.com/aniseongu/skku-notice-platform/issues" target="_blank" rel="noopener noreferrer">GitHub에도 남길 수 있어요<span className="visually-hidden"> (새 창으로 열려요)</span></a></p>
   </div>;
 }

@@ -245,7 +245,7 @@ function settingsModel(app: AppController) {
     saveProfile: (profile: UserProfile) => { void app.saveProfile(profile); },
     byok: aiConnectModel(app),
     account: { busy: app.accountBusy, error: app.accountError, remove: () => { void app.deleteAccount(); } },
-    devicesInfo: { devices: app.devices, loaded: app.devicesLoaded, thisId: app.thisDeviceId, summaryTime: app.summaryTime, hasCanvasToken: !!app.canvasStatus, busy: app.devicesBusy, error: app.devicesError,
+    devicesInfo: { devices: app.devices, loaded: app.devicesLoaded, thisId: app.thisDeviceId, summaryTime: app.summaryTime, hasCanvasToken: !!app.canvasStatus, busy: app.devicesBusy, error: app.devicesError, loadFailed: app.devicesLoadFailed,
       refresh: () => { void app.refreshDevices(); }, setMode: (mode: string) => { void app.setCanvasMode(mode as CanvasMode); }, setAlertAll: (enabled: boolean) => { void app.setDeviceAlertAll(enabled); }, remove: (id: string) => { void app.removeDevice(id); }, rename: (id: string, name: string) => app.renameDevice(id, name),
       setSummaryTime: (period: 'am' | 'pm', hour: number, minute: number) => { void app.setSummaryTime(period, hour, minute); } },
     calendar: { auto: app.calendarAuto, id: app.calendarId, syncedAt: app.calendarSyncedAt, busy: app.calendarBusy, message: app.calendarMessage, error: app.calendarError, savedCount: app.saved.length,

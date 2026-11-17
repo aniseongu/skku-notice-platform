@@ -102,7 +102,7 @@ export function settingsSubtitle(): string {
 
 export function settingsTitle(): string {
   const params = new URLSearchParams(location.search);
-  if (params.get('keys') === '1') return '연결 키';
+  if (params.get('keys') === '1') return 'AI 연결';
   return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정', feedback: '문의하기' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
 }
 
@@ -204,7 +204,7 @@ export class AppController extends Reactive {
     byokOn: { state: true }, byokBackfill: { state: true }, byokStatus: { state: true }, byokLoading: { state: true }, byokBusy: { state: true }, byokError: { state: true }, canvasStatus: { state: true }, canvasBusy: { state: true }, canvasError: { state: true },
     calendarId: { state: true }, calendarBusy: { state: true }, calendarMessage: { state: true }, calendarError: { state: true }, calendarSyncedAt: { state: true },
     myJudgments: { state: true }, myInterests: { state: true }, graduationStatuses: { state: true }, graduationOnly: { state: true }, graduationBusy: { state: true }, graduationError: { state: true },
-    devices: { state: true }, thisDeviceId: { state: true }, devicesBusy: { state: true }, devicesError: { state: true }, summaryTime: { state: true },
+    devices: { state: true }, thisDeviceId: { state: true }, devicesBusy: { state: true }, devicesError: { state: true }, devicesLoadFailed: { state: true }, summaryTime: { state: true },
     calendarAuto: { state: true },
     accountBusy: { state: true }, accountError: { state: true },
     summarizing: { state: true }, summaryError: { state: true }, summaryErrorId: { state: true },
@@ -276,6 +276,8 @@ export class AppController extends Reactive {
   thisDeviceId: string | null = null;
   devicesBusy = false;
   devicesError = '';
+  /** 기기 목록을 받지 못했다(다시 받기를 눌러 이어 간다). */
+  devicesLoadFailed = false;
   summaryTime: string | null = null;
   summarizing: string | null = null;
   accountBusy = false;
@@ -430,7 +432,7 @@ export class AppController extends Reactive {
           this.authUserId = userId;
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); this.detailTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.devicesLoaded = false; this.thisDeviceId = null; this.devicesError = ''; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.devicesLoaded = false; this.thisDeviceId = null; this.devicesBusy = false; this.devicesError = ''; this.devicesLoadFailed = false; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -1183,7 +1185,7 @@ export class AppController extends Reactive {
       ]).catch(() => null);
       if (registration) endpoint = await deviceEndpoint(registration);
       if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
-      this.devices = devices; this.summaryTime = time;
+      this.devices = devices; this.summaryTime = time; this.devicesLoadFailed = false;
       this.thisDeviceId = devices.find((device) => device.endpoint === endpoint)?.id ?? null;
       // 이름이 없는 이 기기는 브라우저가 알려 주는 모델이나 기기 종류로 이름을 자동으로 저장한다(원본과 같다).
       const mine = devices.find((device) => device.id === this.thisDeviceId);
@@ -1192,7 +1194,7 @@ export class AppController extends Reactive {
         await saveDeviceName(authClient, userId, mine.id, suggestion).catch(() => undefined);
         if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.devices = this.devices.map((device) => (device.id === mine.id ? { ...device, name: suggestion } : device));
       }
-    } catch { /* 열이 아직 없으면 기능 없이 보인다 */ } finally {
+    } catch { if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.devicesLoadFailed = true; } finally {
       if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.devicesLoaded = true;
     }
   }

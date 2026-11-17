@@ -140,7 +140,7 @@ test('settings hub opens each page in the app, back works and the theme can be c
   for (const name of ['내 설정', '계정', '화면']) await expect(screen.getByRole('heading', { name })).toBeVisible();
   await screen.getByRole('link', { name: /관심 키워드/ }).click();
   await expect(page).toHaveURL(/section=keywords/);
-  await expect(screen.getByRole('heading', { name: '관심 키워드' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '관심 키워드', level: 1 })).toBeVisible();
   await page.goBack();
   await expect(page).not.toHaveURL(/section=/);
   await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
@@ -198,21 +198,25 @@ test('notification settings show each device state and call the right actions', 
   await expect(screen.getByText('로그인하면 이 기기로 알림을 받을 수 있어요')).toBeVisible();
   await withApp(page, { authUserId: 'account-a', pushStatus: 'off', subscriptions: [], enablePush: 'fn:enable', disablePush: 'fn:disable', testNotification: 'fn:test' });
   await expect(screen.getByText('꺼져 있어요', { exact: false }).first()).toContainText('꺼져 있어요');
-  await screen.getByRole('button', { name: '알림 받기' }).click();
+  const sw = screen.getByRole('switch', { name: /이 기기 알림/ });
+  await expect(screen.getByRole('button', { name: '테스트 알림 띄우기' })).toHaveCount(0);   // 꺼져 있을 때는 테스트 동작이 없다
+  await sw.click();
   expect(await calls(page)).toEqual([['enable']]);
   await withApp(page, { pushStatus: 'on' });
-  await expect(screen.getByText('켜져 있어요', { exact: false }).first()).toContainText('켜져 있어요');
-  await expect(screen.getByText('받을 게시판을 고르면 새 공지를 알려드려요')).toBeVisible();
+  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  await expect(sw).toContainText('켜져 있어요');
   await screen.getByRole('button', { name: '테스트 알림 띄우기' }).click();
-  await screen.getByRole('button', { name: '알림 끄기' }).click();
+  await sw.click();
   expect(await calls(page)).toEqual([['test'], ['disable']]);
   await withApp(page, { pushStatus: 'checking' });
-  await expect(screen.getByRole('button', { name: '확인하고 있어요' })).toBeDisabled();
+  await expect(sw).toBeDisabled();
+  await expect(sw).toContainText('확인하고 있어요');
   await withApp(page, { pushStatus: 'denied' });
-  await expect(screen.getByText('브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요')).toBeVisible();
+  await expect(sw).toBeDisabled();
+  await expect(sw).toContainText('브라우저 설정에서 알림을 허용하면 켤 수 있어요');
   await withApp(page, { pushStatus: 'off', pushRetry: true, pushError: '알림을 켜지 못했어요' });
   await expect(screen.getByRole('alert')).toContainText('알림을 켜지 못했어요');
-  await screen.getByRole('button', { name: '다시 시도하기' }).click();
+  await sw.click();
   expect(await calls(page)).toEqual([['enable']]);
 });
 
@@ -220,7 +224,7 @@ test('board subscriptions: my boards are switches, and more boards are added col
   await settingsAt(page, '&section=notifications');
   const screen = page.locator('platform-settings-screen');
   await withApp(page, { authUserId: 'account-a', subscriptions: ['skku-notice01'], toggleSubscription: 'fn:toggle' });
-  const mine = screen.getByRole('switch', { checked: true }).filter({ hasNotText: '아이캠퍼스' });
+  const mine = screen.getByRole('switch', { checked: true }).filter({ hasNotText: /아이캠퍼스|이 기기 알림/ });
   await expect(mine).toHaveCount(1);
   await expect(mine.first()).toHaveAttribute('aria-checked', 'true');
   await mine.first().click();
@@ -285,7 +289,7 @@ test('connection keys page follows the original rows: Gemini key and iCampus tok
   const screen = page.locator('platform-settings-screen');
   await withApp(page, { authUserId: 'account-a', byokOn: false, registerKey: 'fn:register', removeKey: 'fn:remove', registerCanvas: 'fn:registerCanvas', removeCanvas: 'fn:removeCanvas', profileStatus: 'ready', onboardingDismissed: true });
   // 서버 기능이 아직 없을 때도 줄은 보이고 이유를 알려 준다.
-  await expect(screen.getByRole('heading', { name: 'AI 연결' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'AI 연결', level: 1 })).toBeVisible();
   await expect(screen.getByText('지금은 키를 연결할 수 없어요')).toBeVisible();
   await expect(screen.getByText('아이캠퍼스')).toHaveCount(0);   // 아이캠퍼스는 알림 쪽에서 켠다
   await expect(screen.getByLabel('Gemini 키', { exact: true })).toHaveCount(0);
@@ -561,7 +565,7 @@ test('pressable elements share one hover response: settings switch row and first
   };
   await settingsAt(page, '&section=notifications');
   await withApp(page, { authUserId: 'account-a', subscriptions: ['skku-notice01'], toggleSubscription: 'fn:toggle' });
-  await hoverChanges(page.locator('platform-settings-screen').getByRole('switch').first());
+  await hoverChanges(page.locator('platform-settings-screen').getByRole('switch').filter({ hasNotText: /아이캠퍼스|이 기기 알림/ }).first());
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
   await page.evaluate(() => {
@@ -889,20 +893,18 @@ test('refresh button and R refetch the notice list, lock while loading, and keep
   expect(await rows.count()).toBe(count);                             // 실패해도 지금 목록은 그대로다
 });
 
-test('settings home puts the daily settings first and groups iCampus and Google Calendar under "기타" further down', async ({ page }) => {
+test('settings home puts the daily settings first and groups AI, iCampus and Google Calendar under "연결"', async ({ page }) => {
   await settingsAt(page);
   const screen = page.locator('platform-settings-screen');
-  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, profile: { programs: [{ college: '경영대학', department: '경영학과' }], year: 2, semester: 1, enrollmentStatus: '재학', militaryService: '해당 없음', onboardedAt: 'x', interests: '', wants: '', avoids: '', university3pInternshipSelected: true, university3pInternshipDone: false, } });
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false, aiStateLoaded: true, accountDataLoaded: true, byokStatus: { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 }, profile: { programs: [{ college: '경영대학', department: '경영학과' }], year: 2, semester: 1, enrollmentStatus: '재학', militaryService: '해당 없음', onboardedAt: 'x', interests: '', wants: '', avoids: '', univ: '', admissionYear: 2022, university3pInternshipSelected: false, deptInternshipDone: false } });
   const heads = await screen.locator('h2.settings-head').allInnerTexts();
-  expect(heads).toEqual(['내 설정', '계정', '화면', '기타']);
-  const mine = screen.getByRole('region', { name: '내 설정' }), etc = screen.getByRole('region', { name: '기타' });
+  expect(heads).toEqual(['내 설정', '계정', '연결', '화면']);
+  const mine = screen.getByRole('region', { name: '내 설정' }), conn = screen.getByRole('region', { name: '연결' });
   expect(await mine.getByRole('link').allInnerTexts().then((list) => list.map((text) => text.split('\n')[0]))).toEqual(['알림', '관심 키워드']);
-  expect(await etc.getByRole('link').allInnerTexts().then((list) => list.map((text) => text.split('\n')[0]))).toEqual(['아이캠퍼스', '구글 캘린더']);
-  const y = async (loc: import('@playwright/test').Locator) => (await loc.boundingBox())!.y;
-  expect(await y(etc)).toBeGreaterThan(await y(mine));
-  expect(await y(etc)).toBeGreaterThan(await y(screen.getByRole('region', { name: '계정' })));
-  // 기타 안의 항목도 한 번 눌러 자기 페이지로 간다.
-  await etc.getByRole('link', { name: /아이캠퍼스/ }).click();
+  expect(await conn.getByRole('link').allInnerTexts().then((list) => list.map((text) => text.split('\n')[0]))).toEqual(['AI 연결', '아이캠퍼스', '구글 캘린더']);
+  await expect(conn.getByRole('link', { name: /AI 연결/ })).toContainText('Gemini 연결됨');   // 눌러 들어가지 않고도 상태를 읽는다
+  await expect(screen.getByRole('region', { name: '기타' })).toHaveCount(0);
+  await conn.getByRole('link', { name: /아이캠퍼스/ }).click();
   await expect(page).toHaveURL(/section=canvas/);
 });
 
@@ -1190,7 +1192,7 @@ test('core settings tasks finish within their click budget and in the expected o
   const hub = () => expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
 
   // 1) Gemini 키: 연결 키 → 입력하기 → 저장하기 = 3클릭
-  await click('연결 키', screen.getByRole('link', { name: /연결 키/ }));
+  await click('AI 연결', screen.getByRole('link', { name: /AI 연결/ }));
   await screen.getByLabel('Gemini 키', { exact: true }).fill(`AQ.${'a'.repeat(50)}`);
   await click('Gemini 연결하기', screen.getByRole('button', { name: 'Gemini 키 연결하기' }));
   expect(log.length).toBe(2);
@@ -1225,7 +1227,7 @@ test('google calendar page: connect first, then sync and disconnect, with plain 
     connectCalendar: 'fn:connect', syncCalendarNow: 'fn:sync', disconnectCalendar: 'fn:disconnect' });
   await screen.getByRole('link', { name: /구글 캘린더/ }).click();
   await expect(page).toHaveURL(/section=calendar/);
-  await expect(screen.getByRole('heading', { name: '구글 캘린더' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '구글 캘린더', level: 1 })).toBeVisible();
   await expect(screen.getByRole('button', { name: '구글 캘린더에 연결하기' })).toBeVisible();   // 연결 전에는 누르는 단추만 있고 연결됨 표시는 없다
   await expect(screen.getByText('연결됨')).toHaveCount(0);
   await expect(screen.getByRole('heading', { name: '알아 두세요' })).toHaveCount(0);
@@ -1417,6 +1419,13 @@ test('notifications page: this device and the device list, like the original set
     canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null },
     refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', removeDevice: 'fn:remove', renameDevice: 'fn:rename', setSummaryTime: 'fn:time', setDeviceAlertAll: 'fn:alertAll' });
   await expect(screen.getByRole('region', { name: '받을 게시판' })).toBeVisible();
+  // 위에서 아래로: 이 기기(스위치들) → 받을 게시판 → 알림 기기(마지막). 테스트 알림은 켜져 있을 때만, 스위치 바로 아래.
+  expect(await screen.locator('h2.settings-head').allInnerTexts()).toEqual(['이 기기', '받을 게시판', '알림 기기']);
+  const switches = await screen.getByRole('region', { name: '이 기기' }).getByRole('switch').allInnerTexts();
+  expect(switches.map((text) => text.split('\n')[0])).toEqual(['이 기기 알림', '모든 새 공지를 소리와 함께 알리기', '아이캠퍼스 알림']);
+  const power = await screen.getByRole('switch', { name: /이 기기 알림/ }).boundingBox(), test = await screen.getByRole('button', { name: '테스트 알림 띄우기' }).boundingBox();
+  expect(test!.y).toBeGreaterThan(power!.y);
+  expect(test!.y).toBeLessThan(power!.y + power!.height + 20);
   // 아이캠퍼스를 연결했고 이 기기가 등록돼 있으면 이 기기의 아이캠퍼스 알림을 여기서도 바꾼다.
   const canvas = screen.getByRole('switch', { name: /아이캠퍼스 알림/ });
   await expect(canvas).toHaveAttribute('aria-checked', 'true');
@@ -1432,44 +1441,53 @@ test('notifications page: this device and the device list, like the original set
   const list = screen.getByRole('region', { name: '알림 기기' });
   await expect(list).toContainText('Windows · Whale');
   await expect(list.locator('li', { hasText: 'Windows · Whale' })).toContainText('이 기기');
-  await expect(list.locator('li', { hasText: 'Windows · Whale' }).getByRole('button', { name: /지우기/ })).toHaveCount(0);   // 이 기기는 위에서 끈다
+  // 줄을 누르기 전에는 이름 바꾸기·지우기가 보이지 않고, 누르면 그 자리에서 펼쳐진다.
+  const whale = list.getByRole('button', { name: 'Windows · Whale 관리하기' });
+  await expect(whale).toHaveAttribute('aria-expanded', 'false');
+  await expect(list.getByRole('button', { name: 'Android · Chrome 지우기' })).toBeHidden();
+  await whale.click();
+  await expect(whale).toHaveAttribute('aria-expanded', 'true');
+  await expect(list.getByRole('button', { name: 'Windows · Whale 이름 바꾸기' })).toBeVisible();
+  await expect(list.getByRole('button', { name: /Windows · Whale 지우기/ })).toHaveCount(0);   // 이 기기는 위에서 끈다
   // 이름 바꾸기: 눌러서 고치고 저장하면 줄이 닫힌다(저장은 앱에 맡기고 여기서는 호출을 확인한다).
   await list.getByRole('button', { name: 'Windows · Whale 이름 바꾸기' }).click();
   await list.getByLabel('Windows · Whale 이름').fill('내 노트북');
   await list.getByRole('button', { name: '저장하기' }).click();
   expect((await calls(page)).filter((c) => c[0] === 'rename')).toEqual([['rename', 'd1', '내 노트북']]);
+  await list.getByRole('button', { name: 'Android · Chrome 관리하기' }).click();
   await list.getByRole('button', { name: 'Android · Chrome 지우기' }).click();
   expect((await calls(page)).filter((c) => c[0] === 'remove')).toEqual([['remove', 'd2']]);
 });
 
-test('iCampus page: switch on → token → summary time, each in its own section, with the fewest clicks', async ({ page }) => {
+test('notifications page: a failed device list shows one retry line, and a device save error shows once under 이 기기', async ({ page }) => {
+  await settingsAt(page, '&section=notifications');
+  const screen = page.locator('platform-settings-screen');
+  await withApp(page, { authUserId: 'account-a', pushStatus: 'on', devices: [], devicesLoaded: true, devicesLoadFailed: true, thisDeviceId: null, refreshDevices: 'fn:refresh', devicesError: '설정을 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요' });
+  const list = screen.getByRole('region', { name: '알림 기기' });
+  await expect(list.getByRole('alert')).toContainText('기기 목록을 불러오지 못했어요');
+  await list.getByRole('button', { name: '다시 불러오기' }).click();
+  expect((await calls(page)).filter((c) => c[0] === 'refresh').length).toBeGreaterThan(0);
+  await expect(screen.getByText('설정을 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요')).toHaveCount(1);
+  await expect(screen.getByRole('region', { name: '이 기기' }).getByText('설정을 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요')).toBeVisible();
+});
+
+test('iCampus page: token → switch → summary time, each in its own section, with the fewest clicks', async ({ page }) => {
   await settingsAt(page, '&section=canvas');
   const screen = page.locator('platform-settings-screen');
   const devices = [{ id: 'd1', endpoint: 'https://fcm.googleapis.com/a', name: 'Windows · Whale', canvasMode: 'off', createdAt: '2026-11-07T10:00:00Z' }];
   await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false, pushStatus: 'on', devices, thisDeviceId: 'd1',
     summaryTime: null, canvasStatus: null, refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', registerCanvas: 'fn:registerCanvas', removeCanvas: 'fn:removeCanvas', setSummaryTime: 'fn:time' });
   const sw = screen.getByRole('switch', { name: /아이캠퍼스 알림/ });
-  // 꺼져 있어도 토큰 입력칸은 있다(연결 키 쪽과 같은 입력 줄). 요약 시간은 켜야 나온다.
-  await expect(sw).toHaveAttribute('aria-checked', 'false');
+  // 토큰이 없으면 스위치는 이유와 함께 막혀 있다. 토큰 입력칸이 먼저(위에) 있다.
+  await expect(sw).toBeDisabled();
+  await expect(sw).toContainText('토큰을 연결하면 켤 수 있어요');
   await expect(screen.getByLabel('아이캠퍼스 토큰', { exact: true })).toBeVisible();
   await expect(screen.getByRole('group', { name: '하루 요약 시간' })).toHaveCount(0);
-  expect(await screen.locator('h2.settings-head').allInnerTexts()).toEqual(['알림', '토큰']);
+  expect(await screen.locator('h2.settings-head').allInnerTexts()).toEqual(['토큰', '알림']);
   let clicks = 0;
-  // 1) 스위치 켜기: 요약 시간이 아래에 열리고, 토큰을 연결할 때까지 잠겨 있다.
-  await sw.click(); clicks += 1;
-  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  // 1) 키 입력: 형식이 맞지 않으면 저장할 수 없다. 맞으면 저장 한 번.
   const input = screen.getByLabel('아이캠퍼스 토큰', { exact: true });
   await expect(input).toHaveAttribute('type', 'password');
-  // 구역은 알림 → 토큰 → 하루 요약 순으로 따로 제목이 있다.
-  const heads = await screen.locator('h2.settings-head').allInnerTexts();
-  expect(heads).toEqual(['알림', '토큰', '하루 요약']);
-  const order = await screen.evaluate((root) => ['아이캠퍼스 토큰', '하루 요약 시간'].map((text) => (root.textContent ?? '').indexOf(text)));
-  expect(order[0]).toBeGreaterThan(-1);
-  expect(order[0]).toBeLessThan(order[1]);                     // 키가 요약 시간보다 위
-  const time = screen.getByRole('group', { name: '하루 요약 시간' });
-  await expect(time.getByRole('radio', { name: '오전' })).toBeDisabled();
-  await expect(screen.getByText('토큰을 연결하면 바꿀 수 있어요')).toBeVisible();
-  // 2) 키 입력: 형식이 맞지 않으면 저장할 수 없다. 맞으면 저장 한 번.
   await input.fill('짧음');
   await expect(screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' })).toBeDisabled();
   const token = `1234~${'Z'.repeat(40)}`;
@@ -1478,10 +1496,13 @@ test('iCampus page: switch on → token → summary time, each in its own sectio
   await expect(screen.getByRole('link', { name: '아이캠퍼스 설정' })).toHaveAttribute('href', 'https://canvas.skku.edu/profile/settings');
   await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결하기' }).click(); clicks += 1;
   expect((await calls(page)).filter((c) => c[0] === 'registerCanvas')).toEqual([['registerCanvas', token]]);
-  // 3) 연결되면 모드가 꺼짐이던 이 기기를 켜고, 요약 시간이 풀린다. 입력한 키는 화면에 남지 않는다.
+  // 2) 연결되면 스위치가 풀린다. 입력한 키는 화면에 남지 않는다.
   await withApp(page, { canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null }, summaryTime: '21:00' });
   await expect(screen.getByText('연결됨 ····ZZZZ')).toBeVisible();
   expect(await screen.innerText()).not.toContain(token);
+  await expect(sw).toBeEnabled();
+  await expect(sw).toHaveAttribute('aria-checked', 'false');
+  await expect(screen.getByRole('group', { name: '하루 요약 시간' })).toHaveCount(0);
   // 넓은 화면에서는 토큰 줄의 조작이 스위치처럼 오른쪽 끝에 붙는다.
   if (test.info().project.name === 'desktop') {
     const right = async (loc: import('@playwright/test').Locator) => { const box = (await loc.boundingBox())!; return box.x + box.width; };
@@ -1489,37 +1510,40 @@ test('iCampus page: switch on → token → summary time, each in its own sectio
     const lastAction = await right(screen.getByRole('button', { name: '아이캠퍼스 토큰 연결 끊기', exact: true }));
     expect(Math.abs(swRight - lastAction)).toBeLessThanOrEqual(4);
   }
+  await sw.click(); clicks += 1;
+  await expect(sw).toHaveAttribute('aria-checked', 'true');
   expect((await calls(page)).filter((c) => c[0] === 'mode')).toEqual([['mode', 'reminders']]);
+  // 구역은 토큰 → 알림 → 하루 요약 순으로 따로 제목이 있다.
+  expect(await screen.locator('h2.settings-head').allInnerTexts()).toEqual(['토큰', '알림', '하루 요약']);
+  const time = screen.getByRole('group', { name: '하루 요약 시간' });
   await expect(time.getByRole('radio', { name: '오전' })).toBeEnabled();
   await time.getByRole('radio', { name: '오전' }).click(); clicks += 1;
   expect((await calls(page)).filter((c) => c[0] === 'time').at(-1)).toEqual(['time', 'am', 9, 0]);
-  expect(clicks).toBe(3);   // 켜기, 키 저장, 시간 고르기
+  expect(clicks).toBe(3);   // 키 저장, 켜기, 시간 고르기
   await expect(screen.getByRole('radiogroup', { name: '받을 아이캠퍼스 알림' }).getByRole('radio')).toHaveText(['하루 요약', '요약과 마감']);
-  // 4) 키를 끊어도 입력칸은 그대로 열려 있어 바로 다시 넣을 수 있다.
+  // 3) 키를 끊어도 입력칸은 그대로 열려 있어 바로 다시 넣을 수 있고, 스위치는 다시 막힌다.
   await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결 끊기', exact: true }).click();
   await screen.getByRole('button', { name: '아이캠퍼스 토큰 연결 끊기 확인' }).click();
   expect((await calls(page)).filter((c) => c[0] === 'removeCanvas')).toEqual([['removeCanvas']]);
   await withApp(page, { canvasStatus: null, summaryTime: null });
-  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  await expect(sw).toBeDisabled();
   await expect(screen.getByLabel('아이캠퍼스 토큰', { exact: true })).toBeVisible();
   // 이 기기 알림이 꺼져 있어도 스위치는 눌리고 설정이 열린다. 같은 자리에서 이 기기 알림을 켜게 한다.
   await withApp(page, { pushStatus: 'off', enablePush: 'fn:enablePush', canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null }, summaryTime: '21:00' });
   await expect(sw).toBeEnabled();
-  await expect(sw).toHaveAttribute('aria-checked', 'true');
-  await expect(screen.getByRole('group', { name: '하루 요약 시간' })).toBeVisible();
-  await screen.getByRole('button', { name: '이 기기 알림 켜기' }).click();
-  expect((await calls(page)).filter((c) => c[0] === 'enablePush')).toHaveLength(1);
-  // 처음부터 꺼져 있던 기기에서도 스위치를 켜면 설정이 열린다.
-  await settingsAt(page, '&section=canvas');
-  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false, pushStatus: 'off', devices: [], thisDeviceId: null,
-    summaryTime: null, canvasStatus: null, refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode' });
-  await expect(sw).toHaveAttribute('aria-checked', 'false');
-  await expect(sw).toBeEnabled();
   await sw.click();
   await expect(sw).toHaveAttribute('aria-checked', 'true');
   await expect(screen.getByRole('group', { name: '하루 요약 시간' })).toBeVisible();
-  await expect(screen.getByRole('button', { name: '이 기기 알림 켜기' })).toBeVisible();
-  expect((await calls(page)).filter((c) => c[0] === 'mode')).toEqual([]);   // 기기가 없으면 모드를 저장하지 않는다
+  await screen.getByRole('button', { name: '알림 켜기' }).click();
+  expect((await calls(page)).filter((c) => c[0] === 'enablePush')).toHaveLength(1);
+  // 기기가 아직 없으면 모드를 저장하지 않는다.
+  await settingsAt(page, '&section=canvas');
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false, pushStatus: 'off', devices: [], thisDeviceId: null,
+    summaryTime: null, canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null }, refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode' });
+  await expect(sw).toHaveAttribute('aria-checked', 'false');
+  await sw.click();
+  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  expect((await calls(page)).filter((c) => c[0] === 'mode')).toEqual([]);
 });
 
 test('iCampus page: a device that already has alerts on shows them open, and the switch turns them off', async ({ page }) => {
@@ -1808,8 +1832,8 @@ for (const width of [412, 1440]) {
       const top = (el: Element | null) => el!.getBoundingClientRect().top;
       const bottom = (el: Element | null) => el!.getBoundingClientRect().bottom;
       const ref = root.querySelector('section:has(#s-notify) .box')!;
-      const refGap = top(ref.querySelector('.setting-name')) - top(ref);
-      const lead = root.querySelector('section:has(#s-boards) .box > p.setting-help');
+      const refGap = top(ref.querySelector('.switch-label')) - top(ref);
+      const lead = root.querySelector('section:has(#s-boards) .box > p.settings-lead');
       const first = root.querySelector('section:has(#s-boards) .order-list li');
       return { refGap, gap: top(first) - (bottom(lead) - parseFloat(getComputedStyle(lead!).paddingBottom)) };
     });
@@ -1851,7 +1875,7 @@ test('board order: edit mode shows drag handles only, the keyboard can lift, mov
   expect(before.length).toBeGreaterThanOrEqual(2);
   await screen.getByRole('button', { name: '순서 바꾸기' }).click();
   await expect(screen.locator('.order-handle')).toHaveCount(before.length);
-  await expect(screen.getByRole('switch').filter({ hasNotText: '아이캠퍼스' })).toHaveCount(0);   // 순서를 바꾸는 중에는 받기 스위치를 숨긴다
+  await expect(screen.getByRole('switch').filter({ hasNotText: /아이캠퍼스|이 기기 알림/ })).toHaveCount(0);   // 순서를 바꾸는 중에는 받기 스위치를 숨긴다
   const first = screen.locator('.order-handle').first();
   await first.focus();
   await page.keyboard.press('Space');
@@ -2823,11 +2847,12 @@ test('settings 알림 page: turn on and off with one press each and the test not
   await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, pushStatus: 'off', enablePush: 'fn:enable', disablePush: 'fn:disable', testNotification: 'fn:test' });
   const screen = page.locator('platform-settings-screen');
   const c = { clicks: 0 };
-  await press(page, screen.getByRole('button', { name: '알림 받기' }), c, mobile);
+  const power = screen.getByRole('switch', { name: /이 기기 알림/ });
+  await press(page, power, c, mobile);
   expect((await calls(page)).map((x) => x[0])).toEqual(['enable']);
   await withApp(page, { pushStatus: 'on', disablePush: 'fn:disable', testNotification: 'fn:test' });
   await press(page, screen.getByRole('button', { name: '테스트 알림 띄우기' }), c, mobile);
-  await press(page, screen.getByRole('button', { name: '알림 끄기' }), c, mobile);
+  await press(page, power, c, mobile);
   expect((await calls(page)).map((x) => x[0])).toEqual(['test', 'disable']);
   expect(c.clicks).toBe(3);
   expect(await noOverflow(page)).toBe(true);

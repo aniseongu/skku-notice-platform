@@ -34,10 +34,14 @@ export const SKELETON_BAR = 'block h-[14px] rounded-sm bg-line';
 /** 설정 입력과 강조 텍스트 단추의 공통 모양. */
 export const SETTINGS_INPUT = 'input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink text-[15px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px]';
 export const SETTINGS_ACTION = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-accent [font-family:inherit] [line-height:inherit] [&:hover]:underline [&:hover]:underline-offset-[3px] focus-visible:rounded-sm';
+/** 단추가 막혔을 때의 모양. 채운 단추와 보조 단추 모두 같다(테두리만 남기고 흐린 글자). */
+export const BUTTON_DISABLED = 'disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60';
 /** 설정의 기본 강조 단추(채운 단추). */
 export const SOLID_BUTTON = 'solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60';
 /** 설정의 보조 단추(테두리 단추). */
-export const GHOST_BUTTON = 'ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60';
+export const GHOST_BUTTON = 'ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60';
+/** 지우기·연결 끊기·삭제처럼 되돌리기 어려운 동작의 단추. 보조 단추에 빨간 글자만 더한다. */
+export const DANGER_BUTTON = 'ghost-button danger-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-danger text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60';
 
 /** 목록 줄 안의 작은 보조 단추(기기 이름 바꾸기·지우기). 터치에서는 44px. */
 export const DEVICE_ACTION = 'ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex min-h-[36px] items-center justify-center self-start rounded-md border border-line bg-surface px-[12px] py-0 text-[14px] font-medium text-ink-2 whitespace-nowrap select-none [@media(pointer:coarse)]:min-h-[44px] disabled:opacity-60';
