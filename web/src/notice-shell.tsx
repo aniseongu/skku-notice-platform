@@ -100,20 +100,20 @@ export function NoticeShell({ app }: { app: AppController }) {
       <aside className="sidebar hidden border-r border-line bg-mica px-[12px] pt-0 pb-[12px] min-[720px]:flex min-[720px]:min-h-0 min-[720px]:flex-col min-[720px]:overflow-y-auto" aria-label="탐색">
         <div className="pane-head brand min-[720px]:-mx-[12px] min-[720px]:mt-0 min-[720px]:mb-[12px] min-[720px]:flex min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:items-center min-[720px]:gap-[8px] min-[720px]:border-b min-[720px]:border-line min-[720px]:px-[24px] min-[720px]:text-[17px] min-[720px]:font-bold min-[720px]:tracking-[-0.02em] min-[720px]:[&_.brand-mark]:text-accent min-[720px]:[&_.brand-mark]:size-[32px]"><Brand />{APP_NAME}</div>
         <nav className="side-group flex flex-col gap-[1px]" aria-label="보기">
-          {app.shownTabs().map((t) => <SideItem key={t.id} label={t.label} count={counts[t.id]} active={app.tab() === t.id}
+          {app.shownTabs().map((t) => <SideItem key={t.id} label={t.label} count={counts[t.id]} active={!settings && app.tab() === t.id}
             onClick={() => app.openTab(t.id)} shortcut={String(TABS.indexOf(t) + 1)} icon={t.icon} />)}
         </nav>
         {/* 키워드·게시판 묶음은 계정 정보(키워드, 구독)가 온 뒤 한 번에 그린다. 먼저 그리면 늦게 온 항목만큼 길어지며 아래가 밀린다. */}
         {ready ? <>
         <SideGroup app={app} id="keywords" title="관심 키워드" count={keywordTotals.total}>
           {app.keywords.map((word) => <SideItem key={word} label={word} count={keywordTotals.counts[word]}
-            active={app.keyword === word} onClick={() => app.setKeyword(app.keyword === word ? null : word)}
+            active={!settings && app.keyword === word} onClick={() => { if (settings) { app.setKeyword(word); app.leaveSettings(); } else app.setKeyword(app.keyword === word ? null : word); }}
             ariaLabel={`${word}, 공지 ${keywordTotals.counts[word]}개`} />)}
           <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('keywords')}>{app.keywords.length ? '키워드 관리하기' : '키워드 추가하기'}</button>
         </SideGroup>
         {/* 현장실습은 출처가 톨게이트 하나라 기관 구분(대기업, 중소기업, 스타트업 등)으로 고른다. */}
         <SideGroup app={app} id="boards" title={app.tab() === 'intern' ? '인턴 공고 사이트' : app.tab() === 'coop' ? '기관 구분' : '게시판'} count={app.tab() === 'coop' ? app.coopKinds().length : app.tabSources().length}>
-          {boardChoices(app).map((b) => <SideItem key={b.id} label={b.label} count={null} active={activeChoice(app) === b.id}
+          {boardChoices(app).map((b) => <SideItem key={b.id} label={b.label} count={null} active={!settings && activeChoice(app) === b.id}
             onClick={() => { pickChoice(app, b.id); if (settings) app.leaveSettings(); }} />)}
           {app.tab() === 'intern' || app.tab() === 'coop' ? null : <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('notifications')}>게시판 더 고르기</button>}
         </SideGroup>
@@ -263,7 +263,7 @@ const TOPBAR_TEXT = 'topbar-text min-w-0 flex-1 min-[720px]:min-w-[88px]';
 const TOPBAR_H1 = 'min-[720px]:text-[21px] min-[720px]:leading-[28px]';
 const UPDATED = 'updated text-[13px] leading-[18px] tabular-nums min-[720px]:text-[12px] min-[720px]:leading-[16px]';
 
-// 사이드바(PC 전용) 항목. 현재 항목은 aria-current=page로 표시한다.
+// 사이드바(PC 전용) 항목. 현재 항목은 aria-current=page로 표시한다. 설정을 열면 설정만 강조한다(보기·키워드·게시판 강조는 끈다).
 const SIDE_ITEM = 'flex items-center justify-between gap-[8px] min-h-[40px] px-[12px] py-0 border-0 rounded-sm text-[15px] font-medium text-left select-none [-webkit-user-select:none] [@media(pointer:coarse)]:min-h-[44px]';
 const SIDE_ITEM_IDLE = 'bg-transparent [@media(hover:hover)]:hover:bg-hover active:bg-hover';
 const SIDE_ITEM_CURRENT = 'bg-sunken text-ink font-semibold [&_.i]:text-accent';

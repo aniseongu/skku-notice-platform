@@ -919,6 +919,25 @@ test('settings opened straight from the side menu shortcut closes with one X ins
   await expect(page.locator('platform-settings-screen')).toHaveCount(0);
 });
 
+for (const width of [800, 1366]) test(`opening settings from the side menu highlights only settings at ${width}px (tablet and PC), and a view tab click returns to the list`, async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '왼쪽 메뉴는 넓은 화면(태블릿·PC)에만 있다');
+  await page.setViewportSize({ width, height: 900 });
+  const list = page.locator('notice-rows-screen a.row').first();
+  await page.goto('/?api=sample/api/v1');
+  await list.waitFor();
+  const sidebar = page.locator('aside.sidebar');
+  await expect(sidebar.locator('.side-item[aria-current="page"]')).not.toHaveCount(0); // 목록에서는 보기 탭이 강조된다
+  await page.locator('.side-foot .side-item').click();
+  await expect(page).toHaveURL(/view=settings/);
+  await expect(sidebar.locator('.side-item[aria-current="page"]')).toHaveCount(1);
+  await expect(sidebar.locator('.side-foot .side-item')).toHaveAttribute('aria-current', 'page');
+  const board = sidebar.locator('nav.side-group').first().locator('.side-item').first();
+  await board.click();
+  await expect(page).not.toHaveURL(/view=settings/);
+  await expect(sidebar.locator('.side-foot .side-item')).toHaveAttribute('aria-current', 'false');
+  await expect(sidebar.locator('.side-item[aria-current="page"]')).not.toHaveCount(0);
+});
+
 test('sidebar keyword shortcut opened from inside settings still closes back to the list with one X', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '왼쪽 메뉴는 PC에만 있다');
   const list = page.locator('notice-rows-screen a.row').first();
@@ -2053,7 +2072,7 @@ test('share button in the open detail: opens the device share sheet, stays quiet
   expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toMatch(/^https?:\/\//);
 });
 
-test('opening settings keeps the left menu as it was (tab, pressed keyword, board list), with settings highlighted too', async ({ page }) => {
+test('opening settings keeps the left menu contents (tab board list) but highlights only settings', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 800 });
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
@@ -2064,12 +2083,17 @@ test('opening settings keeps the left menu as it was (tab, pressed keyword, boar
   await expect(side.getByText('인턴 공고 사이트')).toBeVisible();
   await side.getByRole('button', { name: '설정' }).click();
   await expect(page.locator('platform-settings-screen')).toBeVisible();
-  // 설정 안에서도 쓰던 상태가 그대로 보인다: 인턴 공고 탭, 눌러 둔 키워드, 인턴용 사이트 목록.
+  // 설정 안에서도 메뉴 구성(인턴용 사이트 목록)은 그대로 두고, 강조는 설정 하나만 한다(사용자 지시 2026-11-17).
   await expect(side.getByText('인턴 공고 사이트')).toBeVisible();
-  await expect(side.getByRole('button', { name: /^인턴 공고\s*\d*$/ })).toHaveClass(/bg-sunken/);
-  await expect(side.getByRole('button', { name: /^장학, 공지/ })).toHaveClass(/bg-sunken/);
+  await expect(side.getByRole('button', { name: /^인턴 공고\s*\d*$/ })).not.toHaveClass(/bg-sunken/);
+  await expect(side.getByRole('button', { name: /^장학, 공지/ })).not.toHaveClass(/bg-sunken/);
   await expect(side.getByRole('button', { name: '설정' })).toHaveClass(/bg-sunken/);
+  await expect(side.locator('.side-item[aria-current="page"]')).toHaveCount(1);
   await expect(side.getByRole('button', { name: /^성대 공지\s*\d*$/ })).not.toHaveClass(/bg-sunken/);
+  // 키워드를 누르면 설정을 닫고 그 키워드로 목록을 연다.
+  await side.getByRole('button', { name: /^장학, 공지/ }).click();
+  await expect(page.locator('platform-settings-screen')).toHaveCount(0);
+  await expect(side.getByRole('button', { name: /^장학, 공지/ })).toHaveClass(/bg-sunken/);
 });
 
 test('typing in search closes the open detail pane instead of opening another notice', async ({ page }) => {
