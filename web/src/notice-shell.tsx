@@ -387,7 +387,7 @@ function ViewFilters({ app }: { app: AppController }) {
     const selectedRead = selectedVisible.length - selectedUnread;
     const count = selectedVisible.length;
     return <div className="view-options select-options flex items-center justify-between gap-x-[4px] px-[var(--gutter)] min-[720px]:px-[24px] min-[720px]:bg-surface min-[720px]:sticky min-[720px]:top-[var(--head-h)] min-[720px]:z-[2] flex-wrap gap-y-[8px] min-h-[48px] py-[4px] max-[719px]:min-h-[44px] max-[719px]:py-0 min-[720px]:pt-[4px] min-[720px]:pb-0" role="group" aria-label="공지 선택">
-      <label className={`select-all order-1 inline-flex min-h-[44px] cursor-pointer items-center gap-[8px] text-[14px] font-medium ${count ? 'text-ink' : 'text-ink-2'} ${app.gradEnabled() ? 'max-[719px]:w-full' : ''}`}><input className={CHECKBOX} type="checkbox" ref={allBox} checked={everyone} disabled={!list.length}
+      <label className={`select-all order-1 inline-flex min-h-[44px] cursor-pointer items-center gap-[8px] text-[14px] font-medium ${count ? 'text-ink' : 'text-ink-2'}`}><input className={CHECKBOX} type="checkbox" ref={allBox} checked={everyone} disabled={!list.length}
         onChange={(event) => { app.selectedReads = event.currentTarget.checked ? list.map((notice) => notice.id) : []; }} />
         <span aria-live="polite">{count ? `${count}개 선택됨` : '전체 선택'}</span>
 </label>
@@ -407,10 +407,10 @@ function ViewFilters({ app }: { app: AppController }) {
     onClick={(event) => {
       app.selecting = true; app.selectedReads = [];
       if (event.detail === 0) void app.updateComplete.then(() => document.querySelector<HTMLInputElement>('.select-all input')?.focus({ preventScroll: true }));
-    }}><Icon name="select-list" /><span className={app.gradEnabled() ? 'max-[519px]:sr-only' : ''}>선택</span></button>;
+    }}><Icon name="select-list" />선택</button>;
   if (app.view === 'saved') return <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>{select}<SortSelect app={app} /></div></div>;
   return <div className={`view-options ${VIEW_ROW} justify-between`} role="group" aria-label="공지 보기 조건">
-    {/* 두 조건이 다 있어도 선택·정렬과 한 줄에 둔다. 520px 미만에서는 조건 이름과 '선택'을 줄여 한 줄에 들어가게 하고, 그래도 모자라는 아주 좁은 폭에서만 다음 줄로 간다. */}
+    {/* 두 조건이 다 있어도 선택·정렬과 한 줄에 둔다. 520px 미만에서는 조건 이름을 줄여 한 줄에 들어가게 하고, 그래도 모자라는 아주 좁은 폭에서만 다음 줄로 간다. */}
     <div className={`view-filters flex min-w-0 flex-wrap items-center gap-x-[4px] gap-y-0 min-[520px]:gap-x-[12px]`}>
       <button type="button" className={VIEW_TOGGLE} aria-label="읽지 않은 공지만" aria-pressed={app.unreadOnly} onClick={() => {
         app.unreadOnly = !app.unreadOnly;
