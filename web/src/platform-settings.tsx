@@ -496,7 +496,7 @@ function Notifications({ model }: { model: SettingsModel }) {
     </Section> : null}
     {model.userId && info && info.devices.length > 0 ? <Section id="s-devices" title="알림 기기">
       <Setting name="등록된 기기" help="알림을 받도록 켜 둔 기기예요. 이 기기는 위에서 끄고, 다른 기기는 여기서 지워요">
-        <ul className="device-list m-0 grid list-none gap-[4px] p-0 [&>li]:grid [&>li]:grid-cols-[1fr_auto] [&>li]:items-center [&>li]:gap-x-[12px] [&>li]:gap-y-[2px] [&>li]:border-t [&>li]:border-line [&>li]:py-[10px] [&>li:first-child]:border-t-0 [&_.field-note]:col-[1] [&_.field-note]:m-0 [&>li>.inline-row]:col-[1/-1]">
+        <ul className="device-list rule-list m-0 grid list-none gap-[4px] p-0 [&>li]:grid [&>li]:grid-cols-[1fr_auto] [&>li]:items-center [&>li]:gap-x-[12px] [&>li]:gap-y-[2px] [&>li]:border-t [&>li]:border-line [&>li]:py-[10px] [&>li:first-child]:border-t-0 [&_.field-note]:col-[1] [&_.field-note]:m-0 [&>li>.inline-row]:col-[1/-1]">
           {info.devices.map((device) => <DeviceRow key={device.id} device={device} info={info} />)}
         </ul>
       </Setting>
@@ -514,11 +514,10 @@ function BoardsSection({ model }: { model: SettingsModel }) {
   return <Section id="s-boards" title="받을 게시판"
     action={canMove ? <button type="button" className={`head-action ${SETTINGS_ACTION} -ml-[8px] -my-[13px]`} onClick={() => setEditing(!editing)}>{editing ? '완료' : '순서 바꾸기'}</button> : undefined}>
     {!model.userId ? <LoginNote model={model} what="게시판 구독" /> : <>
-      <p className="setting-help m-0 pt-[16px] pb-[12px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{editing ? '끌어서 순서를 바꿔요. 바로 저장돼요' : '켠 게시판 순서대로 목록에 보이고, 새 공지는 알림으로 와요'}</p>
+      <p className="setting-help m-0 pt-[16px] pb-[12px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{!order.boards.length ? '아직 받는 게시판이 없어요. 아래에서 골라 주세요' : editing ? '끌어서 순서를 바꿔요. 바로 저장돼요' : '켠 게시판 순서대로 목록에 보이고, 새 공지는 알림으로 와요'}</p>
       {model.error ? <><p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.error}</p>
         <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={model.retry}>다시 불러오기</button></> : null}
-      {order.boards.length ? <BoardOrderList order={order} editing={editing} onToggle={(id) => model.toggle(id, false)} busy={model.loading} />
-        : <p className="field-note text-[14px] leading-[20px] text-ink-2">아직 받는 게시판이 없어요. 아래에서 골라 주세요</p>}
+      {order.boards.length ? <BoardOrderList order={order} editing={editing} onToggle={(id) => model.toggle(id, false)} busy={model.loading} /> : null}
       <BoardGroups model={model} />
       <BoardRequest key={model.userId ?? 'guest'} toast={model.showToast} userId={model.userId}
         listRequests={model.listBoardRequests} submitRequest={model.submitBoardRequest} />
@@ -685,7 +684,7 @@ function AboutMe({ model }: { model: SettingsModel }) {
     })}
     {/* 이름과 단추가 한 줄뿐인 줄은 PC에서 세로 가운데로 맞춘다(이름이 위에 붙고 단추만 아래로 처지지 않게). */}
     <Setting name="저장" className="min-[720px]:items-center!">
-      <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!ready || !changed || over}
+      <button type="button" className="solid-button [@media(hover:hover)]:hover:enabled:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:enabled:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:bg-sunken disabled:text-ink-3 disabled:opacity-100" disabled={!ready || !changed || over}
         onClick={() => model.saveProfile({ ...profile, interests: drafts.interests.trim(), wants: drafts.wants.trim(), avoids: drafts.avoids.trim() })}>저장하기</button>
       {over ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{PROFILE_TEXT_LIMIT}자 이하로 적어 주세요</p> : null}
     </Setting>
@@ -784,7 +783,7 @@ function Profile({ model }: { model: SettingsModel }) {
     </Section>
     <Section id="s-school" title="학교 정보">
       <Setting name="학년" help="인턴 공고의 지원 자격을 가릴 때만 써요"><Choice label="학년" value={profile.year} disabled={!ready}
-        options={YEARS.map((year) => [year, year === 5 ? '5학년 이상' : `${year}학년`] as const)} onPick={(year) => save({ year })} /></Setting>
+        options={YEARS.map((year) => [year, year === 5 ? '5학년~' : `${year}학년`] as const)} onPick={(year) => save({ year })} /></Setting>
       <Setting name="학기"><Choice label="학기" value={profile.semester} disabled={!ready}
         options={SEMESTERS.map((value) => [value, `${value}학기`] as const)} onPick={(semester) => save({ semester })} /></Setting>
       <Setting name="재학 상태"><Choice label="재학 상태" value={profile.enrollmentStatus} disabled={!ready}
