@@ -19,7 +19,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
 import { FEEDBACK_KINDS, FEEDBACK_LIMIT, feedbackProblem, type FeedbackKind, type FeedbackResult } from './feedback';
-import { BADGE, CHEVRON_RIGHT, CHOICE, SETTINGS_ACTION, SETTINGS_INPUT, SWITCH, SWITCH_ONLY } from './cls';
+import { BADGE, CHEVRON_RIGHT, CHOICE, DEVICE_ACTION, SETTINGS_ACTION, SETTINGS_INPUT, SWITCH, SWITCH_ONLY } from './cls';
 import { aiKeysLead, connectedAiKeys } from './ai-keys';
 import { BoardRequest, BOARD_TRAILING_ROW } from './board-request';
 import type { BoardRequestResult, BoardRequestState } from './shared-board-requests';
@@ -135,7 +135,7 @@ const THEMES: [Theme, string][] = [['auto', '자동'], ['light', '밝게'], ['da
 const YEARS = [1, 2, 3, 4, 5];
 const SEMESTERS = [1, 2];
 
-const SETTING_ROW_CLASS = 'setting flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[1280px]:grid min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,520px)] min-[1280px]:[align-items:start] min-[1280px]:gap-[24px] min-[1280px]:has-[>.setting-control>.rule-list]:grid-cols-[minmax(0,1fr)] min-[1280px]:has-[>.setting-control>.rule-list]:gap-[8px] min-[1280px]:has-[>.setting-control>.connection-summary]:[&>.setting-text]:pt-[11px]';
+const SETTING_ROW_CLASS = 'setting flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[1280px]:grid min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,520px)] min-[1280px]:[align-items:start] min-[1280px]:gap-[24px] min-[1280px]:has-[>.setting-control>.rule-list]:grid-cols-[minmax(0,1fr)] min-[1280px]:has-[>.setting-control>.rule-list]:gap-[8px] min-[1280px]:has-[>.setting-control>.connection-summary]:[&>.setting-text]:pt-[11px] min-[1280px]:has-[>.setting-control>.segmented]:[&>.setting-text]:pt-[14px]';
 
 function Section({ id, title, action, children }: { id: string; title: string; action?: ReactNode; children: ReactNode }) {
   return <section aria-labelledby={id}>
@@ -145,8 +145,8 @@ function Section({ id, title, action, children }: { id: string; title: string; a
 
 export function Setting({ name, help, children, className = '' }: { name: string; help?: ReactNode; children?: ReactNode; className?: string }) {
   return <div className={`${SETTING_ROW_CLASS} ${className}`}>
-    <div className="setting-text"><p className="setting-name text-[15px] leading-[22px] font-medium">{name}</p>{help ? <div className="setting-help mt-[2px] grid gap-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{help}</div> : null}</div>
-    {children ? <div className="setting-control flex min-w-0 flex-col items-stretch gap-[8px] [&>:first-child]:mt-0 [&>.ghost-button]:self-start [&>.solid-button]:self-start min-[1280px]:[&>.ghost-button]:self-end min-[1280px]:[&>.solid-button]:self-end min-[1280px]:[&_.segmented]:self-end min-[1280px]:[&>.time-control]:self-end min-[1280px]:[&>.inline-row]:justify-end min-[1280px]:[&>.field-note]:text-right min-[1280px]:[&>.setting-state]:text-right min-[1280px]:[&>.connection-summary]:justify-end">{children}</div> : null}
+    <div className="setting-text w-full min-w-0"><p className="setting-name text-[15px] leading-[22px] font-medium">{name}</p>{help ? <div className="setting-help mt-[2px] grid gap-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{help}</div> : null}</div>
+    {children ? <div className="setting-control flex w-full min-w-0 flex-col items-stretch gap-[8px] [&>:first-child]:mt-0 [&>.ghost-button]:self-start [&>.solid-button]:self-start min-[1280px]:[&>.ghost-button]:self-end min-[1280px]:[&>.solid-button]:self-end min-[1280px]:[&_.segmented]:self-end min-[1280px]:[&>.time-control]:self-end min-[1280px]:[&>.inline-row]:justify-end min-[1280px]:[&>.field-note]:text-right min-[1280px]:[&>.setting-state]:text-right min-[1280px]:[&>.connection-summary]:justify-end">{children}</div> : null}
   </div>;
 }
 
@@ -380,10 +380,10 @@ function DeviceRow({ device, info }: { device: Device; info: NonNullable<Setting
       </div>
       : <span className="device-name flex items-center gap-[8px] font-semibold">{name}{device.id === info.thisId ? <b className={BADGE}>이 기기</b> : null}</span>}
     <span className="field-note text-[14px] leading-[20px] text-ink-2">{device.createdAt ? `${new Date(device.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}에 등록` : ''} · 아캠 알림 {CANVAS_MODES.find(([mode]) => mode === device.canvasMode)?.[1]}</span>
-    {editing ? null : <span className="device-actions flex gap-[4px] [grid-row:1/span_2] [grid-column:2]">
-      <button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] [@media(pointer:coarse)]:min-h-[44px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" disabled={info.busy} aria-label={`${name} 이름 바꾸기`} onClick={() => { setDraft(device.name ?? ''); setEditing(true); }}>이름 바꾸기</button>
+    {editing ? null : <span className="device-actions flex gap-[8px] [grid-row:1/span_2] [grid-column:2]">
+      <button type="button" className={DEVICE_ACTION} disabled={info.busy} aria-label={`${name} 이름 바꾸기`} onClick={() => { setDraft(device.name ?? ''); setEditing(true); }}>이름 바꾸기</button>
       {device.id === info.thisId ? null
-        : <button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] [@media(pointer:coarse)]:min-h-[44px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" disabled={info.busy} aria-label={`${name} 지우기`} onClick={() => info.remove(device.id)}>지우기</button>}
+        : <button type="button" className={DEVICE_ACTION} disabled={info.busy} aria-label={`${name} 지우기`} onClick={() => info.remove(device.id)}>지우기</button>}
     </span>}
   </li>;
 }
@@ -451,10 +451,9 @@ function Notifications({ model }: { model: SettingsModel }) {
     <Back model={model} />
     <Section id="s-notify" title="이 기기">
       <Setting name="이 기기 알림" help={<>
-        <p>앱을 닫아도 브라우저가 켜져 있으면 알림으로 받아요. 이 기기에만 적용돼요</p>
+        <p>앱을 닫아도 브라우저가 켜져 있으면 알림으로 받아요</p>
         {model.userId ? <>
           <p>{on ? '켜져 있어요' : '꺼져 있어요'} · 브라우저 권한 {permissionText(model.pushStatus)}</p>
-          {on ? <p>팝업 알림은 휴대폰의 알림 설정에 따라 표시돼요</p> : null}
           {model.pushStatus === 'unsupported' ? <p>이 브라우저는 알림을 지원하지 않아요. 최신 브라우저에서 열어 주세요</p> : null}
           {model.pushStatus === 'denied' ? <p>브라우저 설정에서 알림을 허용하면 다시 켤 수 있어요</p> : null}
           {on && model.subscriptions.length === 0 ? <p>받을 게시판을 고르면 새 공지를 알려드려요</p> : null}
@@ -477,12 +476,10 @@ function Notifications({ model }: { model: SettingsModel }) {
       <p className="setting-help m-0 pt-[16px] pb-[4px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">내 계정에 적용돼요. 모든 기기가 같은 기준으로 받아요</p>
       {/* 출처: https://ui.shadcn.com/docs/components/switch */}
       {model.alertAllNew != null ? <SwitchRow label="모든 새 공지를 소리와 함께 알리기" description="끄면 관심 키워드와 맞거나 AI가 관련 있다고 판단한 공지를 소리와 함께 알려요" checked={model.alertAllNew} disabled={model.alertAllBusy} onChange={model.setAlertAll} /> : null}
-      <Setting name="받을 공지" help="알림을 보내는 기준이에요">
+      <Setting name="받을 공지">
         <ul className="rule-list m-0 grid gap-[4px] pl-[18px] text-[13px] leading-[19px] text-ink-2">
           <li>받는 게시판의 새 공지를 알려요</li>
-          <li>{model.alertAllNew ? '새 공지를 소리로 알려요' : '관심 키워드와 맞는 공지는 소리로, 나머지는 조용히 알려요'}</li>
           <li>학교가 고친 중요한 글은 한 번 더 알려요</li>
-          <li>AI 키가 있으면 나와 맞는 공지도 소리로 알려요</li>
           <li>인턴 공고는 나와 맞는 것만 알려요</li>
         </ul>
       </Setting>
@@ -677,10 +674,7 @@ function AboutMe({ model }: { model: SettingsModel }) {
   const changed = JSON.stringify([drafts.interests.trim(), drafts.wants.trim(), drafts.avoids.trim()]) !== stored;
   const ready = model.profileStatus === 'ready';
   return <Section id="s-about" title="나를 소개해요 (선택)">
-    <div className="setting flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:grid min-[720px]:grid-cols-[minmax(0,1fr)_minmax(0,520px)] min-[720px]:[align-items:start] min-[720px]:gap-[24px] min-[720px]:has-[>.setting-control>.rule-list]:grid-cols-[minmax(0,1fr)] min-[720px]:has-[>.setting-control>.rule-list]:gap-[8px] min-[720px]:has-[>.setting-control>.connection-summary]:[&>.setting-text]:pt-[11px]">
-      <div className="setting-text"><p className="setting-name text-[15px] leading-[22px] font-semibold">AI가 읽는 내용</p>
-        <p className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">나에게 맞는 공지와 인턴 공고를 고를 때 참고해요. Google로 보내는 내용이라 이름, 학번, 연락처, 주소는 적지 마세요</p></div>
-    </div>
+    <Setting name="AI가 읽는 내용" help="나에게 맞는 공지와 인턴 공고를 고를 때 참고해요. Google로 보내는 내용이라 이름, 학번, 연락처, 주소는 적지 마세요" />
     {TEXT_FIELDS.map(({ key, name, help, placeholder }) => {
       const count = length(drafts[key]);
       return <Setting key={key} name={name} help={help}>
@@ -789,13 +783,10 @@ function Profile({ model }: { model: SettingsModel }) {
       <ProgramEditor programs={profile.programs} ready={ready} onChange={(programs) => save({ programs })} />
     </Section>
     <Section id="s-school" title="학교 정보">
-      <Setting name="학년 및 학기" help="인턴 공고의 지원 자격을 가릴 때만 써요">
-        <div className="flex flex-col gap-[8px] min-[720px]:items-end">
-          <Choice label="학년" value={profile.year} disabled={!ready}
-            options={YEARS.map((year) => [year, year === 5 ? '5학년 이상' : `${year}학년`] as const)} onPick={(year) => save({ year })} />
-          <Choice label="학기" value={profile.semester} disabled={!ready}
-            options={SEMESTERS.map((value) => [value, `${value}학기`] as const)} onPick={(semester) => save({ semester })} />
-        </div></Setting>
+      <Setting name="학년" help="인턴 공고의 지원 자격을 가릴 때만 써요"><Choice label="학년" value={profile.year} disabled={!ready}
+        options={YEARS.map((year) => [year, year === 5 ? '5학년 이상' : `${year}학년`] as const)} onPick={(year) => save({ year })} /></Setting>
+      <Setting name="학기"><Choice label="학기" value={profile.semester} disabled={!ready}
+        options={SEMESTERS.map((value) => [value, `${value}학기`] as const)} onPick={(semester) => save({ semester })} /></Setting>
       <Setting name="재학 상태"><Choice label="재학 상태" value={profile.enrollmentStatus} disabled={!ready}
         options={ENROLLMENT.map((value) => [value, value] as const)} onPick={(enrollmentStatus) => save({ enrollmentStatus })} /></Setting>
       <Setting name="병역"><Choice label="병역" value={profile.militaryService} disabled={!ready}
