@@ -22,17 +22,6 @@ export function SwitchRow({ checked, onChange, label, description, badge, disabl
 }
 
 
-/** 누르면 바로 한 번 실행되는 줄(테스트 알림 등). 스위치 줄과 같은 모양이고, 오른쪽 스위치 자리에 할 일을 글자로 둔다. */
-export function ActionRow({ label, description, action, onClick, disabled }: {
-  label: string; description?: string; action: string; onClick: () => void; disabled?: boolean;
-}) {
-  return <button type="button" className={`action-row ${SWITCH_ROW}`} disabled={disabled} onClick={onClick}>
-    <span className="switch-text grid gap-[2px]"><span className="switch-label text-[15px] font-medium">{label}</span>
-      {description ? <span className="switch-note text-[13px] text-ink-2">{description}</span> : null}</span>
-    <span className="shrink-0 text-[15px] font-semibold text-accent" aria-hidden="true">{action}</span>
-  </button>;
-}
-
 /** 몇 개 안 되는 값 중 하나를 고른다(학년, 재학 상태 등). */
 export function Segmented<T extends string | number>({ label, options, value, onChange, columns }: {
   label: string; options: readonly { value: T; label: string }[]; value: T | null; onChange: (next: T) => void; columns?: number;

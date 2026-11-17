@@ -17,7 +17,7 @@ import { DndContext, MeasuringStrategy, PointerSensor, TouchSensor, closestCente
 import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ActionRow, Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
+import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
 import { FEEDBACK_KINDS, FEEDBACK_LIMIT, feedbackProblem, type FeedbackKind, type FeedbackResult } from './feedback';
 import { BADGE, CHEVRON_RIGHT, CHOICE, DANGER_BUTTON, GHOST_BUTTON, SETTINGS_ACTION, SETTINGS_INPUT, SOLID_BUTTON, SWITCH, SWITCH_ONLY } from './cls';
 import { aiKeysLead, connectedAiKeys } from './ai-keys';
@@ -380,7 +380,7 @@ function DeleteAccount({ model }: { model: SettingsModel }) {
         <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" ref={closeRef} disabled={account.busy} onClick={() => setConfirming(false)}>닫기</button>
         <button type="button" className="solid-button danger [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--danger-fill)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--danger-fill)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-danger-fill text-[oklch(0.99_0.005_25)] text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:opacity-60" disabled={account.busy} onClick={account.remove}>{account.busy ? '삭제하고 있어요' : '삭제하기'}</button>
       </div>
-    </div> : <button type="button" className={`${DANGER_BUTTON} self-start`} ref={triggerRef} onClick={() => setConfirming(true)}>계정 삭제</button>}
+    </div> : /* 계정 삭제는 공통 위험 단추의 예외다(사용자 지시 2026-11-17): 눈에 덜 띄는 회색 밑줄 글자로 둔다. */ <button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" ref={triggerRef} onClick={() => setConfirming(true)}>계정 삭제</button>}
     {account.error ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{account.error}</p> : null}
   </div>;
 }
@@ -499,8 +499,8 @@ function Notifications({ model }: { model: SettingsModel }) {
       {!model.userId ? <Setting name="이 기기 알림" help="로그인하면 이 기기로 알림을 받을 수 있어요" /> : <>
         {/* 켜기·끄기는 다른 설정과 같은 스위치다. 눌렀을 때의 흐름(허용 창, 등록)은 그대로이고, 상태는 설명 한 줄로만 말한다. */}
         <SwitchRow label="이 기기 알림" description={pushLine(model.pushStatus)} checked={on} disabled={!canToggle} onChange={(next) => (next ? model.enablePush() : model.disablePush())} />
-        {/* 테스트는 이 기기 알림을 확인하는 일이라 바로 아래 같은 모양의 줄로 둔다. */}
-        {on ? <ActionRow label="테스트 알림" description="이 기기에 알림이 뜨는지 확인해요" action="보내기" onClick={model.testNotification} /> : null}
+        {/* 테스트는 이 기기 알림을 확인하는 일이라 바로 아래 둔다. 단추는 '추가 요청'과 같은 보조 단추다. */}
+        {on ? <Setting name="테스트 알림" help="이 기기에 알림이 뜨는지 확인해요" className="border-t border-line"><button type="button" className={GHOST_BUTTON} aria-label="테스트 알림 보내기" onClick={model.testNotification}>보내기</button></Setting> : null}
         {model.pushError ? <p className="field-note error pb-[8px] text-[14px] leading-[20px] text-danger" role="alert">{model.pushError}</p> : null}
         {model.pushError && model.sendPushReport ? <button type="button" className={`${SETTINGS_ACTION} -ml-[8px] mb-[8px] w-fit`} onClick={model.sendPushReport}>문제 알려 주기</button> : null}
         {/* 이 기기에만 적용되는 값이라 이 기기 구역에 둔다. 아이캠퍼스 스위치는 아이캠퍼스 쪽과 같은 줄이다. */}

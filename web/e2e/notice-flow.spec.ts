@@ -1419,7 +1419,7 @@ test('notifications page: this device and the device list, like the original set
     canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null },
     refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', removeDevice: 'fn:remove', renameDevice: 'fn:rename', setSummaryTime: 'fn:time', setDeviceAlertAll: 'fn:alertAll' });
   await expect(screen.getByRole('region', { name: '받을 게시판' })).toBeVisible();
-  // 위에서 아래로: 이 기기(스위치들) → 받을 게시판 → 알림 기기(마지막). 테스트 알림은 켜져 있을 때만, 이 기기 알림 바로 아래 같은 모양의 줄.
+  // 위에서 아래로: 이 기기(스위치들) → 받을 게시판 → 알림 기기(마지막). 테스트 알림은 켜져 있을 때만, 이 기기 알림 바로 아래 보조 단추 줄.
   expect(await screen.locator('h2.settings-head').allInnerTexts()).toEqual(['이 기기', '받을 게시판', '알림 기기']);
   const switches = await screen.getByRole('region', { name: '이 기기' }).getByRole('switch').allInnerTexts();
   expect(switches.map((text) => text.split('\n')[0])).toEqual(['이 기기 알림', '모든 새 공지를 소리와 함께 알리기', '아이캠퍼스 알림']);
@@ -1428,7 +1428,7 @@ test('notifications page: this device and the device list, like the original set
   expect(test!.y).toBeGreaterThanOrEqual(power!.y + power!.height - 1);   // 이 기기 알림 바로 아래
   expect(test!.y + test!.height).toBeLessThanOrEqual(nextSwitch!.y + 1);   // 다른 스위치보다 위
   expect(test!.height).toBeGreaterThanOrEqual(44);
-  expect(test!.width).toBeCloseTo(power!.width, 0);                         // 스위치 줄과 같은 폭
+  await expect(screen.getByRole('button', { name: /^테스트 알림/ })).toHaveClass(/ghost-button/);   // 다른 줄의 보조 단추와 같은 모양
   // 아이캠퍼스를 연결했고 이 기기가 등록돼 있으면 이 기기의 아이캠퍼스 알림을 여기서도 바꾼다.
   const canvas = screen.getByRole('switch', { name: /아이캠퍼스 알림/ });
   await expect(canvas).toHaveAttribute('aria-checked', 'true');
