@@ -410,8 +410,8 @@ function ViewFilters({ app }: { app: AppController }) {
     }}><Icon name="select-list" />선택</button>;
   if (app.view === 'saved') return <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>{select}<SortSelect app={app} /></div></div>;
   return <div className={`view-options ${VIEW_ROW} justify-between`} role="group" aria-label="공지 보기 조건">
-    {/* 휴대폰에서 두 조건이 다 있으면 이 줄이 폭을 다 쓰고 선택·정렬은 다음 줄로 간다. 글꼴 폭에 따라 줄바꿈이 달라져 목록이 밀리지 않게 한다. */}
-    <div className={`view-filters flex min-w-0 flex-wrap items-center gap-x-[12px] gap-y-0 ${app.gradEnabled() ? 'max-[719px]:w-full' : ''}`}>
+    {/* 좁은 휴대폰(520px 미만)에서 두 조건이 다 있으면 이 줄이 폭을 다 쓰고 선택·정렬은 다음 줄로 간다. 글꼴 폭에 따라 줄바꿈이 달라져 목록이 밀리지 않게 한다. */}
+    <div className={`view-filters flex min-w-0 flex-wrap items-center gap-x-[12px] gap-y-0 ${app.gradEnabled() ? 'max-[519px]:w-full' : ''}`}>
       <button type="button" className={VIEW_TOGGLE} aria-pressed={app.unreadOnly} onClick={() => {
         app.unreadOnly = !app.unreadOnly;
         app.listChanged();
