@@ -499,13 +499,13 @@ function Notifications({ model }: { model: SettingsModel }) {
       {!model.userId ? <Setting name="이 기기 알림" help="로그인하면 이 기기로 알림을 받을 수 있어요" /> : <>
         {/* 켜기·끄기는 다른 설정과 같은 스위치다. 눌렀을 때의 흐름(허용 창, 등록)은 그대로이고, 상태는 설명 한 줄로만 말한다. */}
         <SwitchRow label="이 기기 알림" description={pushLine(model.pushStatus)} checked={on} disabled={!canToggle} onChange={(next) => (next ? model.enablePush() : model.disablePush())} />
-        {/* 테스트는 이 기기 알림을 확인하는 일이라 바로 아래 둔다. 단추는 '추가 요청'과 같은 보조 단추다. */}
-        {on ? <Setting name="테스트 알림" help="이 기기에 알림이 뜨는지 확인해요" className="border-t border-line"><button type="button" className={GHOST_BUTTON} aria-label="테스트 알림 보내기" onClick={model.testNotification}>보내기</button></Setting> : null}
         {model.pushError ? <p className="field-note error pb-[8px] text-[14px] leading-[20px] text-danger" role="alert">{model.pushError}</p> : null}
         {model.pushError && model.sendPushReport ? <button type="button" className={`${SETTINGS_ACTION} -ml-[8px] mb-[8px] w-fit`} onClick={model.sendPushReport}>문제 알려 주기</button> : null}
         {/* 이 기기에만 적용되는 값이라 이 기기 구역에 둔다. 아이캠퍼스 스위치는 아이캠퍼스 쪽과 같은 줄이다. */}
         {info && on && thisDevice?.alertAllNew != null ? <SwitchRow label="모든 새 공지를 소리와 함께 알리기" description="끄면 관심 키워드나 AI가 고른 공지만 소리가 나요" checked={thisDevice.alertAllNew} disabled={info.busy} onChange={info.setAlertAll} /> : null}
         {info && on && info.hasCanvasToken && thisDevice ? <SwitchRow label={CANVAS_SWITCH_LABEL} description={CANVAS_SWITCH_HELP} checked={thisDevice.canvasMode !== 'off'} disabled={info.busy} onChange={(next) => info.setMode(canvasModeAfterToggle(next, thisDevice.canvasMode))} /> : null}
+        {/* 테스트 알림은 이 기기 스위치들 맨 아래(사용자 지시). 단추는 '추가 요청'과 같은 보조 단추다. */}
+        {on ? <Setting name="테스트 알림" help="이 기기에 알림이 뜨는지 확인해요" className="border-t border-line"><button type="button" className={GHOST_BUTTON} aria-label="테스트 알림 보내기" onClick={model.testNotification}>보내기</button></Setting> : null}
         {/* 기기 설정을 저장하지 못했을 때의 안내는 이 구역에서 한 번만 보인다. */}
         {info?.error ? <p className="field-note error pb-[12px] text-[14px] leading-[20px] text-danger" role="alert">{info.error}</p> : null}
       </>}
