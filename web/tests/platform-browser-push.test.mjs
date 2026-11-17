@@ -3,7 +3,7 @@ import test from 'node:test';
 import { createEnableChain, disableDevicePush, enableDevicePush, inspectDevicePush, releaseDevicePush } from '../src/platform-browser-push.ts';
 
 const publicKey = Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 1)]).toString('base64url');
-function fixture({ owner = null, saveError = null, deleteError = null, endpoint = null } = {}) {
+function fixture({ owner = null, saveError = null, deleteError = null, endpoint = null, readError = false } = {}) {
   const values = new Map(owner ? [['platform:push-owner', owner]] : []);
   if (endpoint) values.set('platform:push-endpoint', endpoint);
   const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
@@ -20,9 +20,12 @@ function fixture({ owner = null, saveError = null, deleteError = null, endpoint 
   const client = { from() {
     const filters = {};
     let mode = 'select';
-    const query = { upsert: async (row) => { records.push(row); return { error: saveError }; },
-      select: () => query, delete: () => { mode = 'delete'; return query; }, eq: (column, value) => { filters[column] = value; return query; },
-      maybeSingle: async () => ({ data: records.some((row) => row.user_id === filters.user_id && row.endpoint === filters.endpoint) ? { id: 'device' } : null, error: null }),
+    const query = { upsert: async (row) => {
+        const at = records.findIndex((r) => r.endpoint === row.endpoint);
+        if (at >= 0) records[at] = { ...records[at], ...row }; else records.push({ canvas_mode: 'reminders', ...row });   // DB 기본값
+        return { error: saveError }; },
+      select: (cols) => { filters.cols = cols; return query; }, delete: () => { mode = 'delete'; return query; }, eq: (column, value) => { filters[column] = value; return query; },
+      maybeSingle: async () => { if (readError && String(filters.cols).includes('canvas_mode')) return { data: null, error: new Error('read') }; const row = records.find((r) => r.user_id === filters.user_id && r.endpoint === filters.endpoint); return { data: row ? { ...row, id: 'device' } : null, error: null }; },
       then: (resolve, reject) => {
         if (mode === 'delete' && !deleteError) { deleted.push(filters.endpoint); for (let i = records.length - 1; i >= 0; i--) if (records[i].endpoint === filters.endpoint) records.splice(i, 1); }
         return Promise.resolve({ error: deleteError }).then(resolve, reject);
@@ -228,4 +231,56 @@ test('refusing the prompt shown by subscribe asks to allow in the browser', asyn
   await assert.rejects(chain.run(), /고르지 않았어요/);
   await assert.rejects(chain.run(), /브라우저에서 알림을 허용해 주세요/);
   assert.equal(f.records.length, 0);
+});
+
+async function replaced(f, row) {
+  await enableDevicePush(f.client, 'a', f.registration, f.storage, publicKey, async () => 'granted');
+  const old = f.records[0];
+  Object.assign(old, row);
+  f.setCurrent(f.makeSubscription());   // 브라우저가 새 주소를 만들었다
+  assert.equal(await inspectDevicePush(f.client, 'a', f.registration, f.storage, heal), true);
+  return old;
+}
+
+test('a replaced subscription keeps the iCampus mode that was turned off', async () => {
+  const f = fixture();
+  await replaced(f, { canvas_mode: 'off' });
+  assert.equal(f.records.length, 1);
+  assert.equal(f.records[0].endpoint, f.getCurrent().endpoint);
+  assert.equal(f.records[0].canvas_mode, 'off');
+});
+
+test('a replaced subscription keeps the device name the user chose', async () => {
+  const f = fixture();
+  await replaced(f, { device_name: '내 태블릿' });
+  assert.equal(f.records[0].device_name, '내 태블릿');
+});
+
+test('when the previous row is gone the new row gets defaults', async () => {
+  const f = fixture();
+  await enableDevicePush(f.client, 'a', f.registration, f.storage, publicKey, async () => 'granted');
+  f.records.length = 0;
+  f.setCurrent(f.makeSubscription());
+  assert.equal(await inspectDevicePush(f.client, 'a', f.registration, f.storage, heal), true);
+  assert.equal(f.records[0].canvas_mode, 'reminders');
+});
+
+test('a failed read of the previous row falls back to defaults without failing', async () => {
+  const f = fixture({ readError: true });
+  await enableDevicePush(f.client, 'a', f.registration, f.storage, publicKey, async () => 'granted');
+  f.records[0].canvas_mode = 'off';
+  f.setCurrent(f.makeSubscription());
+  assert.equal(await inspectDevicePush(f.client, 'a', f.registration, f.storage, heal), true);
+  assert.equal(f.records.at(-1).canvas_mode, 'reminders');
+});
+
+test('an existing row for the new endpoint is not overwritten with the old mode', async () => {
+  const f = fixture();
+  await enableDevicePush(f.client, 'a', f.registration, f.storage, publicKey, async () => 'granted');
+  f.records[0].canvas_mode = 'off';
+  const next = f.makeSubscription();
+  f.records.push({ user_id: 'a', endpoint: next.endpoint, canvas_mode: 'summary' });
+  f.setCurrent(next);
+  assert.equal(await inspectDevicePush(f.client, 'a', f.registration, f.storage, heal), true);
+  assert.equal(f.records.find((row) => row.endpoint === next.endpoint).canvas_mode, 'summary');
 });

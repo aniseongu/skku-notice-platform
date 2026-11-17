@@ -50,12 +50,30 @@ function forget(storage: Storage): void {
   storage.removeItem(ENDPOINT_KEY);
 }
 
+async function carryOver(client: SupabaseClient, userId: string, previous: string, endpoint: string): Promise<{ canvas_mode?: string; device_name?: string }> {
+  try {
+    const exists = await client.from('user_push_subscriptions').select('id').eq('user_id', userId).eq('endpoint', endpoint).maybeSingle();
+    if (exists.error || exists.data) return {};
+    const { data, error } = await client.from('user_push_subscriptions').select('canvas_mode,device_name').eq('user_id', userId).eq('endpoint', previous).maybeSingle();
+    if (error || !data) return {};
+    const row = data as { canvas_mode?: unknown; device_name?: unknown };
+    return {
+      ...(typeof row.canvas_mode === 'string' && ['off', 'summary', 'reminders'].includes(row.canvas_mode) ? { canvas_mode: row.canvas_mode } : {}),
+      ...(typeof row.device_name === 'string' && row.device_name.trim() ? { device_name: row.device_name } : {}),
+    };
+  } catch { return {}; }
+}
+
 async function saveDevice(client: SupabaseClient, userId: string, subscription: PushSubscription, storage: Storage, previous: string | null): Promise<void> {
   const data = subscription.toJSON();
   if (!data.endpoint || !data.keys?.p256dh || !data.keys.auth) throw new Error('알림 기기 정보를 확인하지 못했어요.');
+  // 주소가 바뀐 기기는 새 줄이 기본값(요약과 마감)으로 만들어지고 옛 줄이 지워져 아이캠퍼스 알림 설정과 바꾼 이름이 사라졌다.
+  // 이 주소의 줄이 아직 없을 때만 옛 줄의 값을 이어 받는다. 읽지 못하면 예전처럼 기본값으로 둔다.
+  const carried = previous && previous !== data.endpoint ? await carryOver(client, userId, previous, data.endpoint) : {};
   const { error } = await withTimeout(Promise.resolve(client.from('user_push_subscriptions').upsert({
     user_id: userId, endpoint: data.endpoint, p256dh: data.keys.p256dh, auth_secret: data.keys.auth,
-    device_name: await deviceName(),
+    device_name: carried.device_name ?? await deviceName(),
+    ...(carried.canvas_mode ? { canvas_mode: carried.canvas_mode } : {}),
     updated_at: new Date().toISOString(),
   }, { onConflict: 'endpoint' })), SAVE_MS, '서버에 이 기기를 등록하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.');
   if (error) throw error;
