@@ -407,21 +407,21 @@ function ViewFilters({ app }: { app: AppController }) {
     onClick={(event) => {
       app.selecting = true; app.selectedReads = [];
       if (event.detail === 0) void app.updateComplete.then(() => document.querySelector<HTMLInputElement>('.select-all input')?.focus({ preventScroll: true }));
-    }}><Icon name="select-list" />선택</button>;
+    }}><Icon name="select-list" /><span className={app.gradEnabled() ? 'max-[519px]:sr-only' : ''}>선택</span></button>;
   if (app.view === 'saved') return <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>{select}<SortSelect app={app} /></div></div>;
   return <div className={`view-options ${VIEW_ROW} justify-between`} role="group" aria-label="공지 보기 조건">
-    {/* 좁은 휴대폰(520px 미만)에서 두 조건이 다 있으면 이 줄이 폭을 다 쓰고 선택·정렬은 다음 줄로 간다. 글꼴 폭에 따라 줄바꿈이 달라져 목록이 밀리지 않게 한다. */}
-    <div className={`view-filters flex min-w-0 flex-wrap items-center gap-x-[12px] gap-y-0 ${app.gradEnabled() ? 'max-[519px]:w-full' : ''}`}>
-      <button type="button" className={VIEW_TOGGLE} aria-pressed={app.unreadOnly} onClick={() => {
+    {/* 두 조건이 다 있어도 선택·정렬과 한 줄에 둔다. 520px 미만에서는 조건 이름과 '선택'을 줄여 한 줄에 들어가게 하고, 그래도 모자라는 아주 좁은 폭에서만 다음 줄로 간다. */}
+    <div className={`view-filters flex min-w-0 flex-wrap items-center gap-x-[4px] gap-y-0 min-[520px]:gap-x-[12px]`}>
+      <button type="button" className={VIEW_TOGGLE} aria-label="읽지 않은 공지만" aria-pressed={app.unreadOnly} onClick={() => {
         app.unreadOnly = !app.unreadOnly;
         app.listChanged();
         remember('view-unread', app.unreadOnly ? '1' : '0');
-      }}><span className={FILTER_CHECK} aria-hidden="true"></span>읽지 않은 공지만</button>
-      {app.gradEnabled() ? <button type="button" className={VIEW_TOGGLE} aria-pressed={app.graduationOnly} onClick={() => {
+      }}><span className={FILTER_CHECK} aria-hidden="true"></span>{app.gradEnabled() ? <><span aria-hidden="true" className="min-[520px]:hidden">안 읽음</span><span aria-hidden="true" className="max-[519px]:hidden">읽지 않은 공지만</span></> : '읽지 않은 공지만'}</button>
+      {app.gradEnabled() ? <button type="button" className={VIEW_TOGGLE} aria-label="인턴십 충족만" aria-pressed={app.graduationOnly} onClick={() => {
         app.graduationOnly = !app.graduationOnly;
         app.listChanged();
         remember('view-grad', app.graduationOnly ? '1' : '0');
-      }}><span className={FILTER_CHECK} aria-hidden="true"></span>인턴십 충족만</button> : null}
+      }}><span className={FILTER_CHECK} aria-hidden="true"></span><span aria-hidden="true" className="min-[520px]:hidden">인턴십 충족</span><span aria-hidden="true" className="max-[519px]:hidden">인턴십 충족만</span></button> : null}
     </div>
     <div className={VIEW_ACTIONS}>{select}<SortSelect app={app} /></div>
   </div>;
