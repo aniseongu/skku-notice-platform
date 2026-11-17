@@ -445,6 +445,7 @@ function Notifications({ model }: { model: SettingsModel }) {
   const refresh = info?.refresh;
   // 설정 쪽을 열 때와 이 기기 알림을 켜고 끌 때 기기 목록을 다시 읽는다.
   useEffect(() => { if (model.userId) refresh?.(); }, [model.userId, model.pushStatus]);
+  const thisDevice = info?.devices.find((device) => device.id === info.thisId) ?? null;
   const waitDevices = !!model.userId && info?.loaded === false;
   return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Back model={model} />
@@ -482,6 +483,14 @@ function Notifications({ model }: { model: SettingsModel }) {
     </Section>
     {/* 기기 목록을 받기 전에는 기기 구역과 그 아래(받을 게시판)를 그리지 않는다. 기기 구역이 나중에 끼어들면 아래가 밀린다. 보통은 로그인 때 미리 받아 둔다. */}
     {waitDevices ? null : <>
+    {/* 아이캠퍼스를 연결했고 이 기기가 등록돼 있을 때만, 이 기기의 아이캠퍼스 알림을 알림 쪽에서도 바꾼다(아이캠퍼스 쪽 스위치와 같은 값).
+        출처: https://ui.shadcn.com/docs/components/radio-group (고르는 선택지는 한 묶음의 라디오, 이름과 설명은 위) */}
+    {model.userId && info && on && info.hasCanvasToken && thisDevice ? <Section id="s-notify-canvas" title="아이캠퍼스">
+      <Setting name="아이캠퍼스 알림" help="과제 마감과 하루 요약을 이 기기로 받을지 골라요. 이 기기에만 적용돼요">
+        <Choice label="이 기기의 아이캠퍼스 알림" value={thisDevice.canvasMode} disabled={info.busy} options={CANVAS_MODES} onPick={(next: CanvasMode) => info.setMode(next)} />
+        {info.error ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{info.error}</p> : null}
+      </Setting>
+    </Section> : null}
     {model.userId && info && info.devices.length > 0 ? <Section id="s-devices" title="알림 기기">
       <Setting name="등록된 기기" help="알림을 받도록 켜 둔 기기예요. 이 기기는 위에서 끄고, 다른 기기는 여기서 지워요">
         <ul className="device-list m-0 grid list-none gap-[4px] p-0 [&>li]:grid [&>li]:grid-cols-[1fr_auto] [&>li]:items-center [&>li]:gap-x-[12px] [&>li]:gap-y-[2px] [&>li]:border-t [&>li]:border-line [&>li]:py-[10px] [&>li:first-child]:border-t-0 [&_.field-note]:col-[1] [&_.field-note]:m-0 [&>li>.inline-row]:col-[1/-1]">

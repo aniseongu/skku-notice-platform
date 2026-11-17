@@ -1398,8 +1398,11 @@ test('notifications page: this device and the device list, like the original set
     canvasStatus: { keyHint: 'ZZZZ', disabled: false, lastError: null, lastOkAt: null },
     refreshDevices: 'fn:refresh', setCanvasMode: 'fn:mode', removeDevice: 'fn:remove', renameDevice: 'fn:rename', setSummaryTime: 'fn:time' });
   await expect(screen.getByRole('region', { name: '받을 게시판' })).toBeVisible();
-  // 아이캠퍼스 알림은 이 쪽에 없다(설정 홈의 아이캠퍼스에서 켠다).
-  await expect(screen.getByRole('switch', { name: /아이캠퍼스/ })).toHaveCount(0);
+  // 아이캠퍼스를 연결했고 이 기기가 등록돼 있으면 이 기기의 아이캠퍼스 알림을 여기서도 바꾼다.
+  const canvas = screen.getByRole('radiogroup', { name: '이 기기의 아이캠퍼스 알림' });
+  await expect(canvas.getByRole('radio', { name: '요약과 마감' })).toHaveAttribute('aria-checked', 'true');
+  await canvas.getByRole('radio', { name: '끄기' }).click();
+  expect((await calls(page)).filter((c) => c[0] === 'mode')).toEqual([['mode', 'off']]);
   // 알림 기기 목록: 이 기기에는 지우기가 없고 다른 기기는 지울 수 있다.
   const list = screen.getByRole('region', { name: '알림 기기' });
   await expect(list).toContainText('Windows · Whale');
