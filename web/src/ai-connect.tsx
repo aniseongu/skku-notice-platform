@@ -1,9 +1,8 @@
 import { useState, type ReactNode } from 'react';
-import { looksLikeAiKey, PROVIDER_GUIDE, type AiPreferences } from './ai-providers';
+import { looksLikeAiKey, PROVIDER_GUIDE, type AiPreferences, type AiProvider } from './ai-providers';
 import type { AppController } from './app-controller';
-import type { AiProvider } from './ai-providers';
 import { canRemoveKey, connectedAiKeys } from './ai-keys';
-import { Choice, ext, Guide, Setting, SecretRow, type SettingsModel } from './platform-settings';
+import { Setting, SecretRow, type SettingsModel } from './platform-settings';
 
 type Byok = NonNullable<SettingsModel['byok']>;
 type Id = 'groq' | 'gemini';
