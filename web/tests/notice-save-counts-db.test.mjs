@@ -8,11 +8,12 @@ test('saved counts aggregate across owners, limit input and exclude anonymous ac
   try {
     await db.exec(`create role anon; create role authenticated;
       create table public.user_notice_states (user_id text, notice_id text, is_saved boolean);
-      insert into public.user_notice_states values ('a','one',true), ('b','one',true), ('a','two',false), ('a','last',true);`);
+      insert into public.user_notice_states values ('a','one',true), ('b','one',true), ('c','one',true), ('a','two',true), ('b','two',true), ('a','three',false), ('a','last',true), ('b','last',true), ('c','last',true);`);
     await db.exec(await readFile(new URL('../../supabase/migrations/20261117110000_notice_save_counts.sql', import.meta.url), 'utf8'));
     await db.exec('set role authenticated');
-    const result = await db.query("select * from public.notice_save_counts(array['one','two'])");
-    assert.deepEqual(result.rows, [{ notice_id: 'one', saves: 2 }]);
+    const result = await db.query("select * from public.notice_save_counts(array['one','two','three'])");
+    // 2명뿐인 'two'와 저장 안 된 'three'는 돌려주지 않는다
+    assert.deepEqual(result.rows, [{ notice_id: 'one', saves: 3 }]);
     assert.deepEqual(result.fields.map((field) => field.name), ['notice_id', 'saves']);
     const capped = await db.query("select * from public.notice_save_counts(array_fill('none'::text,array[500]) || array['last'])");
     assert.equal(capped.rows.length, 0);

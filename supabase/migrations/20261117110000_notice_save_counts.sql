@@ -7,7 +7,9 @@ language sql stable security definer set search_path = '' as $$
   select s.notice_id, count(*)::integer
   from public.user_notice_states s
   where s.is_saved and s.notice_id = any (p_ids[1:500])
-  group by s.notice_id;
+  group by s.notice_id
+  -- 사용자가 적어 1~2명이면 누가 저장했는지 짐작할 수 있다. 3명 이상일 때만 수를 돌려준다.
+  having count(*) >= 3;
 $$;
 revoke all on function public.notice_save_counts(text[]) from public, anon, authenticated;
 grant execute on function public.notice_save_counts(text[]) to authenticated;
