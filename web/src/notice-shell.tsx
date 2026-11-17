@@ -107,7 +107,7 @@ export function NoticeShell({ app }: { app: AppController }) {
         {ready ? <>
         <SideGroup app={app} id="keywords" title="관심 키워드" count={keywordTotals.total}>
           {app.keywords.map((word) => <SideItem key={word} label={word} count={keywordTotals.counts[word]}
-            active={!settings && app.keyword === word} onClick={() => { if (settings) { app.setKeyword(word); app.leaveSettings(); } else app.setKeyword(app.keyword === word ? null : word); }}
+            active={!settings && app.keyword === word} onClick={() => app.setKeyword(settings || app.keyword !== word ? word : null)}
             ariaLabel={`${word}, 공지 ${keywordTotals.counts[word]}개`} />)}
           <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('keywords')}>{app.keywords.length ? '키워드 관리하기' : '키워드 추가하기'}</button>
         </SideGroup>

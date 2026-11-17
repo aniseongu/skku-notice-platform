@@ -50,29 +50,34 @@ function forget(storage: Storage): void {
   storage.removeItem(ENDPOINT_KEY);
 }
 
-async function carryOver(client: SupabaseClient, userId: string, previous: string, endpoint: string): Promise<{ canvas_mode?: string; device_name?: string }> {
-  try {
-    const exists = await client.from('user_push_subscriptions').select('id').eq('user_id', userId).eq('endpoint', endpoint).maybeSingle();
-    if (exists.error || exists.data) return {};
-    const { data, error } = await client.from('user_push_subscriptions').select('canvas_mode,device_name').eq('user_id', userId).eq('endpoint', previous).maybeSingle();
-    if (error || !data) return {};
-    const row = data as { canvas_mode?: unknown; device_name?: unknown };
-    return {
-      ...(typeof row.canvas_mode === 'string' && ['off', 'summary', 'reminders'].includes(row.canvas_mode) ? { canvas_mode: row.canvas_mode } : {}),
-      ...(typeof row.device_name === 'string' && row.device_name.trim() ? { device_name: row.device_name } : {}),
-    };
-  } catch { return {}; }
+// 이 주소의 줄이 이미 있으면(같은 주소로 다시 켬) 이름·아이캠퍼스 설정을 보내지 않아 그대로 둔다.
+// 새 주소면 옛 줄의 값을 이어 받는다. 읽지 못하면 등록을 멈춰(옛 줄을 지우지 않는다) 다음 시도에서 이어 받게 한다.
+type DeviceCarry = { exists: boolean; canvas_mode?: string; device_name?: string };
+async function carryOver(client: SupabaseClient, userId: string, previous: string | null, endpoint: string): Promise<DeviceCarry> {
+  const fail = '서버에 이 기기를 등록하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.';
+  const exists = await withTimeout(Promise.resolve(client.from('user_push_subscriptions').select('id').eq('user_id', userId).eq('endpoint', endpoint).maybeSingle()), SAVE_MS, fail);
+  if (exists.error) throw exists.error;
+  if (exists.data) return { exists: true };
+  if (!previous || previous === endpoint) return { exists: false };
+  const { data, error } = await withTimeout(Promise.resolve(client.from('user_push_subscriptions').select('canvas_mode,device_name').eq('user_id', userId).eq('endpoint', previous).maybeSingle()), SAVE_MS, fail);
+  if (error) throw error;
+  if (!data) return { exists: false };
+  const row = data as { canvas_mode?: unknown; device_name?: unknown };
+  return {
+    exists: false,
+    ...(typeof row.canvas_mode === 'string' && ['off', 'summary', 'reminders'].includes(row.canvas_mode) ? { canvas_mode: row.canvas_mode } : {}),
+    ...(typeof row.device_name === 'string' && row.device_name.trim() ? { device_name: row.device_name } : {}),
+  };
 }
 
 async function saveDevice(client: SupabaseClient, userId: string, subscription: PushSubscription, storage: Storage, previous: string | null): Promise<void> {
   const data = subscription.toJSON();
   if (!data.endpoint || !data.keys?.p256dh || !data.keys.auth) throw new Error('알림 기기 정보를 확인하지 못했어요.');
   // 주소가 바뀐 기기는 새 줄이 기본값(요약과 마감)으로 만들어지고 옛 줄이 지워져 아이캠퍼스 알림 설정과 바꾼 이름이 사라졌다.
-  // 이 주소의 줄이 아직 없을 때만 옛 줄의 값을 이어 받는다. 읽지 못하면 예전처럼 기본값으로 둔다.
-  const carried = previous && previous !== data.endpoint ? await carryOver(client, userId, previous, data.endpoint) : {};
+  const carried = await carryOver(client, userId, previous, data.endpoint);
   const { error } = await withTimeout(Promise.resolve(client.from('user_push_subscriptions').upsert({
     user_id: userId, endpoint: data.endpoint, p256dh: data.keys.p256dh, auth_secret: data.keys.auth,
-    device_name: carried.device_name ?? await deviceName(),
+    ...(carried.exists ? {} : { device_name: carried.device_name ?? await deviceName() }),
     ...(carried.canvas_mode ? { canvas_mode: carried.canvas_mode } : {}),
     updated_at: new Date().toISOString(),
   }, { onConflict: 'endpoint' })), SAVE_MS, '서버에 이 기기를 등록하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.');

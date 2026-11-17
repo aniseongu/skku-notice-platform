@@ -9,6 +9,7 @@ function fixture({ owner = null, saveError = null, deleteError = null, endpoint 
   const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
   let current = null, unsubscribed = 0, serial = 0;
   const records = [];
+  let failRead = readError;
   const deleted = [];
   function makeSubscription(url = `https://fcm.googleapis.com/fcm/send/test-${++serial}`) {
     return { endpoint: url, options: { applicationServerKey: null },
@@ -25,14 +26,14 @@ function fixture({ owner = null, saveError = null, deleteError = null, endpoint 
         if (at >= 0) records[at] = { ...records[at], ...row }; else records.push({ canvas_mode: 'reminders', ...row });   // DB 기본값
         return { error: saveError }; },
       select: (cols) => { filters.cols = cols; return query; }, delete: () => { mode = 'delete'; return query; }, eq: (column, value) => { filters[column] = value; return query; },
-      maybeSingle: async () => { if (readError && String(filters.cols).includes('canvas_mode')) return { data: null, error: new Error('read') }; const row = records.find((r) => r.user_id === filters.user_id && r.endpoint === filters.endpoint); return { data: row ? { ...row, id: 'device' } : null, error: null }; },
+      maybeSingle: async () => { if (failRead && String(filters.cols).includes('canvas_mode')) return { data: null, error: new Error('read') }; const row = records.find((r) => r.user_id === filters.user_id && r.endpoint === filters.endpoint); return { data: row ? { ...row, id: 'device' } : null, error: null }; },
       then: (resolve, reject) => {
         if (mode === 'delete' && !deleteError) { deleted.push(filters.endpoint); for (let i = records.length - 1; i >= 0; i--) if (records[i].endpoint === filters.endpoint) records.splice(i, 1); }
         return Promise.resolve({ error: deleteError }).then(resolve, reject);
       } };
     return query;
   } };
-  return { storage, registration, client, records, values, deleted, makeSubscription,
+  return { storage, registration, client, records, values, deleted, makeSubscription, setReadError: (value) => { failRead = value; },
     setCurrent: (value) => { current = value; }, getCurrent: () => current, getUnsubscribed: () => unsubscribed };
 }
 
@@ -90,7 +91,8 @@ test('enable chain resumes at the failed server step without asking permission o
   let permissionAsks = 0, subscribes = 0, saves = 0, failSave = true;
   const registration = { pushManager: { getSubscription: async () => f.registration.pushManager.getSubscription(),
     subscribe: async (options) => { subscribes++; return f.registration.pushManager.subscribe(options); } } };
-  const client = { from: () => ({ upsert: async (row) => { saves++; if (failSave) return { error: new Error('offline') }; f.records.push(row); return { error: null }; } }) };
+  const none = { eq: () => none, maybeSingle: async () => ({ data: null, error: null }) };
+  const client = { from: () => ({ select: () => none, upsert: async (row) => { saves++; if (failSave) return { error: new Error('offline') }; f.records.push(row); return { error: null }; } }) };
   const chain = createEnableChain(client, 'a', registration, f.storage, publicKey, async () => { permissionAsks++; return 'granted'; });
   await assert.rejects(chain.run(), /offline/);
   assert.equal(f.values.has('platform:push-owner'), false);
@@ -265,13 +267,24 @@ test('when the previous row is gone the new row gets defaults', async () => {
   assert.equal(f.records[0].canvas_mode, 'reminders');
 });
 
-test('a failed read of the previous row falls back to defaults without failing', async () => {
-  const f = fixture({ readError: true });
+test('a failed read stops the re-registration and keeps the old row so a later try can carry its settings', async () => {
+  const f = fixture();
   await enableDevicePush(f.client, 'a', f.registration, f.storage, publicKey, async () => 'granted');
-  f.records[0].canvas_mode = 'off';
+  const old = f.records[0];
+  old.canvas_mode = 'off';
   f.setCurrent(f.makeSubscription());
-  assert.equal(await inspectDevicePush(f.client, 'a', f.registration, f.storage, heal), true);
-  assert.equal(f.records.at(-1).canvas_mode, 'reminders');
+  f.setReadError(true);
+  assert.notEqual(await inspectDevicePush(f.client, 'a', f.registration, f.storage, heal).catch(() => false), true);
+  assert.equal(f.records.filter((row) => row.endpoint !== old.endpoint).length, 0);
+  assert.equal(f.records.find((row) => row.endpoint === old.endpoint)?.canvas_mode, 'off');
+});
+
+test('turning on again with the same endpoint keeps the renamed device name', async () => {
+  const f = fixture();
+  await enableDevicePush(f.client, 'a', f.registration, f.storage, publicKey, async () => 'granted');
+  f.records[0].device_name = '내 노트북';
+  await enableDevicePush(f.client, 'a', f.registration, f.storage, publicKey, async () => 'granted');
+  assert.equal(f.records.find((row) => row.endpoint === f.records[0].endpoint).device_name, '내 노트북');
 });
 
 test('an existing row for the new endpoint is not overwritten with the old mode', async () => {
