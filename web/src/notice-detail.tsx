@@ -110,7 +110,7 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
   // 인턴십 충족 표시는 아래 "인턴십 요건 확인" 한 곳에서만 말한다(제목 아래와 구역에서 같은 말을 두 번 하지 않는다). 목록 줄에는 구역이 없어 그대로 둔다.
   const hasReason = interests.length > 0 || !!ai || !!model.rule || !!model.pending;
   return <div className="detail min-[1080px]:px-[32px] min-[1080px]:py-[24px]">
-    <p className="meta flex min-w-0 flex-wrap gap-[6px] mb-[6px] text-[13px] leading-[18px] font-medium text-ink-3"><span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{model.source}</span>{notice.category ? <span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{notice.category}</span> : null}{model.saveCount ? <span>{model.saveCount}명이 저장했어요</span> : null}</p>
+    <p className="meta flex min-w-0 flex-wrap gap-[6px] mb-[6px] [&>span+span]:before:mr-[6px] [&>span+span]:before:content-['·'] text-[13px] leading-[18px] font-medium text-ink-3"><span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{model.source}</span>{notice.category ? <span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{notice.category}</span> : null}{model.saveCount ? <span>{model.saveCount}명이 저장했어요</span> : null}</p>
     <h2 className="detail-title text-[20px] leading-[28px] font-bold tracking-[-0.02em]" title={title}>{title}</h2>
     {notice.title_ko ? <p className="detail-original mt-[4px] text-[13px] leading-[19px] text-ink-3" lang="en">{cleanTitle(notice.title)}</p> : null}
     {hasReason ? <p className="detail-reason mt-[10px] text-[14px] leading-[21px] text-ink-2"><Reason interests={interests} ai={ai} rule={model.rule} pending={model.pending} /></p> : null}
