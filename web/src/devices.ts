@@ -29,12 +29,18 @@ export async function suggestDeviceName(userAgent: string = navigator.userAgent,
 
 const MODES = new Set<string>(['off', 'summary', 'reminders']);
 
+/** alert_all_new 열이 아직 없을 때만 참(PostgreSQL 42703 undefined_column). 권한 오류 같은 다른 오류는 그대로 던진다. */
+export function missingAlertColumn(error: unknown): boolean {
+  const e = error as { code?: unknown; message?: unknown } | null;
+  return !!e && e.code === '42703' && /alert_all_new/.test(String(e.message ?? ''));
+}
+
 /** 내 알림 기기 목록(본인 행만). 구독 주소는 열쇠라서 가져오지만 화면에는 보이지 않는다. */
 export async function loadDevices(client: SupabaseClient, userId: string): Promise<Device[]> {
   const read = (cols: string) => client.from('user_push_subscriptions').select(cols).eq('user_id', userId).order('created_at', { ascending: true });
   let { data, error } = await read('id,endpoint,device_name,canvas_mode,created_at,alert_all_new');
   // alert_all_new 열이 아직 없으면 그 설정만 숨긴다(null).
-  if (error && /alert_all_new/.test(String(error.message ?? ''))) ({ data, error } = await read('id,endpoint,device_name,canvas_mode,created_at'));
+  if (missingAlertColumn(error)) ({ data, error } = await read('id,endpoint,device_name,canvas_mode,created_at'));
   if (error) throw error;
   return ((data ?? []) as unknown as Record<string, unknown>[]).filter((row) => typeof row.id === 'string' && typeof row.endpoint === 'string').map((row) => ({
     id: row.id as string, endpoint: row.endpoint as string, name: typeof row.device_name === 'string' ? row.device_name : null,

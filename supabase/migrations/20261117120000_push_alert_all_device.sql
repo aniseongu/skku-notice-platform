@@ -1,6 +1,10 @@
 -- 모든 새 공지를 소리와 함께 알리는 설정은 기기별이다(canvas_mode처럼). 기존 RLS와 테이블 단위 update 권한을 그대로 쓴다.
 -- user_preferences.alert_all_new는 더 쓰지 않는다(이미 배포된 웹이 읽어서 지우지 않았고, 나중에 지워도 된다).
 alter table public.user_push_subscriptions add column if not exists alert_all_new boolean not null default false;
+-- 계정 설정을 이미 켠 사람은 그 계정의 기기에 옮긴다(적용 시점 운영 0명, 켜진 값만 옮기므로 다시 실행해도 같다).
+update public.user_push_subscriptions s set alert_all_new = true
+  from public.user_preferences p
+  where p.user_id = s.user_id and p.alert_all_new and not s.alert_all_new;
 
 create or replace function public.list_notice_push_candidates(p_limit integer default 20)
 returns table (

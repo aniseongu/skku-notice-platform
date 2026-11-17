@@ -1,4 +1,4 @@
-import { suggestDeviceName } from './devices.ts';
+import { missingAlertColumn, suggestDeviceName } from './devices.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { connectionChain } from './connection-chain.ts';
 import { activation, note } from './push-diagnostics.ts';
@@ -62,7 +62,7 @@ async function carryOver(client: SupabaseClient, userId: string, previous: strin
   const read = (cols: string) => withTimeout(Promise.resolve(client.from('user_push_subscriptions').select(cols).eq('user_id', userId).eq('endpoint', previous).maybeSingle()), SAVE_MS, fail);
   let { data, error } = await read('canvas_mode,device_name,alert_all_new');
   // 열이 아직 없는 서버에서는 소리 설정 없이 이어 받는다(등록이 막히지 않게).
-  if (error && /alert_all_new/.test(String((error as { message?: unknown }).message ?? ''))) ({ data, error } = await read('canvas_mode,device_name'));
+  if (missingAlertColumn(error)) ({ data, error } = await read('canvas_mode,device_name'));
   if (error) throw error;
   if (!data) return { exists: false };
   const row = data as { canvas_mode?: unknown; device_name?: unknown; alert_all_new?: unknown };
