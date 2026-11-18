@@ -50,3 +50,10 @@ test('remove scopes delete to user and notice, and respects the guard', async ()
   assert.deepEqual(calls, [['user_id', 'u1'], ['notice_id', 's/1']]);
   await assert.rejects(removeOpportunity({ from: () => q }, 'u1', 's/1', () => false), /계정이 바뀌었어요/);
 });
+
+test('deadlineIso turns a notice deadline into a timestamp or null', async () => {
+  const { deadlineIso } = await import('../src/opportunities.ts');
+  assert.equal(deadlineIso(null), null);
+  assert.equal(deadlineIso('아님'), null);
+  assert.equal(deadlineIso('2026-11-30T00:00:00+09:00'), '2026-11-29T15:00:00.000Z');
+});

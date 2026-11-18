@@ -11,6 +11,7 @@ import type { FeedbackKind } from './feedback';
 import { installMode, isStandalone } from './install-hint';
 import { CHECKBOX, CHIP, CHIPS, CHIP_ADD } from './cls';
 import { authClient } from './auth';
+import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, type OpportunityStatus } from './opportunities';
 import { keywordCounts } from './keyword-counts';
 import { type AppController, STALE_MS, TABS, remember, settingsTitle } from './app-controller';
 import type { UserProfile } from './profile';
@@ -327,6 +328,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
           ? <Empty title="받을 게시판이 없어요" body="게시판을 고르면 새 공지가 여기에 보여요" action="게시판 고르기" onAction={() => app.openSettings('notifications')} />
           : <Empty title="아직 설정을 안 했어요" body="첫 설정을 마치면 맞는 게시판을 켜 드려요" />;
       }
+      if (app.view === 'saved' && app.opportunityFilter !== 'all' && app.opportunitiesStatus === 'ready') return <Empty title="이 상태의 공지가 없어요" body="다른 상태를 골라 보세요" action="전체 보기" onAction={() => { app.opportunityFilter = 'all'; app.listChanged(); }} />;
       if (app.query) return <Empty title={`'${app.query}'에 맞는 공지가 없어요`} body="다른 단어로 찾아보세요" action="검색어 지우기" onAction={() => { app.query = ''; app.listChanged(); }} />;
       if (app.keyword && app.view !== 'saved' && app.unreadOnly) return <Empty title={`'${app.keyword}'에 맞는 읽지 않은 공지가 없어요`} body="읽지 않은 공지만 보기를 끄면 모든 공지를 볼 수 있어요" />;
       if (app.keyword) return <Empty title={`'${app.keyword}'에 맞는 공지가 아직 없어요`} body="새 글이 오면 여기에 모여요" />;
@@ -364,6 +366,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
         return { notice: rowNotice, source,
           read: app.isRead(notice), saved: app.isSaved(notice), current: app.isWide && app.detailOpen && app.shownId === notice.id,
           selected: app.selectedReads.includes(notice.id), dim: ai?.verdict === 'not_relevant' && !interests.length,
+          status: app.opportunities.has(notice.id) ? OPPORTUNITY_LABELS[app.opportunities.get(notice.id)!.status] : undefined,
           interests, ai, rule: app.judgement(notice)?.rule_name ?? null, grad, pending: !ai && !interests.length && !grad.length && app.judgePending(notice) };
       }),
       today, selecting: app.selecting, savedView: app.view === 'saved',
@@ -408,7 +411,13 @@ function ViewFilters({ app }: { app: AppController }) {
       app.selecting = true; app.selectedReads = [];
       if (event.detail === 0) void app.updateComplete.then(() => document.querySelector<HTMLInputElement>('.select-all input')?.focus({ preventScroll: true }));
     }}><Icon name="select-list" />선택</button>;
-  if (app.view === 'saved') return <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>{select}<SortSelect app={app} /></div></div>;
+  if (app.view === 'saved') return <>
+    <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>{select}<SortSelect app={app} /></div></div>
+    {app.opportunitiesStatus === 'ready' && app.opportunities.size > 0 ? <div className="opportunity-filter flex gap-[8px] overflow-x-auto px-[var(--gutter)] py-[4px] [scrollbar-width:none] select-none [-webkit-user-select:none] min-[720px]:px-[24px]" role="group" aria-label="진행 상태로 거르기">
+      {(['all', ...OPPORTUNITY_STATUSES] as const).map((id) => <button type="button" key={id} className={CHIP} aria-pressed={app.opportunityFilter === id}
+        onClick={() => { app.opportunityFilter = id; app.listChanged(); }}>{id === 'all' ? '전체' : OPPORTUNITY_LABELS[id]}</button>)}
+    </div> : null}
+  </>;
   return <div className={`view-options ${VIEW_ROW} justify-between`} role="group" aria-label="공지 보기 조건">
     {/* 두 조건이 다 있어도 선택·정렬과 한 줄에 둔다. 520px 미만에서는 조건 이름을 줄여 한 줄에 들어가게 하고, 그래도 모자라는 아주 좁은 폭에서만 다음 줄로 간다. */}
     <div className={`view-filters flex min-w-0 flex-wrap items-center gap-x-[4px] gap-y-0 min-[520px]:gap-x-[12px]`}>
@@ -534,6 +543,13 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
     coop: app.kindOf(notice) === 'coop',
     pending: !(judgement?.ai ?? mine?.ai) && !interests.length && !hasGrad && app.judgePending(notice),
     retry: () => { app.bodies.delete(notice.id); app.requestUpdate(); },
+    opportunity: app.opportunityShown(notice) ? (() => {
+      const record = app.opportunities.get(notice.id), source = boardName(app.sources.find((item) => item.id === notice.source_id), notice.source_id);
+      return { status: record?.status ?? null, note: record?.note ?? '', hasRecord: !!record,
+        onStatus: (status: OpportunityStatus) => { void app.saveOpportunityFor(notice, source, { status }); },
+        onNote: (note: string) => { void app.saveOpportunityFor(notice, source, { note: note.trim() || null }); },
+        onRemove: () => { void app.removeOpportunityFor(notice); } };
+    })() : undefined,
     grad: gradDetail,
     graduation: app.showsGraduation(notice) ? { aiKeys: (app.byokStatus && !app.byokStatus.disabled ? 1 : 0) + app.aiKeys.filter((key) => !key.disabled).length, tracks: visibleTracks(app.profile), assessment: app.graduationFor(notice), error: app.graduationError } : undefined,
   }} />;

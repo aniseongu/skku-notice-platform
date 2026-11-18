@@ -77,3 +77,10 @@ export async function removeOpportunity(client: SupabaseClient, userId: string, 
   const { error } = await client.from('user_opportunities').delete().eq('user_id', userId).eq('notice_id', noticeId);
   if (error) throw error;
 }
+
+/** 공지의 마감 글자를 timestamptz로 보낼 수 있는 ISO 문자열로 바꾼다(읽을 수 없으면 null). */
+export function deadlineIso(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const stamp = Date.parse(value);
+  return Number.isFinite(stamp) ? new Date(stamp).toISOString() : null;
+}

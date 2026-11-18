@@ -11,6 +11,7 @@ import { initialReadState, isNoticeRead, loadReadState, mergeReadStates, parseRe
 import { keywordCounts } from './keyword-counts';
 import type { Theme } from './theme';
 import { authClient } from './auth';
+import { deadlineIso, loadOpportunities, removeOpportunity, saveOpportunity, type Opportunity, type OpportunityStatus } from './opportunities';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadBoardOrderPreference, loadKeywordsPreference, parseKeywords, saveBoardOrderPreference, saveKeywordsPreference } from './preferences';
 import { applyBoardOrder, BOARD_ORDER_LIMIT, parseBoardOrder } from './board-order';
@@ -196,6 +197,7 @@ export class AppController extends Reactive {
     notices: { state: true }, sources: { state: true }, matched: { state: true }, generatedAt: { state: true },
     view: { state: true }, board: { state: true }, keyword: { state: true }, keywords: { state: true }, query: { state: true },
     loading: { state: true }, devicesLoaded: { state: true }, accountDataLoaded: { state: true }, aiStateLoaded: { state: true }, settingsCapped: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
+    opportunities: { state: true }, opportunitiesStatus: { state: true }, opportunityFilter: { state: true },
     toast: { state: true }, linkCopied: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
     saved: { state: true }, read: { state: true }, collapsed: { state: true }, sort: { state: true }, internSort: { state: true }, coopSort: { state: true }, coopKind: { state: true }, savedSort: { state: true },
@@ -298,6 +300,11 @@ export class AppController extends Reactive {
   onboardingError = '';
   private onboardingChain: { key: string; run: () => Promise<void> } | null = null;
   keywordNote = '';
+  // 내 기회함(상태·메모). 계정이 바뀌면 비운다. 표가 없거나 못 불러오면 'unavailable'로 두고 화면에서 숨긴다.
+  opportunities = new Map<string, Opportunity>();
+  opportunitiesStatus: 'idle' | 'ready' | 'unavailable' = 'idle';
+  opportunityFilter: 'all' | OpportunityStatus = 'all';
+  private opportunitySeq = new Map<string, number>();
   private keywordWrite: Promise<void> = Promise.resolve();
   authReady = !authClient;
   authEmail: string | null = null;
@@ -433,6 +440,7 @@ export class AppController extends Reactive {
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); this.detailTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
           this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.devicesLoaded = false; this.thisDeviceId = null; this.devicesBusy = false; this.devicesError = ''; this.devicesLoadFailed = false; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.opportunities = new Map(); this.opportunitiesStatus = 'idle'; this.opportunityFilter = 'all'; this.opportunitySeq = new Map();
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -465,6 +473,7 @@ export class AppController extends Reactive {
             void Promise.allSettled(first).then(() => { if (epoch === this.subscriptionsEpoch && userId === this.authUserId) { this.accountDataLoaded = true; this.liveAccountReady = true; this.saveCurrentListCache(userId, epoch); } });
             setTimeout(() => { if (epoch === this.subscriptionsEpoch) { this.accountDataLoaded = true; this.aiStateLoaded = true; this.settingsCapped = true; } }, AppController.FIRST_LOAD_LIMIT_MS);
             void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch);
+            void this.refreshOpportunities(userId, epoch);
             void this.refreshDevices();   // 알림 설정을 열 때 기기 구역이 뒤늦게 끼어들지 않게 미리 받는다
           })(); }, 0);
           setLocalOwner(userId);
@@ -715,8 +724,68 @@ export class AppController extends Reactive {
     this.saved = next;
     storeSaved(next);
     this.showToast(added ? '저장했어요' : '저장을 지웠어요');
+    // 저장하면 기회함에 '관심'으로 자동 기록한다(입력 없음). 이미 기록이 있으면 상태를 덮지 않는다.
+    if (added && this.opportunitiesStatus === 'ready' && !this.opportunities.has(notice.id)) {
+      void this.saveOpportunityFor(notice, boardName(this.sources.find((item) => item.id === notice.source_id), notice.source_id), { status: 'interested' });
+    }
     const changes = added ? [{ id: notice.id, saved: true }] : savedMembers.map((member) => ({ id: member.id, saved: false }));
     this.uploadStates((guard) => pushSaved(authClient!, changes, guard));
+  }
+
+  async refreshOpportunities(userId: string, epoch: number): Promise<void> {
+    if (!authClient) return;
+    const same = () => epoch === this.subscriptionsEpoch && this.authUserId === userId;
+    try {
+      const items = await loadOpportunities(authClient, userId, same);
+      if (!same()) return;
+      this.opportunities = new Map(items.map((item) => [item.notice_id, item]));
+      this.opportunitiesStatus = 'ready';
+    } catch {
+      if (!same()) return;
+      // 표가 없거나(운영 적용 전) 읽지 못하면 이 영역만 숨긴다. 다른 화면은 그대로다.
+      this.opportunities = new Map(); this.opportunitiesStatus = 'unavailable';
+    }
+  }
+
+  /** 상세에 "내 진행 상태"를 보일지: 기록을 불러왔고, 저장했거나 이미 기록이 있을 때. */
+  opportunityShown(notice: Notice): boolean {
+    return !!this.authUserId && this.opportunitiesStatus === 'ready' && (this.isSaved(notice) || this.opportunities.has(notice.id));
+  }
+
+  /** 상태·메모를 저장한다. 처음이면 제목·링크·게시판·마감 사본과 함께 만든다. 응답을 받은 뒤에 화면에 반영한다. */
+  async saveOpportunityFor(notice: Notice, source: string, patch: { status?: OpportunityStatus; note?: string | null }): Promise<void> {
+    if (!authClient || !this.authUserId) return;
+    const client = authClient, userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    const same = async () => epoch === this.subscriptionsEpoch && this.authUserId === userId && await sessionIs(client, userId);
+    const seq = (this.opportunitySeq.get(notice.id) ?? 0) + 1;
+    this.opportunitySeq.set(notice.id, seq);
+    try {
+      const saved = await saveOpportunity(client, userId, {
+        notice_id: notice.id, title: cleanTitle(notice.title_ko || notice.title), url: /^https?:\/\//i.test(notice.url) ? notice.url : null,
+        board: source || null, deadline: deadlineIso(notice.deadline), ...patch,
+      }, same);
+      if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId || this.opportunitySeq.get(notice.id) !== seq) return;
+      this.opportunities = new Map(this.opportunities).set(notice.id, saved);
+    } catch {
+      if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
+      this.showToast('기록을 저장하지 못했어요. 다시 눌러 주세요');
+      this.requestUpdate();
+    }
+  }
+
+  async removeOpportunityFor(notice: Notice): Promise<void> {
+    if (!authClient || !this.authUserId) return;
+    const client = authClient, userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    const same = async () => epoch === this.subscriptionsEpoch && this.authUserId === userId && await sessionIs(client, userId);
+    this.opportunitySeq.set(notice.id, (this.opportunitySeq.get(notice.id) ?? 0) + 1);
+    try {
+      await removeOpportunity(client, userId, notice.id, same);
+      if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
+      const next = new Map(this.opportunities); next.delete(notice.id); this.opportunities = next;
+      this.showToast('기록을 지웠어요');
+    } catch {
+      if (epoch === this.subscriptionsEpoch && this.authUserId === userId) this.showToast('기록을 지우지 못했어요. 다시 눌러 주세요');
+    }
   }
 
   /** 저장한 글. 지금 목록에 있으면 최신 정보로, 밀려났으면 저장할 때 정보로 보여 준다. */
@@ -1838,7 +1907,8 @@ export class AppController extends Reactive {
       // 같은 공지의 사본을 따로 저장해 두었어도 한 번만 보여 준다(저장한 목록 안에서만 거르므로 하나만 저장한 공지는 그대로다)
       const saved = this.filtered(decorate(this.savedNotices()));
       const firstSeen = new Set(dropDuplicates(saved).map((n) => n.id));
-      return saved.filter((n) => firstSeen.has(n.id) || n.id === this.selectedId || n.id === this.openedId);
+      const unique = saved.filter((n) => firstSeen.has(n.id) || n.id === this.selectedId || n.id === this.openedId);
+      return this.opportunityFilter === 'all' || this.opportunitiesStatus !== 'ready' ? unique : unique.filter((n) => this.opportunities.get(n.id)?.status === this.opportunityFilter);
     }
     return this.byTab(this.filtered(decorate(this.notices)), this.tab());
   }

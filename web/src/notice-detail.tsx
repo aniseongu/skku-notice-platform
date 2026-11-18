@@ -6,7 +6,8 @@ import { useDelayed } from './ui';
 import { summaryLines } from './summary-lines';
 import type { GradPart } from './graduation-assessment';
 import { GraduationNotes, GraduationSection, type GraduationModel } from './graduation-assessment-view';
-import { DETAIL_SECTION, IMAGE_MISSING_CLASS, SECTION_TITLE, SKELETON_BAR } from './cls';
+import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, NOTE_MAX, type OpportunityStatus } from './opportunities';
+import { DETAIL_SECTION, SETTINGS_INPUT, IMAGE_MISSING_CLASS, SECTION_TITLE, SKELETON_BAR } from './cls';
 import { cleanHtml, fileType, IMAGE_MISSING, replaceBrokenImage } from './rich';
 
 export interface NoticeDetailModel {
@@ -27,9 +28,63 @@ export interface NoticeDetailModel {
   /** 톨게이트 현장실습 공고(원문이 학교 로그인이 필요한 페이지). */
   coop?: boolean;
   retry: () => void;
+  /** 내 기회함: 저장했거나 기록이 있는 공지에서만 있다(표가 없으면 없다). */
+  opportunity?: OpportunityModel;
   /** 소프트웨어학과 원전공이 인턴 공고를 열었을 때만 있다. */
   graduation?: GraduationModel;
   grad?: GradPart[];
+}
+
+export interface OpportunityModel {
+  status: OpportunityStatus | null;
+  note: string;
+  hasRecord: boolean;
+  onStatus: (status: OpportunityStatus) => void;
+  onNote: (note: string) => void;
+  onRemove: () => void;
+}
+
+const SEG = 'min-h-[44px] rounded-sm border border-line bg-surface px-[4px] py-0 text-[14px] font-medium text-ink-2 [@media(hover:hover)]:[&:hover:not([aria-checked=true])]:bg-hover active:[&:not([aria-checked=true])]:bg-hover aria-checked:border-ink aria-checked:bg-sunken aria-checked:font-semibold aria-checked:text-ink';
+const TEXT_ACTION = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-ink-2';
+
+/** 내 진행 상태: 칩 한 번으로 바꾸고 메모는 한 줄. 직접 적는 기록이라 인증·합격 말은 쓰지 않는다. */
+function OpportunitySection({ model }: { model: OpportunityModel }) {
+  const [confirming, setConfirming] = useState(false);
+  const [memoOpen, setMemoOpen] = useState(false);   // 메모는 선택이라 접어 둔다. 이미 쓴 메모가 있으면 펼쳐 보인다.
+  const focusable = model.status ?? OPPORTUNITY_STATUSES[0];
+  const move = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
+    const at = buttons.findIndex((button) => button === document.activeElement);
+    const next = (Math.max(at, 0) + step + buttons.length) % buttons.length;
+    buttons[next]?.focus();
+    model.onStatus(OPPORTUNITY_STATUSES[next]);
+  };
+  const memo = !!model.note || memoOpen;
+  const remove = !model.hasRecord ? null : confirming
+    ? <span className="flex items-center gap-[4px]"><span className="mr-[4px] text-[14px] text-ink-2">기록을 지울까요?</span>
+      <button type="button" className={`${TEXT_ACTION} text-danger`} onClick={() => { setConfirming(false); model.onRemove(); }}>지우기</button>
+      <button type="button" className={TEXT_ACTION} onClick={() => setConfirming(false)}>취소</button></span>
+    : <button type="button" className={TEXT_ACTION} onClick={() => setConfirming(true)}>기록 지우기</button>;
+  return <section className={`${DETAIL_SECTION} opportunity`} aria-labelledby="sec-opportunity">
+    <h3 id="sec-opportunity" className={`${SECTION_TITLE} !mb-[2px]`}>내 진행 상태</h3>
+    <p className="m-0 mb-[10px] text-[13px] leading-[19px] text-ink-3">직접 적는 기록이에요. 저장을 지워도 남아요</p>
+    <div role="radiogroup" aria-labelledby="sec-opportunity" className="grid grid-cols-4 gap-[8px]" onKeyDown={move}>
+      {OPPORTUNITY_STATUSES.map((status) => <button type="button" role="radio" key={status} className={SEG} aria-checked={model.status === status}
+        tabIndex={status === focusable ? 0 : -1} onClick={() => model.onStatus(status)}>{OPPORTUNITY_LABELS[status]}</button>)}
+    </div>
+    <div className="mt-[4px] flex items-center justify-between gap-[4px]">
+      {memo
+        ? <input key={model.note} type="text" autoFocus={!model.note} className={`${SETTINGS_INPUT} mt-[4px] w-full`} aria-label="메모" placeholder="메모를 남겨요" maxLength={NOTE_MAX} defaultValue={model.note}
+          onBlur={(event) => { const value = event.currentTarget.value; if (value.trim() !== model.note) model.onNote(value); if (!value.trim()) setMemoOpen(false); }}
+          onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
+        : <button type="button" className={`${TEXT_ACTION} -ml-[8px]`} onClick={() => setMemoOpen(true)}>메모 추가</button>}
+      {!memo ? remove : null}
+    </div>
+    {memo ? <div className="flex justify-end">{remove}</div> : null}
+  </section>;
 }
 
 /** 그림의 대체 텍스트: 자동으로 읽은 글이 있으면 앞부분을 함께 알려 준다. */
@@ -116,6 +171,7 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
     {hasReason ? <p className="detail-reason mt-[10px] text-[14px] leading-[21px] text-ink-2"><Reason interests={interests} ai={ai} rule={model.rule} pending={model.pending} /></p> : null}
     {notice.deadline ? <p className="detail-deadline mt-[6px] text-[14px] leading-[21px] font-semibold tabular-nums">{notice.deadline_kind ?? '마감'} {deadlineDetail(notice.deadline)} <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''} ml-[6px] text-[14px] leading-[18px] tabular-nums ${passed ? 'font-medium' : 'font-bold'} ${urgent ? 'text-danger' : passed ? 'text-ink-3' : ''}`}>{deadlineText(notice.deadline, model.today)}</span></p> : null}
     {notice.changed_at ? <p className="detail-change mt-[4px] text-[13px] leading-[19px] text-ink-2">{koreanDate(notice.changed_at.slice(0, 10))}에 원문 {notice.change_kind === '제목' ? '제목이' : '본문이'} 바뀌었어요</p> : null}
+    {model.opportunity ? <OpportunitySection key={notice.id} model={model.opportunity} /> : null}
     {summary ? <section className={`${DETAIL_SECTION} summary`} aria-labelledby="sec-summary"><h3 id="sec-summary" className={SECTION_TITLE}>요약</h3>{summaryLines(summary).map((line, index) => <p className={SUMMARY_P} key={index}>{line}</p>)}</section>
       : model.summarizing ? <SummaryLoading key={notice.id} />
       : null}

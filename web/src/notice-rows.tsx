@@ -18,6 +18,8 @@ export interface NoticeRowModel {
   grad?: GradPart[];
   /** AI 판정 전(키가 있는 사용자의 새 공지). 줄이 비어 보이지 않게 "판정 중"을 적는다. */
   pending?: boolean;
+  /** 내 기회함 상태 글자(저장 보기에서만 보인다). */
+  status?: string;
 }
 export interface NoticeRowsModel {
   rows: NoticeRowModel[];
@@ -43,7 +45,7 @@ function NoticeRows({ model }: { model: NoticeRowsModel }) {
   return <ol className="rows m-0 list-none overflow-hidden bg-surface p-0 min-[720px]:rounded-none min-[720px]:bg-transparent">{model.rows.map((row, index) => {
     const n = row.notice;
     const title = cleanTitle(n.title_ko || n.title);
-    const tags = [n.category, n.pinned ? '고정' : '', n.changed_at ? '수정됨' : '', !model.savedView && row.saved ? '저장함' : ''].filter(Boolean).join(', ');
+    const tags = [model.savedView ? row.status ?? '' : '', n.category, n.pinned ? '고정' : '', n.changed_at ? '수정됨' : '', !model.savedView && row.saved ? '저장함' : ''].filter(Boolean).join(', ');
     const passed = n.deadline ? deadlinePassed(n.deadline) : false;
     const urgent = !!n.deadline && !passed && daysLeft(n.deadline, model.today) <= 3;
     const hasReason = row.interests.length > 0 || !!row.ai || !!row.rule || (row.grad?.length ?? 0) > 0 || !!row.pending;
