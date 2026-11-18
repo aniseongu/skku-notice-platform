@@ -48,8 +48,8 @@ test('public notice preview reads one notice by id without opening the tables', 
     // 없는 id, 만료된 공지는 빈 결과
     assert.equal((await db.query(`select * from public.get_public_notice('school/999')`)).rows.length, 0);
     assert.equal((await db.query(`select * from public.get_public_notice('school/2')`)).rows.length, 0);
-    // 현장실습(coop) 출처는 익명 미리보기에서 뺀다
-    assert.equal((await db.query(`select * from public.get_public_notice('skku-coop/7')`)).rows.length, 0);
+    // 현장실습(coop)도 미리보기에 포함한다(사용자 결정)
+    assert.equal((await db.query(`select * from public.get_public_notice('skku-coop/7')`)).rows.length, 1);
     // 잘못된 입력은 거절
     for (const bad of ['', 'school', 'school/1 or 1=1', "school/1'--", 'School/1', 'school/a', `s/${'1'.repeat(200)}`, '../etc/1']) {
       await assert.rejects(db.query('select * from public.get_public_notice($1)', [bad]), /invalid notice id/, bad);
