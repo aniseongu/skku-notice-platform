@@ -87,7 +87,7 @@ sources:
   - id: cscience-notice
     name: 자연과학대학 공지
     kind: skku-cms
-    url: https://cscience.skku.edu/cscience/community/under_notice.do
+    url: https://cscience.skku.edu/cscience/notice.do
     on_demand: true
 
   - id: ice-notice

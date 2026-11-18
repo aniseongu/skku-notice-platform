@@ -56,7 +56,7 @@ def test_added_boards_2026_11_03(source_id: str, url: str, expected_count: int, 
 def test_view_board_id_variant_uses_a_stable_canonical_url():
     html = Path("tests/fixtures/art_notice_list_2026-11-07.html").read_text(encoding="utf-8")
     notices = parse_list(html, "art-notice", "https://art.skku.edu/art/notice.do")
-    assert [n.article_no for n in notices] == ["138879", "138885"]
+    assert [n.article_no for n in notices] == ["1422", "1421"]
     assert notices[0].title.startswith("[일반교직]")
     assert notices[0].category == "학사"
     assert notices[0].posted_on.isoformat() == "2026-11-06"
@@ -98,3 +98,13 @@ def test_exchange_notice_table() -> None:
     assert notices[0].posted_on == date(2026, 11, 11)
     assert notices[1].article_no == "141091"
     assert notices[1].posted_on == date(2026, 10, 29)
+
+
+def test_cscience_notice_board_uses_per_post_number_not_shared_board_id() -> None:
+    url = "https://cscience.skku.edu/cscience/notice.do"
+    html = Path("tests/fixtures/cscience_notice_list_2026-11-18.html").read_text(encoding="utf-8")
+    notices = parse_list(html, "cscience-notice", url)
+    assert len(notices) == 10
+    assert len({n.article_no for n in notices}) == 10
+    assert notices[0].article_no == "822"
+    assert notices[0].url.startswith(f"{url}?mode=view&viewBoardId=138879&itemId=CF697A47")

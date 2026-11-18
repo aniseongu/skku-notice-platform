@@ -18,6 +18,7 @@ LINK_SELECTOR = "a[href]"
 CATEGORY_SELECTOR = ".c-board-list-category"
 INFO_SELECTOR = "dd.board-list-content-info li"
 DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+NO_RE = re.compile(r"No\.\s*(\d+)")
 ITEM_ID_RE = re.compile(r"[0-9A-F]{32}[A-Z0-9]{6}")
 DETAIL_SELECTORS = ("dl.board-write-box dd", ".board-view-content-wrap")
 ATTACHMENT_SELECTOR = ".filedown_list a[href*='mode=download'], .board-view-box a[href*='mode=download']"
@@ -60,11 +61,17 @@ def _parse_row(row: LexborNode, source_id: str, board_url: str) -> Notice:
     if not article_no and query.get("viewBoardId"):
         # 일부 단과대·학과 사이트는 articleNo 대신 viewBoardId와 itemId를 쓴다. itemId의 앞 32자리가 고정이고
         # 뒤 6글자는 요청마다 바뀌지만 서버는 앞부분만 확인하므로, 주소가 흔들리지 않게 뒤를 고정해 저장한다.
-        article_no = query["viewBoardId"][0]
+        # viewBoardId는 분류(게시판) 번호라 여러 글이 같은 값을 가진다. 목록의 "No.N"이 글마다 다른 번호다.
+        board_id = query["viewBoardId"][0]
+        article_no = board_id
         item = query.get("itemId", [""])[0]
+        info_nodes = row.css(INFO_SELECTOR)
+        numbered = NO_RE.search(_clean(info_nodes[0])) if info_nodes else None
+        if numbered:
+            article_no = numbered.group(1)
         if not ITEM_ID_RE.fullmatch(item):
             raise ParseError("row without a usable itemId")
-        view_url = f"{board_url.split('?', 1)[0]}?mode=view&viewBoardId={article_no}&itemId={item[:32]}AAAAAA"
+        view_url = f"{board_url.split('?', 1)[0]}?mode=view&viewBoardId={board_id}&itemId={item[:32]}AAAAAA"
     if not article_no.isdecimal() or not title:
         raise ParseError("row without articleNo or title")
     info = row.css(INFO_SELECTOR)
