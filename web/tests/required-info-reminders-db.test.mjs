@@ -153,11 +153,11 @@ test('migration 20261118120000 drops the AI key from old reminder history and ke
   const db = await setup();
   try {
     const profile = { ...base, programs: [BIZ] };
-    const a = await addUser(db, 1, profile, 'none'), b = await addUser(db, 2, profile, 'none'), c = await addUser(db, 3, profile, 'none');
+    const a = await addUser(db, 1, profile, 'none'), b = await addUser(db, 2, profile, 'none'), c = await addUser(db, 3, profile, 'none'), d = await addUser(db, 4, profile, 'none');
     const seed = async () => {
       await db.exec('delete from public.user_required_reminders');
       await db.exec(`insert into public.user_required_reminders(user_id, missing_key, sends, last_sent_at) values
-        ('${a}', 'AI 키', 2, now()), ('${b}', '인턴십,AI 키', 1, now()), ('${c}', '인턴십,AI 키', 3, now()), ('${c}', '인턴십', 1, now())`);
+        ('${a}', 'AI 키', 2, now()), ('${b}', '인턴십,AI 키', 1, now()), ('${c}', '인턴십,AI 키', 3, now()), ('${c}', '인턴십', 1, now()), ('${d}', '인턴십,AI 키', 3, now()), ('${d}', '인턴십', 0, null)`);
     };
     await seed();
     const dir = new URL('../../supabase/migrations/', import.meta.url);
@@ -165,6 +165,6 @@ test('migration 20261118120000 drops the AI key from old reminder history and ke
     await db.exec(sql);
     await db.exec(sql);   // 멱등
     const rows = (await db.query('select user_id, missing_key, sends from public.user_required_reminders order by user_id')).rows;
-    assert.deepEqual(rows.map((r) => [r.user_id, r.missing_key, r.sends]), [[b, '인턴십', 1], [c, '인턴십', 1]]);
+    assert.deepEqual(rows.map((r) => [r.user_id, r.missing_key, r.sends]), [[b, '인턴십', 1], [c, '인턴십', 3], [d, '인턴십', 3]]);   // 기존 행이 있으면 큰 횟수로 병합한다(지워서 횟수가 사라지지 않는다)
   } finally { await db.close(); }
 });

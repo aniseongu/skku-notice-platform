@@ -271,14 +271,11 @@ def run_canvas_batch(store: PushStore, private_key: str, subject: str, now: date
 
 
 APP_URL = "https://skku-notice-platform.pages.dev/"
-AI_KEY_BODY = "공지를 골라 드리려면 AI 키가 필요해요. 앱을 열면 바로 연결할 수 있어요"
 
 
 def required_message(missing: list[str]) -> tuple[str, str]:
     """채워야 할 필수 정보를 알리는 알림 문구."""
     items = [str(item) for item in missing][:5]
-    if items == ["AI 키"]:
-        return "AI 키를 다시 연결해 주세요", AI_KEY_BODY
     return "필요한 정보를 채워 주세요", f"앱을 열고 {', '.join(items)}만 고르면 돼요"
 
 

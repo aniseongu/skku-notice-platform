@@ -320,7 +320,6 @@ def _device(device_id):
 
 def test_required_message_names_missing_items():
     title = "필요한 정보를 채워 주세요"
-    assert worker.required_message(["AI 키"]) == ("AI 키를 다시 연결해 주세요", worker.AI_KEY_BODY)
     assert worker.required_message(["학교 정보", "인턴십"])[0] == title
     assert worker.required_message(["학교 정보", "인턴십"])[1] == "앱을 열고 학교 정보, 인턴십만 고르면 돼요"
 
