@@ -348,6 +348,7 @@ export function Onboarding({ app }: { app: AppController }) {
     const mode = installMode(navigator.userAgent, isStandalone(), !!app.install);
     const iosHint = mode === 'ios' || mode === 'ios-browser' || mode === 'ios-open-safari' ? MANUAL_INSTALL_HINT[mode] : null;
     title = '새 공지를 알림으로 받을까요?';
+    lead = '내 전공에 맞는 새 공지가 올라오면 이렇게 바로 알려 드려요';
     body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]">
       <NoticeExample idPrefix="onb" />
       {status === 'denied' || status === 'unsupported' || failed ? <div className="grid gap-[2px]">
@@ -381,7 +382,7 @@ export function Onboarding({ app }: { app: AppController }) {
       <div className="onb-brand-lockup flex items-center gap-[10px] text-[17px] font-bold tracking-[-0.02em]"><svg className="brand-mark size-[32px] text-accent"><use href="icons/sprite.svg#brand" /></svg>{APP_NAME}</div>
       <div className="onb-brand-copy grid gap-[10px]">
         <h2 className="m-0 text-[22px] leading-[30px] font-bold tracking-[-0.02em]">내 전공에 맞는 공지만<br />골라서 받아요</h2>
-        <p className="m-0 text-[15px] text-ink-2">몇 가지만 고르면 필요한 게시판과 알림을 맞춰 드려요.</p>
+        <p className="m-0 text-[15px] text-ink-2">{step === 'notify' ? '알림을 켜면 새 공지를 바로 받아 볼 수 있어요.' : '몇 가지만 고르면 필요한 게시판과 알림을 맞춰 드려요.'}</p>
       </div>
       <ol className="onb-steplist m-0 grid list-none gap-[14px] p-0">{STEP_LABELS.map((label, i) =>
         <li className="flex items-center gap-[12px] text-[15px] text-ink-3 data-[state=current]:font-bold data-[state=current]:text-ink data-[state=done]:text-ink-2 data-[state=current]:[&_.num]:border-accent data-[state=current]:[&_.num]:bg-accent data-[state=current]:[&_.num]:text-on-accent data-[state=done]:[&_.num]:border-accent data-[state=done]:[&_.num]:text-accent" key={label} data-state={i < stepIndex(step) ? 'done' : i === stepIndex(step) ? 'current' : 'todo'}><span className="num inline-grid size-[28px] flex-none place-items-center rounded-[50%] border-[1.5px] border-line bg-surface text-[13px] font-bold">{i < stepIndex(step) ? '✓' : i + 1}</span>{label}</li>)}</ol>
@@ -401,7 +402,7 @@ export function Onboarding({ app }: { app: AppController }) {
           <span className="onb-top-slot block size-[44px]" aria-hidden="true" />
         </div>
       </div>
-      <div className="onb-body mx-auto grid w-[min(100%,36rem)] flex-[1_0_auto] auto-rows-max content-start gap-[16px] px-[16px] pt-[8px] pb-[24px] min-[900px]:flex-none [&>p]:m-0 [&>p]:text-ink-2 [&_h1:focus]:outline-none [&_h1]:mt-[8px] [&_h1]:mb-0 [&_h1]:overflow-visible [&_h1]:text-clip [&_h1]:whitespace-normal min-[900px]:[&_h1]:text-[21px] min-[900px]:[&_h1]:leading-[28px]">
+      <div className={`${step === 'notify' ? 'min-[900px]:flex-[1_0_auto]!' : ''} onb-body mx-auto grid w-[min(100%,36rem)] flex-[1_0_auto] auto-rows-max content-start gap-[16px] px-[16px] pt-[8px] pb-[24px] min-[900px]:flex-none [&>p]:m-0 [&>p]:text-ink-2 [&_h1:focus]:outline-none [&_h1]:mt-[8px] [&_h1]:mb-0 [&_h1]:overflow-visible [&_h1]:text-clip [&_h1]:whitespace-normal min-[900px]:[&_h1]:text-[21px] min-[900px]:[&_h1]:leading-[28px]`}>
         <h1 id="onb-title" ref={heading} tabIndex={-1}>{title}</h1>
         {lead ? <p className="onb-lead m-0 text-ink-2">{lead}</p> : null}
         {body}

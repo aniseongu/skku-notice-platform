@@ -776,6 +776,7 @@ export class AppController extends Reactive {
   aiHintShown(): boolean {
     const userId = this.authUserId;
     if (!userId || this.hasUsableAiKey() !== false) return false;
+    if (!this.aiPrefs.aiEnabled) return false;   // 요약·판정을 꺼 둔 사용자에게는 연결을 권하지 않는다
     if (this.aiHintSession.has(userId)) return false;
     try { return localStorage.getItem(`platform:ai-hint-dismissed:${userId}`) !== '1'; } catch { return true; }
   }

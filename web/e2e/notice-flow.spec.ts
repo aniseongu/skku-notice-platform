@@ -2983,8 +2983,8 @@ test('detail without an AI key offers one connect line, never a waiting label, a
   await page.locator('notice-rows-screen a.row').nth(1).click();
   const hint = page.getByRole('region', { name: 'AI 연결 안내' });
   await expect(hint).toBeVisible();
-  await expect(hint).toContainText('AI를 연결하면 요약하고, 나에게 맞는지 알려 줘요');
-  expect((await hint.getByRole('button', { name: '연결하기' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect(hint).toContainText('AI를 연결하면 공지를 세 줄로 요약하고, 나에게 맞는지 알려 줘요');
+  expect((await hint.getByRole('button', { name: 'AI 연결하기' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect((await hint.getByRole('button', { name: 'AI 안내 닫기' }).boundingBox())!.width).toBeGreaterThanOrEqual(44);
   // 닫으면 같은 계정에는 다시 안 보이고, 다른 계정에는 보인다.
   await hint.getByRole('button', { name: 'AI 안내 닫기' }).click();
@@ -3006,7 +3006,7 @@ test('the connect button in the detail opens the AI connection page, and a conne
   await withApp(page, { aiKeys: [liveKey] });
   await expect(hint).toHaveCount(0);
   await withApp(page, { aiKeys: [] });
-  await hint.getByRole('button', { name: '연결하기' }).click();
+  await hint.getByRole('button', { name: 'AI 연결하기' }).click();
   await expect(page).toHaveURL(/keys=1/);
   await expect(page.locator('platform-settings-screen')).toBeVisible();
 });
@@ -3022,4 +3022,6 @@ test('the AI connect line stays hidden while the key state is unknown (loading, 
   await expect(page.getByRole('region', { name: 'AI 연결 안내' })).toHaveCount(0);
   await withApp(page, { byokError: '', byokOn: false });
   await expect(page.getByRole('region', { name: 'AI 연결 안내' })).toHaveCount(0);
+  await withApp(page, { byokOn: true, aiPrefs: { aiEnabled: false } });
+  await expect(page.getByRole('region', { name: 'AI 연결 안내' })).toHaveCount(0);   // 요약을 꺼 둔 사용자에게는 안내하지 않는다
 });

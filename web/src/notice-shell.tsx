@@ -189,7 +189,7 @@ export function NoticeShell({ app }: { app: AppController }) {
     <UpdateBar />
     {app.authUserId && !onboarding && !settings && !reading && !app.selecting ? <BottomSheets app={app} /> : null}
     {/* 토스트는 모든 화면 폭에서 아래 가운데(TDS Toast의 아래 위치: 동작 단추를 둘 수 있다). 휴대폰은 탭 바 위, 넓은 화면은 바닥에서 24px. */}
-    <div className="toast fixed bottom-[calc(var(--tabbar-h)+16px+env(safe-area-inset-bottom))] left-1/2 min-[720px]:bottom-[24px] z-[4] w-max max-w-[calc(100%-32px)] [transform:translateX(-50%)] rounded-lg bg-toast px-[20px] py-[14px] text-[15px] leading-[22px] font-medium text-on-toast [box-shadow:var(--shadow-pop)]" role="status" hidden={!app.toast}>{app.toast}{app.toastLink ? <div className="toast-actions flex items-center justify-between gap-[12px]">
+    <div className="toast fixed bottom-[calc(var(--tabbar-h)+16px+env(safe-area-inset-bottom))] left-1/2 min-[720px]:bottom-[24px] z-[4] w-max max-w-[calc(100%-32px)] [transform:translateX(-50%)] rounded-lg border border-line bg-toast px-[20px] py-[14px] text-[15px] leading-[22px] font-medium text-on-toast [box-shadow:var(--shadow-pop)]" role="status" hidden={!app.toast}>{app.toast}{app.toastLink ? <div className="toast-actions flex items-center justify-between gap-[12px]">
       <a className={`${TOAST_ACTION} underline`} href={app.toastLink} target={app.toastLink.startsWith('?') ? '_self' : '_blank'} rel="noopener noreferrer">{app.toastLinkLabel}</a>
       <button type="button" className={`${TOAST_ACTION} min-w-[44px] justify-center border-0 bg-transparent px-[4px] py-0`} onClick={() => { app.toast = ''; app.toastLink = null; }}>닫기</button></div> : null}</div>
     {app.shortcutsOpen ? <ShortcutsDialog app={app} /> : null}
@@ -416,12 +416,15 @@ function ViewFilters({ app }: { app: AppController }) {
     for (const notice of app.savedNotices()) { const status = app.opportunities.get(notice.id)?.status; if (status) counts.set(status, (counts.get(status) ?? 0) + 1); }
     const total = app.savedNotices().length;
     return <>
-      {app.opportunitiesStatus === 'ready' && app.opportunities.size > 0 ? <div className="opportunity-filter flex gap-[8px] overflow-x-auto px-[var(--gutter)] pt-[8px] pb-0 [scrollbar-width:none] select-none [-webkit-user-select:none] min-[720px]:px-[24px]" role="group" aria-label="진행 상태로 거르기">
-        {(['all', ...OPPORTUNITY_STATUSES] as const).map((id) => {
-          const count = id === 'all' ? total : counts.get(id) ?? 0;
-          return <button type="button" key={id} className={`${CHIP} ${count === 0 && app.opportunityFilter !== id ? 'opacity-50' : ''}`} aria-pressed={app.opportunityFilter === id}
-            onClick={() => { app.opportunityFilter = id; app.listChanged(); }}>{id === 'all' ? '전체' : OPPORTUNITY_LABELS[id]} <span className="tabular-nums">{count}</span></button>;
-        })}
+      {app.opportunitiesStatus === 'ready' && app.opportunities.size > 0 ? <div className="relative">
+        <div className="opportunity-filter flex gap-[8px] overflow-x-auto px-[var(--gutter)] pt-[8px] pb-0 [scrollbar-width:none] select-none [-webkit-user-select:none] min-[720px]:px-[24px]" role="group" aria-label="진행 상태로 거르기">
+          {(['all', ...OPPORTUNITY_STATUSES] as const).map((id) => {
+            const count = id === 'all' ? total : counts.get(id) ?? 0;
+            return <button type="button" key={id} className={`${CHIP} [&[aria-pressed=false]]:border-ink-3 ${count === 0 && app.opportunityFilter !== id ? 'text-ink-3' : ''}`} aria-pressed={app.opportunityFilter === id}
+              onClick={() => { app.opportunityFilter = id; app.listChanged(); }}>{id === 'all' ? '전체' : OPPORTUNITY_LABELS[id]} <span className="tabular-nums">{count}</span></button>;
+          })}
+        </div>
+        <span className="pointer-events-none absolute inset-y-0 right-0 w-[40px] bg-linear-to-l from-bg to-transparent min-[720px]:hidden" aria-hidden="true"></span>
       </div> : null}
       <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>{select}<SortSelect app={app} /></div></div>
     </>;

@@ -47,7 +47,7 @@ export interface OpportunityModel {
 }
 
 const SEG = 'inline-flex min-h-[44px] items-center justify-center gap-[3px] rounded-sm border border-line bg-surface px-[2px] py-0 text-[14px] font-medium text-ink-2 [@media(hover:hover)]:[&:hover:not([aria-checked=true])]:bg-hover active:[&:not([aria-checked=true])]:bg-hover aria-checked:border-accent aria-checked:bg-accent aria-checked:font-semibold aria-checked:text-on-accent';
-const SUB_ACTION = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[13px] font-medium text-ink-3';
+const SUB_ACTION = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[13px] font-medium text-ink-2';
 const TEXT_ACTION = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-ink-2';
 
 /** 내 진행 상태: 칩 한 번으로 바꾸고 메모는 한 줄. 직접 적는 기록이라 인증·합격 말은 쓰지 않는다. */
@@ -70,22 +70,23 @@ function OpportunitySection({ model }: { model: OpportunityModel }) {
   };
   const memo = !!model.note || memoOpen;
   const remove = !model.hasRecord ? null : confirming
-    ? <div className="flex flex-wrap items-center justify-end gap-[4px]"><span className="mr-[4px] text-[13px] text-ink-2">상태와 메모를 지울까요?</span>
+    ? <div className="-ml-[8px] flex flex-wrap items-center gap-[4px]"><span className="ml-[8px] mr-[4px] text-[13px] text-ink-2">상태와 메모를 지울까요?</span>
       <button type="button" className={`${SUB_ACTION} text-danger`} onClick={() => { setConfirming(false); model.onRemove(); }}>지우기</button>
       <button type="button" className={SUB_ACTION} onClick={() => setConfirming(false)}>취소</button></div>
-    : <div className="flex justify-end"><button type="button" className={SUB_ACTION} onClick={() => setConfirming(true)}>상태와 메모 지우기</button></div>;
+    : <div className="-ml-[8px] flex"><button type="button" className={SUB_ACTION} onClick={() => setConfirming(true)}>상태와 메모 지우기</button></div>;
   return <section className={`${DETAIL_SECTION} opportunity`} aria-labelledby="sec-opportunity">
     <h3 id="sec-opportunity" className={`${SECTION_TITLE} !mb-[2px]`}>내 진행 상태</h3>
-    <p className="m-0 mb-[10px] text-[14px] leading-[20px] text-ink-2">저장을 해제해도 이 기록은 남아요</p>
-    <div role="radiogroup" aria-labelledby="sec-opportunity" className="grid grid-cols-4 gap-[6px] min-[720px]:max-w-[420px]" onKeyDown={move}>
+    <p className="m-0 mb-[8px] text-[14px] leading-[20px] text-ink-2">저장을 해제해도 진행 상태는 지워지지 않아요</p>
+    <div role="radiogroup" aria-labelledby="sec-opportunity" className="grid grid-cols-4 gap-[6px]" onKeyDown={move}>
       {OPPORTUNITY_STATUSES.map((status) => <button type="button" role="radio" key={status} className={SEG} aria-checked={model.status === status}
         tabIndex={status === focusable ? 0 : -1} onClick={() => model.onStatus(status)}>{model.status === status ? <svg className="size-[14px] flex-none fill-none stroke-current [stroke-width:2.25] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href="icons/sprite.svg#check" /></svg> : null}{OPPORTUNITY_LABELS[status]}</button>)}
     </div>
     {memo
-      ? <input type="text" autoFocus={!model.note} className={`${SETTINGS_INPUT} mt-[8px] w-full`} aria-label="메모" placeholder="메모를 남겨요" maxLength={NOTE_MAX} defaultValue={model.note}
+      ? <input type="text" autoFocus={!model.note} className={`${SETTINGS_INPUT} mt-[6px] w-full`} aria-label="메모" placeholder="메모를 남겨요" maxLength={NOTE_MAX} defaultValue={model.note}
         onBlur={(event) => { const value = event.currentTarget.value; if (value.trim() !== model.note) model.onNote(value); if (!value.trim()) setMemoOpen(false); }}
         onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
-      : <button type="button" className={`${TEXT_ACTION} mt-[4px] -ml-[8px]`} onClick={() => setMemoOpen(true)}>메모 추가</button>}
+      : <button type="button" className="mt-[6px] flex min-h-[44px] w-full items-center gap-[8px] rounded-md border border-line bg-surface px-[12px] py-0 text-left text-[15px] font-normal text-ink-3 [@media(hover:hover)]:hover:bg-hover active:bg-hover" onClick={() => setMemoOpen(true)}>
+        <svg className="size-[16px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round]" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>메모 추가</button>}
     {remove}
   </section>;
 }
@@ -160,10 +161,13 @@ function SummaryLoading() {
 
 /** AI 키가 없는 사용자에게 요약이 들어갈 자리에서 연결을 권한다. 한 줄과 단추 하나, 닫으면 이 계정에는 다시 안 보인다. */
 function AiConnectHint({ hint }: { hint: { connect: () => void; dismiss: () => void } }) {
-  return <section className="ai-hint mt-[16px] flex items-center gap-[8px] rounded-md bg-sunken py-[8px] pr-[4px] pl-[14px]" aria-label="AI 연결 안내">
-    <p className="m-0 min-w-0 flex-1 text-[14px] leading-[21px] text-ink-2 break-keep text-pretty">AI를 연결하면 요약하고, 나에게 맞는지 알려 줘요</p>
-    <button type="button" className="text-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex min-h-[44px] flex-none items-center rounded-sm border-0 bg-transparent px-[10px] py-0 text-[14px] font-semibold text-accent" onClick={hint.connect}>연결하기</button>
-    <button type="button" className="icon-button [@media(hover:hover)]:hover:bg-hover active:bg-hover grid size-[44px] flex-none place-items-center rounded-sm border-0 bg-transparent text-ink-3" aria-label="AI 안내 닫기" onClick={hint.dismiss}>
+  return <section className="ai-hint relative mt-[16px] grid gap-[10px] rounded-md border border-line bg-sunken py-[14px] pr-[52px] pl-[14px]" aria-label="AI 연결 안내">
+    <div>
+      <p className="m-0 text-[14px] leading-[21px] font-medium text-ink break-keep text-pretty">AI를 연결하면 공지를 세 줄로 요약하고, 나에게 맞는지 알려 줘요</p>
+      <p className="m-0 text-[13px] leading-[19px] text-ink-2">무료 키로 시작할 수 있어요</p>
+    </div>
+    <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex min-h-[44px] w-fit items-center rounded-md border border-ink-3 bg-surface px-[16px] py-0 text-[14px] font-semibold text-ink" onClick={hint.connect}>AI 연결하기</button>
+    <button type="button" className="icon-button [@media(hover:hover)]:hover:bg-hover active:bg-hover absolute top-[2px] right-[2px] grid size-[44px] place-items-center rounded-sm border-0 bg-transparent text-ink-2" aria-label="AI 안내 닫기" onClick={hint.dismiss}>
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
   </section>;
 }

@@ -66,7 +66,7 @@ test('saved view filters by status and shows it in the row; unavailable table hi
   const filter = page.getByRole('group', { name: '진행 상태로 거르기' });
   await expect(filter).toBeVisible();
   await expect(page.locator('notice-rows-screen a.row')).toHaveCount(1);
-  await expect(page.locator('notice-rows-screen a.row .status-chip')).toHaveText('지원함');
+  await expect(page.locator('notice-rows-screen a.row .status-chip:visible')).toHaveText('지원함');
   await filter.getByRole('button', { name: /^준비 중/ }).click();
   await expect(page.locator('notice-rows-screen a.row')).toHaveCount(0);
   await expect(page.getByText('이 상태의 공지가 없어요')).toBeVisible();
