@@ -11,7 +11,7 @@ import { initialReadState, isNoticeRead, loadReadState, mergeReadStates, parseRe
 import { keywordCounts } from './keyword-counts';
 import type { Theme } from './theme';
 import { authClient } from './auth';
-import { deadlineIso, loadOpportunities, removeOpportunity, saveOpportunity, type Opportunity, type OpportunityStatus } from './opportunities';
+import { deadlineIso, isLimitReached, isMissingTable, loadOpportunities, removeOpportunity, saveOpportunity, OPPORTUNITY_LABELS, TITLE_MAX, URL_MAX, type Opportunity, type OpportunityStatus } from './opportunities';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadBoardOrderPreference, loadKeywordsPreference, parseKeywords, saveBoardOrderPreference, saveKeywordsPreference } from './preferences';
 import { applyBoardOrder, BOARD_ORDER_LIMIT, parseBoardOrder } from './board-order';
@@ -209,6 +209,7 @@ export class AppController extends Reactive {
     devices: { state: true }, thisDeviceId: { state: true }, devicesBusy: { state: true }, devicesError: { state: true }, devicesLoadFailed: { state: true }, summaryTime: { state: true },
     calendarAuto: { state: true },
     accountBusy: { state: true }, accountError: { state: true },
+    aiHintTick: { state: true },
     summarizing: { state: true }, summaryError: { state: true }, summaryErrorId: { state: true },
     profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, profileError: { state: true }, settingsSection: { state: true },
     onboardingOpen: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
@@ -282,6 +283,9 @@ export class AppController extends Reactive {
   devicesLoadFailed = false;
   summaryTime: string | null = null;
   summarizing: string | null = null;
+  /** AI 연결 안내를 닫은 횟수 표시(바뀌면 화면이 다시 그려진다). */
+  aiHintTick = 0;
+  private aiHintSession = new Set<string>();
   accountBusy = false;
   /** 서버가 캘린더를 자동으로 맞추는 상태(연결할 때 맡긴 구글 열쇠가 있는지, 마지막으로 맞춘 시각, 오류) */
   calendarAuto: GoogleAutoStatus = { active: false, error: null, lastRunAt: null };
@@ -302,7 +306,9 @@ export class AppController extends Reactive {
   keywordNote = '';
   // 내 기회함(상태·메모). 계정이 바뀌면 비운다. 표가 없거나 못 불러오면 'unavailable'로 두고 화면에서 숨긴다.
   opportunities = new Map<string, Opportunity>();
-  opportunitiesStatus: 'idle' | 'ready' | 'unavailable' = 'idle';
+  opportunitiesStatus: 'idle' | 'ready' | 'unavailable' | 'failed' = 'idle';   // unavailable: 표 없음, failed: 일시적 오류(다음 새로고침에 다시 시도)
+  private opportunityQueue = new Map<string, Promise<void>>();
+  private opportunitiesLoading = false;
   opportunityFilter: 'all' | OpportunityStatus = 'all';
   private opportunitySeq = new Map<string, number>();
   private keywordWrite: Promise<void> = Promise.resolve();
@@ -440,7 +446,7 @@ export class AppController extends Reactive {
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); this.detailTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
           this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.devicesLoaded = false; this.thisDeviceId = null; this.devicesBusy = false; this.devicesError = ''; this.devicesLoadFailed = false; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
-          this.opportunities = new Map(); this.opportunitiesStatus = 'idle'; this.opportunityFilter = 'all'; this.opportunitySeq = new Map();
+          this.opportunities = new Map(); this.opportunitiesStatus = 'idle'; this.opportunityFilter = 'all'; this.opportunitySeq = new Map(); this.opportunityQueue = new Map(); this.opportunitiesLoading = false;
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -725,26 +731,61 @@ export class AppController extends Reactive {
     storeSaved(next);
     this.showToast(added ? '저장했어요' : '저장을 지웠어요');
     // 저장하면 기회함에 '관심'으로 자동 기록한다(입력 없음). 이미 기록이 있으면 상태를 덮지 않는다.
-    if (added && this.opportunitiesStatus === 'ready' && !this.opportunities.has(notice.id)) {
-      void this.saveOpportunityFor(notice, boardName(this.sources.find((item) => item.id === notice.source_id), notice.source_id), { status: 'interested' });
+    if (added && this.opportunitiesStatus === 'ready') {
+      void this.saveOpportunityFor(notice, boardName(this.sources.find((item) => item.id === notice.source_id), notice.source_id), { status: 'interested' }, false, true);
     }
     const changes = added ? [{ id: notice.id, saved: true }] : savedMembers.map((member) => ({ id: member.id, saved: false }));
     this.uploadStates((guard) => pushSaved(authClient!, changes, guard));
   }
 
   async refreshOpportunities(userId: string, epoch: number): Promise<void> {
-    if (!authClient) return;
+    if (!authClient || this.opportunitiesLoading) return;
+    this.opportunitiesLoading = true;
     const same = () => epoch === this.subscriptionsEpoch && this.authUserId === userId;
     try {
-      const items = await loadOpportunities(authClient, userId, same);
-      if (!same()) return;
-      this.opportunities = new Map(items.map((item) => [item.notice_id, item]));
-      this.opportunitiesStatus = 'ready';
-    } catch {
-      if (!same()) return;
-      // 표가 없거나(운영 적용 전) 읽지 못하면 이 영역만 숨긴다. 다른 화면은 그대로다.
-      this.opportunities = new Map(); this.opportunitiesStatus = 'unavailable';
-    }
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const items = await loadOpportunities(authClient, userId, same);
+          if (!same()) return;
+          this.opportunities = new Map(items.map((item) => [item.notice_id, item]));
+          this.opportunitiesStatus = 'ready';
+          return;
+        } catch (error) {
+          if (!same()) return;
+          this.opportunities = new Map();
+          // 표가 없으면(운영 적용 전) 이 영역만 숨긴다. 일시적 오류는 한 번 다시 시도하고, 그래도 안 되면 다음 새로고침에서 다시 읽는다.
+          if (isMissingTable(error)) { this.opportunitiesStatus = 'unavailable'; return; }
+          this.opportunitiesStatus = 'failed';
+          if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 2000));
+          if (!same()) return;
+        }
+      }
+    } finally { this.opportunitiesLoading = false; }
+  }
+
+  /** 같은 공지의 저장·삭제는 줄을 세워 앞 요청이 끝난 뒤 보낸다(늦게 커밋돼 상태가 어긋나거나 삭제한 행이 되살아나지 않게). */
+  private enqueueOpportunity(id: string, work: () => Promise<void>): Promise<void> {
+    const next = (this.opportunityQueue.get(id) ?? Promise.resolve()).then(work, work);
+    this.opportunityQueue.set(id, next);
+    void next.then(() => { if (this.opportunityQueue.get(id) === next) this.opportunityQueue.delete(id); });
+    return next;
+  }
+
+  /** 키가 없는 사용자에게 공지 상세에서 AI 연결을 한 줄로 권할지(첫 설정에서 AI 키를 빼서 이 자리에서 권한다, 2026-11-18).
+   * 키 상태를 다 불러와 "없다"고 확인됐고, 이 계정이 안내를 닫은 적이 없을 때만 true다. 닫기는 이 기기에 계정별로 기억한다(다른 계정의 닫기는 보지 않는다). */
+  aiHintShown(): boolean {
+    const userId = this.authUserId;
+    if (!userId || this.hasUsableAiKey() !== false) return false;
+    if (this.aiHintSession.has(userId)) return false;
+    try { return localStorage.getItem(`platform:ai-hint-dismissed:${userId}`) !== '1'; } catch { return true; }
+  }
+
+  dismissAiHint(): void {
+    const userId = this.authUserId;
+    if (!userId) return;
+    this.aiHintSession.add(userId);
+    try { localStorage.setItem(`platform:ai-hint-dismissed:${userId}`, '1'); } catch { /* 저장하지 못하면 이번 방문 동안만 닫는다 */ }
+    this.aiHintTick += 1;
   }
 
   /** 상세에 "내 진행 상태"를 보일지: 기록을 불러왔고, 저장했거나 이미 기록이 있을 때. */
@@ -752,40 +793,48 @@ export class AppController extends Reactive {
     return !!this.authUserId && this.opportunitiesStatus === 'ready' && (this.isSaved(notice) || this.opportunities.has(notice.id));
   }
 
-  /** 상태·메모를 저장한다. 처음이면 제목·링크·게시판·마감 사본과 함께 만든다. 응답을 받은 뒤에 화면에 반영한다. */
-  async saveOpportunityFor(notice: Notice, source: string, patch: { status?: OpportunityStatus; note?: string | null }): Promise<void> {
-    if (!authClient || !this.authUserId) return;
+  /** 상태·메모를 저장한다. 처음이면 제목·링크·게시판·마감 사본과 함께 만든다. 응답을 받은 뒤에 화면에 반영한다.
+   *  ifAbsent: 서버에 이미 행이 있으면 덮지 않는다(저장할 때 자동으로 남기는 '관심'용). */
+  saveOpportunityFor(notice: Notice, source: string, patch: { status?: OpportunityStatus; note?: string | null }, announce = false, ifAbsent = false): Promise<void> {
+    if (!authClient || !this.authUserId) return Promise.resolve();
     const client = authClient, userId = this.authUserId, epoch = this.subscriptionsEpoch;
-    const same = async () => epoch === this.subscriptionsEpoch && this.authUserId === userId && await sessionIs(client, userId);
     const seq = (this.opportunitySeq.get(notice.id) ?? 0) + 1;
     this.opportunitySeq.set(notice.id, seq);
-    try {
-      const saved = await saveOpportunity(client, userId, {
-        notice_id: notice.id, title: cleanTitle(notice.title_ko || notice.title), url: /^https?:\/\//i.test(notice.url) ? notice.url : null,
-        board: source || null, deadline: deadlineIso(notice.deadline), ...patch,
-      }, same);
-      if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId || this.opportunitySeq.get(notice.id) !== seq) return;
-      this.opportunities = new Map(this.opportunities).set(notice.id, saved);
-    } catch {
-      if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
-      this.showToast('기록을 저장하지 못했어요. 다시 눌러 주세요');
-      this.requestUpdate();
-    }
+    return this.enqueueOpportunity(notice.id, async () => {
+      const same = async () => epoch === this.subscriptionsEpoch && this.authUserId === userId && await sessionIs(client, userId);
+      try {
+        const url = /^https?:\/\//i.test(notice.url) && notice.url.length <= URL_MAX ? notice.url : null;
+        const saved = await saveOpportunity(client, userId, {
+          notice_id: notice.id, title: cleanTitle(notice.title_ko || notice.title).slice(0, TITLE_MAX), url,
+          board: source ? source.slice(0, 100) : null, deadline: deadlineIso(notice.deadline), ...patch,
+        }, same, { ifAbsent });
+        if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
+        // 더 새로운 요청이 줄에 있으면 그 결과가 화면을 정한다.
+        if (this.opportunitySeq.get(notice.id) === seq) this.opportunities = new Map(this.opportunities).set(notice.id, saved);
+        if (announce && patch.status) this.showToast(`${OPPORTUNITY_LABELS[patch.status]}으로 기록했어요`);
+      } catch (error) {
+        if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
+        this.showToast(isLimitReached(error) ? '기록이 너무 많아요. 안 쓰는 기록을 지워 주세요' : '기록을 저장하지 못했어요. 다시 눌러 주세요');
+        this.requestUpdate();
+      }
+    });
   }
 
-  async removeOpportunityFor(notice: Notice): Promise<void> {
-    if (!authClient || !this.authUserId) return;
+  removeOpportunityFor(notice: Notice): Promise<void> {
+    if (!authClient || !this.authUserId) return Promise.resolve();
     const client = authClient, userId = this.authUserId, epoch = this.subscriptionsEpoch;
-    const same = async () => epoch === this.subscriptionsEpoch && this.authUserId === userId && await sessionIs(client, userId);
     this.opportunitySeq.set(notice.id, (this.opportunitySeq.get(notice.id) ?? 0) + 1);
-    try {
-      await removeOpportunity(client, userId, notice.id, same);
-      if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
-      const next = new Map(this.opportunities); next.delete(notice.id); this.opportunities = next;
-      this.showToast('기록을 지웠어요');
-    } catch {
-      if (epoch === this.subscriptionsEpoch && this.authUserId === userId) this.showToast('기록을 지우지 못했어요. 다시 눌러 주세요');
-    }
+    return this.enqueueOpportunity(notice.id, async () => {
+      const same = async () => epoch === this.subscriptionsEpoch && this.authUserId === userId && await sessionIs(client, userId);
+      try {
+        await removeOpportunity(client, userId, notice.id, same);
+        if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
+        const next = new Map(this.opportunities); next.delete(notice.id); this.opportunities = next;
+        this.showToast('기록을 지웠어요');
+      } catch {
+        if (epoch === this.subscriptionsEpoch && this.authUserId === userId) this.showToast('기록을 지우지 못했어요. 다시 눌러 주세요');
+      }
+    });
   }
 
   /** 저장한 글. 지금 목록에 있으면 최신 정보로, 밀려났으면 저장할 때 정보로 보여 준다. */
@@ -829,6 +878,7 @@ export class AppController extends Reactive {
   /** 내 판정과 관심 키워드를 다시 읽는다. 로그인할 때와 공지를 새로 불러올 때 부른다. */
   async refreshMine(userId: string, epoch: number): Promise<void> {
     if (!authClient) return;
+    if (this.opportunitiesStatus === 'failed') void this.refreshOpportunities(userId, epoch);
     const [judgments, interests, statuses] = await Promise.all([loadMyJudgments(authClient, userId).catch(() => null), loadMyInterests(authClient).catch(() => null), loadGraduationStatuses(authClient, userId).catch(() => null)]);
     if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
     if (judgments) this.myJudgments = judgments;

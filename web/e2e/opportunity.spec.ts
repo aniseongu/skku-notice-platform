@@ -31,7 +31,7 @@ test('saved notice: one tap sets the status, keys move it, the memo saves on blu
   await page.getByRole('button', { name: '저장하기' }).click();
   await expect(section).toBeVisible();
   expect(await saves(page)).toEqual([expect.objectContaining({ status: 'interested' })]);   // 저장하면 입력 없이 관심으로 기록된다
-  await expect(section.getByRole('radio', { name: '관심' })).toHaveAttribute('aria-checked', 'true');
+  await expect(section.getByRole('radio', { name: '관심 있음' })).toHaveAttribute('aria-checked', 'true');
   await expect(section.getByRole('textbox', { name: '메모' })).toHaveCount(0);   // 메모는 접혀 있다
   const prepare = section.getByRole('radio', { name: '준비 중' });
   const box = await prepare.boundingBox();
@@ -40,6 +40,8 @@ test('saved notice: one tap sets the status, keys move it, the memo saves on blu
   await expect(prepare).toHaveAttribute('aria-checked', 'true');
   expect((await saves(page)).map((s) => s.status)).toEqual(['interested', 'preparing']);
   await prepare.press('ArrowRight');
+  expect((await saves(page)).length).toBe(2);                                // 방향키는 포커스만 옮긴다
+  await page.keyboard.press('Space');
   await expect(section.getByRole('radio', { name: '지원함' })).toHaveAttribute('aria-checked', 'true');
   await section.getByRole('button', { name: '메모 추가' }).click();
   const memo = section.getByRole('textbox', { name: '메모' });
@@ -52,8 +54,8 @@ test('saved notice: one tap sets the status, keys move it, the memo saves on blu
   // 저장을 지워도 기록은 남고 구역도 남는다.
   await page.getByRole('button', { name: '저장 지우기' }).click();
   await expect(section).toBeVisible();
-  await section.getByRole('button', { name: '기록 지우기' }).click();
-  await expect(section.getByText('기록을 지울까요?')).toBeVisible();
+  await section.getByRole('button', { name: '상태와 메모 지우기' }).click();
+  await expect(section.getByText('상태와 메모를 지울까요?')).toBeVisible();
 });
 
 test('saved view filters by status and shows it in the row; unavailable table hides everything', async ({ page }) => {
@@ -64,8 +66,8 @@ test('saved view filters by status and shows it in the row; unavailable table hi
   const filter = page.getByRole('group', { name: '진행 상태로 거르기' });
   await expect(filter).toBeVisible();
   await expect(page.locator('notice-rows-screen a.row')).toHaveCount(1);
-  await expect(page.locator('notice-rows-screen a.row .cat')).toContainText('지원함');
-  await filter.getByRole('button', { name: '준비 중' }).click();
+  await expect(page.locator('notice-rows-screen a.row .status-chip')).toHaveText('지원함');
+  await filter.getByRole('button', { name: /^준비 중/ }).click();
   await expect(page.locator('notice-rows-screen a.row')).toHaveCount(0);
   await expect(page.getByText('이 상태의 공지가 없어요')).toBeVisible();
   await page.getByRole('button', { name: '전체 보기' }).click();

@@ -5,7 +5,7 @@ import type { AccountGuard } from './notice-state-sync.ts';
 export type OpportunityStatus = 'interested' | 'preparing' | 'applied' | 'result';
 export const OPPORTUNITY_STATUSES: readonly OpportunityStatus[] = ['interested', 'preparing', 'applied', 'result'];
 export const OPPORTUNITY_LABELS: Record<OpportunityStatus, string> = {
-  interested: '관심', preparing: '준비 중', applied: '지원함', result: '결과 나옴',
+  interested: '관심 있음', preparing: '준비 중', applied: '지원함', result: '결과 나옴',
 };
 export const NOTE_MAX = 500;
 export const TITLE_MAX = 200;
@@ -57,19 +57,38 @@ function validate(draft: OpportunityDraft): void {
   if (draft.status !== undefined && !isStatus(draft.status)) throw new Error('상태가 올바르지 않아요');
 }
 
-/** 상태·메모 저장(upsert). 지정하지 않은 필드는 보내지 않아 기존 값을 덮지 않는다. */
-export async function saveOpportunity(client: SupabaseClient, userId: string, draft: OpportunityDraft, guard: AccountGuard): Promise<Opportunity> {
+/** 상태·메모 저장(upsert). 지정하지 않은 필드는 보내지 않아 기존 값을 덮지 않는다.
+ *  ifAbsent는 행이 이미 있으면(다른 탭·기기에서 바꾼 상태 포함) 아무것도 덮지 않고 있는 행을 돌려준다. */
+export async function saveOpportunity(client: SupabaseClient, userId: string, draft: OpportunityDraft, guard: AccountGuard, options: { ifAbsent?: boolean } = {}): Promise<Opportunity> {
   validate(draft);
   await ensureSame(guard);
   const row: Record<string, unknown> = { user_id: userId, notice_id: draft.notice_id, title: draft.title.trim() };
   for (const key of ['url', 'board', 'deadline', 'status', 'note'] as const) if (draft[key] !== undefined) row[key] = draft[key];
-  const { data, error } = await client.from('user_opportunities').upsert(row, { onConflict: 'user_id,notice_id' })
-    .select(COLUMNS).single();
+  let result;
+  if (options.ifAbsent) {
+    const { error: insertError } = await client.from('user_opportunities').upsert(row, { onConflict: 'user_id,notice_id', ignoreDuplicates: true });
+    if (insertError) { await ensureSame(guard); throw insertError; }
+    result = await client.from('user_opportunities').select(COLUMNS).eq('user_id', userId).eq('notice_id', draft.notice_id).single();
+  } else {
+    result = await client.from('user_opportunities').upsert(row, { onConflict: 'user_id,notice_id' }).select(COLUMNS).single();
+  }
   await ensureSame(guard);
-  if (error) throw error;
-  const parsed = parseOpportunity(data);
+  if (result.error) throw result.error;
+  const parsed = parseOpportunity(result.data);
   if (!parsed) throw new Error('저장 결과를 읽지 못했어요');
   return parsed;
+}
+
+/** 표가 운영에 아직 없을 때(Postgres 42P01, PostgREST PGRST205)의 오류인지. 일시적인 네트워크 오류와 구분한다. */
+export function isMissingTable(error: unknown): boolean {
+  const e = error as { code?: unknown; message?: unknown } | null;
+  return e?.code === '42P01' || e?.code === 'PGRST205' || (typeof e?.message === 'string' && /user_opportunities/.test(e.message) && /(does not exist|schema cache)/i.test(e.message));
+}
+
+/** 기록이 200개 한도에 닿았을 때의 오류인지(migration의 트리거 메시지). */
+export function isLimitReached(error: unknown): boolean {
+  const message = (error as { message?: unknown } | null)?.message;
+  return typeof message === 'string' && /limit reached/i.test(message);
 }
 
 export async function removeOpportunity(client: SupabaseClient, userId: string, noticeId: string, guard: AccountGuard): Promise<void> {

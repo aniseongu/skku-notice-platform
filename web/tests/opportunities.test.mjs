@@ -5,7 +5,7 @@ import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, loadOpportunities, parseOppor
 const row = (o = {}) => ({ notice_id: 's/1', title: '공모전', url: null, board: null, deadline: null, status: 'interested', note: null, created_at: 'a', updated_at: 'b', ...o });
 
 test('labels and order are fixed', () => {
-  assert.deepEqual(OPPORTUNITY_STATUSES.map((s) => OPPORTUNITY_LABELS[s]), ['관심', '준비 중', '지원함', '결과 나옴']);
+  assert.deepEqual(OPPORTUNITY_STATUSES.map((s) => OPPORTUNITY_LABELS[s]), ['관심 있음', '준비 중', '지원함', '결과 나옴']);
 });
 
 test('parse rejects malformed rows', () => {
@@ -56,4 +56,27 @@ test('deadlineIso turns a notice deadline into a timestamp or null', async () =>
   assert.equal(deadlineIso(null), null);
   assert.equal(deadlineIso('아님'), null);
   assert.equal(deadlineIso('2026-11-30T00:00:00+09:00'), '2026-11-29T15:00:00.000Z');
+});
+
+test('ifAbsent never overwrites an existing row: ignoreDuplicates upsert, then reads the stored row', async () => {
+  const log = [];
+  const q = {
+    upsert: (r, o) => { log.push(['upsert', r, o]); return Promise.resolve({ error: null }); },
+    select: () => q, eq: (...a) => { log.push(['eq', ...a]); return q; },
+    single: async () => ({ error: null, data: row({ status: 'applied' }) }),
+  };
+  const saved = await saveOpportunity({ from: () => q }, 'u1', { notice_id: 's/1', title: '공모전', status: 'interested' }, () => true, { ifAbsent: true });
+  assert.equal(saved.status, 'applied');   // 다른 기기에서 바꾼 상태가 남는다
+  assert.equal(log[0][2].ignoreDuplicates, true);
+  assert.deepEqual(log.filter((l) => l[0] === 'eq'), [['eq', 'user_id', 'u1'], ['eq', 'notice_id', 's/1']]);
+});
+
+test('missing table and limit errors are told apart from transient ones', async () => {
+  const { isMissingTable, isLimitReached } = await import('../src/opportunities.ts');
+  assert.equal(isMissingTable({ code: '42P01' }), true);
+  assert.equal(isMissingTable({ code: 'PGRST205' }), true);
+  assert.equal(isMissingTable({ message: 'Failed to fetch' }), false);
+  assert.equal(isMissingTable(null), false);
+  assert.equal(isLimitReached({ message: 'user_opportunities limit reached' }), true);
+  assert.equal(isLimitReached({ message: 'network' }), false);
 });

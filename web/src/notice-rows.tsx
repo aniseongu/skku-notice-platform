@@ -3,6 +3,9 @@ import { cleanTitle, deadlinePassed, deadlineText, daysLeft, safeUrl, type Notic
 import { Reason } from './reason';
 import type { GradPart } from './graduation-assessment';
 import { CHECKBOX } from './cls';
+import { OPPORTUNITY_LABELS, type OpportunityStatus } from './opportunities';
+
+const STATUS_DOT: Record<OpportunityStatus, string> = { interested: 'bg-ink-3', preparing: 'bg-accent', applied: 'bg-ink', result: 'bg-ink-2' };
 
 export interface NoticeRowModel {
   notice: Notice;
@@ -19,7 +22,7 @@ export interface NoticeRowModel {
   /** AI 판정 전(키가 있는 사용자의 새 공지). 줄이 비어 보이지 않게 "판정 중"을 적는다. */
   pending?: boolean;
   /** 내 기회함 상태 글자(저장 보기에서만 보인다). */
-  status?: string;
+  status?: OpportunityStatus;
 }
 export interface NoticeRowsModel {
   rows: NoticeRowModel[];
@@ -45,7 +48,7 @@ function NoticeRows({ model }: { model: NoticeRowsModel }) {
   return <ol className="rows m-0 list-none overflow-hidden bg-surface p-0 min-[720px]:rounded-none min-[720px]:bg-transparent">{model.rows.map((row, index) => {
     const n = row.notice;
     const title = cleanTitle(n.title_ko || n.title);
-    const tags = [model.savedView ? row.status ?? '' : '', n.category, n.pinned ? '고정' : '', n.changed_at ? '수정됨' : '', !model.savedView && row.saved ? '저장함' : ''].filter(Boolean).join(', ');
+    const tags = [n.category, n.pinned ? '고정' : '', n.changed_at ? '수정됨' : '', !model.savedView && row.saved ? '저장함' : ''].filter(Boolean).join(', ');
     const passed = n.deadline ? deadlinePassed(n.deadline) : false;
     const urgent = !!n.deadline && !passed && daysLeft(n.deadline, model.today) <= 3;
     const hasReason = row.interests.length > 0 || !!row.ai || !!row.rule || (row.grad?.length ?? 0) > 0 || !!row.pending;
@@ -62,7 +65,7 @@ function NoticeRows({ model }: { model: NoticeRowsModel }) {
       <a className={`row ${row.dim ? 'dim' : ''} ${row.read ? 'read' : 'unread'} ${model.selecting ? `${ROW_LAYOUT_SELECTING} min-w-0 flex-1` : ROW_LAYOUT} ${hasReason ? DESKTOP_AREAS : DESKTOP_AREAS_NO_REASON} ${border} ${bg} ${hover} active:bg-sunken focus-visible:outline-offset-[-2px]`} href={safeUrl(n.url)} target="_blank" rel="noopener"
         data-id={n.id} aria-current={row.current ? 'true' : 'false'} onClick={(event) => model.open(event.nativeEvent, n)}>
         <span className="visually-hidden">{row.read ? '읽은 공지' : '읽지 않은 공지'}</span>
-        <span className={`meta ${META}`}>{row.source ? <span className={`board ${META_SPAN} ${row.read ? '' : 'min-[720px]:text-ink-2 min-[720px]:font-semibold'}`}>{row.source}</span> : null}{tags ? <span className={`cat ${META_SPAN}`} title={tags}>{tags}</span> : null}</span>
+        <span className={`meta ${META}`}>{model.savedView && row.status ? <span className="status-chip inline-flex w-fit flex-none items-center gap-[5px] rounded-pill bg-sunken px-[8px] py-[1px] text-[12px] leading-[18px] font-semibold text-ink-2"><span className={`size-[6px] rounded-full ${STATUS_DOT[row.status]}`} aria-hidden="true"></span>{OPPORTUNITY_LABELS[row.status]}</span> : null}{row.source ? <span className={`board ${META_SPAN} ${row.read ? '' : 'min-[720px]:text-ink-2 min-[720px]:font-semibold'}`}>{row.source}</span> : null}{tags ? <span className={`cat ${META_SPAN}`} title={tags}>{tags}</span> : null}</span>
         <span className={`title [grid-area:title] line-clamp-2 text-[16px] leading-[23px] min-[720px]:text-[15px] min-[720px]:leading-[22px] ${row.read ? 'font-normal text-ink-2' : 'font-semibold'} ${n.deadline ? 'mt-[4px] min-[720px]:mt-0' : ''}`}>{title}</span>
         <span className="sub [grid-area:reason] mt-[2px] text-[14px] leading-[20px] text-ink-2 empty:hidden min-[720px]:mt-0 min-[720px]:overflow-hidden min-[720px]:text-[13px] min-[720px]:leading-[19px] min-[720px]:text-ellipsis min-[720px]:whitespace-nowrap"><Reason interests={row.interests} ai={row.ai} rule={row.rule} read={row.read} grad={row.grad} pending={row.pending} /></span>
         {n.deadline ? <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''} [grid-area:dday] self-center text-[14px] leading-[18px] tabular-nums min-[720px]:self-start min-[720px]:pt-[2px] min-[720px]:text-right ${ddayWeight} ${ddayColor}`}>{deadlineText(n.deadline, model.today)}</span> : null}

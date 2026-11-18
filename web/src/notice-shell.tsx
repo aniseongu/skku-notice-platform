@@ -366,7 +366,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
         return { notice: rowNotice, source,
           read: app.isRead(notice), saved: app.isSaved(notice), current: app.isWide && app.detailOpen && app.shownId === notice.id,
           selected: app.selectedReads.includes(notice.id), dim: ai?.verdict === 'not_relevant' && !interests.length,
-          status: app.opportunities.has(notice.id) ? OPPORTUNITY_LABELS[app.opportunities.get(notice.id)!.status] : undefined,
+          status: app.opportunities.get(notice.id)?.status,
           interests, ai, rule: app.judgement(notice)?.rule_name ?? null, grad, pending: !ai && !interests.length && !grad.length && app.judgePending(notice) };
       }),
       today, selecting: app.selecting, savedView: app.view === 'saved',
@@ -411,13 +411,21 @@ function ViewFilters({ app }: { app: AppController }) {
       app.selecting = true; app.selectedReads = [];
       if (event.detail === 0) void app.updateComplete.then(() => document.querySelector<HTMLInputElement>('.select-all input')?.focus({ preventScroll: true }));
     }}><Icon name="select-list" />선택</button>;
-  if (app.view === 'saved') return <>
-    <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>{select}<SortSelect app={app} /></div></div>
-    {app.opportunitiesStatus === 'ready' && app.opportunities.size > 0 ? <div className="opportunity-filter flex gap-[8px] overflow-x-auto px-[var(--gutter)] py-[4px] [scrollbar-width:none] select-none [-webkit-user-select:none] min-[720px]:px-[24px]" role="group" aria-label="진행 상태로 거르기">
-      {(['all', ...OPPORTUNITY_STATUSES] as const).map((id) => <button type="button" key={id} className={CHIP} aria-pressed={app.opportunityFilter === id}
-        onClick={() => { app.opportunityFilter = id; app.listChanged(); }}>{id === 'all' ? '전체' : OPPORTUNITY_LABELS[id]}</button>)}
-    </div> : null}
-  </>;
+  if (app.view === 'saved') {
+    const counts = new Map<string, number>();
+    for (const notice of app.savedNotices()) { const status = app.opportunities.get(notice.id)?.status; if (status) counts.set(status, (counts.get(status) ?? 0) + 1); }
+    const total = app.savedNotices().length;
+    return <>
+      {app.opportunitiesStatus === 'ready' && app.opportunities.size > 0 ? <div className="opportunity-filter flex gap-[8px] overflow-x-auto px-[var(--gutter)] pt-[8px] pb-0 [scrollbar-width:none] select-none [-webkit-user-select:none] min-[720px]:px-[24px]" role="group" aria-label="진행 상태로 거르기">
+        {(['all', ...OPPORTUNITY_STATUSES] as const).map((id) => {
+          const count = id === 'all' ? total : counts.get(id) ?? 0;
+          return <button type="button" key={id} className={`${CHIP} ${count === 0 && app.opportunityFilter !== id ? 'opacity-50' : ''}`} aria-pressed={app.opportunityFilter === id}
+            onClick={() => { app.opportunityFilter = id; app.listChanged(); }}>{id === 'all' ? '전체' : OPPORTUNITY_LABELS[id]} <span className="tabular-nums">{count}</span></button>;
+        })}
+      </div> : null}
+      <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>{select}<SortSelect app={app} /></div></div>
+    </>;
+  }
   return <div className={`view-options ${VIEW_ROW} justify-between`} role="group" aria-label="공지 보기 조건">
     {/* 두 조건이 다 있어도 선택·정렬과 한 줄에 둔다. 520px 미만에서는 조건 이름을 줄여 한 줄에 들어가게 하고, 그래도 모자라는 아주 좁은 폭에서만 다음 줄로 간다. */}
     <div className={`view-filters flex min-w-0 flex-wrap items-center gap-x-[4px] gap-y-0 min-[520px]:gap-x-[12px]`}>
@@ -546,7 +554,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
     opportunity: app.opportunityShown(notice) ? (() => {
       const record = app.opportunities.get(notice.id), source = boardName(app.sources.find((item) => item.id === notice.source_id), notice.source_id);
       return { status: record?.status ?? null, note: record?.note ?? '', hasRecord: !!record,
-        onStatus: (status: OpportunityStatus) => { void app.saveOpportunityFor(notice, source, { status }); },
+        onStatus: (status: OpportunityStatus) => { if (status !== record?.status) void app.saveOpportunityFor(notice, source, { status }, true); },
         onNote: (note: string) => { void app.saveOpportunityFor(notice, source, { note: note.trim() || null }); },
         onRemove: () => { void app.removeOpportunityFor(notice); } };
     })() : undefined,

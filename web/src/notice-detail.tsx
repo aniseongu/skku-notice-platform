@@ -44,46 +44,47 @@ export interface OpportunityModel {
   onRemove: () => void;
 }
 
-const SEG = 'min-h-[44px] rounded-sm border border-line bg-surface px-[4px] py-0 text-[14px] font-medium text-ink-2 [@media(hover:hover)]:[&:hover:not([aria-checked=true])]:bg-hover active:[&:not([aria-checked=true])]:bg-hover aria-checked:border-ink aria-checked:bg-sunken aria-checked:font-semibold aria-checked:text-ink';
+const SEG = 'inline-flex min-h-[44px] items-center justify-center gap-[3px] rounded-sm border border-line bg-surface px-[2px] py-0 text-[14px] font-medium text-ink-2 [@media(hover:hover)]:[&:hover:not([aria-checked=true])]:bg-hover active:[&:not([aria-checked=true])]:bg-hover aria-checked:border-accent aria-checked:bg-accent aria-checked:font-semibold aria-checked:text-on-accent';
+const SUB_ACTION = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[13px] font-medium text-ink-3';
 const TEXT_ACTION = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-ink-2';
 
 /** 내 진행 상태: 칩 한 번으로 바꾸고 메모는 한 줄. 직접 적는 기록이라 인증·합격 말은 쓰지 않는다. */
 function OpportunitySection({ model }: { model: OpportunityModel }) {
   const [confirming, setConfirming] = useState(false);
   const [memoOpen, setMemoOpen] = useState(false);   // 메모는 선택이라 접어 둔다. 이미 쓴 메모가 있으면 펼쳐 보인다.
-  const focusable = model.status ?? OPPORTUNITY_STATUSES[0];
+  // 방향키는 포커스만 옮기고, Space·Enter로 고른다(이동마다 저장 요청이 나가지 않게).
+  const [cursor, setCursor] = useState<OpportunityStatus | null>(null);
+  const focusable = cursor ?? model.status ?? OPPORTUNITY_STATUSES[0];
   const move = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
-    if (!step) return;
-    event.preventDefault();
     const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
-    const at = buttons.findIndex((button) => button === document.activeElement);
-    const next = (Math.max(at, 0) + step + buttons.length) % buttons.length;
+    const at = Math.max(buttons.findIndex((button) => button === document.activeElement), 0);
+    const next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? Math.min(at + 1, buttons.length - 1)
+      : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? Math.max(at - 1, 0)
+        : event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : -1;
+    if (next < 0) return;
+    event.preventDefault();
+    setCursor(OPPORTUNITY_STATUSES[next]);
     buttons[next]?.focus();
-    model.onStatus(OPPORTUNITY_STATUSES[next]);
   };
   const memo = !!model.note || memoOpen;
   const remove = !model.hasRecord ? null : confirming
-    ? <span className="flex items-center gap-[4px]"><span className="mr-[4px] text-[14px] text-ink-2">기록을 지울까요?</span>
-      <button type="button" className={`${TEXT_ACTION} text-danger`} onClick={() => { setConfirming(false); model.onRemove(); }}>지우기</button>
-      <button type="button" className={TEXT_ACTION} onClick={() => setConfirming(false)}>취소</button></span>
-    : <button type="button" className={TEXT_ACTION} onClick={() => setConfirming(true)}>기록 지우기</button>;
+    ? <div className="flex flex-wrap items-center justify-end gap-[4px]"><span className="mr-[4px] text-[13px] text-ink-2">상태와 메모를 지울까요?</span>
+      <button type="button" className={`${SUB_ACTION} text-danger`} onClick={() => { setConfirming(false); model.onRemove(); }}>지우기</button>
+      <button type="button" className={SUB_ACTION} onClick={() => setConfirming(false)}>취소</button></div>
+    : <div className="flex justify-end"><button type="button" className={SUB_ACTION} onClick={() => setConfirming(true)}>상태와 메모 지우기</button></div>;
   return <section className={`${DETAIL_SECTION} opportunity`} aria-labelledby="sec-opportunity">
     <h3 id="sec-opportunity" className={`${SECTION_TITLE} !mb-[2px]`}>내 진행 상태</h3>
-    <p className="m-0 mb-[10px] text-[13px] leading-[19px] text-ink-3">직접 적는 기록이에요. 저장을 지워도 남아요</p>
-    <div role="radiogroup" aria-labelledby="sec-opportunity" className="grid grid-cols-4 gap-[8px]" onKeyDown={move}>
+    <p className="m-0 mb-[10px] text-[14px] leading-[20px] text-ink-2">저장을 해제해도 이 기록은 남아요</p>
+    <div role="radiogroup" aria-labelledby="sec-opportunity" className="grid grid-cols-4 gap-[6px] min-[720px]:max-w-[420px]" onKeyDown={move}>
       {OPPORTUNITY_STATUSES.map((status) => <button type="button" role="radio" key={status} className={SEG} aria-checked={model.status === status}
-        tabIndex={status === focusable ? 0 : -1} onClick={() => model.onStatus(status)}>{OPPORTUNITY_LABELS[status]}</button>)}
+        tabIndex={status === focusable ? 0 : -1} onClick={() => model.onStatus(status)}>{model.status === status ? <svg className="size-[14px] flex-none fill-none stroke-current [stroke-width:2.25] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href="icons/sprite.svg#check" /></svg> : null}{OPPORTUNITY_LABELS[status]}</button>)}
     </div>
-    <div className="mt-[4px] flex items-center justify-between gap-[4px]">
-      {memo
-        ? <input key={model.note} type="text" autoFocus={!model.note} className={`${SETTINGS_INPUT} mt-[4px] w-full`} aria-label="메모" placeholder="메모를 남겨요" maxLength={NOTE_MAX} defaultValue={model.note}
-          onBlur={(event) => { const value = event.currentTarget.value; if (value.trim() !== model.note) model.onNote(value); if (!value.trim()) setMemoOpen(false); }}
-          onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
-        : <button type="button" className={`${TEXT_ACTION} -ml-[8px]`} onClick={() => setMemoOpen(true)}>메모 추가</button>}
-      {!memo ? remove : null}
-    </div>
-    {memo ? <div className="flex justify-end">{remove}</div> : null}
+    {memo
+      ? <input type="text" autoFocus={!model.note} className={`${SETTINGS_INPUT} mt-[8px] w-full`} aria-label="메모" placeholder="메모를 남겨요" maxLength={NOTE_MAX} defaultValue={model.note}
+        onBlur={(event) => { const value = event.currentTarget.value; if (value.trim() !== model.note) model.onNote(value); if (!value.trim()) setMemoOpen(false); }}
+        onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
+      : <button type="button" className={`${TEXT_ACTION} mt-[4px] -ml-[8px]`} onClick={() => setMemoOpen(true)}>메모 추가</button>}
+    {remove}
   </section>;
 }
 
