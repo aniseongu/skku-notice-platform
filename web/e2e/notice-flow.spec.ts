@@ -345,8 +345,8 @@ test('connection keys page says how the AI works for 0, 1 and 2 connected keys',
   await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false });
   const states: [string, unknown, unknown[], RegExp][] = [
     ['아무것도 연결 안 함', null, [], /하나 이상 연결하면/],
-    ['Groq 하나', null, [key('groq')], /AI 키는 하나 이상 있어야 해요/],
-    ['Gemini 하나', gemini, [], /AI 키는 하나 이상 있어야 해요/],
+    ['Groq 하나', null, [key('groq')], /다른 곳도 연결하면/],
+    ['Gemini 하나', gemini, [], /다른 곳도 연결하면/],
     ['Gemini + Groq', gemini, [key('groq')], /번갈아 쓰고, 한 곳이 막히면/],
   ];
   for (const [label, byokStatus, aiKeys, text] of states) {
@@ -430,7 +430,7 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(dialog.getByRole('heading', { name: '복수전공이 있나요?' })).toBeFocused();
   await expect(dialog.getByRole('radiogroup', { name: '복수전공 선택' }).getByRole('radio')).toHaveCount(2);
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
-  await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '7단계 중 2단계');
+  await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '6단계 중 2단계');
   expect(Math.abs((await dialog.getByRole('progressbar').boundingBox())!.width - barWidth1)).toBeLessThanOrEqual(0.5);
   await dialog.getByRole('radio', { name: '있어요', exact: true }).click();
   await dialog.getByRole('button', { name: '경영대학', exact: true }).click();
@@ -513,7 +513,7 @@ test('first-run setup: choices only, department list follows the college, double
   await expect(page.locator('.app')).not.toHaveAttribute('inert', '');
 });
 
-test('first-run setup requires one AI key at the end and records completion only then', async ({ page }) => {
+test('first-run setup ends at the notification step without asking for an AI key', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
   await page.evaluate(() => {
@@ -537,17 +537,9 @@ test('first-run setup requires one AI key at the end and records completion only
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('button', { name: '채웠어요' }).click();
   await next();
-  await next();     // 받을 공지: 저장. 키가 없으니 완료 표시는 미룬다.
-  expect((await calls(page)).filter((c) => c[0] === 'finish')).toEqual([['finish', false]]);
-  // 알림이 이미 켜져 있으면 건너뛰고 AI 키로 간다.
-  await expect(dialog.getByRole('heading', { name: 'AI를 연결해 주세요' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '나중에 할게요' })).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: '끝내기' })).toBeDisabled();
-  await expect(dialog.getByText('필수 선택이에요')).toBeVisible();
-  await expect(dialog.getByText('키를 하나 연결해 주세요')).toBeVisible();
-  await page.evaluate(() => { (document.querySelector('notice-app') as unknown as Record<string, unknown>).byokStatus = { keyHint: 'DDDD', model: 'm', disabled: false, lastError: null, usedToday: 0 }; });
-  await expect(dialog.getByRole('button', { name: '끝내기' })).toBeEnabled();
-  await dialog.getByRole('button', { name: '끝내기' }).click();
+  await expect(dialog.locator('.onb-steplist li')).toHaveCount(6);   // AI 키 단계는 없다
+  await next();     // 받을 공지: 저장. 알림이 이미 켜져 있으면 키와 상관없이 여기서 끝난다.
+  expect((await calls(page)).filter((c) => c[0] === 'finish')).toEqual([['finish', true]]);
   expect((await calls(page)).filter((c) => c[0] === 'complete')).toHaveLength(1);
   await expect(dialog).toHaveCount(0);
 });
@@ -669,25 +661,24 @@ test('first-run boards: when only a few boards are left they sit in the list wit
   await expect(dialog.getByRole('button', { name: /더 보기/ })).toHaveCount(0);
 });
 
-test('reopening a setup that was saved but left at the AI key step resumes at that step instead of asking everything again', async ({ page }) => {
+test('reopening a setup that was saved but not finished resumes at the notification step instead of asking everything again', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
   // 게시판 단계에서 저장까지 했고(전공·학년·재학·3품) 키를 연결하기 전에 나갔다. 다시 열면 프로필을 읽은 뒤 첫 설정이 뜬다.
   await page.evaluate(() => {
     const app = document.querySelector('notice-app') as unknown as Record<string, unknown>;
-    app.authUserId = 'account-a'; app.pushStatus = 'on'; app.byokOn = true; app.byokLoading = false; app.byokStatus = null; app.aiKeys = [];
+    app.authUserId = 'account-a'; app.pushStatus = 'off'; app.byokOn = true; app.byokLoading = false; app.byokStatus = null; app.aiKeys = [];
     app.profile = { programs: [{ college: '경영대학', department: '경영학과' }], year: 3, semester: null, enrollmentStatus: '재학', militaryService: null, onboardedAt: null, admissionYear: null, university3pInternshipSelected: true, deptInternshipDone: null, university3pInternshipDone: false };
     app.profileStatus = 'ready';
   });
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: 'AI를 연결해 주세요' })).toBeVisible();   // 클릭 0번으로 남은 단계
-  await expect(dialog.getByRole('button', { name: '끝내기' })).toBeDisabled();
+  await expect(dialog.getByRole('heading', { name: '새 공지를 알림으로 받을까요?' })).toBeVisible();   // 클릭 0번으로 남은 단계
   // 뒤로 가면 앞에서 한 답이 그대로 있다(복수전공 '없어요'를 다시 고르지 않아도 된다).
   await dialog.getByRole('button', { name: '이전 단계' }).click();
   await expect(dialog.getByRole('heading', { name: '어떤 공지를 받을까요?' })).toBeVisible();
 });
 
-test('first-run setup never finishes without a key, even when the key service is unreachable (no exception)', async ({ page }) => {
+test('first-run setup finishes without a key even when the key service is unreachable', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
   await page.evaluate(() => {
@@ -711,15 +702,9 @@ test('first-run setup never finishes without a key, even when the key service is
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('button', { name: '채웠어요' }).click();
   await next();
-  await next();     // 받을 공지: 저장. 키가 없으니 완료 표시는 미룬다.
-  expect((await calls(page)).filter((c) => c[0] === 'finish')).toEqual([['finish', false]]);
-  // 알림이 이미 켜져 있으면 건너뛰고 AI 키로 간다.
-  await expect(dialog.getByRole('heading', { name: 'AI를 연결해 주세요' })).toBeVisible();
-  // 키 기능을 확인하지 못했어도 키 없이 끝낼 수 없다. 끝내기는 막혀 있고, 다시 확인할 수 있다.
-  await expect(dialog.getByRole('button', { name: '나중에 할게요' })).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: '끝내기' })).toBeDisabled();
-  await expect(dialog.getByRole('button', { name: '다시 확인하기' })).toBeVisible();
-  expect((await calls(page)).filter((c) => c[0] === 'complete')).toHaveLength(0);
+  await next();     // 받을 공지: 저장하고 끝낸다. 키 기능을 확인하지 못해도 막지 않는다.
+  expect((await calls(page)).filter((c) => c[0] === 'complete')).toHaveLength(1);
+  await expect(dialog).toHaveCount(0);
 });
 
 test('nothing chosen yet (an old skip): no boards and no notices, and no way to reopen the first-run setup from the list or settings', async ({ page }) => {
@@ -1729,7 +1714,8 @@ test('software original major is asked for the admission year and the internship
   const notes = page.getByLabel('인턴십 요건 안내');
   await expect(notes).toContainText('실제 인정 여부는 학교와 학과에 확인해 주세요');
   await expect(notes).not.toContainText('Gemini');   // 업체 이름이 아니라 AI 키라고 쓴다
-  await expect(notes).toContainText('AI 키를 연결하면 담당 업무까지 확인해요');
+  await expect(notes).toContainText('AI를 연결하면 담당 업무까지 확인해요');
+  await expect(notes.getByRole('button', { name: '연결하기' })).toBeVisible();
   await expect(notes.getByText('3품은 근무 시간이 280시간 이상인지 확인해요')).toHaveCount(0);
   const criteria = notes.getByRole('button', { name: /판정 근거/ });
   expect((await criteria.boundingBox())!.height).toBeGreaterThanOrEqual(44);
@@ -2507,34 +2493,14 @@ const openFill = async (page: import('@playwright/test').Page, patch: Record<str
 };
 const liveKey = { provider: 'groq', keyHint: 'abcd', model: 'm', disabled: false, lastError: null, usedToday: 0 };
 
-test('finished account without a usable AI key is sent to the AI key step only, and cannot leave without one', async ({ page }) => {
+test('finished account without any AI key is never sent back to the setup or asked to connect one', async ({ page }) => {
   await openFill(page, {});
-  const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: 'AI 키를 연결해 주세요' })).toBeVisible();
-  await expect(dialog.getByText('연결된 AI 키가 없어서 다시 열었어요')).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '끝내기' })).toBeDisabled();
-  await expect(dialog.getByRole('button', { name: /나중에|닫기|건너/ })).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: '이전 단계' })).toHaveCount(0);
-  await expect(dialog.getByRole('progressbar')).toHaveCount(0);   // 항목이 하나면 막대가 없다
-  await expect(dialog.locator('.onb-steplist li')).toHaveCount(7);   // 왼쪽 목록은 그대로 모든 단계를 보인다
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeVisible();
-  // 키가 연결되어도 끝내기를 누를 때까지 화면을 둔다.
-  await withApp(page, { aiKeys: [liveKey], completeOnboarding: 'fn:complete' });
-  await expect(dialog.getByRole('button', { name: '끝내기' })).toBeEnabled();
-  await page.evaluate(() => { const app = document.querySelector('notice-app') as unknown as Record<string, () => void>; const w = window as unknown as { calls: unknown[][] }; app.completeOnboarding = () => { w.calls.push(['complete']); app.closeOnboarding(); return undefined as never; }; });
-  await dialog.getByRole('button', { name: '끝내기' }).click();
-  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await withApp(page, { aiKeys: [{ ...liveKey, disabled: true }] });   // 끊긴 키도 마찬가지다
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('a key the provider rejects asks to connect again with its own wording', async ({ page }) => {
-  await openFill(page, { aiKeys: [{ ...liveKey, disabled: true }] });
-  const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: 'AI 키를 다시 연결해 주세요' })).toBeVisible();
-  await expect(dialog.getByText('연결해 둔 키가 더 이상 작동하지 않아서 다시 열었어요')).toBeVisible();
-});
-
-test('finished account with a usable key, or with key state still unknown, never sees the setup', async ({ page }) => {
+test('finished account never sees the setup for a key, whatever the key state is', async ({ page }) => {
   await openFill(page, { aiKeys: [liveKey] });
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await withApp(page, { aiKeys: [], byokLoading: true });
@@ -2550,7 +2516,7 @@ test('software major missing the admission year sees only the internship step, a
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: '인턴십 진행 상황을 알려 주세요' })).toBeVisible();
   await expect(dialog.getByText('새로 필요한 정보가 생겼어요. 이것만 고르면 바로 쓸 수 있어요')).toBeVisible();
-  await expect(dialog.locator('.onb-steplist li')).toHaveCount(7);
+  await expect(dialog.locator('.onb-steplist li')).toHaveCount(6);
   await expect(dialog.getByRole('button', { name: '다음' })).toBeDisabled();
   await dialog.getByRole('button', { name: '2024', exact: true }).click();
   await dialog.getByRole('group', { name: '솦 인턴십' }).getByRole('button', { name: '마쳤어요' }).click();
@@ -2563,23 +2529,19 @@ test('software major missing the admission year sees only the internship step, a
   expect(await calls(page)).toEqual([['saved', 2024, true]]);
 });
 
-test('profile gap and missing key together: only those two steps, in order', async ({ page }) => {
+test('profile gap alone: only the one step, with no progress bar', async ({ page }) => {
   await openFill(page, { profile: { ...doneProfile, programs: [{ college: '소프트웨어융합대학', department: '소프트웨어학과' }] } });
   const dialog = page.getByRole('dialog');
-  await expect(dialog.locator('.onb-steplist li')).toHaveCount(7);
-  await expect(dialog.getByRole('progressbar').locator('span')).toHaveCount(2);
-  await expect(dialog.getByRole('progressbar')).toBeVisible();
+  await expect(dialog.getByRole('progressbar')).toHaveCount(0);
   await expect(dialog.getByRole('heading', { name: '인턴십 진행 상황을 알려 주세요' })).toBeVisible();
 });
 
-test('settings: the only usable AI key cannot be removed, with two keys removal is offered', async ({ page }) => {
+test('settings: even the only AI key can be removed because AI keys are optional', async ({ page }) => {
   await settingsAt(page, '&keys=1');
   const screen = page.locator('platform-settings-screen');
   await withApp(page, { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, byokOn: true, byokLoading: false, byokError: '', byokStatus: null, aiKeys: [liveKey], profile: doneProfile });
   await expect(screen.getByRole('button', { name: 'Groq 키 바꾸기' })).toBeVisible();
-  await expect(screen.getByRole('button', { name: 'Groq 키 연결 끊기' })).toHaveCount(0);
-  await expect(screen.getByText('AI 키는 하나 이상 있어야 해요. 다른 곳도 연결하면 번갈아 써서 더 많이 확인해요')).toBeVisible();
-  await withApp(page, { aiKeys: [liveKey, { ...liveKey, provider: 'gemini', keyHint: 'wxyz' }] });
+  await expect(screen.getByText('다른 곳도 연결하면 번갈아 써서 더 많이 확인해요')).toBeVisible();
   await expect(screen.getByRole('button', { name: 'Groq 키 연결 끊기' })).toBeVisible();
 });
 
@@ -3007,4 +2969,57 @@ test('install banner buttons are unobstructed at 412 and dismiss in one click', 
   await press(page, banner.getByRole('button', { name: '다음에 할게요' }), c, true);
   await expect(banner).toHaveCount(0);
   expect(c.clicks).toBe(1);
+});
+
+// 키가 없는 사용자에게 공지 상세에서 AI 연결을 한 줄로 권한다(첫 설정에서 AI 키를 뺐다, 2026-11-18).
+const hintState = { authUserId: 'account-a', profileStatus: 'ready', onboardingDismissed: true, subscriptionsLoading: false, byokOn: true, byokLoading: false, byokError: '', byokStatus: null, aiKeys: [], profile: doneProfile, subscriptions: ['skku-notice01'], aiPrefs: { aiEnabled: true } };
+
+test('detail without an AI key offers one connect line, never a waiting label, and remembers a dismissal per account', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => { localStorage.removeItem('platform:ai-hint-dismissed:account-a'); localStorage.removeItem('platform:ai-hint-dismissed:account-b'); });
+  await withApp(page, hintState);
+  await expect(page.getByText('AI가 확인하고 있어요')).toHaveCount(0);   // 키가 없으면 대기 표시가 없다
+  await page.locator('notice-rows-screen a.row').nth(1).click();
+  const hint = page.getByRole('region', { name: 'AI 연결 안내' });
+  await expect(hint).toBeVisible();
+  await expect(hint).toContainText('AI를 연결하면 요약하고, 나에게 맞는지 알려 줘요');
+  expect((await hint.getByRole('button', { name: '연결하기' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  expect((await hint.getByRole('button', { name: 'AI 안내 닫기' }).boundingBox())!.width).toBeGreaterThanOrEqual(44);
+  // 닫으면 같은 계정에는 다시 안 보이고, 다른 계정에는 보인다.
+  await hint.getByRole('button', { name: 'AI 안내 닫기' }).click();
+  await expect(hint).toHaveCount(0);
+  await withApp(page, { authUserId: 'account-b' });
+  await expect(page.getByRole('region', { name: 'AI 연결 안내' })).toBeVisible();
+  await withApp(page, { authUserId: 'account-a' });
+  await expect(page.getByRole('region', { name: 'AI 연결 안내' })).toHaveCount(0);
+});
+
+test('the connect button in the detail opens the AI connection page, and a connected key hides the line', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => localStorage.removeItem('platform:ai-hint-dismissed:account-a'));
+  await withApp(page, hintState);
+  await page.locator('notice-rows-screen a.row').nth(1).click();
+  const hint = page.getByRole('region', { name: 'AI 연결 안내' });
+  await expect(hint).toBeVisible();
+  await withApp(page, { aiKeys: [liveKey] });
+  await expect(hint).toHaveCount(0);
+  await withApp(page, { aiKeys: [] });
+  await hint.getByRole('button', { name: '연결하기' }).click();
+  await expect(page).toHaveURL(/keys=1/);
+  await expect(page.locator('platform-settings-screen')).toBeVisible();
+});
+
+test('the AI connect line stays hidden while the key state is unknown (loading, unreachable, feature off)', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.evaluate(() => localStorage.removeItem('platform:ai-hint-dismissed:account-a'));
+  await withApp(page, { ...hintState, byokLoading: true });
+  await page.locator('notice-rows-screen a.row').nth(1).click();
+  await expect(page.getByRole('region', { name: 'AI 연결 안내' })).toHaveCount(0);
+  await withApp(page, { byokLoading: false, byokError: '키 정보를 불러오지 못했어요.' });
+  await expect(page.getByRole('region', { name: 'AI 연결 안내' })).toHaveCount(0);
+  await withApp(page, { byokError: '', byokOn: false });
+  await expect(page.getByRole('region', { name: 'AI 연결 안내' })).toHaveCount(0);
 });

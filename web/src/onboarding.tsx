@@ -1,7 +1,6 @@
 // 첫 로그인 설정. 한 화면에 한 질문, 모두 골라서 답하고, 이전·건너뛰기가 항상 있다.
 // 순서: 주전공 → 복수전공(선택) → 학년·재학 상태·병역 → 받을 게시판·키워드 → 기타 게시판(부트캠프 등) → 알림.
 import { boardRank } from './board-order';
-import { AiRows, aiConnectModel } from './ai-connect';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { AppController } from './app-controller';
 import { ADMISSION_YEARS, ENROLLMENT, MILITARY, OLD_ADMISSION_YEAR } from './profile';
@@ -19,7 +18,7 @@ import { BoardRequest } from './board-request';
 import { installMode, isStandalone, MANUAL_INSTALL_HINT } from './install-hint';
 import { BackToGroups, Card, ChipGroup, ChoiceList, GroupGrid, Segmented, SwitchRow } from './ui';
 
-const STEP_LABELS = ['주전공', '복수전공', '학교 정보', '인턴십', '받을 공지', '알림', 'AI 키'] as const;
+const STEP_LABELS = ['주전공', '복수전공', '학교 정보', '인턴십', '받을 공지', '알림'] as const;
 
 const YEARS = [1, 2, 3, 4, 5].map((year) => ({ value: year, label: year === 5 ? '5학년~' : `${year}학년` }));
 const STATUS = ENROLLMENT.map((value) => ({ value, label: value }));
@@ -137,7 +136,7 @@ function MoreBoards<T extends { id: string; name: string }>({ sources, on, rende
 export function Onboarding({ app }: { app: AppController }) {
   useSyncExternalStore(app.subscribe, app.getVersion);
   const [draft, setDraft] = useState<Draft>(() => initialDraft(app.profile, app.subscriptions, app.keywords));
-  // 저장까지 하고 AI 키 단계에서 나간 사람은 답한 질문을 다시 거치지 않고 AI 키 단계부터 잇는다.
+  // 저장까지 하고 알림 단계에서 나간 사람은 답한 질문을 다시 거치지 않고 알림 단계부터 잇는다.
   // 이미 첫 설정을 끝낸 계정(isFill)이 새로 필요한 정보 때문에 열면, 비어 있는 항목(REQUIRED_ITEMS 기준)만 순서대로 보인다.
   const [isFill] = useState(() => !!app.profile.onboardedAt);
   const [fill, setFill] = useState<Step[]>(() => (app.profile.onboardedAt ? app.missingRequiredSteps() : []));
@@ -167,8 +166,6 @@ export function Onboarding({ app }: { app: AppController }) {
   // 단계가 바뀌면 새 질문을 화면 낭독기가 읽도록 제목으로 포커스를 옮긴다.
   // 이전 화면의 스크롤 위치가 남아 제목이 가려지지 않게 맨 위로 되돌린 뒤 제목으로 포커스를 옮긴다.
   useEffect(() => { bodyRef.current?.scrollTo({ top: 0 }); heading.current?.focus({ preventScroll: true }); }, [step, addingDouble, changingPrimary, saved]);
-  // AI 키 단계에 들어오면 키 기능이 켜져 있는지 한 번 더 확인한다(처음 확인이 실패했어도 여기서 이어진다).
-  useEffect(() => { if (step === 'ai' && !app.byokOn) void app.recheckByok(); }, [step, app]);
 
   const index = fillMode ? fill.indexOf(step) : stepIndex(step);
   const primary = draft.programs[0];
@@ -176,8 +173,8 @@ export function Onboarding({ app }: { app: AppController }) {
   // 채우는 화면에서는 어느 단계로 가라는 요청이든 "다음 빈 항목"으로 간다. 프로필 항목은 마지막 프로필 항목에서 한 번에 저장하고, 끝이면 닫는다.
   const nextFill = fillMode ? fill[index + 1] : undefined;
   const advanceFill = async () => {
-    const laterProfile = fill.slice(index + 1).some((name) => name !== 'ai');
-    if (step !== 'ai' && !laterProfile && !(await app.saveMissingProfile(draft, !nextFill))) return;
+    const laterProfile = fill.slice(index + 1).length > 0;
+    if (!laterProfile && !(await app.saveMissingProfile(draft, !nextFill))) return;
     if (nextFill) setStep(nextFill);
   };
   const go = (to: Step | null) => { if (!to) return; if (fillMode) void advanceFill(); else setStep(to); };
@@ -202,7 +199,6 @@ export function Onboarding({ app }: { app: AppController }) {
     if (step === 'primary' && !changingPrimary) { setChangingPrimary(true); return; }
     // 앞으로 갈 때 알림이 이미 켜져 있어 건너뛴 단계는 뒤로 갈 때도 건너뛴다.
     if (fillMode) { if (index > 0) setStep(fill[index - 1]); return; }
-    if (step === 'ai' && app.pushStatus === 'on') { go('boards'); return; }
     go(previousStep(step));
   };
   const sources = app.sources.filter((source) => !source.external);
@@ -221,13 +217,10 @@ export function Onboarding({ app }: { app: AppController }) {
     checked={draft.boards.includes(source.id)} onChange={() => setDraft({ ...draft, boards: toggleValue(draft.boards, source.id), boardsTouched: true })} />;
   const keywordOptions = [...KEYWORD_SUGGESTIONS, ...draft.keywords.filter((word) => !(KEYWORD_SUGGESTIONS as readonly string[]).includes(word))];
 
-  // 알림 → AI 키 순서. 알림을 이미 켰거나 지원하지 않으면 알림 단계를 건너뛰고, 키가 이미 있으면 AI 단계를 건너뛴다.
-  // 키 기능이 꺼져 있거나 확인하지 못했어도 키 없이 끝내지 않는다(예외 없음). 그때는 AI 단계에서 다시 확인하게 한다.
-  const needAi = () => !app.byokStatus && app.aiKeys.length === 0;
-  // 키가 이미 있으면 알림 단계가 마지막이라 여기서 완료를 저장한다(게시판 단계에서 미리 완료로 저장하면 새로고침으로 알림 단계를 건너뛸 수 있다).
-  const afterNotify = () => { if (needAi()) go('ai'); else if (app.profile.onboardedAt) app.closeOnboarding(); else void app.completeOnboarding(); };
-  const finishWithKey = () => { void app.completeOnboarding(); };
-  const save = async () => { if (await app.finishOnboarding(draft, !needAi() && app.pushStatus === 'on')) { setSaved(true); if (app.pushStatus !== 'on') go('notify'); else afterNotify(); } };
+  // 알림이 마지막 단계다. AI 키는 첫 설정에서 묻지 않는다(설정의 AI 연결과 공지 상세의 안내에서 연결한다).
+  // 알림을 이미 켰거나 지원하지 않으면 알림 단계를 건너뛴다. 게시판 단계에서 미리 완료로 저장하면 새로고침으로 알림 단계를 건너뛸 수 있어, 알림이 켜진 기기만 거기서 끝낸다.
+  const afterNotify = () => { if (app.profile.onboardedAt) app.closeOnboarding(); else void app.completeOnboarding(); };
+  const save = async () => { if (await app.finishOnboarding(draft, app.pushStatus === 'on')) { setSaved(true); if (app.pushStatus !== 'on') go('notify'); else afterNotify(); } };
   // 허용 창을 늦게 눌러서 나중에 알림이 켜져도 이 단계에 머물지 않고 이어 간다.
   // 상태가 on으로 바뀐 때 한 번만 넘긴다(완료 저장이 실패해도 렌더마다 다시 저장하지 않고, 화면의 '끝내기'로 다시 시도한다).
   useEffect(() => { if (!fillMode && step === 'notify' && app.pushStatus === 'on') afterNotify(); }, [step, app.pushStatus]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -344,17 +337,6 @@ export function Onboarding({ app }: { app: AppController }) {
     </div>;
     foot = <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={app.onboardingBusy} onClick={() => { void save(); }}>
       {app.onboardingBusy ? '저장하고 있어요' : app.onboardingError ? '다시 시도하기' : '다음'}</button>;
-  } else if (step === 'ai') {
-    title = 'AI를 연결해 주세요';
-    const connected = fillMode ? app.hasUsableAiKey() === true : !!app.byokStatus || app.aiKeys.length > 0;
-    body = <div className="onb-group grid gap-[8px] [&>h2]:mt-[16px] [&>h2]:text-[15px] [&>h2]:leading-[22px] [&>h2]:font-semibold [&>h2]:text-ink [&>h2:first-child]:mt-0 [&>h2:not(:first-child)]:mt-[24px]"><div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0 min-[720px]:[&_.setting]:grid-cols-[minmax(0,1fr)] min-[720px]:[&_.setting]:gap-[8px]"><AiRows byok={aiConnectModel(app)} /></div>
-      {app.byokOn ? null : <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold whitespace-nowrap self-start" onClick={() => { void app.recheckByok(); }}>다시 확인하기</button>}
-      {app.onboardingError ? <p className="error-text text-[14px] text-danger" role="alert">{app.onboardingError}</p> : null}</div>;
-    foot = <>
-      {connected ? null : <RequiredHint text="키를 하나 연결해 주세요" />}
-      <button type="button" className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={!connected || app.onboardingBusy || app.byokBusy || app.aiBusy} onClick={nextFill ? () => setStep(nextFill) : finishWithKey}>
-        {app.onboardingBusy ? '저장하고 있어요' : '끝내기'}</button>
-    </>;
   } else {
     // 알림은 첫 설정에서 꼭 켠다(사용자 지시 2026-11-16). 켤 수 없는 기기(지원 안 함, 브라우저가 막음, 반복 실패)만 이 기기에서 건너뛸 수 있고, 건너뛴 기기에는 알림 패널이 다시 권한다.
     const SOLID = 'solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60';
@@ -381,7 +363,7 @@ export function Onboarding({ app }: { app: AppController }) {
     foot = <>
       {status === 'off' && !failed || waiting ? <p className="m-0 text-center text-[14px] text-ink-2 break-keep text-pretty">설정에서 언제든 끌 수 있어요</p> : null}
       {status === 'on' || status === 'unsupported'
-        ? <button type="button" className={SOLID} onClick={afterNotify}>{status === 'unsupported' ? '계속하기' : needAi() ? '다음' : '끝내기'}</button>
+        ? <button type="button" className={SOLID} onClick={afterNotify}>{status === 'unsupported' ? '계속하기' : '끝내기'}</button>
         : status === 'denied'
           ? <button type="button" className={SOLID} onClick={() => { void app.recheckPush(); }}>다시 확인하기</button>
           : <button type="button" className={SOLID} disabled={waiting} onClick={() => { void app.enablePush(); }}>
@@ -390,13 +372,7 @@ export function Onboarding({ app }: { app: AppController }) {
     </>;
   }
 
-  if (fillMode) {
-    if (step === 'ai') {
-      const broken = !!app.byokStatus?.disabled || app.aiKeys.some((key) => key.disabled);
-      title = broken ? 'AI 키를 다시 연결해 주세요' : 'AI 키를 연결해 주세요';
-      lead = broken ? '연결해 둔 키가 더 이상 작동하지 않아서 다시 열었어요' : '연결된 AI 키가 없어서 다시 열었어요';
-    } else lead = index === 0 ? '새로 필요한 정보가 생겼어요. 이것만 고르면 바로 쓸 수 있어요' : '';
-  }
+  if (fillMode) lead = index === 0 ? '새로 필요한 정보가 생겼어요. 이것만 고르면 바로 쓸 수 있어요' : '';
   const showBack = fillMode ? index > 0 || addingDouble || (step === 'primary' && !changingPrimary) : index > 0 || addingDouble || (step === 'primary' && !changingPrimary);
   return <div className="onb fixed inset-0 z-[60] grid grid-cols-[minmax(0,1fr)] bg-bg text-ink min-[900px]:grid-cols-[minmax(320px,5fr)_minmax(0,7fr)] [&_.seg_button]:rounded-pill [&_.chip]:min-h-[44px] [&_.chip]:before:inset-0 [&_.text-button]:min-h-[44px] [&_.choice:focus-visible]:[outline-offset:-2px]" role="dialog" aria-modal="true" aria-labelledby="onb-title">
     {app.toast ? <div className="toast fixed bottom-[calc(88px+env(safe-area-inset-bottom))] left-1/2 z-[70] w-max max-w-[calc(100%-32px)] [transform:translateX(-50%)] rounded-lg bg-toast px-[20px] py-[14px] text-[15px] leading-[22px] font-medium text-on-toast [box-shadow:var(--shadow-pop)]" role="status">{app.toast}</div> : null}
@@ -421,7 +397,7 @@ export function Onboarding({ app }: { app: AppController }) {
             aria-valuetext={`${fillMode ? fill.length : STEPS.length}단계 중 ${index + 1}단계`} aria-label={fillMode ? '필요한 정보 채우기 진행' : '첫 설정 진행'}>
             {(fillMode ? fill : STEPS).map((name, i) => <span className={`h-[4px] flex-1 rounded-pill [transition:background_.2s] ${i <= index ? 'bg-ink' : 'bg-line'}`} key={name} data-done={i <= index} />)}
           </div>}
-          {/* 첫 설정은 처음에만 열리고 건너뛸 수도, 닫을 수도 없다(전공과 AI 키는 필수). */}
+          {/* 첫 설정은 처음에만 열리고 건너뛸 수도, 닫을 수도 없다(전공 정보는 필수). */}
           <span className="onb-top-slot block size-[44px]" aria-hidden="true" />
         </div>
       </div>
@@ -429,7 +405,7 @@ export function Onboarding({ app }: { app: AppController }) {
         <h1 id="onb-title" ref={heading} tabIndex={-1}>{title}</h1>
         {lead ? <p className="onb-lead m-0 text-ink-2">{lead}</p> : null}
         {body}
-        {fillMode && app.onboardingError && step !== 'ai' && step !== 'boards' ? <p className="error-text text-[14px] text-danger" role="alert">{app.onboardingError}</p> : null}
+        {fillMode && app.onboardingError && step !== 'boards' ? <p className="error-text text-[14px] text-danger" role="alert">{app.onboardingError}</p> : null}
       </div>
       {foot ? <div className="onb-foot sticky bottom-0 z-[2] border-t border-line bg-bg pt-[12px] [&_.solid-button]:w-full [&_.ghost-button]:w-full [&_.solid-button:disabled]:border-line [&_.solid-button:disabled]:bg-sunken [&_.solid-button:disabled]:text-ink-2 [&_.solid-button:disabled]:opacity-100"><div className="onb-foot-inner mx-auto grid w-[min(100%,36rem)] gap-[8px] px-[16px] pt-0 pb-[calc(12px+env(safe-area-inset-bottom))]">
         {blocked ? <>

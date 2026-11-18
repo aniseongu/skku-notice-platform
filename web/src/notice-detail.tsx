@@ -19,6 +19,8 @@ export interface NoticeDetailModel {
   /** 내 Gemini 키로 만든 요약(없으면 null) */
   mySummary?: string | null;
   summarizing?: boolean;
+  /** 키가 없는 사용자에게 요약 자리에서 AI 연결을 권하는 한 줄. 없으면 안 보인다. */
+  aiHint?: { connect: () => void; dismiss: () => void };
   interests: string[];
   ai: { verdict: Verdict; reason: string } | null;
   rule: string | null;
@@ -156,6 +158,16 @@ function SummaryLoading() {
     <div className={`grid gap-[16px] py-[5px] ${shown ? '' : 'invisible'}`} aria-hidden="true"><span className={`${SKELETON_BAR} w-full`}></span><span className={`${SKELETON_BAR} w-[88%]`}></span><span className={`${SKELETON_BAR} w-[56%]`}></span></div></section>;
 }
 
+/** AI 키가 없는 사용자에게 요약이 들어갈 자리에서 연결을 권한다. 한 줄과 단추 하나, 닫으면 이 계정에는 다시 안 보인다. */
+function AiConnectHint({ hint }: { hint: { connect: () => void; dismiss: () => void } }) {
+  return <section className="ai-hint mt-[16px] flex items-center gap-[8px] rounded-md bg-sunken py-[8px] pr-[4px] pl-[14px]" aria-label="AI 연결 안내">
+    <p className="m-0 min-w-0 flex-1 text-[14px] leading-[21px] text-ink-2 break-keep text-pretty">AI를 연결하면 요약하고, 나에게 맞는지 알려 줘요</p>
+    <button type="button" className="text-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex min-h-[44px] flex-none items-center rounded-sm border-0 bg-transparent px-[10px] py-0 text-[14px] font-semibold text-accent" onClick={hint.connect}>연결하기</button>
+    <button type="button" className="icon-button [@media(hover:hover)]:hover:bg-hover active:bg-hover grid size-[44px] flex-none place-items-center rounded-sm border-0 bg-transparent text-ink-3" aria-label="AI 안내 닫기" onClick={hint.dismiss}>
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+  </section>;
+}
+
 function NoticeDetail({ model }: { model: NoticeDetailModel }) {
   const { notice, body, ai, interests } = model;
   const loaded = body === 'loading' ? null : body;
@@ -175,6 +187,7 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
     {model.opportunity ? <OpportunitySection key={notice.id} model={model.opportunity} /> : null}
     {summary ? <section className={`${DETAIL_SECTION} summary`} aria-labelledby="sec-summary"><h3 id="sec-summary" className={SECTION_TITLE}>요약</h3>{summaryLines(summary).map((line, index) => <p className={SUMMARY_P} key={index}>{line}</p>)}</section>
       : model.summarizing ? <SummaryLoading key={notice.id} />
+      : model.aiHint ? <AiConnectHint hint={model.aiHint} />
       : null}
     {model.graduation ? <GraduationSection title={title} model={model.graduation} /> : null}
     {body === 'loading' ? <BodyLoading key={notice.id} /> : !loaded ? <><p className={NOTE} role="status">본문을 불러오지 못했어요. 다시 불러오거나 원문을 확인해 주세요</p><button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" onClick={model.retry}>본문 다시 불러오기</button></>

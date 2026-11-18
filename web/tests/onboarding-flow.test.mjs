@@ -4,7 +4,7 @@ import test from 'node:test';
 import { BOARD_CATALOG, COLLEGE_BOARD, DEFAULT_BOARD, DEPARTMENT_BOARD, boardsForPrograms } from '../src/skku-boards.ts';
 import { COLLEGES, validProgram } from '../src/skku-programs.ts';
 import { EMPTY_PROFILE } from '../src/profile.ts';
-import { KEYWORD_SUGGESTIONS, REQUIRED_ITEMS, missingItems, missingRequired, savedDoubleAnswer, canContinue, earlierMissing, filterDepartments, initialDraft, nextStep, previousStep, resumeStep, toggleValue, withPrograms } from '../src/onboarding-flow.ts';
+import { KEYWORD_SUGGESTIONS, REQUIRED_ITEMS, STEPS, missingItems, missingRequired, savedDoubleAnswer, canContinue, earlierMissing, filterDepartments, initialDraft, nextStep, previousStep, resumeStep, toggleValue, withPrograms } from '../src/onboarding-flow.ts';
 
 const sw = { college: '소프트웨어융합대학', department: '소프트웨어학과' };
 const biz = { college: '경영대학', department: '경영학과' };
@@ -44,7 +44,7 @@ test('앞 단계에 필수 답이 비면 뒤 단계에서 그 단계로 돌아�
   assert.equal(earlierMissing('notify', { ...ok, programs: [] }, 'no'), 'primary');   // 가장 앞의 빈 단계부터
   assert.equal(earlierMissing('internship', { ...ok, year: null }, 'no'), 'status');
   assert.equal(earlierMissing('status', { ...ok, year: null }, 'no'), null);   // 자기 단계는 다음 단추가 막는다
-  assert.equal(earlierMissing('ai', { ...ok, university3pInternshipSelected: null }, 'no'), 'internship');
+  assert.equal(earlierMissing('notify', { ...ok, university3pInternshipSelected: null }, 'no'), 'internship');
 });
 
 test('board catalog only points at known boards and valid college/department pairs', () => {
@@ -103,8 +103,8 @@ test('steps move forward and back in order and required answers gate the next bu
   assert.equal(nextStep('status'), 'internship');
   assert.equal(nextStep('internship'), 'boards');
   assert.equal(nextStep('boards'), 'notify');
-  assert.equal(nextStep('notify'), 'ai');
-  assert.equal(nextStep('ai'), null);
+  assert.equal(nextStep('notify'), null);   // AI 키 단계는 없다(2026-11-18)
+  assert.deepEqual(STEPS, ['primary', 'double', 'status', 'internship', 'boards', 'notify']);
   const draft = initialDraft(EMPTY_PROFILE, [], []);
   assert.equal(canContinue('primary', draft), false);
   assert.equal(canContinue('double', draft), false, 'the double major question needs an answer before 다음');
@@ -139,16 +139,16 @@ test('저장까지 하고 AI 키 단계에서 나간 사람은 다시 열면 AI 
 const completeProfile = { ...EMPTY_PROFILE, programs: [biz], year: 3, enrollmentStatus: '재학', university3pInternshipSelected: true, university3pInternshipDone: false, onboardedAt: 'x' };
 const missingFor = (profile, usable, registry) => { const draft = initialDraft(profile, [], []); return missingRequired(draft, savedDoubleAnswer(draft), { usable }, registry); };
 
-test('missingRequired: complete account is empty, no key is [ai], unknown key is never missing', () => {
+test('missingRequired: complete account is empty, a missing AI key is never required', () => {
   assert.deepEqual(missingFor(completeProfile, true), []);
-  assert.deepEqual(missingFor(completeProfile, false), ['ai']);
+  assert.deepEqual(missingFor(completeProfile, false), []);
   assert.deepEqual(missingFor(completeProfile, null), []);
 });
 
 test('missingRequired: software major without admission year, and empty profile, come back in step order', () => {
   const swProfile = { ...completeProfile, programs: [sw], admissionYear: null, deptInternshipDone: true };
   assert.deepEqual(missingFor(swProfile, true), ['internship']);
-  assert.deepEqual(missingFor(swProfile, false), ['internship', 'ai']);
+  assert.deepEqual(missingFor(swProfile, false), ['internship']);
   assert.deepEqual(missingFor({ ...EMPTY_PROFILE, onboardedAt: 'x' }, true), ['primary', 'status', 'internship']);
 });
 
@@ -159,5 +159,5 @@ test('missingRequired: a new required item added to the registry is the only mis
   // 목록이 순서와 이름의 유일한 출처다.
   const draft = initialDraft(completeProfile, [], []);
   assert.deepEqual(missingItems({ draft, doubleAnswer: 'no', keysUsable: true }, registry).map((item) => item.label), ['연락처']);
-  assert.deepEqual(REQUIRED_ITEMS.map((item) => item.step), ['primary', 'double', 'status', 'internship', 'ai']);
+  assert.deepEqual(REQUIRED_ITEMS.map((item) => item.step), ['primary', 'double', 'status', 'internship']);
 });

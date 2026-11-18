@@ -7,6 +7,8 @@ import { STATUS_TEXT, displayStatus, jobNote, reasonOf, type GraduationAssessmen
 export interface GraduationModel {
   /** 연결한 AI 키 개수. 한도로 끝났을 때 다른 키를 더 연결하라고 안내할지 정한다. */
   aiKeys?: number;
+  /** 키가 없을 때 AI 연결 쪽으로 보낸다. */
+  connectAi?: () => void;
   tracks: VisibleTracks;
   assessment: GraduationAssessment | null;
   error: string;
@@ -14,7 +16,7 @@ export interface GraduationModel {
 
 // 업체 이름(Gemini 등)이 아니라 "AI 키"라고 쓴다. 그리고 "공고 내용만 봤다"고만 쓰면 무엇을 못 봤는지 모르니, AI가 해 주는 일(담당 업무 확인)을 못 했다고 말한다.
 const AI_NOTE = {
-  no_key: 'AI 키를 연결하면 담당 업무까지 확인해요',
+  no_key: 'AI를 연결하면 담당 업무까지 확인해요',
   unavailable: 'AI가 응답하지 않아 담당 업무는 확인하지 못했어요. 잠시 뒤 다시 확인해요',
   limit: '오늘 AI 사용 한도를 다 써서 담당 업무는 확인하지 못했어요. 내일 다시 확인해요',
 } as const;
@@ -81,6 +83,6 @@ export function GraduationNotes({ model }: { model: GraduationModel }) {
       {hasP3 ? <p className="m-0">3품은 근무 시간이 280시간 이상인지 확인해요</p> : null}
       {hasDept ? <p className="m-0">솦은 소프트웨어 업무인지와 근무 기간·시간을 확인해요</p> : null}
     </div> : null}
-    {ready.aiStatus && ready.aiStatus !== 'used' ? <p className="m-0 mt-[12px] text-ink-3" role="status">{AI_NOTE[ready.aiStatus]}{ready.aiStatus === 'limit' && (model.aiKeys ?? 3) < 3 ? '. 다른 AI 키를 더 연결하면 오늘도 더 확인해요' : ''}</p> : null}
+    {ready.aiStatus && ready.aiStatus !== 'used' ? <p className="m-0 mt-[12px] text-ink-3" role="status">{AI_NOTE[ready.aiStatus]}{ready.aiStatus === 'no_key' && model.connectAi ? <button type="button" className="text-button [@media(hover:hover)]:hover:bg-hover active:bg-hover ml-[4px] -my-[13px] inline-flex min-h-[44px] items-center rounded-sm border-0 bg-transparent px-[6px] py-0 align-middle text-[14px] font-semibold text-accent" onClick={model.connectAi}>연결하기</button> : null}{ready.aiStatus === 'limit' && (model.aiKeys ?? 3) < 3 ? '. 다른 AI 키를 더 연결하면 오늘도 더 확인해요' : ''}</p> : null}
   </div>;
 }

@@ -546,7 +546,8 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
     // 같은 공지 묶음은 글마다 따로 저장되므로, 겹쳐 세지 않게 가장 큰 수를 보인다.
     saveCount: Math.max(...[notice, ...app.mates(notice.id)].map((member) => app.saveCounts.get(member.id) ?? 0)) || undefined,
     notice: shown, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
-    today: todayKst(), body: shownBody, mySummary: mine?.summary ?? null, summarizing: app.summarizing === notice.id, interests,
+    today: todayKst(), body: shownBody, mySummary: mine?.summary ?? null,
+    aiHint: app.aiHintShown() ? { connect: () => app.openSettings('keys'), dismiss: () => app.dismissAiHint() } : undefined, summarizing: app.summarizing === notice.id, interests,
     ai: judgement?.ai ?? mine?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
     coop: app.kindOf(notice) === 'coop',
     pending: !(judgement?.ai ?? mine?.ai) && !interests.length && !hasGrad && app.judgePending(notice),
@@ -559,7 +560,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
         onRemove: () => { void app.removeOpportunityFor(notice); } };
     })() : undefined,
     grad: gradDetail,
-    graduation: app.showsGraduation(notice) ? { aiKeys: (app.byokStatus && !app.byokStatus.disabled ? 1 : 0) + app.aiKeys.filter((key) => !key.disabled).length, tracks: visibleTracks(app.profile), assessment: app.graduationFor(notice), error: app.graduationError } : undefined,
+    graduation: app.showsGraduation(notice) ? { connectAi: () => app.openSettings('keys'), aiKeys: (app.byokStatus && !app.byokStatus.disabled ? 1 : 0) + app.aiKeys.filter((key) => !key.disabled).length, tracks: visibleTracks(app.profile), assessment: app.graduationFor(notice), error: app.graduationError } : undefined,
   }} />;
 }
 

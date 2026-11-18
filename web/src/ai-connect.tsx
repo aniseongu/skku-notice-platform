@@ -57,7 +57,7 @@ export function AiRows({ byok, alignEnd = false }: { byok?: Byok; alignEnd?: boo
   if (!byok?.available || !ai) {
     return <Setting name="AI 키" help="지금은 키를 연결할 수 없어요. 잠시 뒤 다시 열어 주세요" />;
   }
-  // 쓸 수 있는 키가 하나뿐이면 그 키는 지울 수 없다(지우면 첫 설정으로 되돌아간다). 바꾸는 것은 언제든 된다. 이유는 구역 설명 한 줄(aiKeysLead)이 말한다.
+  // AI 키는 첫 설정의 필수가 아니라서 마지막 키도 지울 수 있다(canRemoveKey). 지우면 AI 요약·판정만 멈춘다.
   const usable = connectedAiKeys({ byok });
   return <>
     {ORDER.map((id) => {

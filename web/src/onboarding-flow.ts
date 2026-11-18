@@ -6,9 +6,9 @@ import { isSoftwareOriginal as isSwOriginal, threePAnswer } from './graduation-a
 
 const isSoftwareOriginal = (draft: { programs: Program[] }) => isSwOriginal({ programs: draft.programs });
 
-// 7단계: 알림은 핵심 가치라 먼저 묻고, 입력이 번거로운 선택 사항(AI 키)은 마지막에 둔다. 기타 게시판은 게시판에 합쳤다. 인턴십은 질문이 많아 학교 정보와 따로 둔다(독립 평가: 한 화면에 질문이 많으면 6.5점).
-export type Step = 'primary' | 'double' | 'status' | 'internship' | 'boards' | 'notify' | 'ai';
-export const STEPS: readonly Step[] = ['primary', 'double', 'status', 'internship', 'boards', 'notify', 'ai'];
+// 6단계: 알림이 마지막이다. AI 키는 첫 설정에서 묻지 않는다(2026-11-18 사용자 결정, 설정과 공지 상세에서 연결). 기타 게시판은 게시판에 합쳤다. 인턴십은 질문이 많아 학교 정보와 따로 둔다(독립 평가: 한 화면에 질문이 많으면 6.5점).
+export type Step = 'primary' | 'double' | 'status' | 'internship' | 'boards' | 'notify';
+export const STEPS: readonly Step[] = ['primary', 'double', 'status', 'internship', 'boards', 'notify'];
 
 // 골라서 쓰는 키워드. 직접 쓰는 입력은 설정에서 한다(처음에는 고르기만 해도 되게).
 export const KEYWORD_SUGGESTIONS = ['장학', '인턴', '채용', '공모전', '대외활동', '교환학생', '수강신청', '졸업', '특강', '등록금'] as const;
@@ -89,13 +89,12 @@ export function canContinue(step: Step, draft: Draft, doubleAnswer: DoubleAnswer
     // 소프트웨어학과 원전공은 인턴십 졸업요건 판정에 입학 연도가 필요하다.
     // 3품 인턴십은 모두 답해야 하고, 소프트웨어학과 원전공은 입학 연도와 솦 인턴십도 답해야 한다(아무것도 안 골라도 켜져 있으면 무엇이 빠졌는지 모른다).
     case 'internship': return threePAnswer(draft) !== null && (!isSoftwareOriginal(draft) || (draft.admissionYear !== null && draft.deptInternshipDone !== null));
-    case 'ai': return true;
     case 'boards': return true;
     case 'notify': return true;
   }
 }
 
-/** 필수 항목이 비었는지 판단할 때 쓰는 값. keysUsable이 null이면 아직 모르는 것(기능 꺼짐, 불러오는 중, 불러오기 실패)이라 비었다고 보지 않는다. */
+/** 필수 항목이 비었는지 판단할 때 쓰는 값. keysUsable은 AI 키가 필수에서 빠진 뒤 쓰이지 않지만(항목을 만들 때 참고용) 시험과 호출부가 같은 모양을 쓰도록 남겼다. */
 export interface RequiredContext { draft: Draft; doubleAnswer: DoubleAnswer; keysUsable: boolean | null }
 export interface RequiredItem { step: Step; label: string; missing: (ctx: RequiredContext) => boolean }
 
@@ -107,7 +106,6 @@ export const REQUIRED_ITEMS: readonly RequiredItem[] = [
   { step: 'double', label: '복수전공', missing: ({ draft, doubleAnswer }) => !canContinue('double', draft, doubleAnswer) },
   { step: 'status', label: '학교 정보', missing: ({ draft, doubleAnswer }) => !canContinue('status', draft, doubleAnswer) },
   { step: 'internship', label: '인턴십', missing: ({ draft, doubleAnswer }) => !canContinue('internship', draft, doubleAnswer) },
-  { step: 'ai', label: 'AI 키', missing: ({ keysUsable }) => keysUsable === false },
 ];
 
 /** 채워야 하지만 비어 있는 항목(목록 순서). 첫 설정을 끝낸 계정에 이 화면만 보이게 하는 기준이다. registry는 시험에서 바꿔 끼운다. */
@@ -137,7 +135,7 @@ export function savedBefore(profile: Pick<UserProfile, 'programs' | 'enrollmentS
   return profile.programs.length > 0 && profile.enrollmentStatus !== null;
 }
 
-/** 다시 열었을 때 시작할 단계. 저장까지 하고 알림·AI 키 단계에서 나갔다면 이미 답한 질문을 다시 묻지 않고 알림 단계부터 잇는다(알림이 이미 켜져 있으면 화면이 바로 다음으로 넘긴다).
+/** 다시 열었을 때 시작할 단계. 저장까지 하고 알림 단계에서 나갔다면(예전 AI 키 단계에서 나간 경우 포함) 이미 답한 질문을 다시 묻지 않고 알림 단계부터 잇는다(알림이 이미 켜져 있으면 화면이 바로 다음으로 넘긴다).
  * 그 사이 새 필수 질문이 생겨 답이 비어 있으면 처음부터 묻는다(그 단계로 돌아가는 일은 earlierMissing이 맡는다). */
 export function resumeStep(profile: Pick<UserProfile, 'programs' | 'enrollmentStatus'>, draft: Draft): Step {
   if (!savedBefore(profile)) return 'primary';
