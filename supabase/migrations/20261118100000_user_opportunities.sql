@@ -36,6 +36,8 @@ create or replace function public.user_opportunities_before_insert() returns tri
 language plpgsql set search_path = public, pg_temp as $$
 begin
   perform pg_advisory_xact_lock(hashtextextended('user_opportunities:' || new.user_id::text, 0));
+  -- upsert(ON CONFLICT DO UPDATE)도 이 트리거를 먼저 지나므로, 이미 있는 행의 수정은 한도에 걸리지 않게 한다.
+  if exists (select 1 from public.user_opportunities where user_id = new.user_id and notice_id = new.notice_id) then return new; end if;
   if (select count(*) from public.user_opportunities where user_id = new.user_id) >= 200 then
     raise exception 'user_opportunities limit reached' using errcode = 'check_violation';
   end if;

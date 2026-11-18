@@ -50,6 +50,10 @@ test('opportunities are isolated, validated, limited and survive notice deletion
     await db.exec(`insert into user_opportunities(user_id,notice_id,title) select '${a}','n'||g,'t' from generate_series(1,199) g`);
     assert.equal((await db.query('select count(*)::int c from user_opportunities')).rows[0].c, 200);
     await assert.rejects(db.exec(`insert into user_opportunities(user_id,notice_id,title) values ('${a}','over','t')`), /limit/);
+    // 한도(200행)에 닿아도 이미 있는 행의 상태·메모 수정(upsert)은 된다
+    const existing = (await db.query(`select notice_id from user_opportunities where user_id='${a}' limit 1`)).rows[0].notice_id;
+    await db.exec(`insert into user_opportunities(user_id,notice_id,title,status) values ('${a}','${existing}','t','applied') on conflict (user_id,notice_id) do update set status = excluded.status`);
+    assert.equal((await db.query(`select status from user_opportunities where user_id='${a}' and notice_id='${existing}'`)).rows[0].status, 'applied');
     await db.exec(`set request.jwt.claim.sub = '${b}'`);
     await db.exec(`insert into user_opportunities(user_id,notice_id,title) values ('${b}','mine','t')`);
     await db.exec('reset role; set role anon');
