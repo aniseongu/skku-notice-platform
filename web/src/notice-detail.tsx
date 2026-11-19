@@ -188,13 +188,13 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
     {hasReason ? <p className="detail-reason mt-[10px] text-[14px] leading-[21px] text-ink-2"><Reason interests={interests} ai={ai} rule={model.rule} pending={model.pending} /></p> : null}
     {notice.deadline ? <p className="detail-deadline mt-[6px] text-[14px] leading-[21px] font-semibold tabular-nums">{notice.deadline_kind ?? '마감'} {deadlineDetail(notice.deadline)} <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''} ml-[6px] text-[14px] leading-[18px] tabular-nums ${passed ? 'font-medium' : 'font-bold'} ${urgent ? 'text-danger' : passed ? 'text-ink-3' : ''}`}>{deadlineText(notice.deadline, model.today)}</span></p> : null}
     {notice.changed_at ? <p className="detail-change mt-[4px] text-[13px] leading-[19px] text-ink-2">{koreanDate(notice.changed_at.slice(0, 10))}에 원문 {notice.change_kind === '제목' ? '제목이' : '본문이'} 바뀌었어요</p> : null}
-    {model.opportunity ? <OpportunitySection key={notice.id} model={model.opportunity} /> : null}
+    {model.opportunity ? <OpportunitySection key={`opportunity-${notice.id}`} model={model.opportunity} /> : null}
     {summary ? <section className={`${DETAIL_SECTION} summary`} aria-labelledby="sec-summary"><h3 id="sec-summary" className={SECTION_TITLE}>요약</h3>{summaryLines(summary).map((line, index) => <p className={SUMMARY_P} key={index}>{line}</p>)}</section>
-      : model.summarizing ? <SummaryLoading key={notice.id} />
+      : model.summarizing ? <SummaryLoading key={`summary-${notice.id}`} />
       : model.aiHint ? <AiConnectHint hint={model.aiHint} />
       : null}
     {model.graduation ? <GraduationSection title={title} model={model.graduation} /> : null}
-    {body === 'loading' ? <BodyLoading key={notice.id} /> : !loaded ? <><p className={NOTE} role="status">본문을 불러오지 못했어요. 다시 불러오거나 원문을 확인해 주세요</p><button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" onClick={model.retry}>본문 다시 불러오기</button></>
+    {body === 'loading' ? <BodyLoading key={`body-${notice.id}`} /> : !loaded ? <><p className={NOTE} role="status">본문을 불러오지 못했어요. 다시 불러오거나 원문을 확인해 주세요</p><button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" onClick={model.retry}>본문 다시 불러오기</button></>
       : loaded.translation?.body ? <><section className={`${DETAIL_SECTION} body-text`} aria-label="한국어로 옮긴 본문"><h3 className={SECTION_TITLE}>본문 (한국어로 옮긴 글)</h3><p className={NOTE_BODY}>Gemini 번역이에요. 정확한 내용은 아래 영어 원문을 확인해 주세요</p>{loaded.translation.body.split(/\n+/).filter(Boolean).map((para, index) => <p className={BODY_P} key={index}>{para}</p>)}</section><div className="original-body" lang="en"><Body body={loaded} heading="영어 원문" /></div></> : <Body body={loaded} />}
     {model.coop ? <p className={NOTE}>신청은 톨게이트에 학교 계정으로 로그인한 뒤 할 수 있어요</p> : null}
     {/* 그림에서 읽은 글은 판정에만 쓰고 화면에는 보이지 않는다(틀린 글자가 섞여 있고 그림이 더 정확하다). */}

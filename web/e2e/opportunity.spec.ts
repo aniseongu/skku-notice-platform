@@ -58,6 +58,27 @@ test('saved notice: one tap sets the status, keys move it, the memo saves on blu
   await expect(section.getByText('상태와 메모를 지울까요?')).toBeVisible();
 });
 
+test('the status section stays one even while the summary and body loading states come and go', async ({ page }) => {
+  await setup(page);
+  await page.getByRole('button', { name: '저장하기' }).click();
+  const section = page.getByRole('region', { name: '내 진행 상태' });
+  await expect(section).toHaveCount(1);
+  // 요약 불러오는 중·본문 불러오는 중 표시가 같은 자리에 들어왔다 나가도 진행 상태 구역은 늘어나지 않는다(형제 key가 겹치던 버그).
+  for (let i = 0; i < 4; i++) {
+    await page.evaluate((round) => {
+      const app = document.querySelector('notice-app') as unknown as App;
+      const id = app.selectedId as string;
+      app.summarizing = round % 2 === 0 ? id : null;
+      const bodies = new Map(app.bodies);
+      if (round % 2 === 0) bodies.set(id, 'loading'); else bodies.delete(id);
+      app.bodies = bodies;
+    }, i);
+    await page.waitForTimeout(50);
+  }
+  await expect(section).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: '내 진행 상태' })).toHaveCount(1);
+});
+
 test('saved view filters by status and shows it in the row; unavailable table hides everything', async ({ page }) => {
   await setup(page);
   await page.getByRole('button', { name: '저장하기' }).click();
