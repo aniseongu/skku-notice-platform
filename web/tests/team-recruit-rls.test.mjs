@@ -291,12 +291,17 @@ test('review fixes: block cuts access, withdraw beats decide, no rewrite evasion
     await assert.rejects(db.exec(`select team_create_post('school/2','역할',0,'소개')`), /team_invalid_input/);
     await assert.rejects(db.exec(`select team_create_post('school/2','${'가'.repeat(41)}',2,'소개')`), /team_invalid_input/);
     await assert.rejects(db.exec(`select team_set_contact('${again}','${'a'.repeat(201)}')`), /team_invalid_input/);
-    for (const bad of ['javascript:alert(1)', ' DATA:text/html,x', 'vbscript:x']) {
-      await assert.rejects(db.exec(`select team_set_contact('${again}','${bad}')`), /team_invalid_input/);
+    // 허용 목록: http(s) 주소이거나 콜론 없는 아이디·이메일. 제어 문자를 끼운 우회와 다른 스킴은 거절
+    for (const bad of ['javascript:alert(1)', ' DATA:text/html,x', 'vbscript:x', 'java\tscript:alert(1)', 'mailto:a@b.c', 'https://a b', 'line\nbreak']) {
+      await assert.rejects(db.query('select team_set_contact($1,$2)', [again, bad]), /team_invalid_input/, JSON.stringify(bad));
+    }
+    for (const good of ['https://open.kakao.com/o/abc', 'http://x.example/y', 'abc@skku.edu', '카톡 아이디 abc_1']) {
+      await db.query('select team_set_contact($1,$2)', [again, good]);
     }
     await assert.rejects(db.exec(`update team_posts set contact='javascript:x'`), /permission denied|check/);
     await db.exec('reset role');
     await assert.rejects(db.exec(`update team_posts set contact='javascript:x'`), /check/);
+    await assert.rejects(db.query(`update team_posts set contact=$1`, ['java\tscript:x']), /check/);
     await as(db, B);
     await assert.rejects(db.exec(`select team_apply('${again}','${'가'.repeat(101)}')`), /team_invalid_input/);
   } finally { await db.close(); }

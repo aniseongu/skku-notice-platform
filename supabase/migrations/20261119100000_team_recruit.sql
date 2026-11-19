@@ -10,7 +10,7 @@ create table if not exists public.team_posts (
   role text not null check (char_length(btrim(role)) between 1 and 40),
   capacity int not null check (capacity between 1 and 10),
   intro text not null check (char_length(btrim(intro)) between 1 and 200),
-  contact text check (contact is null or (char_length(btrim(contact)) between 1 and 200 and contact !~* '^\s*(javascript|data|vbscript|file|blob):')),
+  contact text check (contact is null or (char_length(btrim(contact)) between 1 and 200 and contact !~ '[[:cntrl:]]' and (btrim(contact) ~* '^https?://[^[:space:]]+$' or btrim(contact) !~ ':'))),
   status text not null default 'open' check (status in ('open', 'closed')),
   closes_at timestamptz not null,
   hidden_at timestamptz,
@@ -127,11 +127,18 @@ exception when unique_violation then
   raise exception 'team_already_posted' using errcode = 'P0001';
 end $$;
 
+-- 연락처 제약을 허용 목록으로 바꾼다(재적용 시 기존 표에도 반영). 기존 행이 어기면 비운다.
+update public.team_posts set contact = null where contact is not null and not (char_length(btrim(contact)) between 1 and 200 and contact !~ '[[:cntrl:]]' and (btrim(contact) ~* '^https?://[^[:space:]]+$' or btrim(contact) !~ ':'));
+alter table public.team_posts drop constraint if exists team_posts_contact_check;
+alter table public.team_posts add constraint team_posts_contact_check check (contact is null or (char_length(btrim(contact)) between 1 and 200 and contact !~ '[[:cntrl:]]' and (btrim(contact) ~* '^https?://[^[:space:]]+$' or btrim(contact) !~ ':')));
+
 create or replace function public.team_set_contact(p_post_id uuid, p_contact text) returns void
 language plpgsql security definer set search_path = '' as $$
 declare u uuid := public.team_uid();
 begin
-  if p_contact is not null and (char_length(btrim(p_contact)) > 200 or p_contact ~* '^\s*(javascript|data|vbscript|file|blob):') then
+  -- 연락처는 허용 목록: http(s) 주소이거나 콜론이 없는 아이디·이메일. 제어 문자 거절(java\tscript: 같은 우회 차단).
+  if p_contact is not null and (char_length(btrim(p_contact)) > 200 or p_contact ~ '[[:cntrl:]]'
+      or not (btrim(p_contact) ~* '^https?://[^[:space:]]+$' or btrim(p_contact) !~ ':')) then
     raise exception 'team_invalid_input' using errcode = '22023';
   end if;
   perform public.team_rate_check(u, 'edit', 60);
