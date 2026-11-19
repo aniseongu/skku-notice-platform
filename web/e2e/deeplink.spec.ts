@@ -43,7 +43,7 @@ test('with ?notice= a signed-out visitor sees only that notice and the login she
   await expect(page.getByRole('heading', { name: '공유받은 장학 안내' })).toBeVisible();
   await expect(page.getByText('공유 본문입니다')).toBeVisible();
   await expect(sheet).toBeVisible();
-  await expect(sheet).toContainText('로그인하면 공지를 저장하고 마감 알림을 받아요');
+  await expect(sheet).toContainText('로그인하면 저장·마감 알림을 받아요');
   expect(await page.evaluate(() => (window as unknown as { __rpc: unknown[] }).__rpc)).toEqual([['get_public_notice', { p_id: 'skku-notice01/777' }]]);
   // 목록·탭·설정으로 가는 길이 없다
   await expect(page.locator('notice-rows-screen')).toHaveCount(0);
