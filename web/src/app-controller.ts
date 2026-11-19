@@ -12,6 +12,8 @@ import { keywordCounts } from './keyword-counts';
 import type { Theme } from './theme';
 import { authClient } from './auth';
 import { deadlineIso, isLimitReached, isMissingTable, loadOpportunities, removeOpportunity, saveOpportunity, OPPORTUNITY_LABELS, TITLE_MAX, URL_MAX, type Opportunity, type OpportunityStatus } from './opportunities';
+import { AccountChanged, createTeamApi, isTeamNotice, isTeamUnavailable, teamErrorCode, teamErrorMessage, type TeamApi, type TeamApplicant, type TeamDraft, type TeamPost } from './team';
+import type { TeamModel } from './team-section';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadBoardOrderPreference, loadKeywordsPreference, parseKeywords, saveBoardOrderPreference, saveKeywordsPreference } from './preferences';
 import { applyBoardOrder, BOARD_ORDER_LIMIT, parseBoardOrder } from './board-order';
@@ -198,6 +200,7 @@ export class AppController extends Reactive {
     notices: { state: true }, sources: { state: true }, matched: { state: true }, generatedAt: { state: true },
     view: { state: true }, board: { state: true }, keyword: { state: true }, keywords: { state: true }, query: { state: true },
     loading: { state: true }, devicesLoaded: { state: true }, accountDataLoaded: { state: true }, aiStateLoaded: { state: true }, settingsCapped: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
+    teamState: { state: true }, teamBusy: { state: true }, teamUnavailable: { state: true },
     opportunities: { state: true }, opportunitiesStatus: { state: true }, opportunityFilter: { state: true },
     toast: { state: true }, linkCopied: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
@@ -311,6 +314,13 @@ export class AppController extends Reactive {
   private opportunityQueue = new Map<string, Promise<void>>();
   private opportunitiesLoading = false;
   opportunityFilter: 'all' | OpportunityStatus = 'all';
+  // 공고별 팀원 모집(공고 한 건의 목록만 들고 있는다). 계정이 바뀌면 비운다. 함수가 운영에 없으면 구역을 숨긴다.
+  teamState: { noticeId: string | null; status: 'loading' | 'ready' | 'failed'; posts: TeamPost[] } = { noticeId: null, status: 'loading', posts: [] };
+  teamBusy = false;
+  teamUnavailable = false;
+  /** 시험에서 서버 대신 쓰는 가짜. 비어 있으면 로그인한 계정의 Supabase를 쓴다. */
+  teamApiOverride: TeamApi | null = null;
+  private teamSeq = 0;
   private opportunitySeq = new Map<string, number>();
   private keywordWrite: Promise<void> = Promise.resolve();
   /** 주소의 ?notice=<id>. 한 번 열면 비운다(미리보기와 로그인 사용자의 상세 열기가 이 값을 쓴다). 형식이 틀리면 처음부터 null. */
@@ -455,6 +465,7 @@ export class AppController extends Reactive {
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
           this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.devicesLoaded = false; this.thisDeviceId = null; this.devicesBusy = false; this.devicesError = ''; this.devicesLoadFailed = false; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.opportunities = new Map(); this.opportunitiesStatus = 'idle'; this.opportunityFilter = 'all'; this.opportunitySeq = new Map(); this.opportunityQueue = new Map(); this.opportunitiesLoading = false;
+          this.teamState = { noticeId: null, status: 'loading', posts: [] }; this.teamBusy = false; this.teamUnavailable = false; ++this.teamSeq;
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -826,6 +837,79 @@ export class AppController extends Reactive {
         }
       }
     } finally { this.opportunitiesLoading = false; }
+  }
+
+
+  /** 상세에 팀원 모집 구역을 보일지: 로그인했고, 팀을 꾸릴 만한 공고이고, 서버에 기능이 있을 때. */
+  teamShown(notice: Notice): boolean {
+    return !!this.authUserId && !this.teamUnavailable && this.kindOf(notice) !== 'coop' && isTeamNotice(notice);
+  }
+
+  private teamApi(): TeamApi | null { return this.teamApiOverride ?? (authClient ? createTeamApi(authClient) : null); }
+
+  loadTeam(noticeId: string): void {
+    const api = this.teamApi(), userId = this.authUserId;
+    if (!api || !userId) return;
+    const seq = ++this.teamSeq, epoch = this.subscriptionsEpoch;
+    if (this.teamState.noticeId !== noticeId) this.teamState = { noticeId, status: 'loading', posts: [] };
+    else if (this.teamState.status === 'failed') this.teamState = { ...this.teamState, status: 'loading' };
+    const guard = () => epoch === this.subscriptionsEpoch && this.authUserId === userId && seq === this.teamSeq;
+    void api.list(noticeId, guard).then((posts) => {
+      if (guard()) this.teamState = { noticeId, status: 'ready', posts };
+    }, (error: unknown) => {
+      if (error instanceof AccountChanged || !guard()) return;
+      if (isTeamUnavailable(error)) { this.teamUnavailable = true; return; }
+      this.teamState = { noticeId, status: 'failed', posts: [] };
+    });
+  }
+
+  /** 쓰기 동작 하나를 실행한다. 계정이 바뀌면 조용히 버리고, 실패하면 해요체 한 줄을 토스트로 알린다. */
+  private async teamRun<T>(noticeId: string, work: (api: TeamApi, guard: () => Promise<boolean>) => Promise<T>, done: string | null, reload = true): Promise<{ ok: true; value: T } | { ok: false; code: string | null }> {
+    const api = this.teamApi(), userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!api || !userId) return { ok: false, code: null };
+    const guard = async () => epoch === this.subscriptionsEpoch && this.authUserId === userId && (this.teamApiOverride ? true : !authClient || await sessionIs(authClient, userId));
+    this.teamBusy = true;
+    try {
+      const value = await work(api, guard);
+      if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return { ok: false, code: null };
+      if (done) this.showToast(done);
+      if (reload && this.teamState.noticeId === noticeId) this.loadTeam(noticeId);
+      return { ok: true, value };
+    } catch (error) {
+      if (error instanceof AccountChanged || epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return { ok: false, code: null };
+      const code = teamErrorCode(error);
+      if (code !== 'team_contact_required') this.showToast(teamErrorMessage(error));
+      if (reload && this.teamState.noticeId === noticeId && code && code !== 'team_rate_limited') this.loadTeam(noticeId);   // 상태가 어긋났을 수 있으니 다시 읽는다
+      return { ok: false, code };
+    } finally { if (epoch === this.subscriptionsEpoch && this.authUserId === userId) this.teamBusy = false; }
+  }
+
+  teamModel(notice: Notice): TeamModel {
+    const id = notice.id;
+    const mine = this.teamState.noticeId === id;
+    const run = async <T,>(work: (api: TeamApi, guard: () => Promise<boolean>) => Promise<T>, done: string | null, reload = true) => (await this.teamRun(id, work, done, reload)).ok;
+    return {
+      status: mine ? this.teamState.status : 'loading', posts: mine ? this.teamState.posts : [], busy: this.teamBusy,
+      canCreate: !notice.deadline || !deadlinePassed(notice.deadline),
+      load: () => this.loadTeam(id),
+      create: (draft: TeamDraft) => run((api, guard) => api.create(id, draft, guard), '모집을 올렸어요'),
+      apply: (post, message) => run((api, guard) => api.apply(post.id, message, guard), '신청했어요'),
+      withdraw: (post) => run((api, guard) => api.withdraw(post.id, guard), '신청을 취소했어요'),
+      setClosed: (post, closed) => run((api, guard) => api.setStatus(post.id, closed ? 'closed' : 'open', guard), closed ? '모집을 마감했어요' : '모집을 다시 열었어요'),
+      remove: (post) => run((api, guard) => api.remove(post.id, guard), '모집을 지웠어요'),
+      applicants: async (post) => { const result = await this.teamRun<TeamApplicant[]>(id, (api, guard) => api.applicants(post.id, guard), null, false); return result.ok ? result.value : null; },
+      decide: async (post, applicant, decision, contact) => {
+        const result = await this.teamRun(id, async (api, guard) => {
+          if (contact) await api.setContact(post.id, contact, guard);
+          await api.decide(applicant.id, decision, guard);
+        }, decision === 'approved' ? '승인했어요' : '거절했어요');
+        return result.ok ? 'ok' : result.code === 'team_contact_required' ? 'contact' : 'error';
+      },
+      contact: async (post) => { const result = await this.teamRun<string | null>(id, (api, guard) => api.contact(post.id, guard), null, false); return result.ok ? result.value : undefined; },
+      report: (post) => run((api, guard) => api.report(post.id, guard), '신고했어요. 확인할게요'),
+      blockOwner: (post) => run((api, guard) => api.blockOwner(post.id, guard), '이 모집자를 차단했어요'),
+      blockApplicant: (applicant) => run((api, guard) => api.blockApplicant(applicant.id, guard), '이 신청자를 차단했어요'),
+    };
   }
 
   /** 같은 공지의 저장·삭제는 줄을 세워 앞 요청이 끝난 뒤 보낸다(늦게 커밋돼 상태가 어긋나거나 삭제한 행이 되살아나지 않게). */

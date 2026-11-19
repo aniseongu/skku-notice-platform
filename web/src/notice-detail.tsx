@@ -8,6 +8,7 @@ import type { GradPart } from './graduation-assessment';
 import { GraduationNotes, GraduationSection, type GraduationModel } from './graduation-assessment-view';
 import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, NOTE_MAX, type OpportunityStatus } from './opportunities';
 import { DETAIL_SECTION, SETTINGS_INPUT, IMAGE_MISSING_CLASS, SECTION_TITLE, SKELETON_BAR } from './cls';
+import { TeamSection, type TeamModel } from './team-section';
 import { cleanHtml, fileType, IMAGE_MISSING, replaceBrokenImage } from './rich';
 
 export interface NoticeDetailModel {
@@ -33,6 +34,8 @@ export interface NoticeDetailModel {
   /** 내 기회함: 저장했거나 기록이 있는 공지에서만 있다(표가 없으면 없다). */
   opportunity?: OpportunityModel;
   /** 소프트웨어학과 원전공이 인턴 공고를 열었을 때만 있다. */
+  /** 팀을 꾸릴 만한 공고(공모전·대회 등)에서 로그인했을 때만 있다. */
+  team?: TeamModel;
   graduation?: GraduationModel;
   grad?: GradPart[];
 }
@@ -194,6 +197,7 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
       : model.aiHint ? <AiConnectHint hint={model.aiHint} />
       : null}
     {model.graduation ? <GraduationSection title={title} model={model.graduation} /> : null}
+    {model.team ? <TeamSection key={`team-${notice.id}`} model={model.team} /> : null}
     {body === 'loading' ? <BodyLoading key={`body-${notice.id}`} /> : !loaded ? <><p className={NOTE} role="status">본문을 불러오지 못했어요. 다시 불러오거나 원문을 확인해 주세요</p><button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" onClick={model.retry}>본문 다시 불러오기</button></>
       : loaded.translation?.body ? <><section className={`${DETAIL_SECTION} body-text`} aria-label="한국어로 옮긴 본문"><h3 className={SECTION_TITLE}>본문 (한국어로 옮긴 글)</h3><p className={NOTE_BODY}>Gemini 번역이에요. 정확한 내용은 아래 영어 원문을 확인해 주세요</p>{loaded.translation.body.split(/\n+/).filter(Boolean).map((para, index) => <p className={BODY_P} key={index}>{para}</p>)}</section><div className="original-body" lang="en"><Body body={loaded} heading="영어 원문" /></div></> : <Body body={loaded} />}
     {model.coop ? <p className={NOTE}>신청은 톨게이트에 학교 계정으로 로그인한 뒤 할 수 있어요</p> : null}
