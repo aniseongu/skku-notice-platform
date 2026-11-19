@@ -12,8 +12,8 @@ const Glyph = ({ name }: { name: string }) => <svg className="size-[22px] flex-n
 // 떠 있는 카드는 본문과 사이가 떠 어색해서 PC에서도 바닥에 붙인다.
 const DOCK = 'fixed inset-x-0 bottom-0 z-[4] border-t border-ink-3 bg-surface shadow-lg max-[719px]:rounded-t-lg';
 const DOCK_COLUMN = 'mx-auto w-full max-w-[680px] px-[20px] min-[720px]:px-[var(--gutter)] min-[1080px]:px-[calc(var(--gutter)+32px)]';
-const SIGN_IN_SHEET = '공지를 저장하고 마감 알림을 받아요';
-const SIGN_IN_BAR = '로그인하고 저장·알림 받기';
+const SIGN_IN_SHEET = '로그인하면 공지를 저장하고 마감 알림을 받아요';
+const SIGN_IN_BAR = '로그인하면 저장하고 알림 받아요';
 const GOOGLE_BUTTON = 'inline-flex items-center justify-center gap-[10px] rounded-md border border-[light-dark(#747775,#8E918F)] bg-[light-dark(#FFFFFF,#131314)] px-[16px] text-[16px] font-semibold text-[light-dark(#1F1F1F,#E3E3E3)] [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-[light-dark(#F2F2F2,#1E1F20)] [&:active:not(:disabled)]:bg-[light-dark(#F2F2F2,#1E1F20)] disabled:opacity-70';
 
 /** 시트와 낮은 줄이 같이 쓰는 로그인 단추(모양과 이름이 같다). */
