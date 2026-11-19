@@ -1,7 +1,7 @@
 // Supabase Edge Function `byok`: 로그인한 사용자의 Gemini 키를 검증하고 암호화해 저장하거나 삭제한다.
 // 필요한 비밀: BYOK_MASTER_KEY(32바이트 base64url). SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY는 플랫폼이 넣는다.
 // 배포 시 JWT 검증을 켠 상태(기본값)로 둔다.
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient } from 'jsr:@supabase/supabase-js@2.119.0';
 import { decryptApiKey, importMasterKey } from './crypto.ts';
 import { handle, SummaryError } from './handler.ts';
 import { haeyo, threeLines } from './haeyo.ts';
