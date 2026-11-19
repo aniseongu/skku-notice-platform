@@ -181,7 +181,7 @@ export function TeamSection({ model }: { model: TeamModel }) {
     if (!autoOpened.current && model.status === 'ready') { autoOpened.current = true; if (model.posts.some((post) => post.mine || post.myStatus)) setOpen(true); }
   }, [model.status, model.posts]);
   const live = model.posts.filter((post) => post.state === 'open').length;
-  const summary = model.status === 'loading' ? '불러오는 중' : model.status === 'failed' ? '불러오지 못했어요' : live ? `모집 중 ${live}팀` : '모집 중인 팀 없음';
+  const summary = model.status === 'loading' ? '불러오는 중' : model.status === 'failed' ? '불러오지 못했어요' : live ? `모집 중 ${live}팀` : '모집 중인 팀이 없어요';
   return <section className={`${DETAIL_SECTION} team`} aria-labelledby="sec-team">
     <h3 id="sec-team" className={`${SECTION_TITLE} !mb-0`}>
       <button type="button" className={COLLAPSE_HEAD} aria-expanded={open} aria-controls="team-body" onClick={() => setOpen(!open)}>

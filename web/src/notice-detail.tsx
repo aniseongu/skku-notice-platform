@@ -70,7 +70,7 @@ function OpportunitySection({ model }: { model: OpportunityModel }) {
   };
   const memo = !!model.note || memoOpen;
   const remove = !model.hasRecord ? null : confirming
-    ? <div className="flex flex-wrap items-center gap-[4px]"><span className="mr-[4px] text-[13px] text-ink-2">상태와 메모를 지울까요?</span>
+    ? <div className="flex flex-wrap items-center gap-[4px]"><span className="mr-[4px] text-[13px] text-ink-2">상태와 메모를 지울까요? 되돌릴 수 없어요</span>
       <button type="button" className={TEXT_BUTTON_DANGER} onClick={() => { setConfirming(false); model.onRemove(); }}>지우기</button>
       <button type="button" className={TEXT_BUTTON} onClick={() => setConfirming(false)}>취소</button></div>
     : <button type="button" className={`${TEXT_BUTTON_DANGER} flex-none`} onClick={() => setConfirming(true)}>상태와 메모 지우기</button>;

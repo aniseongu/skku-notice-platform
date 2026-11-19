@@ -356,7 +356,8 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
     groups.set(key, [...(groups.get(key) ?? []), notice]);
   }
   return <>{[...groups].map(([heading, items], index) => <section className={`group ${index > 0 ? 'mt-[20px] min-[720px]:mt-[8px]' : ''}`} aria-label={heading} key={heading}>
-    <div className="group-head mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-between min-[720px]:m-0 min-[720px]:min-h-0 min-[720px]:px-[24px] min-[720px]:py-[6px]"><h2 className="text-[13px] leading-[18px] font-semibold text-ink-3 min-[720px]:text-[12px] min-[720px]:leading-[16px]">{heading}</h2>{index === 0 && !app.selecting ? <BoardSelect app={app} /> : null}</div>
+    <div className="group-head [&>.board-picker]:ml-auto mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-between min-[720px]:m-0 min-[720px]:min-h-0 min-[720px]:px-[24px] min-[720px]:py-[6px]"><h2 className={`text-[13px] leading-[18px] font-semibold text-ink-3 min-[720px]:text-[12px] min-[720px]:leading-[16px] ${app.view === 'saved' && heading === '저장한 공지' ? 'visually-hidden' : ''}`}>{heading}</h2>{index === 0 && !app.selecting ? <BoardSelect app={app} /> : null}</div>
+    {index === 0 && app.view === 'saved' && app.savedNotices().length >= 2 && app.savedFilterOn() ? <p id="reorder-why" className={`${NOTE_TEXT} mx-[var(--gutter)] mb-[8px] min-[720px]:mx-0 min-[720px]:px-[24px]`}>전체 보기에서 순서를 바꿀 수 있어요</p> : null}
     <notice-rows-screen model={{
       rows: items.map((notice) => {
         const ai = app.judgement(notice)?.ai ?? null;
@@ -424,7 +425,6 @@ function ViewFilters({ app }: { app: AppController }) {
           : select}
         <StatusSelect app={app} /><SortSelect app={app} />
       </div></div>
-      {total >= 2 && !reorderOk && !app.reordering && app.savedFilterOn() ? <p id="reorder-why" className={`${NOTE_TEXT} px-[var(--gutter)] pb-[4px] text-left min-[720px]:px-[24px]`}>전체 보기에서 순서를 바꿀 수 있어요</p> : null}
     </>;
   }
   return <div className={`view-options ${VIEW_ROW} justify-between`} role="group" aria-label="공지 보기 조건">

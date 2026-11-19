@@ -7,21 +7,21 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import type { AppController } from './app-controller';
 import { boardName, cleanTitle, type Notice } from './data';
-import { STATUS_DOT, STATUS_META } from './cls';
+import { SAVED_FAINT, SAVED_LINE, STATUS_DOT, STATUS_META } from './cls';
 import { OPPORTUNITY_LABELS } from './opportunities';
 
-export interface ReorderItem { id: string; title: string; source: string; status?: keyof typeof OPPORTUNITY_LABELS }
+export interface ReorderItem { id: string; title: string; source: string; tags: string; read: boolean; status?: keyof typeof OPPORTUNITY_LABELS }
 
 function Row({ item, keyboardIndex, onKeyboard, onKeyboardBlur }: { item: ReorderItem; keyboardIndex?: number; onKeyboard: (id: string, event: React.KeyboardEvent<HTMLButtonElement>) => void; onKeyboardBlur: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   return <li ref={setNodeRef} data-notice-id={item.id} style={{ transform: CSS.Transform.toString(transform), transition, order: keyboardIndex }}
-    className={`flex min-h-[56px] items-center gap-[12px] rounded-md border bg-surface py-[14px] pr-[6px] pl-[16px] ${isDragging ? 'relative z-10 border-accent shadow-pop' : 'border-line'}`}>
+    className={`flex min-h-[56px] items-center gap-[12px] rounded-md border bg-surface py-[14px] pr-[6px] pl-[16px] ${isDragging ? 'relative z-10 border-accent shadow-pop' : `${SAVED_LINE}`}`}>
     <span className="min-w-0 flex-1">
-      <span className="mb-[2px] flex min-w-0 flex-wrap gap-x-[6px] text-[13px] leading-[18px] text-ink-3">
-        {item.status ? <span className={`${STATUS_META} ${item.status === 'interested' ? 'font-normal text-ink-3' : 'font-semibold text-ink-2'}`}><span className={`size-[6px] rounded-full ${STATUS_DOT}`} aria-hidden="true"></span>{OPPORTUNITY_LABELS[item.status]}</span> : null}
-        {item.source ? <span className="min-w-0 [overflow-wrap:anywhere]">{item.source}</span> : null}
+      <span className={`mb-[2px] flex min-w-0 flex-wrap gap-x-[6px] text-[13px] leading-[18px] ${SAVED_FAINT}`}>
+        {item.status ? <span className={`${STATUS_META} ${item.status === 'interested' ? 'font-normal' : 'font-semibold text-ink-2'}`}><span className={`size-[6px] rounded-full ${STATUS_DOT}`} aria-hidden="true"></span>{OPPORTUNITY_LABELS[item.status]}</span> : null}
+        {item.source ? <span className="min-w-0 [overflow-wrap:anywhere]">{item.source}</span> : null}{item.tags ? <span className="min-w-0 [overflow-wrap:anywhere]">{item.tags}</span> : null}
       </span>
-      <span className="reorder-title line-clamp-2 text-[16px] leading-[23px] font-semibold text-ink min-[720px]:text-[15px] min-[720px]:leading-[22px]">{item.title}</span>
+      <span className={`reorder-title line-clamp-2 text-[16px] leading-[23px] ${item.read ? 'font-normal text-ink-2' : 'font-semibold'} min-[720px]:text-[15px] min-[720px]:leading-[22px]`}>{item.title}</span>
     </span>
     <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} onKeyDown={(event) => onKeyboard(item.id, event)} onBlur={() => onKeyboardBlur(item.id)} aria-label={`${item.title} 순서 옮기기`}
       className="order-handle grid size-[44px] flex-none cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent text-ink-3 [@media(hover:hover)]:hover:bg-hover active:bg-hover active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-accent">
@@ -33,6 +33,7 @@ export function reorderItems(app: AppController, list: Notice[]): ReorderItem[] 
   return list.map((notice) => ({
     id: notice.id, title: cleanTitle(notice.title_ko || notice.title),
     source: boardName(app.sources.find((item) => item.id === notice.source_id), notice.source_id), status: app.statusOf(notice),
+    tags: [notice.category, notice.pinned ? '고정' : '', notice.changed_at ? '수정됨' : ''].filter(Boolean).join(', '), read: app.isRead(notice),
   }));
 }
 
