@@ -45,3 +45,19 @@ export const DANGER_BUTTON = 'ghost-button danger-button [@media(hover:hover)]:h
 
 /** 목록 줄 안의 작은 보조 단추(기기 이름 바꾸기·지우기). 터치에서는 44px. */
 export const DEVICE_ACTION = 'ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex min-h-[36px] items-center justify-center self-start rounded-md border border-line bg-surface px-[12px] py-0 text-[14px] font-medium text-ink-2 whitespace-nowrap select-none [@media(pointer:coarse)]:min-h-[44px] disabled:opacity-60';
+
+/** 글자 단추 1종(눌림 44px). 구역 안의 보조 동작(지우기·취소·더 보기)에 쓴다. 위험한 동작은 TEXT_BUTTON_DANGER. */
+export const TEXT_BUTTON = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[14px] font-medium text-ink-2 disabled:text-ink-3';
+export const TEXT_BUTTON_DANGER = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-danger disabled:text-ink-3';
+/** 구역·카드 안의 안내 한 줄(13px). 구역 제목(13px ink-3)보다 진하되 크지 않다. */
+export const NOTE_TEXT = 'm-0 text-[13px] leading-[19px] text-ink-2';
+/** 고르는 칩(상태·인원 등 하나를 고르는 것). 고른 것은 채움이 아니라 중립 면+굵기+체크다. aria-checked로 정한다. */
+export const OPTION_CHIP = 'inline-flex min-h-[44px] items-center justify-center gap-[4px] rounded-pill border border-line bg-surface px-[14px] py-0 text-[14px] font-medium text-ink-2 [@media(hover:hover)]:[&:hover:not([aria-checked=true])]:bg-hover active:[&:not([aria-checked=true])]:bg-hover aria-checked:border-ink-3 aria-checked:bg-sunken aria-checked:font-semibold aria-checked:text-ink';
+/** 선택 칩 안의 체크 표시(14px) */
+export const OPTION_CHECK = 'size-[14px] flex-none fill-none stroke-current [stroke-width:2.25] [stroke-linecap:round] [stroke-linejoin:round]';
+/** 접히는 구역의 머리 한 줄(제목 ··· 현재 값 ⌄). h3 안에 넣는 단추다. */
+export const COLLAPSE_HEAD = '[@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] flex min-h-[44px] w-[calc(100%+16px)] items-center justify-between gap-[8px] rounded-sm border-0 bg-transparent px-[8px] py-0 text-left text-[13px] font-semibold text-ink-3';
+/** 저장 목록 줄의 상태 표시(메타 줄의 글자 한 요소). 기본 상태는 연하게, 직접 고른 상태는 굵게 한다. */
+export const STATUS_META = 'status-meta inline-flex flex-none items-center gap-[5px]';
+/** 상태 점 색(무채색 셋과 강조색 하나) */
+export const STATUS_DOT: Record<'interested' | 'preparing' | 'applied' | 'result', string> = { interested: 'bg-ink-3', preparing: 'bg-accent', applied: 'bg-ink', result: 'bg-ink-2' };

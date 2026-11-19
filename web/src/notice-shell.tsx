@@ -9,9 +9,10 @@ import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, d
 import { APP_NAME } from './brand';
 import type { FeedbackKind } from './feedback';
 import { installMode, isStandalone } from './install-hint';
-import { CHECKBOX, CHIP, CHIPS, CHIP_ADD } from './cls';
+import { CHECKBOX, CHIP, CHIPS, CHIP_ADD, NOTE_TEXT } from './cls';
 import { authClient } from './auth';
 import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, type OpportunityStatus } from './opportunities';
+import { SavedReorderList, reorderItems } from './saved-reorder';
 import { keywordCounts } from './keyword-counts';
 import { type AppController, STALE_MS, TABS, remember, settingsTitle } from './app-controller';
 import type { UserProfile } from './profile';
@@ -345,6 +346,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
     })();
     return <>{picker}{note}</>;
   }
+  if (app.reordering && app.view === 'saved') return <SavedReorderList app={app} items={reorderItems(app, list)} />;
   const today = todayKst();
   const groups = new Map<string, Notice[]>();
   for (const notice of list) {
@@ -367,7 +369,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
         return { notice: rowNotice, source,
           read: app.isRead(notice), saved: app.isSaved(notice), current: app.isWide && app.detailOpen && app.shownId === notice.id,
           selected: app.selectedReads.includes(notice.id), dim: ai?.verdict === 'not_relevant' && !interests.length,
-          status: app.opportunities.get(notice.id)?.status,
+          status: app.view === 'saved' ? app.statusOf(notice) : undefined,
           interests, ai, rule: app.judgement(notice)?.rule_name ?? null, grad, pending: !ai && !interests.length && !grad.length && app.judgePending(notice) };
       }),
       today, selecting: app.selecting, savedView: app.view === 'saved',
@@ -413,21 +415,17 @@ function ViewFilters({ app }: { app: AppController }) {
       if (event.detail === 0) void app.updateComplete.then(() => document.querySelector<HTMLInputElement>('.select-all input')?.focus({ preventScroll: true }));
     }}><Icon name="select-list" />선택</button>;
   if (app.view === 'saved') {
-    const counts = new Map<string, number>();
-    for (const notice of app.savedNotices()) { const status = app.opportunities.get(notice.id)?.status; if (status) counts.set(status, (counts.get(status) ?? 0) + 1); }
     const total = app.savedNotices().length;
+    const canReorder = total >= 2;
+    const reorderOk = canReorder && app.canReorderSaved();
     return <>
-      {app.opportunitiesStatus === 'ready' && app.opportunities.size > 0 ? <div className="relative">
-        <div className="opportunity-filter flex gap-[8px] overflow-x-auto px-[var(--gutter)] pt-[8px] pb-0 [scrollbar-width:none] select-none [-webkit-user-select:none] min-[720px]:px-[24px]" role="group" aria-label="진행 상태로 거르기">
-          {(['all', ...OPPORTUNITY_STATUSES] as const).map((id) => {
-            const count = id === 'all' ? total : counts.get(id) ?? 0;
-            return <button type="button" key={id} className={`${CHIP} [&[aria-pressed=false]]:border-ink-3 ${count === 0 && app.opportunityFilter !== id ? 'text-ink-3' : ''}`} aria-pressed={app.opportunityFilter === id}
-              onClick={() => { app.opportunityFilter = id; app.listChanged(); }}>{id === 'all' ? '전체' : OPPORTUNITY_LABELS[id]} <span className="tabular-nums">{count}</span></button>;
-          })}
-        </div>
-        <span className="pointer-events-none absolute inset-y-0 right-0 w-[40px] bg-linear-to-l from-bg to-transparent min-[720px]:hidden" aria-hidden="true"></span>
-      </div> : null}
-      <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>{select}<SortSelect app={app} /></div></div>
+      <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>
+        {app.reordering
+          ? <button type="button" className={`${OPTION_ACTION} font-semibold! text-ink!`} onClick={() => { app.reordering = false; }}>완료</button>
+          : <>{canReorder ? <button type="button" className={OPTION_ACTION} disabled={!reorderOk} aria-describedby={reorderOk ? undefined : 'reorder-why'} onClick={() => app.startReordering()}>순서 바꾸기</button> : null}{select}</>}
+        <StatusSelect app={app} /><SortSelect app={app} />
+      </div></div>
+      {canReorder && !reorderOk && !app.reordering ? <p id="reorder-why" className={`${NOTE_TEXT} px-[var(--gutter)] pb-[4px] text-right min-[720px]:px-[24px]`}>전체 보기에서 바꿀 수 있어요</p> : null}
     </>;
   }
   return <div className={`view-options ${VIEW_ROW} justify-between`} role="group" aria-label="공지 보기 조건">
@@ -448,6 +446,7 @@ function ViewFilters({ app }: { app: AppController }) {
   </div>;
 }
 
+const OPTION_ACTION = 'select-trigger inline-flex min-h-[44px] min-w-[44px] items-center gap-[6px] border-0 bg-transparent px-[4px] py-0 text-[14px] font-medium whitespace-nowrap text-ink-2 disabled:text-ink-3 [&_.i]:size-[18px]';
 const VIEW_ROW = 'flex flex-wrap items-center gap-[8px] px-[var(--gutter)] min-[720px]:px-[24px] min-[720px]:pt-[4px] min-[720px]:pb-0';
 const VIEW_ACTIONS = 'view-actions ml-auto flex items-center gap-[4px] max-[359px]:gap-0';
 const VIEW_TOGGLE = 'view-toggle rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover group inline-flex min-h-[44px] items-center gap-[8px] border-0 bg-transparent py-0 pr-[8px] pl-0 text-[14px] font-medium text-ink-2 aria-pressed:font-semibold aria-pressed:text-ink';
@@ -471,10 +470,11 @@ function moveFocus(event: React.KeyboardEvent, selector: string) {
 
 function SortSelect({ app }: { app: AppController }) {
   const sort = app.sortFor(app.tab());
-  const options = [{ id: 'latest', label: app.view === 'saved' ? '저장한 순' : '최신순' }, { id: 'deadline', label: '마감순' }] as const;
-  const label = options.find((option) => option.id === sort)!.label;
+  const options = [{ id: 'latest', label: app.view === 'saved' ? '저장한 순' : '최신순' }, { id: 'deadline', label: '마감순' },
+    ...(app.view === 'saved' && app.savedOrder.length ? [{ id: 'custom', label: '내가 정한 순' } as const] : [])] as { id: 'latest' | 'deadline' | 'custom'; label: string }[];
+  const label = options.find((option) => option.id === sort)?.label ?? options[0].label;
   return <div className="sort-picker relative flex-none">
-    <button type="button" className={`sort-trigger ${MENU_TRIGGER} font-medium`} aria-label={`정렬: ${label}`}
+    <button type="button" className={`sort-trigger ${MENU_TRIGGER} font-medium disabled:text-ink-3`} aria-label={`정렬: ${label}`} disabled={app.reordering}
       aria-expanded={app.sortMenuOpen} aria-controls="sort-options" onClick={() => {
         app.sortMenuOpen = !app.sortMenuOpen;
         if (app.sortMenuOpen) void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.sort-option[aria-pressed="true"]')?.focus());
@@ -485,15 +485,48 @@ function SortSelect({ app }: { app: AppController }) {
       {options.map((option) => <button type="button" className={`sort-option ${MENU_OPTION}`} key={option.id} aria-pressed={sort === option.id}
         onClick={() => {
           if (app.view === 'saved') app.savedSort = option.id;
+          else if (option.id === 'custom') return;
           else if (app.view === 'intern') app.internSort = option.id;
           else if (app.view === 'coop') app.coopSort = option.id;
           else app.sort = option.id;
           remember(app.view === 'saved' ? 'saved-sort' : app.view === 'intern' ? 'intern-sort' : app.view === 'coop' ? 'coop-sort' : 'notice-sort', option.id);
           app.listChanged();
           app.sortMenuOpen = false;
-          history.replaceState(null, '', `${location.pathname}?tab=${app.tab()}&sort=${option.id}`);
+          history.replaceState(null, '', `${location.pathname}?tab=${app.tab()}&sort=${option.id === 'custom' ? 'latest' : option.id}`);
           void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.sort-trigger')?.focus());
         }}><span>{option.label}</span>{sort === option.id ? <span className={MENU_CHECK} aria-hidden="true" /> : null}</button>)}
+    </div> : null}
+  </div>;
+}
+
+/** 저장 목록의 진행 상태 거르기. 정렬과 같은 옵션 줄 메뉴다. 상태가 두 종류 이상일 때만 나오고, 메뉴에는 공지가 있는 상태만 개수와 함께 나열한다. */
+function StatusSelect({ app }: { app: AppController }) {
+  if (app.opportunitiesStatus !== 'ready') return null;
+  const counts = app.savedStatusCounts();
+  const filter = app.opportunityFilter;
+  const present = OPPORTUNITY_STATUSES.filter((status) => (counts.get(status) ?? 0) > 0);
+  if (present.length < 2 && filter === 'all') return null;
+  const total = [...counts.values()].reduce((sum, n) => sum + n, 0);
+  // 거르는 중에 그 상태의 공지가 0이 돼도 선택된 항목은 남겨 둔다(눌러서 전체로 돌아갈 수 있게).
+  const items: { id: 'all' | OpportunityStatus; label: string; count: number }[] = [{ id: 'all', label: '전체', count: total },
+    ...OPPORTUNITY_STATUSES.filter((status) => (counts.get(status) ?? 0) > 0 || status === filter).map((status) => ({ id: status, label: OPPORTUNITY_LABELS[status], count: counts.get(status) ?? 0 }))];
+  const label = filter === 'all' ? '전체' : OPPORTUNITY_LABELS[filter];
+  const pick = (id: 'all' | OpportunityStatus) => {
+    app.opportunityFilter = id; app.statusMenuOpen = false; app.listChanged();
+    void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.status-trigger')?.focus());
+  };
+  return <div className="status-picker relative flex-none">
+    <button type="button" className={`status-trigger ${MENU_TRIGGER} ${filter === 'all' ? 'font-medium' : 'font-semibold text-accent!'} disabled:text-ink-3`} aria-label={`진행 상태: ${label}`} disabled={app.reordering}
+      aria-expanded={app.statusMenuOpen} aria-controls="status-options" onClick={() => {
+        app.statusMenuOpen = !app.statusMenuOpen;
+        if (app.statusMenuOpen) void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.status-option[aria-pressed="true"]')?.focus());
+      }}>진행 상태: {label}<span className={MENU_CHEVRON} aria-hidden="true" /></button>
+    {app.statusMenuOpen ? <div id="status-options" className={`status-options ${MENU_OPTIONS} min-w-[180px]`} role="group" aria-label="진행 상태 선택"
+      onKeyDown={(event) => moveFocus(event, '.status-option')}
+      onBlur={(event) => { if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) app.statusMenuOpen = false; }}>
+      {items.map((item) => <button type="button" className={`status-option ${MENU_OPTION}`} key={item.id} aria-pressed={filter === item.id} onClick={() => pick(item.id)}>
+        <span className="flex items-center gap-[8px]">{filter === item.id ? <span className={MENU_CHECK} aria-hidden="true" /> : <span className="w-[10px]" aria-hidden="true" />}{item.label}</span>
+        <span className="tabular-nums text-ink-3">{item.count}</span></button>)}
     </div> : null}
   </div>;
 }
@@ -558,8 +591,9 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
     retry: () => { app.bodies.delete(notice.id); app.requestUpdate(); },
     opportunity: app.opportunityShown(notice) ? (() => {
       const record = app.opportunities.get(notice.id), source = boardName(app.sources.find((item) => item.id === notice.source_id), notice.source_id);
-      return { status: record?.status ?? null, note: record?.note ?? '', hasRecord: !!record,
-        onStatus: (status: OpportunityStatus) => { if (status !== record?.status) void app.saveOpportunityFor(notice, source, { status }, true); },
+      const current = app.statusOf(notice) ?? null;
+      return { status: current, note: record?.note ?? '', hasRecord: !!record,
+        onStatus: (status: OpportunityStatus) => { if (status !== current) void app.saveOpportunityFor(notice, source, { status }, true); },
         onNote: (note: string) => { void app.saveOpportunityFor(notice, source, { note: note.trim() || null }); },
         onRemove: () => { void app.removeOpportunityFor(notice); } };
     })() : undefined,

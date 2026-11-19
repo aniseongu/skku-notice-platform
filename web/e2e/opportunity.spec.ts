@@ -79,22 +79,142 @@ test('the status section stays one even while the summary and body loading state
   await expect(page.getByRole('heading', { name: '내 진행 상태' })).toHaveCount(1);
 });
 
-test('saved view filters by status and shows it in the row; unavailable table hides everything', async ({ page }) => {
+// 저장한 공지를 화면 기본값 그대로(기록 없이) 몇 개 만든다. 서버 행을 만들지 않는 것이 결정 A다.
+async function saveSome(page: Page, count: number, records: Record<number, string> = {}) {
+  await page.evaluate(({ count, records }) => {
+    const app = document.querySelector('notice-app') as unknown as App;
+    const picked = app.notices.filter((n: { deadline: string | null }) => !n.deadline).slice(0, count);
+    app.saved = picked.map((n: Record<string, unknown>, i: number) => { const { first_seen: _f, ...rest } = n; return { ...rest, saved_at: `2026-11-0${i + 1}T00:00:00.000Z` }; });
+    app.opportunities = new Map(Object.entries(records).map(([i, status]) => [picked[Number(i)].id, { notice_id: picked[Number(i)].id, title: 't', url: null, board: null, deadline: null, status, note: null, created_at: '', updated_at: '' }]));
+    app.detailOpen = false; app.selectedId = null; app.openedId = null; app.setView('saved');
+  }, { count, records });
+}
+const rowStatuses = (page: Page) => page.locator('notice-rows-screen a.row .status-meta').allInnerTexts();
+
+test('a saved notice without a record shows the default status "관심 있음"; the filter menu appears only with two kinds and hides empty ones', async ({ page }) => {
   await setup(page);
-  await page.getByRole('button', { name: '저장하기' }).click();
-  await page.getByRole('radio', { name: '지원함' }).click();
-  await page.evaluate(() => { const app = document.querySelector('notice-app') as unknown as App; app.detailOpen = false; app.selectedId = null; app.openedId = null; app.setView('saved'); });
-  const filter = page.getByRole('group', { name: '진행 상태로 거르기' });
-  await expect(filter).toBeVisible();
+  await saveSome(page, 3);
+  expect(await rowStatuses(page)).toEqual(['관심 있음', '관심 있음', '관심 있음']);          // 기록이 없어도 모두 같은 모양
+  await expect(page.locator('.status-trigger')).toHaveCount(0);                              // 거를 것이 한 종류뿐이면 거르기가 없다
+  await expect(page.getByRole('group', { name: '진행 상태로 거르기' })).toHaveCount(0);        // 칩 줄은 없다
+  await saveSome(page, 3, { 0: 'applied' });
+  const trigger = page.getByRole('button', { name: /^진행 상태: 전체/ });
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+  const menu = page.getByRole('group', { name: '진행 상태 선택' });
+  await expect(menu.getByRole('button')).toHaveText(['전체3', '관심 있음2', '지원함1']);     // 0건인 준비 중·결과 나옴은 없다
+  await menu.getByRole('button', { name: /지원함/ }).click();
   await expect(page.locator('notice-rows-screen a.row')).toHaveCount(1);
-  await expect(page.locator('notice-rows-screen a.row .status-chip:visible')).toHaveText('지원함');
-  await filter.getByRole('button', { name: /^준비 중/ }).click();
-  await expect(page.locator('notice-rows-screen a.row')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '진행 상태: 지원함' })).toHaveClass(/text-accent/);   // 거르는 중에는 글자만 강조색
+  expect(await rowStatuses(page)).toEqual(['지원함']);
+  // 그 공지가 관심으로 돌아가 0건이 돼도 트리거는 남아 전체로 돌아갈 수 있다.
+  await page.evaluate(() => { const app = document.querySelector('notice-app') as unknown as App; app.opportunities = new Map(); });
   await expect(page.getByText('이 상태의 공지가 없어요')).toBeVisible();
   await page.getByRole('button', { name: '전체 보기' }).click();
-  await expect(page.locator('notice-rows-screen a.row')).toHaveCount(1);
+  await expect(page.locator('notice-rows-screen a.row')).toHaveCount(3);
+  await expect(page.getByRole('button', { name: '진행 상태: 전체' })).toHaveCount(0);        // 다시 한 종류뿐이라 거르기가 사라진다
+  // 기록 표를 쓸 수 없으면 상태는 어디에도 나오지 않는다.
   await page.evaluate(() => { (document.querySelector('notice-app') as unknown as App).opportunitiesStatus = 'unavailable'; });
-  await expect(filter).toHaveCount(0);
+  await expect(page.locator('notice-rows-screen a.row .status-meta')).toHaveCount(0);
   await page.locator('notice-rows-screen a.row').first().click();
   await expect(page.getByRole('region', { name: '내 진행 상태' })).toHaveCount(0);
+});
+
+test('the detail shows the same default status as the list for a saved notice without a record', async ({ page }) => {
+  await setup(page);
+  await saveSome(page, 2);
+  await page.locator('notice-rows-screen a.row').first().click();
+  const section = page.getByRole('region', { name: '내 진행 상태' });
+  await expect(section.getByRole('radio', { name: '관심 있음' })).toHaveAttribute('aria-checked', 'true');
+  await expect(section.getByRole('button', { name: '상태와 메모 지우기' })).toHaveCount(0);   // 기록 행이 없으니 지울 것도 없다
+  expect(await saves(page)).toEqual([]);                                                     // 보기만 해서는 서버에 쓰지 않는다
+});
+
+test('detail sections keep the order reason → summary → graduation → my status → team → body, and the status section is one and always open', async ({ page }) => {
+  await setup(page);
+  await page.getByRole('button', { name: '저장하기' }).click();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as App;
+    app.myInfo = () => ({ summary: '첫 줄\n둘째 줄\n셋째 줄', deadline: null, deadlineKind: null, ai: null });
+    app.teamShown = () => true;
+    app.teamModel = () => ({ status: 'ready', posts: [], busy: false, canCreate: true, load: () => {}, create: async () => true, apply: async () => true, withdraw: async () => true, setClosed: async () => true, remove: async () => true, applicants: async () => [], decide: async () => 'ok', contact: async () => null, report: async () => true, blockOwner: async () => true, blockApplicant: async () => true });
+    app.requestUpdate();
+  });
+  const detail = page.locator('notice-detail-screen:visible').first();
+  await expect(detail.getByRole('region', { name: '내 진행 상태' })).toHaveCount(1);
+  await expect(detail.locator('#sec-opportunity')).toHaveCount(1);
+  const order = await detail.evaluate((root) => {
+    const marks: [string, string][] = [['.detail-reason, .detail-deadline', 'reason'], ['section.summary', 'summary'], ['section.opportunity', 'opportunity'], ['section.team', 'team'], ['section.body-text', 'body']];
+    const found = marks.map(([selector, name]) => { const el = root.querySelector(selector); return el ? { name, top: el.getBoundingClientRect().top + window.scrollY, pos: [...root.querySelectorAll('*')].indexOf(el) } : null; }).filter((x): x is { name: string; top: number; pos: number } => !!x);
+    return found.sort((a, b) => a.pos - b.pos).map((x) => x.name);
+  });
+  expect(order.filter((name) => name !== 'reason')).toEqual(['summary', 'opportunity', 'team', 'body'].filter((name) => order.includes(name)));
+  expect(order).toContain('summary'); expect(order).toContain('opportunity'); expect(order).toContain('team');
+  // 진행 상태는 항상 펼쳐 있어 칩이 바로 보인다(1탭).
+  await expect(detail.getByRole('radio', { name: '준비 중' })).toBeVisible();
+});
+
+test('reorder mode: keyboard pick-move-drop saves once, a mouse drag saves once, the row does not open, filters block it with a reason', async ({ page }) => {
+  await setup(page);
+  await saveSome(page, 3, { 0: 'applied' });
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as App;
+    const w = window as unknown as { orderSaves: string[][] };
+    w.orderSaves = [];
+    app.savedOrderAccount = true;
+    app.persistSavedOrder = async (_u: string, order: string[]) => { w.orderSaves.push(order); };
+    app.authUserId = 'account-a';
+  });
+  const orderSaves = () => page.evaluate(() => (window as unknown as { orderSaves: string[][] }).orderSaves);
+  const titles = () => page.locator('.saved-reorder .reorder-title').allInnerTexts();
+  const before = (await page.locator('notice-rows-screen a.row .title').allInnerTexts()).map((t) => t.trim());
+  // 필터가 걸려 있으면 막히고 이유가 보인다.
+  await page.getByRole('button', { name: /^진행 상태: 전체/ }).click();
+  await page.getByRole('group', { name: '진행 상태 선택' }).getByRole('button', { name: /지원함/ }).click();
+  await expect(page.getByRole('button', { name: '순서 바꾸기' })).toBeDisabled();
+  await expect(page.getByText('전체 보기에서 바꿀 수 있어요')).toBeVisible();
+  await page.getByRole('button', { name: '진행 상태: 지원함' }).click();
+  await page.getByRole('group', { name: '진행 상태 선택' }).getByRole('button', { name: /^전체/ }).click();
+  await expect(page.getByRole('button', { name: '순서 바꾸기' })).toBeEnabled();
+  // 진입 1번, 이동, 완료 1번.
+  await page.getByRole('button', { name: '순서 바꾸기' }).click();
+  await expect(page.getByRole('button', { name: '완료' })).toBeVisible();
+  await expect(page.locator('notice-rows-screen a.row')).toHaveCount(0);        // 모드 중에는 눌러 열리는 줄이 없다
+  expect(await titles()).toEqual(before);
+  const handles = page.getByRole('button', { name: /순서 옮기기$/ });
+  expect((await handles.first().boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await handles.first().focus();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('ArrowDown');
+  expect((await orderSaves()).length).toBe(0);                                   // 옮기는 동안은 저장하지 않는다
+  await page.keyboard.press('Space');
+  await expect.poll(async () => (await orderSaves()).length).toBe(1);            // 놓으면 한 번 저장
+  expect(await titles()).toEqual([before[1], before[0], before[2]]);
+  // 마우스로 끌기
+  const first = page.locator('.saved-reorder li').nth(0), last = page.locator('.saved-reorder li').nth(2);
+  const a = (await first.getByRole('button').boundingBox())!, b = (await last.boundingBox())!;
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2 + 10, { steps: 3 });
+  await page.mouse.move(a.x + a.width / 2, b.y + b.height - 4, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await orderSaves()).length).toBe(2);
+  expect((await orderSaves())[1].length).toBe(3);
+  await page.waitForTimeout(150);   // 끌기 직후의 클릭 막이가 풀릴 때까지
+  await page.getByRole('button', { name: '완료' }).click();
+  await expect(page.locator('.saved-reorder')).toHaveCount(0);
+  // 정렬에 '내가 정한 순'이 생기고 그 순서로 보인다.
+  await expect(page.getByRole('button', { name: '정렬: 내가 정한 순' })).toBeVisible();
+  const after = (await page.locator('notice-rows-screen a.row .title').allInnerTexts()).map((t) => t.trim());
+  expect(after.sort()).toEqual([...before].sort());
+  // 새로 저장한 공지는 맨 위에 들어간다.
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as App;
+    const extra = app.notices.filter((n: { deadline: string | null }) => !n.deadline)[3];
+    const { first_seen: _f, ...rest } = extra;
+    app.saved = [{ ...rest, saved_at: '2026-12-01T00:00:00.000Z' }, ...app.saved];
+  });
+  await expect(page.locator('notice-rows-screen a.row')).toHaveCount(4);
+  const top = await page.evaluate(() => { const app = document.querySelector('notice-app') as unknown as App; return app.visible()[0].id === app.saved[0].id; });
+  expect(top).toBe(true);
 });

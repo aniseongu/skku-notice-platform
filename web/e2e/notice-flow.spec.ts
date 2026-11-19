@@ -2983,7 +2983,7 @@ test('detail without an AI key offers one connect line, never a waiting label, a
   await page.locator('notice-rows-screen a.row').nth(1).click();
   const hint = page.getByRole('region', { name: 'AI 연결 안내' });
   await expect(hint).toBeVisible();
-  await expect(hint).toContainText('AI를 연결하면 공지를 세 줄로 요약하고, 나에게 맞는지 알려 줘요');
+  await expect(hint).toContainText('AI를 연결하면 세 줄로 요약해 줘요');
   expect((await hint.getByRole('button', { name: 'AI 연결하기' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect((await hint.getByRole('button', { name: 'AI 안내 닫기' }).boundingBox())!.width).toBeGreaterThanOrEqual(44);
   // 닫으면 같은 계정에는 다시 안 보이고, 다른 계정에는 보인다.

@@ -7,10 +7,37 @@ import { orderNotices, type Sort } from './notice-order.ts';
 
 export type SavedNotice = Omit<Notice, 'first_seen'> & { saved_at: string };
 
-export function orderSaved(items: readonly SavedNotice[], current: readonly Notice[], sort: Sort): Notice[] {
+/** 저장 목록의 정렬. 'custom'은 사용자가 직접 정한 순서(계정에 저장)다. */
+export type SavedSort = Sort | 'custom';
+export const SAVED_ORDER_LIMIT = 200;
+
+/** 직접 정한 순서를 적용한다. 순서에 있는 공지는 그 순서대로, 없는 공지(새로 저장했거나 순서를 정하기 전에 저장한 것)는 맨 위에 들어온 순서(items의 순서)대로 둔다. 사라진 id는 무시한다. */
+export function applySavedOrder<T extends { id: string }>(items: readonly T[], order: readonly string[]): T[] {
+  const rank = new Map<string, number>();
+  order.forEach((id, index) => { if (!rank.has(id)) rank.set(id, index); });
+  const fresh = items.filter((item) => !rank.has(item.id));
+  const ordered = items.filter((item) => rank.has(item.id)).sort((a, b) => rank.get(a.id)! - rank.get(b.id)!);
+  return [...fresh, ...ordered];
+}
+
+/** 놓은 순서(화면에 보이던 공지)와 그 밖의 저장 공지를 합쳐 저장할 순서를 만든다. 현재 저장 집합에 없는 id는 버린다. */
+export function savedOrderToStore(moved: readonly string[], allSaved: readonly string[]): string[] {
+  const known = new Set(allSaved);
+  const head = [...new Set(moved)].filter((id) => known.has(id));
+  const used = new Set(head);
+  return [...head, ...allSaved.filter((id) => !used.has(id))].slice(0, SAVED_ORDER_LIMIT);
+}
+
+export function parseSavedOrder(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 100))].slice(0, SAVED_ORDER_LIMIT);
+}
+
+export function orderSaved(items: readonly SavedNotice[], current: readonly Notice[], sort: SavedSort, order: readonly string[] = []): Notice[] {
   const byId = new Map(current.map((notice) => [notice.id, notice]));
   const ordered = [...items].sort((a, b) => b.saved_at.localeCompare(a.saved_at))
     .map((item) => byId.get(item.id) ?? { ...item, first_seen: null });
+  if (sort === 'custom') return applySavedOrder(ordered, order);
   return sort === 'deadline' ? orderNotices(ordered, 'deadline') : ordered;
 }
 

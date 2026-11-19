@@ -6,7 +6,7 @@ import {
   type IconName, type Judgement, type MatchedFile, type Notice, type NoticeBody, type NoticesFile, type Source,
   boardName, cleanTitle, deadlineGroup, deadlinePassed, fetchBody, fetchJson, isExpired, keywordMatches, noticeKind, postedGroup, safeUrl, todayKst,
 } from './data';
-import { type SavedNotice, loadSaved, orderSaved, storeSaved, toggleSaved } from './saved-notices';
+import { type SavedNotice, type SavedSort, SAVED_ORDER_LIMIT, loadSaved, orderSaved, parseSavedOrder, savedOrderToStore, storeSaved, toggleSaved } from './saved-notices';
 import { initialReadState, isNoticeRead, loadReadState, mergeReadStates, parseReadState, readIds, setReadState, storeReadState } from './read-notices';
 import { keywordCounts } from './keyword-counts';
 import type { Theme } from './theme';
@@ -15,7 +15,7 @@ import { deadlineIso, isLimitReached, isMissingTable, loadOpportunities, removeO
 import { AccountChanged, createTeamApi, isTeamNotice, isTeamUnavailable, teamErrorCode, teamErrorMessage, type TeamApi, type TeamApplicant, type TeamDraft, type TeamPost } from './team';
 import type { TeamModel } from './team-section';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
-import { loadBoardOrderPreference, loadKeywordsPreference, parseKeywords, saveBoardOrderPreference, saveKeywordsPreference } from './preferences';
+import { loadBoardOrderPreference, loadKeywordsPreference, loadSavedOrderPreference, parseKeywords, saveBoardOrderPreference, saveKeywordsPreference, saveSavedOrderPreference } from './preferences';
 import { applyBoardOrder, BOARD_ORDER_LIMIT, parseBoardOrder } from './board-order';
 import { loadNoticeStates, planStateSync, pushRead, pushSaved, sessionIs, type StatePlan } from './notice-state-sync';
 import { connectionChain } from './connection-chain';
@@ -137,7 +137,7 @@ function rememberSelected(id?: string | null): string | null {
 
 export function remember(key: string, value?: string): string | null {
   try {
-    const storageKey = ['keywords', 'board', 'board-order', 'view-unread', 'onboarding-dismissed'].includes(key) ? localKey(key) : key;
+    const storageKey = ['keywords', 'board', 'board-order', 'saved-order', 'view-unread', 'onboarding-dismissed'].includes(key) ? localKey(key) : key;
     if (value === undefined) return localStorage.getItem(storageKey);
     localStorage.setItem(storageKey, value);
   } catch { /* 사생활 보호 모드에서는 기억하지 않는다 */ }
@@ -156,6 +156,10 @@ function loadSort(tab: 'all' | 'intern' | 'coop'): Sort {
 
 function loadBoardOrder(): string[] {
   try { return parseBoardOrder(JSON.parse(remember('board-order') ?? '[]')); } catch { return []; }
+}
+
+function loadSavedOrder(): string[] {
+  try { return parseSavedOrder(JSON.parse(remember('saved-order') ?? '[]')); } catch { return []; }
 }
 
 function loadKeywords(): string[] {
@@ -219,7 +223,7 @@ export class AppController extends Reactive {
     onboardingOpen: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
     keywordNote: { state: true },
     subscriptions: { state: true }, subscriptionsLoading: { state: true }, subscriptionsError: { state: true },
-    boardOrder: { state: true }, boardOrderStatus: { state: true },
+    boardOrder: { state: true }, boardOrderStatus: { state: true }, savedOrder: { state: true }, savedOrderStatus: { state: true }, savedOrderAccount: { state: true }, reordering: { state: true }, statusMenuOpen: { state: true },
     preferencesLoading: { state: true }, preferencesError: { state: true }, preferencesUnavailable: { state: true },
     unreadOnly: { state: true }, selecting: { state: true }, selectedReads: { state: true },
   };
@@ -230,6 +234,14 @@ export class AppController extends Reactive {
   boardOrderStatus: '' | 'saved' | 'failed' = '';
   boardOrderAccount = false;
   boardOrderChain: Promise<void> = Promise.resolve();
+  /** 저장 목록을 사용자가 직접 정한 순서(공지 id). 계정에 저장하고, 열이 없으면 이 기기에만 둔다. */
+  savedOrder: string[] = loadSavedOrder();
+  savedOrderStatus: '' | 'failed' = '';
+  savedOrderAccount = false;
+  savedOrderChain: Promise<void> = Promise.resolve();
+  /** 저장 목록의 순서 바꾸기 모드 */
+  reordering = false;
+  statusMenuOpen = false;
   preferencesError = '';
   preferencesUnavailable = false;
   subscriptions: string[] = [];
@@ -355,7 +367,7 @@ export class AppController extends Reactive {
   coopSort: Sort = loadSort('coop');
   /** 현장실습 기관 구분(대기업, 중소기업, 스타트업 등). 'all'이면 모두. */
   coopKind = remember('coop-kind') ?? 'all';
-  savedSort: Sort = remember('saved-sort') === 'deadline' ? 'deadline' : 'latest';
+  savedSort: SavedSort = ((v) => v === 'deadline' || v === 'custom' ? v : 'latest')(remember('saved-sort'));
   unreadOnly = remember('view-unread') === '1';
   selecting = savedSelection() !== null;
   selectedReads: string[] = savedSelection()?.ids ?? [];
@@ -464,7 +476,7 @@ export class AppController extends Reactive {
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); this.detailTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
           this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.devicesLoaded = false; this.thisDeviceId = null; this.devicesBusy = false; this.devicesError = ''; this.devicesLoadFailed = false; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
-          this.opportunities = new Map(); this.opportunitiesStatus = 'idle'; this.opportunityFilter = 'all'; this.opportunitySeq = new Map(); this.opportunityQueue = new Map(); this.opportunitiesLoading = false;
+          this.opportunities = new Map(); this.opportunitiesStatus = 'idle'; this.opportunityFilter = 'all'; this.statusMenuOpen = false; this.reordering = false; this.opportunitySeq = new Map(); this.opportunityQueue = new Map(); this.opportunitiesLoading = false;
           this.teamState = { noticeId: null, status: 'loading', posts: [] }; this.teamBusy = false; this.teamUnavailable = false; ++this.teamSeq;
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
@@ -498,7 +510,7 @@ export class AppController extends Reactive {
             void Promise.allSettled(first).then(() => { if (epoch === this.subscriptionsEpoch && userId === this.authUserId) { this.accountDataLoaded = true; this.liveAccountReady = true; this.saveCurrentListCache(userId, epoch); } });
             setTimeout(() => { if (epoch === this.subscriptionsEpoch) { this.accountDataLoaded = true; this.aiStateLoaded = true; this.settingsCapped = true; } }, AppController.FIRST_LOAD_LIMIT_MS);
             void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch);
-            void this.refreshOpportunities(userId, epoch);
+            void this.refreshOpportunities(userId, epoch); void this.refreshSavedOrder(userId, epoch);
             void this.refreshDevices();   // 알림 설정을 열 때 기기 구역이 뒤늦게 끼어들지 않게 미리 받는다
           })(); }, 0);
           setLocalOwner(userId);
@@ -507,6 +519,7 @@ export class AppController extends Reactive {
           this.boardOrder = loadBoardOrder();
           this.boardOrderStatus = '';
           this.boardOrderAccount = false;
+          this.savedOrder = loadSavedOrder(); this.savedOrderStatus = ''; this.savedOrderAccount = false;
           const startRead = initialReadState(loadReadState(), !!userId);
           this.readState = startRead.state;
           this.needsReadBaseline = startRead.needsBaseline;
@@ -557,6 +570,7 @@ export class AppController extends Reactive {
   closeBoardMenuOutside = (event: PointerEvent) => {
     if (this.boardMenuOpen && !(event.target as Element).closest('.board-picker')) this.boardMenuOpen = false;
     if (this.sortMenuOpen && !(event.target as Element).closest('.sort-picker')) this.sortMenuOpen = false;
+    if (this.statusMenuOpen && !(event.target as Element).closest('.status-picker')) this.statusMenuOpen = false;
   };
 
   /** 로그인 전에는 앱 어느 데이터도 받지 않는다. 로그인 화면만 보인다. */
@@ -806,6 +820,8 @@ export class AppController extends Reactive {
     this.saved = next;
     storeSaved(next);
     this.showToast(added ? '저장했어요' : '저장을 지웠어요');
+    // 다시 저장한 공지는 옛 자리가 아니라 맨 위로 온다(순서에서 뺀다).
+    if (added && this.savedOrder.includes(notice.id)) this.setSavedOrder(this.savedOrder.filter((id) => id !== notice.id));
     // 저장하면 기회함에 '관심'으로 자동 기록한다(입력 없음). 이미 기록이 있으면 상태를 덮지 않는다.
     if (added && this.opportunitiesStatus === 'ready') {
       void this.saveOpportunityFor(notice, boardName(this.sources.find((item) => item.id === notice.source_id), notice.source_id), { status: 'interested' }, false, true);
@@ -991,7 +1007,7 @@ export class AppController extends Reactive {
   savedNotices(): Notice[] {
     // 저장해 둔 사본도 기한이 지났으면 보이지 않는다(서버가 지운 현장실습 포함).
     const sources = new Map(this.sources.map((source) => [source.id, source]));
-    return orderSaved(this.saved, this.notices, this.savedSort).filter((notice) => !isExpired(notice, sources.get(notice.source_id)));
+    return orderSaved(this.saved, this.notices, this.sortFor('saved'), this.savedOrder).filter((notice) => !isExpired(notice, sources.get(notice.source_id)));
   }
 
   judgement(notice: Notice): Judgement | undefined {
@@ -1131,6 +1147,85 @@ export class AppController extends Reactive {
     });
     if (report) this.boardOrderStatus = '';
     return this.boardOrderChain;
+  }
+
+  async refreshSavedOrder(userId: string, epoch: number): Promise<void> {
+    if (!authClient) return;
+    try {
+      const { available, order } = await loadSavedOrderPreference(authClient, userId);
+      if (epoch !== this.subscriptionsEpoch) return;
+      this.savedOrderAccount = available;
+      if (!available) return;
+      if (order.length) { this.savedOrder = order; remember('saved-order', JSON.stringify(order)); }
+      else if (this.savedOrder.length) void this.saveSavedOrderToAccount(this.savedOrder, false);
+    } catch { /* 계정에서 못 읽으면 이 기기의 순서를 그대로 쓴다 */ }
+  }
+
+  /** 저장 목록의 순서를 바꾼다. 놓을 때마다 한 번 저장한다(배열 통째 교체). */
+  setSavedOrder(ids: string[]) {
+    const order = parseSavedOrder(ids).slice(0, SAVED_ORDER_LIMIT);
+    this.savedOrder = order;
+    remember('saved-order', JSON.stringify(order));
+    if (this.authUserId && this.savedOrderAccount) void this.saveSavedOrderToAccount(order, true);
+  }
+
+  /** 계정에 저장하는 호출 하나. 시험에서 바꿔 끼운다. */
+  persistSavedOrder(userId: string, order: string[]): Promise<void> {
+    if (!authClient) return Promise.reject(new Error('no client'));
+    return saveSavedOrderPreference(authClient, userId, order);
+  }
+
+  private saveSavedOrderToAccount(order: string[], report: boolean): Promise<void> {
+    const userId = this.authUserId;
+    const epoch = this.subscriptionsEpoch;
+    if (!userId) return Promise.resolve();
+    this.savedOrderChain = this.savedOrderChain.then(async () => {
+      if (report && this.savedOrder !== order) return;   // 더 새 순서가 이미 있으면 이 저장은 건너뛴다
+      try {
+        await this.persistSavedOrder(userId, order);
+        if (report && epoch === this.subscriptionsEpoch && this.savedOrder === order) this.savedOrderStatus = '';
+      } catch {
+        if (report && epoch === this.subscriptionsEpoch && this.savedOrder === order) this.savedOrderStatus = 'failed';
+      }
+    });
+    if (report) this.savedOrderStatus = '';
+    return this.savedOrderChain;
+  }
+
+  /** 순서 바꾸기는 저장한 공지 전체를 볼 때만 한다(일부만 보이면 전체 순서가 모호하다). */
+  canReorderSaved(): boolean {
+    if (this.opportunityFilter !== 'all' || this.query || this.keyword) return false;
+    return this.visible().length === dropDuplicates(this.decorated(this.savedNotices())).length;
+  }
+
+  startReordering() {
+    if (!this.canReorderSaved()) return;
+    this.selecting = false; this.selectedReads = [];
+    this.statusMenuOpen = false; this.sortMenuOpen = false;
+    this.savedSort = 'custom'; remember('saved-sort', 'custom');
+    this.reordering = true;
+    this.listChanged();
+  }
+
+  /** 순서를 놓은 직후 저장할 배열: 화면에 보이던 순서 + 보이지 않던 저장 공지. */
+  commitSavedOrder(moved: string[]) {
+    this.setSavedOrder(savedOrderToStore(moved, this.savedNotices().map((notice) => notice.id)));
+  }
+
+  /** 저장한 공지의 진행 상태. 기록이 없으면 화면 기본값 '관심 있음'(서버에는 행을 만들지 않는다). 기록 표를 쓸 수 없으면 없다. */
+  statusOf(notice: Notice): OpportunityStatus | undefined {
+    if (this.opportunitiesStatus !== 'ready') return undefined;
+    return this.opportunities.get(notice.id)?.status ?? (this.isSaved(notice) ? 'interested' : undefined);
+  }
+
+  /** 저장한 공지의 상태별 개수(상태 거르기 메뉴용). */
+  savedStatusCounts(): Map<OpportunityStatus, number> {
+    const counts = new Map<OpportunityStatus, number>();
+    for (const notice of dropDuplicates(this.decorated(this.savedNotices()))) {
+      const status = this.statusOf(notice);
+      if (status) counts.set(status, (counts.get(status) ?? 0) + 1);
+    }
+    return counts;
   }
 
   async refreshPreferences(userId: string, epoch: number): Promise<void> {
@@ -2078,10 +2173,10 @@ export class AppController extends Reactive {
     const shown = unique
       .filter((n) => !this.unreadOnly || !this.isRead(n) || n.id === this.selectedId || n.id === this.openedId)
       .filter((n) => !this.graduationOnly || !this.gradEnabled() || this.gradPartsFor(n, this.judgement(n)?.ai?.verdict).some((part) => part.met) || n.id === this.selectedId || n.id === this.openedId);
-    return orderNotices(shown, this.sortFor(tab));
+    return orderNotices(shown, this.sortFor(tab) as Sort);
   }
 
-  sortFor(tab: Tab): Sort { return tab === 'saved' ? this.savedSort : tab === 'intern' ? this.internSort : tab === 'coop' ? this.coopSort : this.sort; }
+  sortFor(tab: Tab): SavedSort { return tab === 'saved' ? (this.savedSort === 'custom' && !this.savedOrder.length ? 'latest' : this.savedSort) : tab === 'intern' ? this.internSort : tab === 'coop' ? this.coopSort : this.sort; }
 
   private decorated(items: Notice[]): Notice[] {
     return items.map((notice) => {
@@ -2108,7 +2203,7 @@ export class AppController extends Reactive {
       const saved = this.filtered(decorate(this.savedNotices()));
       const firstSeen = new Set(dropDuplicates(saved).map((n) => n.id));
       const unique = saved.filter((n) => firstSeen.has(n.id) || n.id === this.selectedId || n.id === this.openedId);
-      return this.opportunityFilter === 'all' || this.opportunitiesStatus !== 'ready' ? unique : unique.filter((n) => this.opportunities.get(n.id)?.status === this.opportunityFilter);
+      return this.opportunityFilter === 'all' || this.opportunitiesStatus !== 'ready' ? unique : unique.filter((n) => this.statusOf(n) === this.opportunityFilter);
     }
     return this.byTab(this.filtered(decorate(this.notices)), this.tab());
   }
@@ -2121,6 +2216,8 @@ export class AppController extends Reactive {
     this.openedId = null;
     this.boardMenuOpen = false;
     this.sortMenuOpen = false;
+    this.statusMenuOpen = false;
+    this.reordering = false;
     if (view !== 'settings') remember('tab', view);
     // 주소도 보기와 맞춘다. 설정은 기록에 쌓아 뒤로 가기로 닫히고, 탭은 바꿔 써서 새로고침해도 같은 보기가 열린다.
     if (entering) history.pushState({ view: 'settings', depth: 1 }, '', `${location.pathname}?view=settings`);
@@ -2234,6 +2331,7 @@ export class AppController extends Reactive {
     this.openedId = typeof history.state?.notice === 'string' ? history.state.notice : null;
     this.boardMenuOpen = false;
     this.sortMenuOpen = false;
+    this.statusMenuOpen = false;
     this.settingsSection = settingsSectionFromUrl();
     const params = new URLSearchParams(location.search);
     const view: View = params.get('view') === 'settings' ? 'settings'
@@ -2354,6 +2452,12 @@ export class AppController extends Reactive {
       event.preventDefault();
       this.sortMenuOpen = false;
       this.updateComplete.then(() => qs<HTMLButtonElement>('.sort-trigger')?.focus());
+      return;
+    }
+    if (event.key === 'Escape' && this.statusMenuOpen) {
+      event.preventDefault();
+      this.statusMenuOpen = false;
+      this.updateComplete.then(() => qs<HTMLButtonElement>('.status-trigger')?.focus());
       return;
     }
     if (event.key === 'Escape' && this.boardMenuOpen) {

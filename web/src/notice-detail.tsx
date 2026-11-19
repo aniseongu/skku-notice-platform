@@ -7,7 +7,7 @@ import { summaryLines } from './summary-lines';
 import type { GradPart } from './graduation-assessment';
 import { GraduationNotes, GraduationSection, type GraduationModel } from './graduation-assessment-view';
 import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, NOTE_MAX, type OpportunityStatus } from './opportunities';
-import { DETAIL_SECTION, SETTINGS_INPUT, IMAGE_MISSING_CLASS, SECTION_TITLE, SKELETON_BAR } from './cls';
+import { DETAIL_SECTION, IMAGE_MISSING_CLASS, NOTE_TEXT, OPTION_CHECK, OPTION_CHIP, SECTION_TITLE, SETTINGS_INPUT, SKELETON_BAR, TEXT_BUTTON, TEXT_BUTTON_DANGER } from './cls';
 import { TeamSection, type TeamModel } from './team-section';
 import { cleanHtml, fileType, IMAGE_MISSING, replaceBrokenImage } from './rich';
 
@@ -49,9 +49,6 @@ export interface OpportunityModel {
   onRemove: () => void;
 }
 
-const SEG = 'inline-flex min-h-[44px] items-center justify-center gap-[3px] rounded-sm border border-line bg-surface px-[2px] py-0 text-[14px] font-medium text-ink-2 [@media(hover:hover)]:[&:hover:not([aria-checked=true])]:bg-hover active:[&:not([aria-checked=true])]:bg-hover aria-checked:border-accent aria-checked:bg-accent aria-checked:font-semibold aria-checked:text-on-accent';
-const SUB_ACTION = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[13px] font-medium text-ink-2';
-const TEXT_ACTION = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-ink-2';
 
 /** 내 진행 상태: 칩 한 번으로 바꾸고 메모는 한 줄. 직접 적는 기록이라 인증·합격 말은 쓰지 않는다. */
 function OpportunitySection({ model }: { model: OpportunityModel }) {
@@ -74,15 +71,15 @@ function OpportunitySection({ model }: { model: OpportunityModel }) {
   const memo = !!model.note || memoOpen;
   const remove = !model.hasRecord ? null : confirming
     ? <div className="-ml-[8px] flex flex-wrap items-center gap-[4px]"><span className="ml-[8px] mr-[4px] text-[13px] text-ink-2">상태와 메모를 지울까요?</span>
-      <button type="button" className={`${SUB_ACTION} text-danger`} onClick={() => { setConfirming(false); model.onRemove(); }}>지우기</button>
-      <button type="button" className={SUB_ACTION} onClick={() => setConfirming(false)}>취소</button></div>
-    : <div className="-ml-[8px] flex"><button type="button" className={SUB_ACTION} onClick={() => setConfirming(true)}>상태와 메모 지우기</button></div>;
+      <button type="button" className={TEXT_BUTTON_DANGER} onClick={() => { setConfirming(false); model.onRemove(); }}>지우기</button>
+      <button type="button" className={TEXT_BUTTON} onClick={() => setConfirming(false)}>취소</button></div>
+    : <div className="-ml-[8px] flex"><button type="button" className={TEXT_BUTTON} onClick={() => setConfirming(true)}>상태와 메모 지우기</button></div>;
   return <section className={`${DETAIL_SECTION} opportunity`} aria-labelledby="sec-opportunity">
     <h3 id="sec-opportunity" className={`${SECTION_TITLE} !mb-[2px]`}>내 진행 상태</h3>
-    <p className="m-0 mb-[8px] text-[14px] leading-[20px] text-ink-2">저장을 해제해도 진행 상태는 지워지지 않아요</p>
-    <div role="radiogroup" aria-labelledby="sec-opportunity" className="grid grid-cols-4 gap-[6px]" onKeyDown={move}>
-      {OPPORTUNITY_STATUSES.map((status) => <button type="button" role="radio" key={status} className={SEG} aria-checked={model.status === status}
-        tabIndex={status === focusable ? 0 : -1} onClick={() => model.onStatus(status)}>{model.status === status ? <svg className="size-[14px] flex-none fill-none stroke-current [stroke-width:2.25] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href="icons/sprite.svg#check" /></svg> : null}{OPPORTUNITY_LABELS[status]}</button>)}
+    <p className={`${NOTE_TEXT} mb-[8px]`}>직접 고른 상태와 메모는 저장을 해제해도 남아요</p>
+    <div role="radiogroup" aria-labelledby="sec-opportunity" className="flex flex-wrap gap-[8px]" onKeyDown={move}>
+      {OPPORTUNITY_STATUSES.map((status) => <button type="button" role="radio" key={status} className={OPTION_CHIP} aria-checked={model.status === status}
+        tabIndex={status === focusable ? 0 : -1} onClick={() => model.onStatus(status)}>{model.status === status ? <svg className={OPTION_CHECK} aria-hidden="true"><use href="icons/sprite.svg#check" /></svg> : null}{OPPORTUNITY_LABELS[status]}</button>)}
     </div>
     {memo
       ? <input type="text" autoFocus={!model.note} className={`${SETTINGS_INPUT} mt-[6px] w-full`} aria-label="메모" placeholder="메모를 남겨요" maxLength={NOTE_MAX} defaultValue={model.note}
@@ -162,15 +159,12 @@ function SummaryLoading() {
     <div className={`grid gap-[16px] py-[5px] ${shown ? '' : 'invisible'}`} aria-hidden="true"><span className={`${SKELETON_BAR} w-full`}></span><span className={`${SKELETON_BAR} w-[88%]`}></span><span className={`${SKELETON_BAR} w-[56%]`}></span></div></section>;
 }
 
-/** AI 키가 없는 사용자에게 요약이 들어갈 자리에서 연결을 권한다. 한 줄과 단추 하나, 닫으면 이 계정에는 다시 안 보인다. */
+/** AI 키가 없는 사용자에게 요약이 들어갈 자리에서 연결을 권한다. 카드가 아니라 한 줄이다(글자 단추 하나와 닫기). 닫으면 이 계정에는 다시 안 보인다. */
 function AiConnectHint({ hint }: { hint: { connect: () => void; dismiss: () => void } }) {
-  return <section className="ai-hint relative mt-[16px] grid gap-[10px] rounded-md border border-line bg-sunken py-[14px] pr-[52px] pl-[14px]" aria-label="AI 연결 안내">
-    <div>
-      <p className="m-0 text-[14px] leading-[21px] font-medium text-ink break-keep text-pretty">AI를 연결하면 공지를 세 줄로 요약하고, 나에게 맞는지 알려 줘요</p>
-      <p className="m-0 text-[13px] leading-[19px] text-ink-2">무료 키로 시작할 수 있어요</p>
-    </div>
-    <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex min-h-[44px] w-fit items-center rounded-md border border-ink-3 bg-surface px-[16px] py-0 text-[14px] font-semibold text-ink" onClick={hint.connect}>AI 연결하기</button>
-    <button type="button" className="icon-button [@media(hover:hover)]:hover:bg-hover active:bg-hover absolute top-[2px] right-[2px] grid size-[44px] place-items-center rounded-sm border-0 bg-transparent text-ink-2" aria-label="AI 안내 닫기" onClick={hint.dismiss}>
+  return <section className="ai-hint mt-[12px] flex items-center gap-[4px]" aria-label="AI 연결 안내">
+    <p className="m-0 min-w-0 flex-1 text-[14px] leading-[21px] text-ink-2 break-keep text-pretty">AI를 연결하면 세 줄로 요약해 줘요</p>
+    <button type="button" className={`${TEXT_BUTTON} flex-none !font-semibold !text-accent`} aria-label="AI 연결하기" onClick={hint.connect}>연결하기</button>
+    <button type="button" className="icon-button [@media(hover:hover)]:hover:bg-hover active:bg-hover grid size-[44px] flex-none place-items-center rounded-sm border-0 bg-transparent text-ink-2" aria-label="AI 안내 닫기" onClick={hint.dismiss}>
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
   </section>;
 }
@@ -191,12 +185,12 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
     {hasReason ? <p className="detail-reason mt-[10px] text-[14px] leading-[21px] text-ink-2"><Reason interests={interests} ai={ai} rule={model.rule} pending={model.pending} /></p> : null}
     {notice.deadline ? <p className="detail-deadline mt-[6px] text-[14px] leading-[21px] font-semibold tabular-nums">{notice.deadline_kind ?? '마감'} {deadlineDetail(notice.deadline)} <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''} ml-[6px] text-[14px] leading-[18px] tabular-nums ${passed ? 'font-medium' : 'font-bold'} ${urgent ? 'text-danger' : passed ? 'text-ink-3' : ''}`}>{deadlineText(notice.deadline, model.today)}</span></p> : null}
     {notice.changed_at ? <p className="detail-change mt-[4px] text-[13px] leading-[19px] text-ink-2">{koreanDate(notice.changed_at.slice(0, 10))}에 원문 {notice.change_kind === '제목' ? '제목이' : '본문이'} 바뀌었어요</p> : null}
-    {model.opportunity ? <OpportunitySection key={`opportunity-${notice.id}`} model={model.opportunity} /> : null}
-    {summary ? <section className={`${DETAIL_SECTION} summary`} aria-labelledby="sec-summary"><h3 id="sec-summary" className={SECTION_TITLE}>요약</h3>{summaryLines(summary).map((line, index) => <p className={SUMMARY_P} key={index}>{line}</p>)}</section>
+    {summary ? <section key={`summary-${notice.id}`} className={`${DETAIL_SECTION} summary`} aria-labelledby="sec-summary"><h3 id="sec-summary" className={SECTION_TITLE}>요약</h3>{summaryLines(summary).map((line, index) => <p className={SUMMARY_P} key={index}>{line}</p>)}</section>
       : model.summarizing ? <SummaryLoading key={`summary-${notice.id}`} />
-      : model.aiHint ? <AiConnectHint hint={model.aiHint} />
+      : model.aiHint ? <AiConnectHint key={`aihint-${notice.id}`} hint={model.aiHint} />
       : null}
-    {model.graduation ? <GraduationSection title={title} model={model.graduation} /> : null}
+    {model.graduation ? <GraduationSection key={`grad-${notice.id}`} title={title} model={model.graduation} /> : null}
+    {model.opportunity ? <OpportunitySection key={`opportunity-${notice.id}`} model={model.opportunity} /> : null}
     {model.team ? <TeamSection key={`team-${notice.id}`} model={model.team} /> : null}
     {body === 'loading' ? <BodyLoading key={`body-${notice.id}`} /> : !loaded ? <><p className={NOTE} role="status">본문을 불러오지 못했어요. 다시 불러오거나 원문을 확인해 주세요</p><button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" onClick={model.retry}>본문 다시 불러오기</button></>
       : loaded.translation?.body ? <><section className={`${DETAIL_SECTION} body-text`} aria-label="한국어로 옮긴 본문"><h3 className={SECTION_TITLE}>본문 (한국어로 옮긴 글)</h3><p className={NOTE_BODY}>Gemini 번역이에요. 정확한 내용은 아래 영어 원문을 확인해 주세요</p>{loaded.translation.body.split(/\n+/).filter(Boolean).map((para, index) => <p className={BODY_P} key={index}>{para}</p>)}</section><div className="original-body" lang="en"><Body body={loaded} heading="영어 원문" /></div></> : <Body body={loaded} />}
@@ -205,7 +199,6 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
     {loaded?.attachments?.length ? <section className={DETAIL_SECTION} aria-labelledby="sec-files"><h3 id="sec-files" className={SECTION_TITLE}>첨부 {loaded.attachments.length}개</h3><ul className="attachments m-0 p-0 list-none [&>li+li]:border-t [&>li+li]:border-line">{loaded.attachments.map((file, index) => <li key={index}><a className="file flex items-center gap-[10px] min-h-[48px] text-[14px] text-ink no-underline" href={safeUrl(file.url)} target="_blank" rel="noopener"><span className="file-type flex-none min-w-[40px] px-0 py-[2px] border border-line rounded-[4px] text-[11px] font-semibold text-center text-ink-2">{fileType(file.name, file.type)}</span><span className="file-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{file.name}</span>{file.size ? <span className="file-size flex-none text-[12px] text-ink-3 tabular-nums">{file.size}</span> : null}</a></li>)}</ul><p className={NOTE_FIRST}>누르면 학교 공지 사이트의 원본 파일을 받아요</p></section> : null}
     <dl className="facts m-0 mt-[24px] border-t border-line pt-[4px]" aria-label="글 정보"><div className={FACT}><dt className={FACT_DT}>게시일</dt><dd className="m-0">{koreanDate(notice.posted_on)}</dd></div>
       {notice.previous_title ? <div className={FACT}><dt className={FACT_DT}>이전 제목</dt><dd className="m-0">{cleanTitle(notice.previous_title)}</dd></div> : null}
-      {interests.length ? <div className={FACT}><dt className={FACT_DT}>관심</dt><dd className="m-0"><b className="interest font-semibold text-accent">{interests.join(', ')}</b></dd></div> : null}
       {model.notified ? <div className={FACT}><dt className={FACT_DT}>알림</dt><dd className="m-0">알림을 보냈어요</dd></div> : null}</dl>
     {model.graduation ? <GraduationNotes model={model.graduation} /> : null}
   </div>;
