@@ -66,7 +66,7 @@ declare module 'react' {
 export function NoticeShell({ app }: { app: AppController }) {
   useSyncExternalStore(app.subscribe, app.getVersion);
   // 화면이 반영된 뒤에 포커스 이동 같은 후속 작업이 풀리게 알린다.
-  useEffect(() => { app.commit(); });
+  useEffect(() => { app.commit(); app.resumeDeepLink(); });
   useEffect(() => {
     document.title = app.gated ? `로그인 - ${APP_NAME}` : app.authReady && app.view === 'settings' ? `${settingsTitle()} - ${APP_NAME}` : APP_NAME;
   });

@@ -1,11 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 
 // 로그인 모의: test-user가 localStorage에 있으면 로그인 상태, 없으면 비로그인. get_public_notice는 skku-notice01/777만 돌려준다.
-async function mockAuth(page: Page, user: string | null, long = false) {
+async function mockAuth(page: Page, user: string | null, long = false, fresh = false) {
   await page.route('**/src/auth.ts*', (route) => route.fulfill({ contentType: 'application/javascript', body: `
     const session = () => localStorage.getItem('test-user') ? { user: { id: localStorage.getItem('test-user'), user_metadata: {} } } : null;
     const query = (table) => {
-      const result = () => table === 'user_profiles' ? {data: null, error: {message: 'unavailable'}} : table === 'user_source_subscriptions' ? {data: [{source_id: 'skku-notice01'}], error: null} : {data: [], error: null};
+      const result = () => table === 'user_profiles' ? {data: null, error: ${fresh} ? null : {message: 'unavailable'}} : table === 'user_source_subscriptions' ? {data: [{source_id: 'skku-notice01'}], error: null} : {data: [], error: null};
       const q = new Proxy({}, { get(_, prop) { if (prop === 'then') return (resolve) => resolve(result()); if (prop === 'maybeSingle' || prop === 'single') return () => Promise.resolve(result()); return () => q; } });
       return q;
     };
@@ -19,8 +19,9 @@ async function mockAuth(page: Page, user: string | null, long = false) {
       signOut: async () => ({error: null}) },
       from: query, rpc: async (name, args) => { window.__rpc.push([name, args]); return {data: args.p_id === row.id ? [row] : [], error: null}; }, functions: {invoke: async () => ({data: null, error: null})} };
   ` }));
+  await page.addInitScript((f) => { (window as unknown as { __fresh: boolean }).__fresh = f; }, fresh);
   await page.addInitScript((u) => {
-    if (u) { localStorage.setItem('test-user', u); localStorage.setItem(`platform:onboarded:${u}`, '1'); } else localStorage.removeItem('test-user');
+    if (u) { localStorage.setItem('test-user', u); if (!window.__fresh) localStorage.setItem(`platform:onboarded:${u}`, '1'); } else localStorage.removeItem('test-user');
   }, user);
 }
 const open = (page: Page, search: string) => page.goto(`/?api=sample/api/v1${search}`);
@@ -42,7 +43,7 @@ test('with ?notice= a signed-out visitor sees only that notice and the login she
   await expect(page.getByRole('heading', { name: '공유받은 장학 안내' })).toBeVisible();
   await expect(page.getByText('공유 본문입니다')).toBeVisible();
   await expect(sheet).toBeVisible();
-  await expect(sheet).toContainText('로그인하면 저장하고 마감 알림을 받아요');
+  await expect(sheet).toContainText('공지를 저장하고 마감 알림을 받아요');
   expect(await page.evaluate(() => (window as unknown as { __rpc: unknown[] }).__rpc)).toEqual([['get_public_notice', { p_id: 'skku-notice01/777' }]]);
   // 목록·탭·설정으로 가는 길이 없다
   await expect(page.locator('notice-rows-screen')).toHaveCount(0);
@@ -108,12 +109,29 @@ test('the sheet never covers the last line of a long notice, and on a wide scree
   await expect(sheet).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   const last = await page.getByText('마지막 줄이에요').boundingBox();
-  const card = await sheet.locator('> div > div').boundingBox();
+  const card = await sheet.boundingBox();
   expect(last!.y + last!.height).toBeLessThanOrEqual(card!.y);
   if (page.viewportSize()!.width >= 1080) {
     const text = await page.getByText('긴 본문 0번째 줄이에요').boundingBox();
     const open = await page.getByRole('link', { name: '원문 열기' }).boundingBox();
     expect(Math.abs(open!.x - text!.x)).toBeLessThanOrEqual(1);
-    expect(Math.abs(card!.x - text!.x)).toBeLessThanOrEqual(21);   // 카드 안쪽 여백 20px 안에서 본문 왼쪽 선과 맞는다
+    const button = await sheet.getByRole('button', { name: 'Google로 로그인' }).boundingBox();
+    expect(Math.abs(button!.x - text!.x)).toBeLessThanOrEqual(1);   // 바 안의 내용이 본문 왼쪽 선과 맞는다
   }
+});
+
+test('a brand-new account finishes first setup before the shared notice opens (nothing is opened or marked read meanwhile)', async ({ page }) => {
+  await mockAuth(page, 'new', false, true);
+  await open(page, '&notice=skku-notice01%2F141494');
+  await expect(page.getByRole('heading', { name: '필요한 설정을 알려 주세요' }).or(page.locator('.onb').first())).toBeVisible({ timeout: 10000 });
+  const state = () => page.evaluate(() => { const app = document.querySelector('notice-app') as unknown as Record<string, any>; return { deep: app.deepId, opened: app.openedId, selected: app.selectedId, detail: app.detailOpen, read: app.read ? [...app.read].length : 0 }; }); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const waiting = await state();
+  expect(waiting.deep).toBe('skku-notice01/141494');   // 보존된다
+  expect(waiting.opened).toBeNull();
+  expect(waiting.selected === null || waiting.detail === false || waiting.selected !== 'skku-notice01/141494').toBeTruthy();
+  expect(await page.evaluate(() => location.search)).toContain('notice=');
+  // 첫 설정을 마친(건너뛴) 것으로 두면 그때 열린다
+  await page.evaluate(() => { const app = document.querySelector('notice-app') as unknown as Record<string, any>; app.onboardingOpen = false; app.onboardingDismissed = true; app.profileStatus = 'unavailable'; }); // eslint-disable-line @typescript-eslint/no-explicit-any
+  await expect.poll(async () => (await state()).deep).toBeNull();
+  await expect(page.getByRole('heading', { name: /배워서 남 주는 프로젝트 성과공유회/ }).first()).toBeVisible();
 });

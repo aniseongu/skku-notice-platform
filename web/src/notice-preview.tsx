@@ -8,33 +8,37 @@ import { GoogleG, LoginStatus } from './login-screen';
 
 const ICON_BUTTON = 'grid size-[44px] flex-none place-items-center rounded-md border border-line bg-surface text-ink active:bg-hover [@media(hover:hover)]:hover:bg-hover min-[720px]:size-[40px]';
 const Glyph = ({ name }: { name: string }) => <svg className="size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href={`icons/sprite.svg#${name}`} /></svg>;
-// 시트와 닫은 뒤 줄은 본문 열(PC 680px, 1080px 이상은 상세의 안쪽 32px까지)에 맞춘다. 휴대폰은 화면 폭 전체.
-const DOCK = 'fixed inset-x-0 bottom-0 z-[4] pointer-events-none min-[720px]:pb-[24px]';
-const DOCK_COLUMN = 'mx-auto w-full max-w-[680px] min-[720px]:px-[var(--gutter)] min-[1080px]:px-[calc(var(--gutter)+32px)]';
-const DOCK_CARD = 'pointer-events-auto border border-ink-3/50 bg-surface shadow-lg max-[719px]:rounded-t-lg min-[720px]:rounded-lg';
-const SIGN_IN = '로그인하면 저장하고 마감 알림을 받아요';
-const GOOGLE_BUTTON = 'inline-flex min-h-[48px] w-full items-center justify-center gap-[10px] rounded-md border border-[light-dark(#747775,#8E918F)] bg-[light-dark(#FFFFFF,#131314)] px-[16px] text-[16px] font-semibold text-[light-dark(#1F1F1F,#E3E3E3)] [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-[light-dark(#F2F2F2,#1E1F20)] [&:active:not(:disabled)]:bg-[light-dark(#F2F2F2,#1E1F20)] disabled:opacity-70';
+// 시트와 닫은 뒤 줄은 화면 바닥에 붙는 전체 폭 바이고, 안의 내용만 본문 열(PC 680px, 1080px 이상은 상세의 안쪽 32px까지)에 맞춘다.
+// 떠 있는 카드는 본문과 사이가 떠 어색해서 PC에서도 바닥에 붙인다.
+const DOCK = 'fixed inset-x-0 bottom-0 z-[4] border-t border-ink-3 bg-surface shadow-lg max-[719px]:rounded-t-lg';
+const DOCK_COLUMN = 'mx-auto w-full max-w-[680px] px-[20px] min-[720px]:px-[var(--gutter)] min-[1080px]:px-[calc(var(--gutter)+32px)]';
+const SIGN_IN_SHEET = '공지를 저장하고 마감 알림을 받아요';
+const SIGN_IN_BAR = '로그인하고 저장·알림 받기';
+const GOOGLE_BUTTON = 'inline-flex items-center justify-center gap-[10px] rounded-md border border-[light-dark(#747775,#8E918F)] bg-[light-dark(#FFFFFF,#131314)] px-[16px] text-[16px] font-semibold text-[light-dark(#1F1F1F,#E3E3E3)] [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-[light-dark(#F2F2F2,#1E1F20)] [&:active:not(:disabled)]:bg-[light-dark(#F2F2F2,#1E1F20)] disabled:opacity-70';
+
+/** 시트와 낮은 줄이 같이 쓰는 로그인 단추(모양과 이름이 같다). */
+function SignInButton({ app, className }: { app: AppController; className: string }) {
+  const busy = app.authBusy;
+  return <button type="button" className={`${GOOGLE_BUTTON} ${className}`} disabled={busy} aria-busy={busy} onClick={() => { void app.signIn(); }}>
+    {busy ? null : <GoogleG />}
+    <span>{busy ? 'Google로 이동하고 있어요' : 'Google로 로그인'}</span>
+  </button>;
+}
 
 function LoginSheet({ app, onClose }: { app: AppController; onClose: () => void }) {
-  const busy = app.authBusy;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return <section className={`login-sheet ${DOCK} [animation:install-rise_240ms_ease-out_both] motion-reduce:animate-none`} aria-label="로그인 안내">
-    <div className={DOCK_COLUMN}>
-      <div className={`${DOCK_CARD} px-[20px] pt-[12px] pb-[calc(16px+env(safe-area-inset-bottom))] min-[720px]:pb-[16px]`}>
-        <div className="flex items-center gap-[8px]">
-          <p className="m-0 min-w-0 flex-1 text-[17px] leading-[24px] font-bold text-ink break-keep text-pretty">{SIGN_IN}</p>
-          <button type="button" className="-mr-[12px] grid size-[44px] flex-none place-items-center rounded-pill border-0 bg-transparent text-ink-2 active:bg-hover [@media(hover:hover)]:hover:bg-hover" aria-label="닫기" onClick={onClose}><Glyph name="close" /></button>
-        </div>
-        <button type="button" className={`${GOOGLE_BUTTON} mt-[4px]`} disabled={busy} aria-busy={busy} onClick={() => { void app.signIn(); }}>
-          {busy ? null : <GoogleG />}
-          <span>{busy ? 'Google로 이동하고 있어요' : 'Google로 로그인'}</span>
-        </button>
-        {app.authError ? <p className="m-0 mt-[12px] text-center text-[14px] leading-[20px] text-danger" role="alert">{app.authError}</p> : null}
+    <div className={`${DOCK_COLUMN} pt-[12px] pb-[calc(16px+env(safe-area-inset-bottom))]`}>
+      <div className="flex items-center gap-[8px]">
+        <p className="m-0 min-w-0 flex-1 text-[17px] leading-[24px] font-bold text-ink break-keep text-pretty">{SIGN_IN_SHEET}</p>
+        <button type="button" className="-mr-[12px] grid size-[44px] flex-none place-items-center rounded-pill border-0 bg-transparent text-ink-2 active:bg-hover [@media(hover:hover)]:hover:bg-hover" aria-label="닫기" onClick={onClose}><Glyph name="close" /></button>
       </div>
+      <SignInButton app={app} className="mt-[4px] min-h-[48px] w-full" />
+      {app.authError ? <p className="m-0 mt-[12px] text-center text-[14px] leading-[20px] text-danger" role="alert">{app.authError}</p> : null}
     </div>
   </section>;
 }
@@ -59,10 +63,10 @@ export function NoticePreview({ app }: { app: AppController }) {
       <notice-detail-screen model={{ notice, source, today: todayKst(), body, interests: [], ai: null, rule: null, notified: false, retry: () => { void app.loadPreview(); } }} />
       <a className="mt-[20px] inline-flex min-h-[48px] w-full items-center justify-center rounded-md border border-line bg-surface px-[16px] text-[16px] font-semibold text-ink no-underline active:bg-hover [@media(hover:hover)]:hover:bg-hover min-[720px]:w-auto min-[1080px]:ml-[32px]" href={safeUrl(notice.url)} target="_blank" rel="noopener noreferrer">원문 열기</a>
     </main>
-    {sheet ? <LoginSheet app={app} onClose={() => setSheet(false)} /> : <div className={`login-bar ${DOCK}`}><div className={DOCK_COLUMN}>
-      <div className={`${DOCK_CARD} flex items-center gap-[12px] px-[20px] pt-[8px] pb-[calc(8px+env(safe-area-inset-bottom))] min-[720px]:py-[8px]`}>
-        <p className="m-0 min-w-0 flex-1 text-[14px] leading-[20px] font-medium text-ink break-keep">{SIGN_IN}</p>
-        <button type="button" className="inline-flex min-h-[44px] flex-none items-center justify-center rounded-md border border-line bg-sunken px-[16px] text-[15px] font-semibold text-ink active:bg-line [@media(hover:hover)]:hover:bg-line disabled:opacity-60" disabled={app.authBusy} onClick={() => { void app.signIn(); }}>Google로 로그인</button>
-      </div></div></div>}
+    {sheet ? <LoginSheet app={app} onClose={() => setSheet(false)} /> : <div className={`login-bar ${DOCK}`}>
+      <div className={`${DOCK_COLUMN} flex items-center gap-[12px] pt-[8px] pb-[calc(8px+env(safe-area-inset-bottom))]`}>
+        <p className="m-0 min-w-0 flex-1 text-[14px] leading-[20px] font-medium text-ink break-keep">{SIGN_IN_BAR}</p>
+        <SignInButton app={app} className="min-h-[44px] flex-none" />
+      </div></div>}
     </div>;
 }

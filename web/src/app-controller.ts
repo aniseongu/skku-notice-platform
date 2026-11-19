@@ -616,26 +616,39 @@ export class AppController extends Reactive {
     }
   }
 
-  /** 로그인 사용자의 딥링크: 목록에 있으면 그 공지를, 없으면 한 건을 받아 상세로 연다. */
+  /** 로그인 사용자의 딥링크: 목록에 있으면 그 공지를, 없으면 한 건을 받아 상세로 연다.
+   *  첫 설정이 필요한 계정은 끝난 뒤에 연다(deepId를 보존하고 화면이 다시 부른다). 조회 중 계정이 바뀌면 deepId를 지우지 않고 다음에 다시 시도한다. */
+  private deepBusy = false;
   async openDeepLink(userId: string | null, epoch: number) {
     const id = this.deepId;
-    if (!id || this.gated) return;
-    this.deepId = null;
-    history.replaceState(history.state, '', withoutNotice(location.href));
-    let notice = this.notices.find((n) => n.id === id) ?? null;
-    if (!notice && authClient) {
-      try {
-        const found = await loadPublicNotice(authClient, id);
-        if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
-        if (found) { this.deepNotice = found; this.bodies.set(id, found.body); notice = found.notice; }
-      } catch { /* 아래에서 못 찾은 것과 같이 알린다 */ }
-    }
-    if (!notice) { this.showToast('공지를 찾지 못했어요. 지워졌거나 기한이 지났을 수 있어요'); return; }
-    this.markRead(notice);
-    if (this.isWide) { this.selectedId = id; this.detailOpen = true; return; }
-    this.openedId = id;
-    history.pushState({ notice: id }, '');
-    window.scrollTo({ top: 0 });
+    if (!id || this.gated || this.deepBusy) return;
+    if (this.awaitingProfile() || this.needsOnboarding()) return;
+    this.deepBusy = true;
+    try {
+      let notice = this.notices.find((n) => n.id === id) ?? null;
+      let failed = false;
+      if (!notice && authClient) {
+        try {
+          const found = await loadPublicNotice(authClient, id);
+          if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;   // 계정이 바뀌었다: deepId를 남겨 다시 시도한다
+          if (found) { this.deepNotice = found; this.bodies.set(id, found.body); notice = found.notice; }
+        } catch { failed = true; }
+      }
+      if (this.deepId !== id) return;
+      this.deepId = null;
+      history.replaceState(history.state, '', withoutNotice(location.href));
+      if (!notice) { this.showToast(failed ? '공지를 열지 못했어요. 잠시 뒤 다시 시도해 주세요' : '공지를 찾지 못했어요. 지워졌거나 기한이 지났을 수 있어요'); return; }
+      this.markRead(notice);
+      if (this.isWide) { this.selectedId = id; this.detailOpen = true; return; }
+      this.openedId = id;
+      history.pushState({ notice: id }, '');
+      window.scrollTo({ top: 0 });
+    } finally { this.deepBusy = false; }
+  }
+
+  /** 첫 설정·불러오기가 끝난 뒤 미뤄 둔 딥링크를 연다(화면이 반영될 때마다 부른다). */
+  resumeDeepLink() {
+    if (this.deepId && !this.gated && this.generatedAt && !this.deepBusy) void this.openDeepLink(this.authUserId, this.subscriptionsEpoch);
   }
 
   /** 딥링크로 연 공지(목록에 없어도 상세에 보이게). */
