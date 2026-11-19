@@ -95,6 +95,8 @@ test('a saved notice without a record shows the default status "관심 있음"; 
   await setup(page);
   await saveSome(page, 3);
   expect(await rowStatuses(page)).toEqual(['관심 있음', '관심 있음', '관심 있음']);          // 기록이 없어도 모두 같은 모양
+  const dots = await page.locator('notice-rows-screen a.row .status-meta > span').evaluateAll((els) => els.map((el) => getComputedStyle(el).backgroundColor));
+  expect(new Set(dots).size).toBe(1);                                                           // 점 색은 하나다
   await expect(page.locator('.status-trigger')).toHaveCount(0);                              // 거를 것이 한 종류뿐이면 거르기가 없다
   await expect(page.getByRole('group', { name: '진행 상태로 거르기' })).toHaveCount(0);        // 칩 줄은 없다
   await saveSome(page, 3, { 0: 'applied' });
@@ -171,12 +173,15 @@ test('reorder mode: keyboard pick-move-drop saves once, a mouse drag saves once,
   // 필터가 걸려 있으면 막히고 이유가 보인다.
   await page.getByRole('button', { name: /^진행 상태: 전체/ }).click();
   await page.getByRole('group', { name: '진행 상태 선택' }).getByRole('button', { name: /지원함/ }).click();
+  await expect(page.getByText('전체 보기에서 순서를 바꿀 수 있어요')).toBeVisible();
+  await page.getByRole('button', { name: /^정렬:/ }).click();
   await expect(page.getByRole('button', { name: '순서 바꾸기' })).toBeDisabled();
-  await expect(page.getByText('전체 보기에서 바꿀 수 있어요')).toBeVisible();
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '진행 상태: 지원함' }).click();
   await page.getByRole('group', { name: '진행 상태 선택' }).getByRole('button', { name: /^전체/ }).click();
+  await page.getByRole('button', { name: /^정렬:/ }).click();
   await expect(page.getByRole('button', { name: '순서 바꾸기' })).toBeEnabled();
-  // 진입 1번, 이동, 완료 1번.
+  // 진입(정렬 메뉴 안) 1번, 이동, 완료 1번.
   await page.getByRole('button', { name: '순서 바꾸기' }).click();
   await expect(page.getByRole('button', { name: '완료' })).toBeVisible();
   await expect(page.locator('notice-rows-screen a.row')).toHaveCount(0);        // 모드 중에는 눌러 열리는 줄이 없다

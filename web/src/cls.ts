@@ -58,6 +58,6 @@ export const OPTION_CHECK = 'size-[14px] flex-none fill-none stroke-current [str
 /** 접히는 구역의 머리 한 줄(제목 ··· 현재 값 ⌄). h3 안에 넣는 단추다. */
 export const COLLAPSE_HEAD = '[@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] flex min-h-[44px] w-[calc(100%+16px)] items-center justify-between gap-[8px] rounded-sm border-0 bg-transparent px-[8px] py-0 text-left text-[13px] font-semibold text-ink-3';
 /** 저장 목록 줄의 상태 표시(메타 줄의 글자 한 요소). 기본 상태는 연하게, 직접 고른 상태는 굵게 한다. */
-export const STATUS_META = 'status-meta inline-flex flex-none items-center gap-[5px]';
-/** 상태 점 색(무채색 셋과 강조색 하나) */
-export const STATUS_DOT: Record<'interested' | 'preparing' | 'applied' | 'result', string> = { interested: 'bg-ink-3', preparing: 'bg-accent', applied: 'bg-ink', result: 'bg-ink-2' };
+export const STATUS_META = 'status-meta inline-flex flex-none items-center gap-[5px] whitespace-nowrap';
+/** 상태 점 색은 하나다(색으로 상태를 가르지 않는다). 직접 고른 상태는 글자 굵기로 구분한다. */
+export const STATUS_DOT = 'bg-ink-3';

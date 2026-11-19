@@ -238,6 +238,8 @@ export class AppController extends Reactive {
   savedOrder: string[] = loadSavedOrder();
   savedOrderStatus: '' | 'failed' = '';
   savedOrderAccount = false;
+  /** 응답을 기다리는 사이 이 기기에서 순서를 바꿨는지(바꿨으면 응답으로 덮지 않는다) */
+  savedOrderTouched = false;
   savedOrderChain: Promise<void> = Promise.resolve();
   /** 저장 목록의 순서 바꾸기 모드 */
   reordering = false;
@@ -329,6 +331,7 @@ export class AppController extends Reactive {
   // 공고별 팀원 모집(공고 한 건의 목록만 들고 있는다). 계정이 바뀌면 비운다. 함수가 운영에 없으면 구역을 숨긴다.
   teamState: { noticeId: string | null; status: 'loading' | 'ready' | 'failed'; posts: TeamPost[] } = { noticeId: null, status: 'loading', posts: [] };
   teamBusy = false;
+  private teamBusyCount = 0;
   teamUnavailable = false;
   /** 시험에서 서버 대신 쓰는 가짜. 비어 있으면 로그인한 계정의 Supabase를 쓴다. */
   teamApiOverride: TeamApi | null = null;
@@ -477,7 +480,7 @@ export class AppController extends Reactive {
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
           this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.devicesLoaded = false; this.thisDeviceId = null; this.devicesBusy = false; this.devicesError = ''; this.devicesLoadFailed = false; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.opportunities = new Map(); this.opportunitiesStatus = 'idle'; this.opportunityFilter = 'all'; this.statusMenuOpen = false; this.reordering = false; this.opportunitySeq = new Map(); this.opportunityQueue = new Map(); this.opportunitiesLoading = false;
-          this.teamState = { noticeId: null, status: 'loading', posts: [] }; this.teamBusy = false; this.teamUnavailable = false; ++this.teamSeq;
+          this.teamState = { noticeId: null, status: 'loading', posts: [] }; this.teamBusy = false; this.teamBusyCount = 0; this.teamUnavailable = false; ++this.teamSeq;
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           const staleChain = this.pushChain; this.pushChain = null;
@@ -519,7 +522,7 @@ export class AppController extends Reactive {
           this.boardOrder = loadBoardOrder();
           this.boardOrderStatus = '';
           this.boardOrderAccount = false;
-          this.savedOrder = loadSavedOrder(); this.savedOrderStatus = ''; this.savedOrderAccount = false;
+          this.savedOrder = loadSavedOrder(); this.savedOrderStatus = ''; this.savedOrderAccount = false; this.savedOrderTouched = false;
           const startRead = initialReadState(loadReadState(), !!userId);
           this.readState = startRead.state;
           this.needsReadBaseline = startRead.needsBaseline;
@@ -884,7 +887,7 @@ export class AppController extends Reactive {
     const api = this.teamApi(), userId = this.authUserId, epoch = this.subscriptionsEpoch;
     if (!api || !userId) return { ok: false, code: null };
     const guard = async () => epoch === this.subscriptionsEpoch && this.authUserId === userId && (this.teamApiOverride ? true : !authClient || await sessionIs(authClient, userId));
-    this.teamBusy = true;
+    this.teamBusyCount++; this.teamBusy = true;
     try {
       const value = await work(api, guard);
       if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return { ok: false, code: null };
@@ -897,7 +900,7 @@ export class AppController extends Reactive {
       if (code !== 'team_contact_required') this.showToast(teamErrorMessage(error));
       if (reload && this.teamState.noticeId === noticeId && code && code !== 'team_rate_limited') this.loadTeam(noticeId);   // 상태가 어긋났을 수 있으니 다시 읽는다
       return { ok: false, code };
-    } finally { if (epoch === this.subscriptionsEpoch && this.authUserId === userId) this.teamBusy = false; }
+    } finally { if (epoch === this.subscriptionsEpoch && this.authUserId === userId) { this.teamBusyCount = Math.max(0, this.teamBusyCount - 1); this.teamBusy = this.teamBusyCount > 0; } }
   }
 
   teamModel(notice: Notice): TeamModel {
@@ -1156,7 +1159,8 @@ export class AppController extends Reactive {
       if (epoch !== this.subscriptionsEpoch) return;
       this.savedOrderAccount = available;
       if (!available) return;
-      if (order.length) { this.savedOrder = order; remember('saved-order', JSON.stringify(order)); }
+      if (this.savedOrderTouched) void this.saveSavedOrderToAccount(this.savedOrder, true);   // 응답을 기다리는 사이 이 기기에서 바꾼 순서가 먼저다
+      else if (order.length) { this.savedOrder = order; remember('saved-order', JSON.stringify(order)); }
       else if (this.savedOrder.length) void this.saveSavedOrderToAccount(this.savedOrder, false);
     } catch { /* 계정에서 못 읽으면 이 기기의 순서를 그대로 쓴다 */ }
   }
@@ -1164,7 +1168,7 @@ export class AppController extends Reactive {
   /** 저장 목록의 순서를 바꾼다. 놓을 때마다 한 번 저장한다(배열 통째 교체). */
   setSavedOrder(ids: string[]) {
     const order = parseSavedOrder(ids).slice(0, SAVED_ORDER_LIMIT);
-    this.savedOrder = order;
+    this.savedOrder = order; this.savedOrderTouched = true;
     remember('saved-order', JSON.stringify(order));
     if (this.authUserId && this.savedOrderAccount) void this.saveSavedOrderToAccount(order, true);
   }
@@ -1193,6 +1197,9 @@ export class AppController extends Reactive {
   }
 
   /** 순서 바꾸기는 저장한 공지 전체를 볼 때만 한다(일부만 보이면 전체 순서가 모호하다). */
+  /** 저장 목록에 보기 조건(상태·검색·키워드·게시판)이 걸려 일부만 보이는지 */
+  savedFilterOn(): boolean { return !this.canReorderSaved(); }
+
   canReorderSaved(): boolean {
     if (this.opportunityFilter !== 'all' || this.query || this.keyword) return false;
     return this.visible().length === dropDuplicates(this.decorated(this.savedNotices())).length;

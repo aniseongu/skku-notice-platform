@@ -416,16 +416,15 @@ function ViewFilters({ app }: { app: AppController }) {
     }}><Icon name="select-list" />선택</button>;
   if (app.view === 'saved') {
     const total = app.savedNotices().length;
-    const canReorder = total >= 2;
-    const reorderOk = canReorder && app.canReorderSaved();
+    const reorderOk = total >= 2 && app.canReorderSaved();
     return <>
       <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>
         {app.reordering
           ? <button type="button" className={`${OPTION_ACTION} font-semibold! text-ink!`} onClick={() => { app.reordering = false; }}>완료</button>
-          : <>{canReorder ? <button type="button" className={OPTION_ACTION} disabled={!reorderOk} aria-describedby={reorderOk ? undefined : 'reorder-why'} onClick={() => app.startReordering()}>순서 바꾸기</button> : null}{select}</>}
+          : select}
         <StatusSelect app={app} /><SortSelect app={app} />
       </div></div>
-      {canReorder && !reorderOk && !app.reordering ? <p id="reorder-why" className={`${NOTE_TEXT} px-[var(--gutter)] pb-[4px] text-right min-[720px]:px-[24px]`}>전체 보기에서 바꿀 수 있어요</p> : null}
+      {total >= 2 && !reorderOk && !app.reordering && app.savedFilterOn() ? <p id="reorder-why" className={`${NOTE_TEXT} px-[var(--gutter)] pb-[4px] text-left min-[720px]:px-[24px]`}>전체 보기에서 순서를 바꿀 수 있어요</p> : null}
     </>;
   }
   return <div className={`view-options ${VIEW_ROW} justify-between`} role="group" aria-label="공지 보기 조건">
@@ -495,6 +494,8 @@ function SortSelect({ app }: { app: AppController }) {
           history.replaceState(null, '', `${location.pathname}?tab=${app.tab()}&sort=${option.id === 'custom' ? 'latest' : option.id}`);
           void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.sort-trigger')?.focus());
         }}><span>{option.label}</span>{sort === option.id ? <span className={MENU_CHECK} aria-hidden="true" /> : null}</button>)}
+      {app.view === 'saved' && app.savedNotices().length >= 2 ? <button type="button" className={`sort-option reorder-option ${MENU_OPTION} mt-[4px] border-t border-line disabled:text-ink-3`} disabled={!app.canReorderSaved()} aria-describedby={app.canReorderSaved() ? undefined : 'reorder-why'}
+        onClick={() => { app.sortMenuOpen = false; app.startReordering(); }}><span>순서 바꾸기</span></button> : null}
     </div> : null}
   </div>;
 }
@@ -520,7 +521,7 @@ function StatusSelect({ app }: { app: AppController }) {
       aria-expanded={app.statusMenuOpen} aria-controls="status-options" onClick={() => {
         app.statusMenuOpen = !app.statusMenuOpen;
         if (app.statusMenuOpen) void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.status-option[aria-pressed="true"]')?.focus());
-      }}>진행 상태: {label}<span className={MENU_CHEVRON} aria-hidden="true" /></button>
+      }}>{filter === 'all' ? '진행 상태' : label}<span className={MENU_CHEVRON} aria-hidden="true" /></button>
     {app.statusMenuOpen ? <div id="status-options" className={`status-options ${MENU_OPTIONS} min-w-[180px]`} role="group" aria-label="진행 상태 선택"
       onKeyDown={(event) => moveFocus(event, '.status-option')}
       onBlur={(event) => { if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) app.statusMenuOpen = false; }}>

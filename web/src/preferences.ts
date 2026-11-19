@@ -38,7 +38,10 @@ export async function saveBoardOrderPreference(client: SupabaseClient, userId: s
 /** 계정에 저장된 저장 목록 순서. 열이 아직 없으면(마이그레이션 전) available이 false다. */
 export async function loadSavedOrderPreference(client: SupabaseClient, userId: string): Promise<{ available: boolean; order: string[] }> {
   const { data, error } = await client.from('user_preferences').select('saved_order').eq('user_id', userId).maybeSingle();
-  if (error) return { available: false, order: [] };
+  if (error) {
+    if ((error as { code?: unknown }).code === '42703') return { available: false, order: [] };   // 열 없음(마이그레이션 전)만 '없음'이다
+    throw error;   // 그 밖은 일시 오류라 다음 갱신에서 다시 읽는다
+  }
   return { available: true, order: parseSavedOrder(data?.saved_order) };
 }
 
