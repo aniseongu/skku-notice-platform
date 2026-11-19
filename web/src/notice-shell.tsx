@@ -21,6 +21,7 @@ import { InstallBanner } from './install-banner';
 import { PushSheet, pushSheetShown } from './push-sheet';
 import { subscribeUpdate, updateAvailable } from './app-update';
 import { LoginScreen, LoginStatus } from './login-screen';
+import { NoticePreview } from './notice-preview';
 import type { CanvasMode } from './devices';
 import { bodyInterests, withMyDeadline } from './notice-view';
 import './platform-settings';
@@ -71,7 +72,7 @@ export function NoticeShell({ app }: { app: AppController }) {
   });
 
   if (!app.authReady) return <LoginStatus />;
-  if (app.gated) return <LoginScreen app={app} />;
+  if (app.gated) return app.deepId && app.preview.status !== 'missing' ? <NoticePreview app={app} /> : <LoginScreen app={app} missing={!!app.deepId} />;
   if (app.awaitingProfile()) return <LoginStatus />;
   // 첫 목록이 준비되기 전의 개수는 계정 정보가 오면 바뀌므로(판정 대기 공지가 빠진다) 보이지 않는다.
   const ready = app.userDataReady();
@@ -84,10 +85,10 @@ export function NoticeShell({ app }: { app: AppController }) {
   const keywordTotals = keywordCounts(keywordScope.filter((notice) => board === 'all' || notice.source_id === board),
     app.keywords, (notice) => app.interests(notice));
   const title = settings ? settingsTitle() : app.keyword ? app.keyword : TABS.find((t) => t.id === app.view)!.label;
-  const selected = settings ? undefined : list.find((n) => n.id === app.selectedId) ?? (app.isWide ? list[0] : undefined);
+  const selected = settings ? undefined : list.find((n) => n.id === app.selectedId) ?? (app.selectedId && app.selectedId === app.deepNotice?.notice.id ? app.deepShown(app.selectedId) : undefined) ?? (app.isWide ? list[0] : undefined);
   app.shownId = selected?.id ?? null;
   const reading = !app.isWide && !settings
-    ? app.notices.find((n) => n.id === app.openedId) ?? list.find((n) => n.id === app.openedId) : undefined;
+    ? app.notices.find((n) => n.id === app.openedId) ?? list.find((n) => n.id === app.openedId) ?? app.deepShown(app.openedId) : undefined;
   // 첫 로그인 설정 창이 떠 있는 동안 뒤쪽 화면은 비활성으로 두어 Tab 키 포커스와 화면 낭독기가 새지 않게 한다.
   const onboarding = app.needsOnboarding();
   const noDetail = app.isWide && (!app.detailOpen || !selected);

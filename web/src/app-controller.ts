@@ -37,6 +37,7 @@ import type { Subscription } from '@supabase/supabase-js';
 import { dropDuplicates, groupMates } from './dup-notices';
 import { orderNotices, type Sort } from './notice-order';
 import { Reactive, defineReactive } from './reactive';
+import { loadPublicNotice, noticeIdFromSearch, noticeLink, withoutNotice, type PublicNotice } from './deeplink';
 import { clearListCache, loadListCache, saveListCache } from './list-cache';
 
 const COOP_KIND_ORDER = ['대기업', '중견기업', '중소기업', '스타트업', '기업', '공공기관', '연구기관', '협회/기타', '기타 기관'];
@@ -209,7 +210,7 @@ export class AppController extends Reactive {
     devices: { state: true }, thisDeviceId: { state: true }, devicesBusy: { state: true }, devicesError: { state: true }, devicesLoadFailed: { state: true }, summaryTime: { state: true },
     calendarAuto: { state: true },
     accountBusy: { state: true }, accountError: { state: true },
-    aiHintTick: { state: true },
+    aiHintTick: { state: true }, deepId: { state: true }, preview: { state: true }, deepNotice: { state: true },
     summarizing: { state: true }, summaryError: { state: true }, summaryErrorId: { state: true },
     profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, profileError: { state: true }, settingsSection: { state: true },
     onboardingOpen: { state: true }, onboardingDismissed: { state: true }, onboardingBusy: { state: true }, onboardingError: { state: true },
@@ -312,6 +313,13 @@ export class AppController extends Reactive {
   opportunityFilter: 'all' | OpportunityStatus = 'all';
   private opportunitySeq = new Map<string, number>();
   private keywordWrite: Promise<void> = Promise.resolve();
+  /** 주소의 ?notice=<id>. 한 번 열면 비운다(미리보기와 로그인 사용자의 상세 열기가 이 값을 쓴다). 형식이 틀리면 처음부터 null. */
+  deepId: string | null = noticeIdFromSearch(location.search);
+  /** 비로그인 미리보기 상태. 없는 공지(missing)면 평소 로그인 화면으로 돌아간다. */
+  preview: { status: 'idle' | 'loading' | 'ready' | 'missing' | 'error'; data?: PublicNotice } = { status: 'idle' };
+  /** 딥링크로 열었는데 목록에 없는 공지 한 건. 목록·캐시에는 섞지 않는다. */
+  deepNotice: PublicNotice | null = null;
+  private previewRequest = 0;
   authReady = !authClient;
   authEmail: string | null = null;
   authName: string | null = null;
@@ -515,7 +523,7 @@ export class AppController extends Reactive {
         const name = meta.full_name ?? meta.name;
         this.authName = typeof name === 'string' && name.trim() ? name.trim().slice(0, 60) : null;
         this.authAvatar = safeAvatarUrl(meta.avatar_url ?? meta.picture);
-        if (!this.authReady) { this.authReady = true; void this.refresh(true); }
+        if (!this.authReady) { this.authReady = true; if (!userId && this.deepId) void this.loadPreview(); void this.refresh(true); }
         else if (loggedIn) void this.refresh(true);
       }).data.subscription;
     } else { void this.refresh(); }
@@ -558,6 +566,7 @@ export class AppController extends Reactive {
       this.sources = notices!.sources;
       if (userId) void this.refreshSaveCounts(userId, epoch);
       this.generatedAt = notices!.generated_at;
+      if (this.deepId) void this.openDeepLink(userId, epoch);
       this.liveFeedReady = true;
       if (userId) this.saveCurrentListCache(userId, epoch);
       remember('has-coop', this.hasCoop() ? '1' : '0');
@@ -593,6 +602,48 @@ export class AppController extends Reactive {
     }
   }
 
+  /** 비로그인 미리보기: get_public_notice 한 건만 읽는다. */
+  async loadPreview() {
+    if (!authClient || !this.deepId) return;
+    const id = this.deepId, request = ++this.previewRequest;
+    this.preview = { status: 'loading' };
+    try {
+      const data = await loadPublicNotice(authClient, id);
+      if (request !== this.previewRequest) return;
+      this.preview = data ? { status: 'ready', data } : { status: 'missing' };
+    } catch {
+      if (request === this.previewRequest) this.preview = { status: 'error' };
+    }
+  }
+
+  /** 로그인 사용자의 딥링크: 목록에 있으면 그 공지를, 없으면 한 건을 받아 상세로 연다. */
+  async openDeepLink(userId: string | null, epoch: number) {
+    const id = this.deepId;
+    if (!id || this.gated) return;
+    this.deepId = null;
+    history.replaceState(history.state, '', withoutNotice(location.href));
+    let notice = this.notices.find((n) => n.id === id) ?? null;
+    if (!notice && authClient) {
+      try {
+        const found = await loadPublicNotice(authClient, id);
+        if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
+        if (found) { this.deepNotice = found; this.bodies.set(id, found.body); notice = found.notice; }
+      } catch { /* 아래에서 못 찾은 것과 같이 알린다 */ }
+    }
+    if (!notice) { this.showToast('공지를 찾지 못했어요. 지워졌거나 기한이 지났을 수 있어요'); return; }
+    this.markRead(notice);
+    if (this.isWide) { this.selectedId = id; this.detailOpen = true; return; }
+    this.openedId = id;
+    history.pushState({ notice: id }, '');
+    window.scrollTo({ top: 0 });
+  }
+
+  /** 딥링크로 연 공지(목록에 없어도 상세에 보이게). */
+  deepShown(id: string | null): Notice | undefined {
+    if (!id) return undefined;
+    return this.notices.find((n) => n.id === id) ?? (this.deepNotice?.notice.id === id ? this.deepNotice.notice : undefined);
+  }
+
   async signIn() {
     if (!authClient || this.authBusy) return;
     this.authBusy = true; this.authError = '';
@@ -620,6 +671,7 @@ export class AppController extends Reactive {
       if (error) throw error;
       // 다시 로그인하면 설정이 아니라 공지 목록에서 시작하게 주소를 첫 화면으로 돌려놓는다.
       history.replaceState(null, '', location.pathname);
+      this.deepId = null; this.deepNotice = null; this.preview = { status: 'idle' };
     } catch {
       this.authError = '로그아웃을 완료하지 못했어요. 다시 확인해 주세요.';
     } finally { this.authBusy = false; }
@@ -2149,8 +2201,9 @@ export class AppController extends Reactive {
     applyTheme(theme);
   }
 
+  /** 공유·복사하는 주소는 앱 안의 이 공지(원문은 상세의 '원문 열기'). */
   async copyLink(notice: Notice) {
-    const url = safeUrl(notice.url);
+    const url = noticeLink(notice.id, location.href);
     try {
       await navigator.clipboard.writeText(url);
     } catch {
@@ -2160,17 +2213,17 @@ export class AppController extends Reactive {
       document.body.append(box); box.select();
       const ok = document.execCommand('copy');
       box.remove();
-      if (!ok) { this.showToast('복사하지 못했어요. 원문 열기에서 주소를 확인해 주세요'); return; }
+      if (!ok) { this.showToast('복사하지 못했어요. 주소창의 주소를 직접 복사해 주세요'); return; }
     }
     this.linkCopied = true;
     clearTimeout(this.copiedTimer);
     this.copiedTimer = window.setTimeout(() => { this.linkCopied = false; }, 2000);
-    this.showToast('원문 링크를 복사했어요');
+    this.showToast('링크를 복사했어요');
   }
 
   // 기기의 공유 창(카카오톡, 메시지, 에어드롭 등)이 있으면 그것으로 보낸다. 없거나 쓸 수 없으면 링크를 복사한다.
   async share(notice: Notice) {
-    const data = { title: cleanTitle(notice.title_ko || notice.title), url: safeUrl(notice.url) };
+    const data = { title: cleanTitle(notice.title_ko || notice.title), url: noticeLink(notice.id, location.href) };
     if (typeof navigator.share !== 'function' || (navigator.canShare && !navigator.canShare(data))) { await this.copyLink(notice); return; }
     try {
       await navigator.share(data);

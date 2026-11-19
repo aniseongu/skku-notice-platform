@@ -1,5 +1,13 @@
 // 출처: https://github.com/mdn/serviceworker-cookbook/tree/master/push-payload
 // Workbox가 만든 워커에서 불러온다. 키와 구독 주소는 이 파일에 두지 않는다.
+// 알림 tag `notice:<id>`의 id가 공지 id 형식(deeplink.ts의 isNoticeId와 같다)이면 앱 안의 그 공지로 연다.
+const NOTICE_ID = /^[a-z0-9-]+\/[0-9]+$/;
+function noticeIdOf(tag) {
+  if (typeof tag !== 'string' || !tag.startsWith('notice:')) return null;
+  const id = tag.slice('notice:'.length);
+  return id.length <= 200 && NOTICE_ID.test(id) ? id : null;
+}
+
 self.addEventListener('push', (event) => {
   let payload = {};
   try {
@@ -23,13 +31,28 @@ self.addEventListener('push', (event) => {
     badge: new URL('icon-monochrome-512.png', self.registration.scope).href,
     tag: typeof payload.tag === 'string' ? payload.tag : 'skku-notice',
     silent: payload.silent === true,
-    data: { url: target.href },
+    data: { url: target.href, notice: noticeIdOf(payload.tag) },
   }));
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  // URL은 push 수신 때 검사한 값이다. 알림을 누르면 바로 원문을 연다.
+  // 공지 알림은 원문이 아니라 앱 안의 그 공지(./?notice=<id>)로 연다. 열린 앱 창이 있으면 그 창을 앞으로 가져와 이동한다.
+  // 그 밖의 알림(아이캠퍼스, 필수 정보, 옛 알림)은 push 수신 때 검사한 URL을 그대로 연다.
+  const noticeId = noticeIdOf(event.notification.tag) ?? (NOTICE_ID.test(event.notification.data?.notice || '') ? event.notification.data.notice : null);
+  if (noticeId) {
+    const link = new URL('./', self.registration.scope);
+    link.searchParams.set('notice', noticeId);
+    event.waitUntil((async () => {
+      try {
+        const windows = self.clients.matchAll ? await self.clients.matchAll({ type: 'window', includeUncontrolled: true }) : [];
+        const open = windows.find((client) => typeof client.url === 'string' && client.url.startsWith(self.registration.scope));
+        if (open) { await open.focus(); await open.navigate(link.href); return; }
+      } catch { /* 창을 옮기지 못하면 새 창으로 연다 */ }
+      await self.clients.openWindow(link.href);
+    })());
+    return;
+  }
   const target = event.notification.data?.url || self.registration.scope;
   event.waitUntil(self.clients.openWindow(target));
 });

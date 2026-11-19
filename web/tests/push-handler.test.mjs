@@ -4,7 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const source = readFileSync(new URL('../public/push-handler.js', import.meta.url), 'utf8');
-function worker() {
+function worker(windows = []) {
   const events = new Map();
   const notifications = [];
   const opened = [];
@@ -12,7 +12,7 @@ function worker() {
   const self = {
     location: new URL(scope + 'sw.js'),
     registration: { scope, showNotification: async (title, options) => notifications.push({ title, ...options }) },
-    clients: { openWindow: async (url) => opened.push(url) },
+    clients: { openWindow: async (url) => opened.push(url), matchAll: async () => windows },
     addEventListener: (name, handler) => events.set(name, handler),
   };
   vm.runInNewContext(source, { self, URL });
@@ -90,4 +90,48 @@ test('a lost subscription is recreated with the same server key when the browser
   assert.equal(made.length, 1);
   assert.equal(made[0].applicationServerKey, key);
   assert.equal(made[0].userVisibleOnly, true);
+});
+
+const APP_ID = 'skku-notice01/12345';
+const appUrl = (w) => `${w.scope}?notice=skku-notice01%2F12345`;
+
+test('clicking a notice alert opens that notice inside the app, not the original page', async () => {
+  const w = worker();
+  await w.push({ title: '장학', url: 'https://cse.skku.edu/cse/notice.do?mode=view&articleNo=123', tag: `notice:${APP_ID}` });
+  assert.equal(w.notifications[0].data.notice, APP_ID);
+  assert.equal(w.notifications[0].data.url, 'https://cse.skku.edu/cse/notice.do?mode=view&articleNo=123');   // 원문 검증은 그대로
+  await w.click(w.notifications[0]);
+  assert.deepEqual(w.opened, [appUrl(w)]);
+});
+
+test('an open app window is focused and moved to the notice instead of opening another window', async () => {
+  const calls = [];
+  const scope = 'https://example.github.io/skku-notice-alert/';
+  const window = { url: scope + '?tab=all', focus: async () => calls.push('focus'), navigate: async (url) => calls.push(['navigate', url]) };
+  const other = { url: 'https://example.github.io/other/', focus: async () => calls.push('wrong'), navigate: async () => calls.push('wrong') };
+  const w = worker([other, window]);
+  await w.push({ title: '장학', tag: `notice:${APP_ID}` });
+  await w.click(w.notifications[0]);
+  assert.deepEqual(calls, ['focus', ['navigate', appUrl(w)]]);
+  assert.deepEqual(w.opened, []);
+});
+
+test('if the window cannot be moved the app link opens in a new window', async () => {
+  const w = worker([{ url: 'https://example.github.io/skku-notice-alert/', focus: async () => {}, navigate: async () => { throw new TypeError('uncontrolled'); } }]);
+  await w.push({ title: '장학', tag: `notice:${APP_ID}` });
+  await w.click(w.notifications[0]);
+  assert.deepEqual(w.opened, [appUrl(w)]);
+});
+
+test('canvas, required-info, forged and old alerts keep opening the checked url', async () => {
+  const w = worker();
+  const url = 'https://cse.skku.edu/cse/notice.do?mode=view&articleNo=9';
+  for (const tag of ['canvas:123', 'required', 'notice:../x/1', 'notice:a/1/2', 'notice:' + 'a/1'.padEnd(300, '1'), 'skku-notice']) {
+    await w.push({ title: 't', url, tag });
+    await w.click(w.notifications.at(-1));
+    assert.equal(w.opened.at(-1), url, tag);
+  }
+  // 알림 객체의 data.notice가 위조돼도 형식이 틀리면 열지 않는다
+  await w.click({ tag: 'x', data: { url, notice: 'https://evil.example/' } });
+  assert.equal(w.opened.at(-1), url);
 });

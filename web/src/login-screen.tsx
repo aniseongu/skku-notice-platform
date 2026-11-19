@@ -6,7 +6,7 @@ import { InstallBanner } from './install-banner';
 import { NoticeExample } from './notice-example';
 
 // 출처: https://developers.google.com/identity/branding-guidelines
-const GoogleG = () => <svg className="flex-none w-[20px] h-[20px]" width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+export const GoogleG = () => <svg className="flex-none w-[20px] h-[20px]" width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
   <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
   <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
@@ -21,7 +21,7 @@ export function LoginStatus({ text = '불러오고 있어요' }: { text?: string
   return <div className="flex min-h-dvh items-center justify-center bg-bg px-[24px]"><div role="status" className={`text-center ${shown ? '' : 'invisible'}`}><p className="m-0 text-[15px] leading-[22px] text-ink-2">{text}</p></div></div>;
 }
 
-export function LoginScreen({ app }: { app: AppController }) {
+export function LoginScreen({ app, missing = false }: { app: AppController; missing?: boolean }) {
   const busy = app.authBusy;
   // 가운데 알림 예시는 실제 알림(src/skku_notice/push_collection.py)과 같은 모양이다: 제목은 공지 제목, 본문 첫 줄은 AI 판정 문구, 둘째 줄은 관심 키워드와 마감(키워드가 없으면 마감만), 마지막 줄은 게시판. 알림은 AI 판정이 끝난 뒤에 간다.
   // 토스 첫 화면 구성(TDS Top: 위 그림, 28px 제목, 17px 설명, 아래 고정 단추 하나)을 따른다. 가운데에는 이 앱이 하는 일을 알림 예시 하나로 보여 준다.
@@ -41,6 +41,7 @@ export function LoginScreen({ app }: { app: AppController }) {
           {busy ? null : <GoogleG />}
           <span>{busy ? 'Google로 이동하고 있어요' : 'Google로 계속하기'}</span>
         </button>
+        {missing ? <p className="m-0 mb-[12px] text-center text-[14px] leading-[20px] text-ink-2 break-keep">공유받은 공지를 찾지 못했어요. 지워졌거나 기한이 지났을 수 있어요</p> : null}
         <div aria-live="polite" className="mt-[12px] empty:hidden">
           {app.authError ? <p className="m-0 text-[14px] leading-[20px] text-center text-danger" role="alert">{app.authError}</p> : null}
         </div>

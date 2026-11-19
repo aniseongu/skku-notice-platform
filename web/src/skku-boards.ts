@@ -10,7 +10,7 @@ export const BOARD_CATALOG: readonly BoardRef[] = [
   { id: 'ecostat-notice', name: '경제대학 공지', url: 'https://ecostat.skku.edu/ecostat/notice_total.do' },
   { id: 'biz-notice', name: '경영대학 공지', url: 'https://biz.skku.edu/bizskk/notice.do' },
   { id: 'art-notice', name: '예술대학 공지', url: 'https://art.skku.edu/art/notice.do' },
-  { id: 'cscience-notice', name: '자연과학대학 공지', url: 'https://cscience.skku.edu/cscience/community/under_notice.do' },
+  { id: 'cscience-notice', name: '자연과학대학 공지', url: 'https://cscience.skku.edu/cscience/notice.do' },
   { id: 'ice-notice', name: '정보통신대학 공지', url: 'https://ice.skku.edu/ice/notice.do' },
   { id: 'enc-notice', name: '공과대학 공지', url: 'https://enc.skku.edu/enc/notice.do' },
   { id: 'biotech-notice', name: '생명공학대학 공지', url: 'https://biotech.skku.edu/biotech/notice_under.do' },
