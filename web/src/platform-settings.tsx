@@ -293,6 +293,8 @@ const permissionText = (status: SettingsModel['pushStatus']) =>
 function BoardGroups({ model }: { model: SettingsModel }) {
   const [group, setGroup] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [searchMinHeight, setSearchMinHeight] = useState(0);
+  const resultsRef = useRef<HTMLDivElement>(null);
   const known = new Set(BOARD_CATALOG.map((board) => board.id));
   // 기타 게시판은 "기타 · 사업단", "기타 · 부트캠프"처럼 묶는다(첫 설정의 기타 게시판 소제목과 같다).
   const otherGroup = new Map(OTHER_BOARDS.map((board) => [board.id, `기타 · ${board.group}`]));
@@ -323,7 +325,14 @@ function BoardGroups({ model }: { model: SettingsModel }) {
     <div className="flex flex-col gap-3 pt-3 pb-3">
       <p className="setting-help m-0 text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">단과대를 골라 게시판을 추가해요</p>
       <input className="input min-h-[44px] px-[12px] py-[10px] border border-line rounded-md bg-surface text-ink text-[15px] placeholder:text-ink-3 focus:outline-2 focus:outline-accent focus:outline-offset-[-1px]" type="search" aria-label="게시판 검색" placeholder="학과나 단과대 이름으로 찾기" autoComplete="off" value={query}
-        onChange={(event) => setQuery(event.currentTarget.value)} />
+        onChange={(event) => {
+          const next = event.currentTarget.value;
+          const currentHeight = resultsRef.current?.getBoundingClientRect().height ?? 0;
+          if (next.trim()) setSearchMinHeight((height) => Math.max(height, currentHeight));
+          else setSearchMinHeight(0);
+          setQuery(next);
+        }} />
+      <div ref={resultsRef} style={needle ? { minHeight: searchMinHeight } : undefined}>
       {needle
         ? found.length
           ? <div className="choice-list grid overflow-hidden rounded-lg bg-surface" role="group" aria-label="검색 결과">{found.map(row)}</div>
@@ -334,6 +343,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
             <div className="choice-list grid overflow-hidden rounded-lg bg-surface" role="group" aria-label={`${current} 게시판`}>{(groups.get(current) ?? []).map(row)}</div>
           </>
           : <GroupGrid label="단과대와 기타 묶음 선택" names={names} onPick={setGroup} />}
+      </div>
     </div>
   </details>;
 }
