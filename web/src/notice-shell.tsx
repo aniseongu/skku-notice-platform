@@ -9,12 +9,13 @@ import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, d
 import { APP_NAME } from './brand';
 import type { FeedbackKind } from './feedback';
 import { installMode, isStandalone } from './install-hint';
-import { CHECKBOX, CHIP, CHIPS, CHIP_ADD, NOTE_TEXT } from './cls';
+import { CHECKBOX, CHEVRON_RIGHT, CHIP, CHIPS, CHIP_ADD, NOTE_TEXT } from './cls';
 import { authClient } from './auth';
 import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, type OpportunityStatus } from './opportunities';
 import { SavedReorderList, reorderItems } from './saved-reorder';
 import { keywordCounts } from './keyword-counts';
 import type { InboxItem } from './inbox';
+import { summarize } from './explore-map';
 import { type AppController, STALE_MS, TABS, remember, settingsTitle } from './app-controller';
 import type { UserProfile } from './profile';
 import { Avatar } from './ui';
@@ -263,6 +264,7 @@ function settingsModel(app: AppController) {
     devicesInfo: { devices: app.devices, loaded: app.devicesLoaded, thisId: app.thisDeviceId, summaryTime: app.summaryTime, hasCanvasToken: !!app.canvasStatus, busy: app.devicesBusy, error: app.devicesError, loadFailed: app.devicesLoadFailed,
       refresh: () => { void app.refreshDevices(); }, setMode: (mode: string) => { void app.setCanvasMode(mode as CanvasMode); }, setAlertAll: (enabled: boolean) => { void app.setDeviceAlertAll(enabled); }, remove: (id: string) => { void app.removeDevice(id); }, rename: (id: string, name: string) => app.renameDevice(id, name),
       setSummaryTime: (period: 'am' | 'pm', hour: number, minute: number) => { void app.setSummaryTime(period, hour, minute); } },
+    explore: { summary: summarize(app.exploreItems()) },
     inbox: { items: app.inboxItems, pushOn: app.pushStatus === 'on', open: (item: InboxItem) => app.openInboxItem(item), remove: (id: string) => { void app.changeInbox({ kind: 'remove', ids: [id] }); },
       readAll: () => { void app.changeInbox({ kind: 'read-all' }); }, clear: () => { void app.changeInbox({ kind: 'clear' }); }, goNotifications: () => app.openSettingsSection('notifications') },
     calendar: { auto: app.calendarAuto, id: app.calendarId, syncedAt: app.calendarSyncedAt, busy: app.calendarBusy, message: app.calendarMessage, error: app.calendarError, savedCount: app.saved.length,
@@ -432,7 +434,11 @@ function ViewFilters({ app }: { app: AppController }) {
   if (app.view === 'saved') {
     const total = app.savedNotices().length;
     const reorderOk = total >= 2 && app.canReorderSaved();
+    const recorded = app.authUserId ? app.exploreItems().length : 0;
     return <>
+      {recorded > 0 ? <button type="button" className={`explore-entry [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[44px] w-full items-center justify-between gap-[12px] border-0 bg-transparent px-[var(--gutter)] py-0 text-left text-[14px] leading-[20px] text-ink-2 min-[720px]:px-[24px]`} onClick={app.openExploreMap}>
+        <span>기록한 활동 {recorded}개</span><span className="inline-flex items-center font-semibold text-accent">탐험 지도<span className={`${CHEVRON_RIGHT} ml-[6px]`} aria-hidden="true" /></span>
+      </button> : null}
       <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>
         {app.reordering
           ? <button type="button" className={`${OPTION_ACTION} font-semibold! text-ink!`} onClick={() => { app.reordering = false; }}>완료</button>

@@ -39,6 +39,7 @@ import { localKey, setLocalOwner } from './local-scope.ts';
 import { isRememberedOnboarded, rememberOnboarded } from './onboarded-flag.ts';
 import type { Subscription } from '@supabase/supabase-js';
 import { dropDuplicates, groupMates } from './dup-notices';
+import type { ExploreItem } from './explore-map';
 import { orderNotices, type Sort } from './notice-order';
 import { Reactive, defineReactive } from './reactive';
 import { loadPublicNotice, noticeIdFromSearch, noticeLink, withoutNotice, type PublicNotice } from './deeplink';
@@ -90,7 +91,7 @@ export function settingsSectionFromUrl(): string | null {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'keys';
   const section = params.get('section');
-  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile', 'feedback', 'inbox'].includes(section) ? section : null;
+  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile', 'feedback', 'inbox', 'explore'].includes(section) ? section : null;
 }
 
 /** 설정 머리의 부제. 쪽마다 그 쪽에서 하는 일을 말한다. */
@@ -104,6 +105,7 @@ export function settingsSubtitle(): string {
     case 'keys': return 'AI 키를 관리해요';
     case 'feedback': return '궁금한 점이나 바라는 점을 남겨 주세요';
     case 'inbox': return '이 기기가 받은 알림을 다시 봐요';
+    case 'explore': return '기록한 활동이 어느 영역에 있는지 봐요';
     default: return '알림과 연결을 정해요';
   }
 }
@@ -111,7 +113,7 @@ export function settingsSubtitle(): string {
 export function settingsTitle(): string {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'AI 연결';
-  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정', feedback: '문의하기', inbox: '알림함' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
+  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정', feedback: '문의하기', inbox: '알림함', explore: '탐험 지도' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
 }
 
 export interface InstallPrompt extends Event { prompt(): Promise<void> }
@@ -1315,6 +1317,18 @@ export class AppController extends Reactive {
     return this.opportunities.get(notice.id)?.status ?? (this.isSaved(notice) ? 'interested' : undefined);
   }
 
+  /** 탐험 지도용 기록: 기회함 기록 + 기록 없는 저장 공지(기본 '관심 있음'). 기록 표를 쓸 수 없으면 비어 있다. */
+  exploreItems(): ExploreItem[] {
+    if (this.opportunitiesStatus !== 'ready') return [];
+    const items = new Map<string, ExploreItem>();
+    for (const notice of this.savedNotices()) {
+      const status = this.statusOf(notice);
+      if (status) items.set(notice.id, { id: notice.id, title: notice.title, board: boardName(this.sources.find((source) => source.id === notice.source_id), notice.source_id), category: notice.category, status });
+    }
+    for (const record of this.opportunities.values()) if (!items.has(record.notice_id)) items.set(record.notice_id, { id: record.notice_id, title: record.title, board: record.board, status: record.status });
+    return [...items.values()];
+  }
+
   /** 저장한 공지의 상태별 개수(상태 거르기 메뉴용). */
   savedStatusCounts(): Map<OpportunityStatus, number> {
     const counts = new Map<OpportunityStatus, number>();
@@ -2439,6 +2453,7 @@ export class AppController extends Reactive {
 
   get inboxUnread(): number { return unreadCount(this.inboxItems); }
 
+  openExploreMap = () => { this.openSettings('explore'); };
   openInbox = () => { this.openSettings('inbox'); };
 
   async changeInbox(change: InboxChange): Promise<void> {

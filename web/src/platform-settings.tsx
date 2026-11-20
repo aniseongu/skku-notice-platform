@@ -23,6 +23,7 @@ import { BADGE, CHEVRON_RIGHT, CHOICE, DANGER_BUTTON, GHOST_BUTTON, SETTINGS_ACT
 import { aiKeysLead, connectedAiKeys } from './ai-keys';
 import { BoardRequest, BOARD_TRAILING_ROW } from './board-request';
 import { InboxPage, type InboxModel } from './inbox-view';
+import { ExploreMapPage, type ExploreModel } from './explore-map-view';
 import type { BoardRequestResult, BoardRequestState } from './shared-board-requests';
 
 export interface SettingsModel {
@@ -99,6 +100,7 @@ export interface SettingsModel {
     setSummaryTime: (period: 'am' | 'pm', hour: number, minute: number) => void;
   };
   inbox?: InboxModel;
+  explore?: ExploreModel;
   calendar?: {
     auto: { active: boolean; error: string | null; lastRunAt: string | null };
     id: string | null;
@@ -1017,6 +1019,7 @@ export function PlatformSettings({ model }: { model: SettingsModel }) {
     case 'keys': return <Keys model={model} />;
     case 'feedback': return <Feedback model={model} />;
     case 'inbox': return model.inbox ? <InboxPage model={model.inbox} /> : <Overview model={model} />;
+    case 'explore': return model.explore ? <ExploreMapPage model={model.explore} /> : <Overview model={model} />;
     default: return <Overview model={model} />;
   }
 }
