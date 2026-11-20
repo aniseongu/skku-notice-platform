@@ -1,7 +1,7 @@
 // 기회 탐험 지도(설정 하위 쪽 틀: ?view=settings&section=explore). 설계는 docs/design/2026-11-21_explore-map.md.
 // 개수만 보여 준다. 퍼센트·막대·순위·연속 기록은 두지 않는다.
 import { statusLine, type DomainSummary, type ExploreSummary } from './explore-map';
-import { GHOST_BUTTON } from './cls';
+import { GHOST_BUTTON, NOTE_TEXT } from './cls';
 
 export type ExploreModel =
   | { status: 'loading' }
@@ -38,7 +38,7 @@ export function ExploreMapPage({ model }: { model: ExploreModel }) {
   return <div className="explore-map pb-[calc(var(--tabbar-h)+32px)] min-[720px]:pb-[48px]">
     <div className={`pt-[8px] pb-[12px] ${GUTTER}`}>
       <p className="explore-total m-0 text-[15px] leading-[22px] font-medium text-ink">기록한 활동 {summary.total}개</p>
-      <p className={`m-0 text-[13px] leading-[19px] text-ink-2`}>영역마다 한 번씩 세어서, 합치면 위 숫자가 돼요</p>
+      <p className={NOTE_TEXT}>내가 기록한 공고를 제목으로 나눴어요</p>
     </div>
     <ul className={`m-0 grid list-none grid-cols-1 gap-[8px] p-0 min-[720px]:grid-cols-2 min-[720px]:gap-[12px] ${GUTTER}`} aria-label="영역별 기록">
       {open.map((domain) => <DomainCard key={domain.id} domain={domain} />)}

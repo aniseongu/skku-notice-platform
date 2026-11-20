@@ -52,7 +52,7 @@ test('the bell shows an unread dot, opens the inbox in one tap and lists only th
   await expect(rows.nth(1)).toContainText('알림 1');
   await expect(rows.nth(2)).toContainText('알림 4');
   await expect(rows.nth(0)).toContainText('5분 전');
-  await expect(page.getByText('이 기기에 최대 200개, 30일 동안 보관해요')).toBeVisible();
+  await expect(page.getByText('이 기기에서 받은 알림을 30일 동안 보관해요')).toBeVisible();
   const open = await rows.nth(0).locator('.inbox-open').boundingBox();
   expect(open!.height).toBeGreaterThanOrEqual(44);
   expect(page.url()).toContain('section=inbox');

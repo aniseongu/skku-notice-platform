@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { BADGE, COLLAPSE_HEAD, DETAIL_SECTION, GHOST_BUTTON, NOTE_TEXT, OPTION_CHIP, SECTION_TITLE, SETTINGS_INPUT, SOLID_BUTTON, TEXT_BUTTON } from './cls';
-import { BODY_MAX, formatAverage, validateExperience, validateQuestionBody, type Experience, type ExperienceInput, type Experiences, type Question, type RatingSummary, type Stars } from './questions';
+import { BODY_MAX, formatAverage, validateExperience, validateQuestionBody, type Experience, type ExperienceInput, type Experiences, type Question, type Stars } from './questions';
 import { Confirm } from './team-section';
 
 export interface ReviewDraft { satisfaction: Stars | null; learning: Stars | null; difficulty: Stars | null; participated: boolean; body: string }
@@ -31,7 +31,10 @@ const STAR_VALUES: readonly Stars[] = [1, 2, 3, 4, 5];
 
 function RatingSummaryView({ experiences }: { experiences: Experiences }) {
   const { satisfaction, learning, difficulty } = experiences;
-  const parts = [learning.count ? `배운 정도 ${formatAverage(learning.average)}` : '', difficulty.count ? `전형 난이도 ${formatAverage(difficulty.average)}` : ''].filter(Boolean);
+  const parts = [
+    learning.count > 0 ? `배운 정도 ${formatAverage(learning.average)}(${learning.count}명)` : '',
+    difficulty.count > 0 ? `전형 난이도 ${formatAverage(difficulty.average)}(${difficulty.count}명)` : '',
+  ].filter(Boolean);
   if (!satisfaction.count) return null;
   return <div className="grid gap-[2px]">
     <p className="m-0 flex items-baseline gap-[8px] text-[15px] leading-[28px] text-ink-2">
@@ -72,7 +75,7 @@ function ReviewForm({ model, onDone }: { model: QuestionsModel; onDone: () => vo
       <StarPicker id="qe-diff" label="전형 난이도" value={difficulty} onChange={setDifficulty} optional />
       <label className="grid gap-[4px] text-[13px] font-medium text-ink-2">한마디
         <textarea className={AREA} maxLength={BODY_MAX} value={body} placeholder="분위기나 하는 일, 준비할 점을 편하게 적어 주세요" onChange={(event) => setBody(event.target.value)} /></label>
-      <label className="flex min-h-[44px] items-center gap-[10px] text-[14px] text-ink"><input type="checkbox" className="size-[18px] accent-[var(--accent)]" checked={participated} onChange={(event) => setParticipated(event.target.checked)} />직접 참여했어요</label>
+      <label className="flex min-h-[44px] items-center gap-[10px] text-[14px] text-ink"><input type="checkbox" className="size-[18px] accent-[var(--accent)]" checked={participated} onChange={(event) => setParticipated(event.target.checked)} />이 활동에 직접 참여했어요</label>
     </div> : <div className="-ml-[8px]"><button type="button" className={TEXT_BUTTON} aria-expanded={false} onClick={() => setMore(true)}>더 남기기 (선택)</button></div>}
     <p className={NOTE_TEXT}>이름은 보이지 않아요. 별점만 남겨도 괜찮아요. 쓰던 글은 이 기기에 저장돼요</p>
     {problem ? <p className="m-0 text-[13px] text-danger" role="status">{problem}</p> : null}
@@ -120,7 +123,7 @@ function ReviewCard({ model, post }: { model: QuestionsModel; post: Experience }
       {post.difficulty ? <span className={BADGE}>전형 난이도 {post.difficulty}</span> : null}
       {post.mine ? <span className={BADGE}>내 후기</span> : null}
     </div>
-    {post.participated ? <p className="m-0 text-[13px] leading-[19px] font-medium text-ink-2">직접 참여했어요</p> : null}
+    {post.participated ? <p className={NOTE_TEXT}>직접 참여했다고 했어요</p> : null}
     {post.body ? <ReviewBody text={post.body} /> : null}
     {post.hidden ? <p className={NOTE_TEXT} role="status">신고가 쌓여 다른 사람에게는 보이지 않아요</p> : null}
     <Actions model={model} mine={post.mine} postId={post.id} noun="후기" />

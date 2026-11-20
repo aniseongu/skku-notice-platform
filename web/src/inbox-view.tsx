@@ -21,7 +21,7 @@ export function InboxPage({ model }: { model: InboxModel }) {
   const { items } = model;
   const hasUnread = items.some((item) => !item.read);
   return <div className="inbox pb-[calc(var(--tabbar-h)+32px)] min-[720px]:pb-[48px]">
-    {items.length === 0 ? <section aria-label="알림함" className="empty flex flex-col items-center gap-[4px] px-[24px] py-[64px] text-center text-ink-3">
+    {items.length === 0 ? <section aria-label="알림함" className="empty flex flex-col items-center gap-[4px] px-[24px] pt-[64px] pb-[12px] text-center text-ink-3">
       <svg className="i mb-[8px] size-[36px] flex-none fill-none stroke-current [stroke-width:1.5] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href="icons/sprite.svg#ginkgo" /></svg>
       <h2 className="m-0 text-[16px] leading-[23px] font-bold text-ink-2">{model.pushOn ? '받은 알림이 없어요' : '알림이 꺼져 있어요'}</h2>
       <p className="m-0 mb-[12px] text-[14px] leading-[20px]">{model.pushOn ? '새 공지 알림을 놓쳐도 여기서 다시 볼 수 있어요' : '알림을 켜면 놓친 공지를 여기서 볼 수 있어요'}</p>
@@ -48,7 +48,7 @@ export function InboxPage({ model }: { model: InboxModel }) {
           </button>
         </div>)}
       </div>
-      <p className={`${NOTE_TEXT} mt-[12px] ${GUTTER}`}>이 기기에 최대 200개, 30일 동안 보관해요</p>
     </section>}
+    <p className={`${NOTE_TEXT} ${items.length ? `mt-[12px] ${GUTTER}` : 'px-[24px] text-center'}`}>이 기기에서 받은 알림을 30일 동안 보관해요</p>
   </div>;
 }
