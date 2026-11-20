@@ -130,7 +130,7 @@ test('"더 보기" only appears on long review bodies; star-only review has one 
   await expect(form.getByRole('textbox')).toBeHidden();
   await form.getByRole('button', { name: '후기 남기기' }).click();
   await expect(section.getByText('짧은 후기예요')).toBeVisible();
-  await expect(section.getByRole('button', { name: '더 보기' })).toHaveCount(0);   // 짧은 글에는 없다
+  await expect(section.getByRole('button', { name: '더 보기', exact: true })).toHaveCount(0);   // 짧은 글에는 없다
 });
 
 test('a long review body is clamped and "더 보기" expands it', async ({ page }) => {
@@ -143,7 +143,7 @@ test('a long review body is clamped and "더 보기" expands it', async ({ page 
   await form.getByRole('button', { name: /더 남기기/ }).click();
   await form.getByRole('textbox').fill('아주 긴 후기예요. '.repeat(30));
   await form.getByRole('button', { name: '후기 남기기' }).click();
-  const more = section.getByRole('button', { name: '더 보기' });
+  const more = section.getByRole('button', { name: '더 보기', exact: true });
   await expect(more).toBeVisible();
   await more.click();
   await expect(section.getByRole('button', { name: '접기' })).toBeVisible();

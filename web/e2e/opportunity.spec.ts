@@ -58,24 +58,71 @@ test('saved notice: one tap sets the status, keys move it, the memo saves on blu
   await expect(section.getByText('상태와 메모를 지울까요?')).toBeVisible();
 });
 
+test('the four status segments fit on one line at 360px with any status selected', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  await setup(page);
+  await page.getByRole('button', { name: '저장하기' }).click();
+  const group = page.getByRole('radiogroup', { name: '내 진행 상태' });
+  const labels = ['관심 있음', '준비 중', '지원함', '결과 나옴'];
+  await expect(group.getByRole('radio')).toHaveText(labels);
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+
+  for (const label of labels) {
+    const option = group.getByRole('radio', { name: label });
+    await option.click();
+    await expect(option).toHaveAttribute('aria-checked', 'true');
+    await expect(group.getByRole('radio', { checked: true })).toHaveCount(1);
+    const { height, verticalPadding, buttons } = await group.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        height: element.getBoundingClientRect().height,
+        verticalPadding: parseFloat(style.paddingTop) + parseFloat(style.paddingBottom),
+        buttons: [...element.querySelectorAll('button')].map((button) => {
+          const { top, width, height, left, right } = button.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNode(button.lastChild!);
+          const text = range.getBoundingClientRect();
+          const check = button.querySelector('svg')?.getBoundingClientRect();
+          return { top, width, height, lines: range.getClientRects().length,
+            fits: text.left >= left && text.right <= right && (!check || (check.left >= left && check.right <= text.left)) };
+        }),
+      };
+    });
+    const [first] = buttons;
+    expect(first.height).toBeGreaterThanOrEqual(44);
+    expect(height).toBeCloseTo(first.height + verticalPadding, 1);
+    for (const button of buttons) {
+      expect(button.top).toBe(first.top);
+      expect(button.height).toBe(first.height);
+      expect(button.width).toBeCloseTo(first.width, 1);
+      expect(button.lines).toBe(1);
+      expect(button.fits).toBe(true);
+    }
+  }
+});
+
 test('the status section stays one even while the summary and body loading states come and go', async ({ page }) => {
   await setup(page);
   await page.getByRole('button', { name: '저장하기' }).click();
   const section = page.getByRole('region', { name: '내 진행 상태' });
   await expect(section).toHaveCount(1);
   // 요약 불러오는 중·본문 불러오는 중 표시가 같은 자리에 들어왔다 나가도 진행 상태 구역은 늘어나지 않는다(형제 key가 겹치던 버그).
+  const bodyLoading = page.getByText('본문을 불러오고 있어요');
+  const bodyLoaded = page.getByText('시험용 본문');
   for (let i = 0; i < 4; i++) {
-    await page.evaluate((round) => {
-      const app = document.querySelector('notice-app') as unknown as App;
-      const id = app.selectedId as string;
-      app.summarizing = round % 2 === 0 ? id : null;
+    const loading = i % 2 === 0;
+    await page.evaluate((loading) => {
+      const { controller: app } = document.querySelector('notice-app') as unknown as { controller: App };
+      const id = (app.openedId ?? app.selectedId) as string;
+      app.summarizing = loading ? id : null;
       const bodies = new Map(app.bodies);
-      if (round % 2 === 0) bodies.set(id, 'loading'); else bodies.delete(id);
+      bodies.set(id, loading ? 'loading' : { id, body: '시험용 본문', attachments: [] });
       app.bodies = bodies;
-    }, i);
-    await page.waitForTimeout(50);
+      app.requestUpdate();
+    }, loading);
+    await expect(loading ? bodyLoading : bodyLoaded).toBeVisible();
+    await expect(section).toHaveCount(1);
   }
-  await expect(section).toHaveCount(1);
   await expect(page.getByRole('heading', { name: '내 진행 상태' })).toHaveCount(1);
 });
 

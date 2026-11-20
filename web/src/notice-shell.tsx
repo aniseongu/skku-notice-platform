@@ -139,7 +139,7 @@ export function NoticeShell({ app }: { app: AppController }) {
         <SideGroup app={app} id="boards" title={app.tab() === 'intern' ? '인턴 공고 사이트' : app.tab() === 'coop' ? '기관 구분' : '게시판'} count={app.tab() === 'coop' ? app.coopKinds().length : app.tabSources().length}>
           {boardChoices(app).map((b) => <SideItem key={b.id} label={b.label} count={null} active={!settings && activeChoice(app) === b.id}
             onClick={() => { pickChoice(app, b.id); if (settings) app.leaveSettings(); }} />)}
-          {app.tab() === 'intern' || app.tab() === 'coop' ? null : <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('notifications')}>게시판 더 고르기</button>}
+          {app.tab() === 'all' ? <button type="button" className={`side-item add ${SIDE_ITEM} text-ink-3 ${SIDE_ITEM_IDLE}`} onClick={() => app.openSettings('notifications')}>게시판 더 고르기</button> : null}
         </SideGroup>
         </> : null}
         <div className="side-foot mt-auto flex flex-col gap-[1px] pt-[12px]">
@@ -585,7 +585,7 @@ function BoardSelect({ app }: { app: AppController }) {
       {boards.map((b) => <button type="button" className={`board-option ${MENU_OPTION}`} key={b.id} aria-pressed={activeChoice(app) === b.id}
         onClick={() => { pickChoice(app, b.id); void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.board-picker .board-trigger')?.focus()); }}>
         <span>{b.label}</span>{activeChoice(app) === b.id ? <span className={MENU_CHECK} aria-hidden="true" /> : null}</button>)}
-      {app.tab() === 'intern' || app.tab() === 'coop' ? null : <button type="button" className={`board-more ${MENU_OPTION}`} onClick={() => app.openSettings('notifications')}><span>게시판 더 고르기</span></button>}
+      {app.tab() === 'all' ? <button type="button" className={`board-more ${MENU_OPTION}`} onClick={() => app.openSettings('notifications')}><span>게시판 더 고르기</span></button> : null}
     </div> : null}
   </div>;
 }

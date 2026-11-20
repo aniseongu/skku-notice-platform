@@ -7,7 +7,7 @@ import { summaryLines } from './summary-lines';
 import type { GradPart } from './graduation-assessment';
 import { GraduationNotes, GraduationSection, type GraduationModel } from './graduation-assessment-view';
 import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, NOTE_MAX, type OpportunityStatus } from './opportunities';
-import { DETAIL_SECTION, IMAGE_MISSING_CLASS, NOTE_TEXT, OPTION_CHECK, OPTION_CHIP, SECTION_TITLE, SETTINGS_INPUT, SKELETON_BAR, TEXT_BUTTON, TEXT_BUTTON_DANGER } from './cls';
+import { DETAIL_SECTION, IMAGE_MISSING_CLASS, NOTE_TEXT, OPTION_CHECK, SECTION_TITLE, SEGMENTED_GRID, SETTINGS_INPUT, SKELETON_BAR, TEXT_BUTTON, TEXT_BUTTON_DANGER } from './cls';
 import { TeamSection, type TeamModel } from './team-section';
 import { QuestionsSection, type QuestionsModel } from './questions-section';
 import { cleanHtml, fileType, IMAGE_MISSING, replaceBrokenImage } from './rich';
@@ -52,7 +52,7 @@ export interface OpportunityModel {
 }
 
 
-/** 내 진행 상태: 칩 한 번으로 바꾸고 메모는 한 줄. 직접 적는 기록이라 인증·합격 말은 쓰지 않는다. */
+/** 내 진행 상태는 한 번에 바꾸고 메모는 한 줄로 적는다. */
 function OpportunitySection({ model }: { model: OpportunityModel }) {
   const [confirming, setConfirming] = useState(false);
   const [memoOpen, setMemoOpen] = useState(false);   // 메모는 선택이라 접어 둔다. 이미 쓴 메모가 있으면 펼쳐 보인다.
@@ -79,8 +79,8 @@ function OpportunitySection({ model }: { model: OpportunityModel }) {
   return <section className={`${DETAIL_SECTION} opportunity`} aria-labelledby="sec-opportunity">
     <h3 id="sec-opportunity" className={`${SECTION_TITLE} !mb-[2px]`}>내 진행 상태</h3>
     <p className={`${NOTE_TEXT} mb-[8px]`}>고른 상태와 메모는 저장을 해제해도 남아요</p>
-    <div role="radiogroup" aria-labelledby="sec-opportunity" className="flex flex-wrap gap-[8px]" onKeyDown={move}>
-      {OPPORTUNITY_STATUSES.map((status) => <button type="button" role="radio" key={status} className={OPTION_CHIP} aria-checked={model.status === status}
+    <div role="radiogroup" aria-labelledby="sec-opportunity" className={`${SEGMENTED_GRID} grid-cols-4`} onKeyDown={move}>
+      {OPPORTUNITY_STATUSES.map((status) => <button type="button" role="radio" key={status} className="inline-flex min-h-[44px]! items-center justify-center gap-[2px] whitespace-nowrap [@media(hover:hover)]:[&:hover:not([aria-checked=true])]:bg-line active:[&:not([aria-checked=true])]:bg-line" aria-checked={model.status === status}
         tabIndex={status === focusable ? 0 : -1} onClick={() => model.onStatus(status)}>{model.status === status ? <svg className={OPTION_CHECK} aria-hidden="true"><use href="icons/sprite.svg#check" /></svg> : null}{OPPORTUNITY_LABELS[status]}</button>)}
     </div>
     <div className="mt-[6px] flex flex-wrap items-center gap-x-[8px] gap-y-[4px]">

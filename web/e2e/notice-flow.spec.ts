@@ -1,5 +1,29 @@
 import { test, expect } from '@playwright/test';
 
+test('saved sidebar lists only boards with saved notices and filters them', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'sidebar is desktop only');
+  await page.goto('/?api=sample/api/v1');
+  await expect(page.locator('notice-rows-screen a.row').first()).toBeVisible();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as any;
+    app.sources = [...app.sources, { id: 'software-notice', name: '소프트웨어학과 공지', url: 'https://example.com' }];
+    const notice = { ...app.notices[0], id: 'software-notice/123', source_id: 'software-notice', title: '소프트웨어학과 시험 공지', deadline: null };
+    app.notices = [...app.notices, notice];
+    app.saved = [{ ...notice, saved_at: new Date().toISOString() }];
+    app.authUserId = 'account-a'; app.profileStatus = 'unavailable';
+    app.subscriptions = ['software-notice', app.sources[0].id]; app.subscriptionsLoading = false;
+  });
+  await page.getByRole('navigation', { name: '보기' }).getByRole('button', { name: /저장/ }).click();
+  await expect(page.locator('#side-boards').getByRole('button', { name: '소프트웨어학과' })).toBeVisible();
+  await expect(page.locator('#side-boards .side-item:not(.add)')).toHaveCount(2);
+  await page.locator('#side-boards').getByRole('button', { name: '소프트웨어학과' }).click();
+  await expect(page).toHaveURL(/tab=saved/);
+  await expect(page.locator('notice-rows-screen')).toContainText('소프트웨어학과 시험 공지');
+  // 저장 목록이 비워지면 이전 계정이나 해제한 공지의 게시판을 남기지 않는다.
+  await page.evaluate(() => { (document.querySelector('notice-app') as any).saved = []; });
+  await expect(page.locator('#side-boards').getByRole('button', { name: '소프트웨어학과' })).toHaveCount(0);
+});
+
 test('React notice list opens the detail and settings', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));

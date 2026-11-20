@@ -613,13 +613,15 @@ export class AppController extends Reactive {
       const notices = await fetchJson<NoticesFile>('notices.json');
       if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
       // 뒤늦게 채운 본문도 새 수집 결과와 함께 다시 받는다.
-      if (this.generatedAt !== notices!.generated_at) this.bodies.clear();
+      if (this.generatedAt !== notices!.generated_at) {
+        this.generatedAt = notices!.generated_at;
+        this.bodies = new Map();
+      }
       // 기한이 지난 공지는 어느 목록에도 두지 않는다(저장·검색 포함). 서버가 나중에 지운다. 숨기는 곳은 여기 한 곳이다.
       const bySource = new Map(notices!.sources.map((source) => [source.id, source]));
       this.notices = notices!.notices.filter((notice) => !isExpired(notice, bySource.get(notice.source_id)));
       this.sources = notices!.sources;
       if (userId) void this.refreshSaveCounts(userId, epoch);
-      this.generatedAt = notices!.generated_at;
       if (this.deepId) void this.openDeepLink(userId, epoch);
       this.liveFeedReady = true;
       if (userId) this.saveCurrentListCache(userId, epoch);
@@ -2302,6 +2304,10 @@ export class AppController extends Reactive {
    */
   tabSources(): Source[] {
     const tab = this.tab();
+    if (tab === 'saved') {
+      const savedSources = new Set(this.savedNotices().map((notice) => notice.source_id));
+      return applyBoardOrder(this.sources.filter((source) => savedSources.has(source.id)), this.boardOrder);
+    }
     if (tab === 'coop') return this.sources.filter((s) => s.coop === true);
     if (tab === 'intern') return this.sources.filter((s) => s.external === true && !s.coop);
     return applyBoardOrder(this.schoolSources(), this.boardOrder);
@@ -2913,13 +2919,14 @@ export class AppController extends Reactive {
   }
 
   body(notice: Notice): NoticeBody | null | 'loading' {
-    const cached = this.bodies.get(notice.id);
+    const { bodies, generatedAt: generation, subscriptionsEpoch: epoch } = this;
+    const cached = bodies.get(notice.id);
     if (cached !== undefined) return cached;
-    this.bodies.set(notice.id, 'loading');
-    const generation = this.generatedAt;
-    fetchBody(notice).catch(() => null).then((body) => {
-      if (generation !== this.generatedAt) return;
-      this.bodies.set(notice.id, body);
+    bodies.set(notice.id, 'loading');
+    withTimeout(fetchBody(notice), 20_000).catch(() => null).then((body) => {
+      if (bodies !== this.bodies || epoch !== this.subscriptionsEpoch || bodies.get(notice.id) !== 'loading') return;
+      if (generation !== this.generatedAt) bodies.delete(notice.id);
+      else bodies.set(notice.id, body);
       this.requestUpdate();
     });
     return 'loading';
