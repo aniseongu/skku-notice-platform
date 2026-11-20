@@ -3,9 +3,10 @@
 
 import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from html import escape, unescape
 from urllib.parse import parse_qs, urljoin, urlsplit
+from zoneinfo import ZoneInfo
 
 import nh3
 from selectolax.lexbor import LexborHTMLParser, LexborNode
@@ -133,6 +134,16 @@ def parse_list(html: str, source_id: str, board_url: str) -> list[Notice]:
     return [_parse_row(row, source_id, board_url) for row in rows]
 
 
+def _gnuboard_date(text: str, today: date | None = None) -> date:
+    """그누보드 목록 날짜. 기본 스킨은 오늘 글을 시각(18:30), 지난 글을 두 자리 연도(26-11-20)로 쓴다."""
+    today = today or datetime.now(ZoneInfo("Asia/Seoul")).date()
+    if re.fullmatch(r"[0-9]{1,2}:[0-9]{2}", text):
+        return today
+    if re.fullmatch(r"[0-9]{2}-[0-9]{2}-[0-9]{2}", text):
+        return date.fromisoformat(f"20{text}")
+    return date.fromisoformat(text)
+
+
 def _parse_gnuboard_list(tree: LexborHTMLParser, source_id: str, board_url: str) -> list[Notice]:
     notices = []
     for row in tree.css("#bo_list tbody tr"):
@@ -146,7 +157,7 @@ def _parse_gnuboard_list(tree: LexborHTMLParser, source_id: str, board_url: str)
         if not number or not title:
             raise ParseError("Gnuboard row without article number or title")
         try:
-            posted_on = date.fromisoformat(_clean(date_node))
+            posted_on = _gnuboard_date(_clean(date_node))
         except ValueError as exc:
             raise ParseError("Gnuboard row with invalid date") from exc
         pinned = "bo_notice" in row.attributes.get("class", "").split()

@@ -163,3 +163,17 @@ def test_cscience_notice_board_uses_per_post_number_not_shared_board_id() -> Non
     assert len({n.article_no for n in notices}) == 10
     assert notices[0].article_no == "822"
     assert notices[0].url.startswith(f"{url}?mode=view&viewBoardId=138879&itemId=CF697A47")
+
+
+def test_aibootcamp_list_reads_gnuboard_short_dates():
+    from skku_notice.parse import _gnuboard_date
+
+    today = date(2026, 11, 21)
+    assert _gnuboard_date("18:30", today) == today
+    assert _gnuboard_date("26-11-20", today) == date(2026, 11, 20)
+    assert _gnuboard_date("2026-11-20", today) == date(2026, 11, 20)
+    with pytest.raises(ValueError):
+        _gnuboard_date("어제", today)
+    html = Path("tests/fixtures/aibootcamp_news_list_2026-11-21.html").read_text(encoding="utf-8")
+    notices = parse_list(html.replace("2026-11-20</td>", "09:15</td>", 1), "aibootcamp-news", BOOTCAMP)
+    assert len(notices) == 15
