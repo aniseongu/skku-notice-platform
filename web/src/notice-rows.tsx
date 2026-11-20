@@ -2,7 +2,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { cleanTitle, deadlinePassed, deadlineText, daysLeft, safeUrl, type Notice, type Verdict } from './data';
 import { Reason } from './reason';
 import type { GradPart } from './graduation-assessment';
-import { CHECKBOX, SAVED_FAINT, SAVED_LINE, STATUS_DOT, STATUS_META } from './cls';
+import { CHECKBOX, STATUS_DOT, STATUS_META } from './cls';
 import { OPPORTUNITY_LABELS, type OpportunityStatus } from './opportunities';
 
 export interface NoticeRowModel {
@@ -55,7 +55,7 @@ function NoticeRows({ model }: { model: NoticeRowsModel }) {
     const hasReason = row.interests.length > 0 || !!row.ai || !!row.rule || (row.grad?.length ?? 0) > 0 || !!row.pending;
     const bg = model.selecting && row.selected ? 'bg-sunken' : row.current ? 'bg-sunken' : row.read ? 'bg-read' : 'bg-surface';
     const hover = row.current ? '' : 'min-[720px]:hover:bg-hover';
-    const lineColor = model.savedView ? SAVED_LINE : 'border-line';
+    const lineColor = 'border-line';
     const border = index > 0 ? `border-t ${lineColor}` : `min-[720px]:border-t min-[720px]:${lineColor}`;
     const ddayColor = urgent ? 'text-danger' : row.read ? 'text-ink-2' : passed ? 'text-ink-3' : '';
     const ddayWeight = row.read ? 'font-semibold' : passed ? 'font-medium' : 'font-bold';
@@ -67,7 +67,7 @@ function NoticeRows({ model }: { model: NoticeRowsModel }) {
       <a className={`row ${row.dim ? 'dim' : ''} ${row.read ? 'read' : 'unread'} ${model.selecting ? `${layoutSelecting} min-w-0 flex-1` : layout} ${hasReason ? DESKTOP_AREAS : DESKTOP_AREAS_NO_REASON} ${border} ${bg} ${hover} active:bg-sunken focus-visible:outline-offset-[-2px]`} href={safeUrl(n.url)} target="_blank" rel="noopener"
         data-id={n.id} aria-current={row.current ? 'true' : 'false'} onClick={(event) => model.open(event.nativeEvent, n)}>
         <span className="visually-hidden">{row.read ? '읽은 공지' : '읽지 않은 공지'}</span>
-        <span className={`meta ${META} ${model.savedView ? SAVED_FAINT : ''}`}>{model.savedView ? <span className="max-[719px]:contents min-[720px]:flex min-[720px]:min-w-0 min-[720px]:flex-nowrap min-[720px]:items-center min-[720px]:gap-[8px]">{model.savedView && row.status ? <span className={`${STATUS_META} ${row.status === 'interested' ? 'font-normal' : 'font-semibold text-ink-2'}`}><span className={`size-[6px] rounded-full ${STATUS_DOT}`} aria-hidden="true"></span>{OPPORTUNITY_LABELS[row.status]}</span> : null}{row.source ? <span className={`board ${META_SPAN} ${row.read ? '' : 'min-[720px]:text-ink-2 min-[720px]:font-semibold'}`}>{row.source}</span> : null}</span> : <>{row.source ? <span className={`board ${META_SPAN} ${row.read ? '' : 'min-[720px]:text-ink-2 min-[720px]:font-semibold'}`}>{row.source}</span> : null}</>}{tags ? <span className={`cat ${META_SPAN}`} title={tags}>{tags}</span> : null}</span>
+        <span className={`meta ${META}`}>{model.savedView ? <span className="max-[719px]:contents min-[720px]:flex min-[720px]:min-w-0 min-[720px]:flex-nowrap min-[720px]:items-center min-[720px]:gap-[8px]">{model.savedView && row.status ? <span className={`${STATUS_META} ${row.status === 'interested' ? 'font-normal' : 'font-semibold text-ink-2'}`}><span className={`size-[6px] rounded-full ${STATUS_DOT}`} aria-hidden="true"></span>{OPPORTUNITY_LABELS[row.status]}</span> : null}{row.source ? <span className={`board ${META_SPAN} ${row.read ? '' : 'min-[720px]:text-ink-2 min-[720px]:font-semibold'}`}>{row.source}</span> : null}</span> : <>{row.source ? <span className={`board ${META_SPAN} ${row.read ? '' : 'min-[720px]:text-ink-2 min-[720px]:font-semibold'}`}>{row.source}</span> : null}</>}{tags ? <span className={`cat ${META_SPAN}`} title={tags}>{tags}</span> : null}</span>
         <span className={`title [grid-area:title] line-clamp-2 text-[16px] leading-[23px] min-[720px]:text-[15px] min-[720px]:leading-[22px] ${row.read ? 'font-normal text-ink-2' : 'font-semibold'} ${n.deadline ? 'mt-[4px] min-[720px]:mt-0' : ''}`}>{title}</span>
         <span className="sub [grid-area:reason] mt-[2px] text-[14px] leading-[20px] text-ink-2 empty:hidden min-[720px]:mt-0 min-[720px]:overflow-hidden min-[720px]:text-[13px] min-[720px]:leading-[19px] min-[720px]:text-ellipsis min-[720px]:whitespace-nowrap"><Reason interests={row.interests} ai={row.ai} rule={row.rule} read={row.read} grad={row.grad} pending={row.pending} /></span>
         {n.deadline ? <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''} [grid-area:dday] self-center text-[14px] leading-[18px] tabular-nums min-[720px]:self-start min-[720px]:pt-[2px] min-[720px]:text-right ${ddayWeight} ${ddayColor}`}>{deadlineText(n.deadline, model.today)}</span> : null}

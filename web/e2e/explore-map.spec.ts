@@ -16,16 +16,18 @@ async function setup(page: Page, records: { id: string; title: string; status: s
     app.detailOpen = false; app.selectedId = null; app.openedId = null; app.setView('saved');
   }, records);
 }
-const entry = (page: Page) => page.getByRole('button', { name: /^기록한 활동 \d+개/ });
+const entry = (page: Page) => page.getByRole('button', { name: /^탐험 지도/ });
 
-test('saved screen shows the entry line, one tap opens the map with counts, back returns to the saved screen', async ({ page }) => {
+test('saved screen shows the header button, one tap opens the map with counts, back returns to the saved screen', async ({ page }) => {
   await setup(page, [
     { id: 'x1', title: '하계 인턴 채용', status: 'interested' }, { id: 'x2', title: '신입 채용 공고', status: 'applied' },
     { id: 'x3', title: '국가장학금 신청', status: 'preparing' }, { id: 'x4', title: '도서관 이용 안내', status: 'result' },
   ]);
   await expect(entry(page)).toBeVisible();
-  await expect(entry(page)).toContainText('기록한 활동 4개');
-  expect((await entry(page).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect(entry(page)).toHaveAttribute('aria-label', /기록한 활동 4개/);
+  const box = (await entry(page).boundingBox())!;   // 머리 줄의 다른 단추와 같은 크기(휴대폰 44, PC 36)
+  expect(box.height).toBeGreaterThanOrEqual(36);
+  expect(Math.abs(box.height - (await page.getByRole('button', { name: '공지 다시 가져오기' }).boundingBox())!.height)).toBeLessThan(1);
   await entry(page).click();                                              // 진입: 1탭
   expect(page.url()).toContain('section=explore');
   await expect(page.getByRole('heading', { name: '탐험 지도', level: 1 })).toBeVisible();
@@ -36,11 +38,13 @@ test('saved screen shows the entry line, one tap opens the map with counts, back
   await expect(career.locator('.explore-count')).toHaveText('2개');
   await expect(career.locator('.explore-status')).toHaveText('관심 1 · 지원 1');
   await expect(cards.filter({ hasText: '장학금' }).locator('.explore-status')).toHaveText('준비 1');
-  const locked = cards.filter({ hasText: '교환학생' });                   // 기록 없는 영역은 잠긴 모양과 찾는 방법
+  const locked = cards.filter({ hasText: '교환학생' });                   // 기록 없는 영역은 아래의 한 줄과 찾는 방법
   await expect(locked).toHaveAttribute('data-open', 'false');
-  await expect(locked).toContainText('아직 기록이 없어요');
   await expect(locked).toContainText('교환학생 공지 게시판에서 찾아볼 수 있어요');
-  await expect(page.locator('.explore-other')).toHaveText('그 밖 1개 · 결과 1');
+  await expect(page.getByText('아직 기록이 없는 영역')).toBeVisible();
+  await expect(page.locator('.explore-other')).toContainText('그 밖');
+  await expect(page.locator('.explore-other')).toContainText('1개');
+  await expect(page.locator('.explore-other')).toContainText('결과 1');
   await expect(page.locator('body')).not.toContainText('%');             // 퍼센트·점수는 없다
   await page.goBack();                                                     // 뒤로 가기로 저장 화면
   await expect(entry(page)).toBeVisible();
@@ -61,16 +65,59 @@ test('saved notices without a record count as "관심" and the same notice is co
     app.saved = picked.map((n: Record<string, unknown>, i: number) => { const { first_seen: _f, ...rest } = n; return { ...rest, saved_at: `2026-11-0${i + 1}T00:00:00.000Z` }; });
     app.opportunities = new Map([[picked[0].id, { notice_id: picked[0].id, title: picked[0].title, url: null, board: null, deadline: null, status: 'applied', note: null, created_at: '', updated_at: '' }]]);
   });
-  await expect(entry(page)).toContainText('기록한 활동 2개');
+  await expect(entry(page)).toHaveAttribute('aria-label', /기록한 활동 2개/);
 });
 
 test('the map page stays within the viewport and cards are a grid on desktop', async ({ page }, info) => {
-  await setup(page, [{ id: 'x1', title: '교환학생 파견 안내', status: 'interested' }]);
+  await setup(page, [{ id: 'x1', title: '교환학생 파견 안내', status: 'interested' }, { id: 'x2', title: '하계 인턴 채용', status: 'interested' }]);
   await entry(page).click();
   await expect(page.locator('.explore-card')).toHaveCount(6);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
-  const boxes = await page.locator('.explore-card').evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, h: r.height }; }));
+  const boxes = await page.locator('.explore-card[data-open="true"]').evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, h: r.height }; }));
   expect(boxes[0].h).toBeGreaterThanOrEqual(88);
   if (info.project.name === 'desktop') expect(boxes[1].y).toBe(boxes[0].y); else expect(boxes[1].y).toBeGreaterThan(boxes[0].y);
+});
+
+test('empty areas sit below the areas with records, records first by count', async ({ page }) => {
+  await setup(page, [
+    { id: 'x1', title: '교환학생 파견 안내', status: 'interested' },
+    { id: 'x2', title: '하계 인턴 채용', status: 'interested' }, { id: 'x3', title: '신입 채용 공고', status: 'applied' },
+  ]);
+  await entry(page).click();
+  const ys = await page.locator('.explore-card').evaluateAll((els) => els.map((el) => ({ open: el.getAttribute('data-open'), text: el.textContent ?? '', y: el.getBoundingClientRect().y })));
+  expect(ys).toHaveLength(6);
+  expect(ys[0].text).toContain('취업·인턴');   // 기록 많은 순
+  expect(ys[1].text).toContain('교환학생');
+  const openBottom = Math.max(...ys.filter((c) => c.open === 'true').map((c) => c.y));
+  for (const c of ys.filter((c) => c.open === 'false')) expect(c.y).toBeGreaterThan(openBottom);
+  await expect(page.locator('.explore-card[data-open="false"]').first().getByText('아직 기록이 없어요')).toHaveCount(0);
+});
+
+test('click budget: saved tab -> map is 1 click, back is 1 click and lands on the saved tab at the top', async ({ page }) => {
+  await setup(page, [{ id: 'x1', title: '하계 인턴 채용', status: 'interested' }]);
+  await entry(page).click();                                   // 1번
+  await expect(page.locator('.explore-total')).toBeVisible();
+  await page.goBack();                                         // 1번
+  await expect(entry(page)).toBeVisible();
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});
+
+test('saved list groups by saved date (today, yesterday) in latest order and has no date groups in custom order', async ({ page }) => {
+  await setup(page, []);
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as App;
+    const picked = app.notices.filter((n: { deadline: string | null }) => !n.deadline).slice(0, 2);
+    const iso = (ms: number) => new Date(Date.now() - ms).toISOString();
+    app.saved = picked.map((n: Record<string, unknown>, i: number) => { const { first_seen: _f, ...rest } = n; return { ...rest, saved_at: iso(i * 26 * 3600_000) }; });
+    app.savedSort = 'latest'; app.savedOrder = [];
+  });
+  await expect(page.locator('section.group[aria-label="오늘"]')).toHaveCount(1);
+  await expect(page.locator('section.group[aria-label="어제"]')).toHaveCount(1);
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as App;
+    app.savedOrder = app.saved.map((n: { id: string }) => n.id); app.savedSort = 'custom';
+  });
+  await expect(page.locator('section.group[aria-label="저장한 공지"]')).toHaveCount(1);
+  await expect(page.locator('section.group[aria-label="오늘"]')).toHaveCount(0);
 });

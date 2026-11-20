@@ -148,6 +148,8 @@ const kstDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' });
 const WEEKDAY = '일월화수목금토';
 
 export const todayKst = () => kstDay.format(new Date());
+/** ISO 시각의 한국 날짜(YYYY-MM-DD). */
+export const kstDateOf = (iso: string) => kstDay.format(new Date(iso));
 const toUtc = (day: string) => { const [y, m, d] = day.split('-').map(Number); return Date.UTC(y, m - 1, d); };
 export const dayDiff = (from: string, to: string) => Math.round((toUtc(to) - toUtc(from)) / 86_400_000);
 

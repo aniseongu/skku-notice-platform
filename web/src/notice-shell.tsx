@@ -5,7 +5,7 @@ import { aiConnectModel } from './ai-connect';
 import { visibleTracks } from './graduation-assessment';
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { applyBoardOrder } from './board-order';
-import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, deadlinePassed, postedGroup, safeUrl, todayKst } from './data';
+import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, deadlinePassed, kstDateOf, postedGroup, safeUrl, todayKst } from './data';
 import { APP_NAME } from './brand';
 import type { FeedbackKind } from './feedback';
 import { installMode, isStandalone } from './install-hint';
@@ -58,6 +58,13 @@ function InboxButton({ app }: { app: AppController }) {
   return <button type="button" className={BELL_BUTTON} aria-label={unread ? `알림함, 안 읽은 알림 ${unread}개` : '알림함'} title="알림함" onClick={app.openInbox}>
     <BellIcon />{unread ? <span className="absolute top-[10px] right-[11px] size-[8px] rounded-full bg-accent min-[720px]:top-[6px] min-[720px]:right-[7px]" aria-hidden="true" /> : null}
   </button>;
+}
+const CompassIcon = () => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M15.5 8.5l-2 5-5 2 2-5z" /></svg>;
+/** 저장 화면 머리의 탐험 지도 단추. 로그인했고 기록이 하나라도 있을 때만 보인다. */
+function ExploreButton({ app }: { app: AppController }) {
+  const recorded = app.view === 'saved' && app.authUserId ? app.exploreItems().length : 0;
+  if (!recorded) return null;
+  return <button type="button" className={`explore-entry ${BELL_BUTTON}`} aria-label={`탐험 지도, 기록한 활동 ${recorded}개`} title="탐험 지도" onClick={app.openExploreMap}><CompassIcon /></button>;
 }
 const GearIcon = () => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" />
   <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>;
@@ -157,6 +164,7 @@ export function NoticeShell({ app }: { app: AppController }) {
                   onClick={() => app.setDetail(true)}><Icon name="panel" /></button>}
                 <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover" aria-label="공지 다시 가져오기" title="공지 다시 가져오기 (R)" aria-keyshortcuts="r"
                   disabled={app.loading} onClick={() => { void app.collectNow(); }}><Icon name="refresh" /></button>
+                <ExploreButton app={app} />
                 <InboxButton app={app} />
               </>}
               {settings ? null : <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover narrow-only min-[720px]:hidden!" aria-label="설정" onClick={app.openSettingsHome}><GearIcon /></button>}
@@ -365,10 +373,11 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
   if (app.reordering && app.view === 'saved') return <SavedReorderList app={app} items={reorderItems(app, list)} />;
   const today = todayKst();
   const groups = new Map<string, Notice[]>();
+  const savedDay = new Map(app.saved.map((item) => [item.id, kstDateOf(item.saved_at)]));
   for (const notice of list) {
     const key = app.sortFor(app.tab()) === 'deadline'
       ? !notice.deadline ? '마감일 미정' : deadlinePassed(notice.deadline) ? '마감 지난 글' : deadlineGroup(notice.deadline, today)
-      : app.view === 'saved' ? '저장한 공지' : postedGroup(notice.posted_on, today);
+      : app.view === 'saved' ? (app.sortFor('saved') === 'latest' ? postedGroup(savedDay.get(notice.id) ?? notice.posted_on, today) : '저장한 공지') : postedGroup(notice.posted_on, today);
     groups.set(key, [...(groups.get(key) ?? []), notice]);
   }
   return <>{[...groups].map(([heading, items], index) => <section className={`group ${index > 0 ? 'mt-[20px] min-[720px]:mt-[8px]' : ''}`} aria-label={heading} key={heading}>
@@ -434,11 +443,7 @@ function ViewFilters({ app }: { app: AppController }) {
   if (app.view === 'saved') {
     const total = app.savedNotices().length;
     const reorderOk = total >= 2 && app.canReorderSaved();
-    const recorded = app.authUserId ? app.exploreItems().length : 0;
     return <>
-      {recorded > 0 ? <button type="button" className={`explore-entry [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[44px] w-full items-center justify-between gap-[12px] border-0 bg-transparent px-[var(--gutter)] py-0 text-left text-[14px] leading-[20px] text-ink-2 min-[720px]:px-[24px]`} onClick={app.openExploreMap}>
-        <span>기록한 활동 {recorded}개</span><span className="inline-flex items-center font-semibold text-accent">탐험 지도<span className={`${CHEVRON_RIGHT} ml-[6px]`} aria-hidden="true" /></span>
-      </button> : null}
       <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>
         {app.reordering
           ? <button type="button" className={`${OPTION_ACTION} font-semibold! text-ink!`} onClick={() => { app.reordering = false; }}>완료</button>

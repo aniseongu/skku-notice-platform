@@ -61,6 +61,3 @@ export const COLLAPSE_HEAD = '[@media(hover:hover)]:hover:bg-hover active:bg-hov
 export const STATUS_META = 'status-meta inline-flex flex-none items-center gap-[5px] whitespace-nowrap';
 /** 상태 점 색은 하나다(색으로 상태를 가르지 않는다). 직접 고른 상태는 글자 굵기로 구분한다. */
 export const STATUS_DOT = 'bg-[light-dark(var(--text-3),oklch(0.85_0.01_var(--h)))]';
-/** 저장 목록 줄만 다크에서 구분선과 연한 글자를 한 단계 밝게 한다(앱 전체 토큰은 그대로). */
-export const SAVED_LINE = 'border-[light-dark(var(--line),oklch(0.43_0.008_var(--h)))]';
-export const SAVED_FAINT = 'text-[light-dark(var(--text-3),oklch(0.82_0.01_var(--h)))]';

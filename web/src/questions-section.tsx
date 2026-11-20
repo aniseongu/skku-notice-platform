@@ -20,20 +20,28 @@ export interface QuestionsModel {
   draft: { get: () => ReviewDraft | null; set: (value: ReviewDraft | null) => void };
 }
 
-const CARD = 'qe-post grid gap-[6px] rounded-md border border-line bg-surface p-[12px]';
+const CARD = 'qe-post grid gap-[8px] rounded-md border border-line bg-surface p-[12px]';
+/** 이 글자 수나 줄 수를 넘으면 본문을 4줄로 줄이고 "더 보기"를 보인다. */
+const CLAMP_CHARS = 120;
+const CLAMP_LINES = 4;
 const AREA = `${SETTINGS_INPUT} min-h-[88px] w-full resize-y leading-[22px]`;
 const SUBTITLE = 'm-0 text-[14px] leading-[21px] font-bold text-ink';
 const STAR_VALUES: readonly Stars[] = [1, 2, 3, 4, 5];
 
-function Rating({ label, summary, strong }: { label: string; summary: RatingSummary; strong?: boolean }) {
-  if (!summary.count) return null;
-  return <p className={`m-0 flex items-baseline gap-[8px] ${strong ? 'text-[15px]' : 'text-[13px]'} leading-[22px] text-ink-2`}>
-    <span className={strong ? 'text-[20px] leading-[28px] font-bold tabular-nums text-ink' : 'font-semibold tabular-nums text-ink'}><span aria-hidden="true">★ </span>{formatAverage(summary.average)}</span>
-    <span>{label} · {strong ? `후기 ${summary.count}개` : `${summary.count}명 답했어요`}</span></p>;
+function RatingSummaryView({ experiences }: { experiences: Experiences }) {
+  const { satisfaction, learning, difficulty } = experiences;
+  const parts = [learning.count ? `배운 정도 ${formatAverage(learning.average)}` : '', difficulty.count ? `전형 난이도 ${formatAverage(difficulty.average)}` : ''].filter(Boolean);
+  if (!satisfaction.count) return null;
+  return <div className="grid gap-[2px]">
+    <p className="m-0 flex items-baseline gap-[8px] text-[15px] leading-[28px] text-ink-2">
+      <span className="text-[22px] leading-[28px] font-bold tabular-nums text-ink"><span aria-hidden="true">★ </span>{formatAverage(satisfaction.average)}</span>
+      <span>업무 만족 · 후기 {experiences.count}개</span></p>
+    {parts.length ? <p className={`m-0 text-[12px] leading-[18px] tabular-nums text-ink-2`}>{parts.join(' · ')}</p> : null}
+  </div>;
 }
 
 function StarPicker({ id, label, value, onChange, optional }: { id: string; label: string; value: Stars | null; onChange: (v: Stars | null) => void; optional?: boolean }) {
-  return <div className="grid gap-[4px]"><span id={id} className="text-[13px] font-medium text-ink-2">{label}</span>
+  return <div className="grid gap-[4px]"><span className="flex items-center gap-[6px] text-[13px] font-medium text-ink-2"><span id={id}>{label}</span>{optional ? null : <span className={BADGE}>필수</span>}</span>
     <div role="radiogroup" aria-labelledby={id} className="grid grid-cols-5 gap-[6px]">
       {STAR_VALUES.map((n) => <button type="button" role="radio" key={n} className={OPTION_CHIP} aria-checked={value === n} aria-label={`${label} ${n}점`}
         onClick={() => onChange(optional && value === n ? null : n)}><span aria-hidden="true">★</span><span className="tabular-nums">{n}</span></button>)}</div></div>;
@@ -57,13 +65,14 @@ function ReviewForm({ model, onDone }: { model: QuestionsModel; onDone: () => vo
   const submit = () => { if (input && !problem) void model.review(input).then((ok) => { if (ok) { model.draft.set(null); onDone(); } }); };
   return <form className="grid gap-[10px] rounded-md border border-line bg-surface p-[12px]" aria-label="후기 남기기" onSubmit={(event) => { event.preventDefault(); submit(); }}>
     <StarPicker id="qe-sat" label="업무 만족" value={satisfaction} onChange={setSatisfaction} />
-    {more ? <>
+    {more ? <div className="grid gap-[10px]">
+      <p className="m-0 flex items-center gap-[6px] text-[13px] font-semibold text-ink-2">더 남기기<span className={BADGE}>선택</span></p>
       <StarPicker id="qe-learn" label="배운 정도" value={learning} onChange={setLearning} optional />
       <StarPicker id="qe-diff" label="전형 난이도" value={difficulty} onChange={setDifficulty} optional />
       <label className="grid gap-[4px] text-[13px] font-medium text-ink-2">한마디
         <textarea className={AREA} maxLength={BODY_MAX} value={body} placeholder="분위기나 하는 일, 준비할 점을 편하게 적어 주세요" onChange={(event) => setBody(event.target.value)} /></label>
       <label className="flex min-h-[44px] items-center gap-[10px] text-[14px] text-ink"><input type="checkbox" className="size-[18px] accent-[var(--accent)]" checked={participated} onChange={(event) => setParticipated(event.target.checked)} />직접 참여했어요</label>
-    </> : <div><button type="button" className={TEXT_BUTTON} aria-expanded={false} onClick={() => setMore(true)}>더 남기기</button></div>}
+    </div> : <div className="-ml-[8px]"><button type="button" className={TEXT_BUTTON} aria-expanded={false} onClick={() => setMore(true)}>더 남기기 (선택)</button></div>}
     <p className={NOTE_TEXT}>이름은 보이지 않아요. 별점만 남겨도 괜찮아요. 쓰던 글은 이 기기에 저장돼요</p>
     {problem ? <p className="m-0 text-[13px] text-danger" role="status">{problem}</p> : null}
     <div className="flex gap-[6px]"><button type="submit" className={SOLID_BUTTON} disabled={model.busy || !input || !!problem}>후기 남기기</button>
@@ -78,7 +87,7 @@ function QuestionForm({ model, parentId, onDone, label }: { model: QuestionsMode
   return <form className="grid gap-[8px]" aria-label={label} onSubmit={(event) => { event.preventDefault(); if (ok) void model.ask(body, parentId).then((done) => { if (done) onDone(); }); }}>
     <textarea autoFocus className={AREA} aria-label={label} maxLength={BODY_MAX} value={body} placeholder={parentId ? '아는 만큼 답해 주세요' : '궁금한 점을 적어 주세요'} onChange={(event) => setBody(event.target.value)} />
     {problem ? <p className="m-0 text-[13px] text-danger" role="status">{problem}</p> : null}
-    <div className="flex gap-[6px]"><button type="submit" className={SOLID_BUTTON} disabled={model.busy || !ok}>{parentId ? '답 남기기' : '질문하기'}</button>
+    <div className="flex gap-[6px]"><button type="submit" className={GHOST_BUTTON} disabled={model.busy || !ok}>{parentId ? '답 남기기' : '질문하기'}</button>
       <button type="button" className={GHOST_BUTTON} onClick={onDone}>닫기</button></div>
   </form>;
 }
@@ -90,19 +99,28 @@ function Actions({ model, mine, postId, noun }: { model: QuestionsModel; mine: b
     <Confirm label="신고" question={`이 ${noun}을 신고할까요?`} disabled={model.busy} onConfirm={() => { void model.report(postId); }} />
     <Confirm label="작성자 차단" question="이 작성자를 차단할까요?" disabled={model.busy} onConfirm={() => { void model.block(postId); }} />
     <button type="button" className={TEXT_BUTTON} onClick={() => setMore(false)}>닫기</button></span>
-    : <button type="button" className={TEXT_BUTTON} aria-expanded={false} onClick={() => setMore(true)}>더 보기</button>}</div>;
+    : <button type="button" className={TEXT_BUTTON} aria-expanded={false} onClick={() => setMore(true)}>신고·차단</button>}</div>;
+}
+
+function ReviewBody({ text }: { text: string }) {
+  const long = text.length > CLAMP_CHARS || text.split('\n').length > CLAMP_LINES;
+  const [expanded, setExpanded] = useState(false);
+  return <div className="grid gap-[2px]">
+    <p className={`m-0 text-[14px] leading-[21px] text-ink whitespace-pre-wrap [overflow-wrap:anywhere] ${long && !expanded ? 'line-clamp-4' : ''}`}>{text}</p>
+    {long ? <div className="-ml-[8px]"><button type="button" className={TEXT_BUTTON} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? '접기' : '더 보기'}</button></div> : null}
+  </div>;
 }
 
 function ReviewCard({ model, post }: { model: QuestionsModel; post: Experience }) {
   return <li className={CARD}>
     <div className="flex flex-wrap items-center gap-[6px] text-[13px] text-ink-2">
-      <span className="font-semibold tabular-nums text-ink"><span aria-hidden="true">★ </span>{post.satisfaction}</span><span>업무 만족</span>
-      {post.learning ? <span className="tabular-nums">· 배운 정도 {post.learning}</span> : null}
-      {post.difficulty ? <span className="tabular-nums">· 전형 난이도 {post.difficulty}</span> : null}
-      {post.participated ? <span>· 직접 참여했어요</span> : null}
+      <span className="text-[15px] font-semibold tabular-nums text-ink"><span aria-hidden="true">★ </span>{post.satisfaction}</span><span className="mr-[2px]">업무 만족</span>
+      {post.learning ? <span className={BADGE}>배운 정도 {post.learning}</span> : null}
+      {post.difficulty ? <span className={BADGE}>전형 난이도 {post.difficulty}</span> : null}
       {post.mine ? <span className={BADGE}>내 후기</span> : null}
     </div>
-    {post.body ? <p className="m-0 text-[14px] leading-[21px] text-ink whitespace-pre-wrap [overflow-wrap:anywhere]">{post.body}</p> : null}
+    {post.participated ? <p className="m-0 text-[13px] leading-[19px] font-medium text-ink-2">직접 참여했어요</p> : null}
+    {post.body ? <ReviewBody text={post.body} /> : null}
     {post.hidden ? <p className={NOTE_TEXT} role="status">신고가 쌓여 다른 사람에게는 보이지 않아요</p> : null}
     <Actions model={model} mine={post.mine} postId={post.id} noun="후기" />
   </li>;
@@ -120,7 +138,7 @@ function QuestionItem({ model, question, replies, canReply }: { model: Questions
       {reply.detached ? <p className={NOTE_TEXT}>원래 질문이 사라졌어요</p> : null}
       <div className="-ml-[8px]"><Actions model={model} mine={reply.mine} postId={reply.id} noun="답" /></div></li>)}</ul> : null}
     {replying ? <QuestionForm model={model} parentId={question.id} label="답 남기기" onDone={() => setReplying(false)} />
-      : <div className="flex flex-wrap items-center">
+      : <div className="flex flex-wrap items-center gap-[12px]">
         {canReply ? <div className="-ml-[8px]"><button type="button" className={TEXT_BUTTON} onClick={() => setReplying(true)}>답하기</button></div> : null}
         <Actions model={model} mine={question.mine} postId={question.id} noun="질문" /></div>}
   </li>;
@@ -140,7 +158,7 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
   const repliesOf = (id: string) => model.questions.filter((q) => q.parentId === id);
   const total = top.length + model.experiences.count;
   const reviewed = model.experiences.posts.some((p) => p.mine);
-  const summary = model.status === 'loading' ? '불러오는 중' : model.status === 'failed' ? '불러오지 못했어요' : total ? `${total}` : '남겨 봐요';
+  const summary = model.status === 'loading' ? '불러오는 중' : model.status === 'failed' ? '불러오지 못했어요' : total ? `${total}` : '아직 글이 없어요';
   const { experiences } = model;
   return <section className={`${DETAIL_SECTION} qe`} aria-labelledby="sec-qe">
     <h3 id="sec-qe" className={`${SECTION_TITLE} !mb-0`}>
@@ -157,7 +175,7 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
 
         {experiences.count || experiences.posts.length || reviewing ? <div className="grid gap-[8px]">
           <h4 className={SUBTITLE}>후기</h4>
-          {experiences.count ? <div className="grid gap-[2px]"><Rating label="업무 만족" summary={experiences.satisfaction} strong /><Rating label="배운 정도" summary={experiences.learning} /><Rating label="전형 난이도" summary={experiences.difficulty} /></div> : null}
+          {experiences.count ? <RatingSummaryView experiences={experiences} /> : null}
           {experiences.posts.length ? <ul className="m-0 grid list-none gap-[8px] p-0">{experiences.posts.map((post) => <ReviewCard key={post.id} model={model} post={post} />)}</ul> : null}
           {reviewing ? <ReviewForm model={model} onDone={() => setReviewing(false)} />
             : !reviewed ? <div><button type="button" className={GHOST_BUTTON} onClick={() => setReviewing(true)}>후기 남기기</button></div> : null}
@@ -170,7 +188,7 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
             : <div><button type="button" className={GHOST_BUTTON} onClick={() => setAsking(true)}>질문하기</button></div>}
         </div> : null}
         {total && !experiences.count && !experiences.posts.length && !reviewing ? <div><button type="button" className={GHOST_BUTTON} onClick={() => setReviewing(true)}>후기 남기기</button></div> : null}
-        <p className={NOTE_TEXT}>남긴 글에는 이름이 보이지 않아요. 연락처나 링크는 쓸 수 없어요. 학교의 공식 답변은 아니에요</p>
+        <p className={NOTE_TEXT}>이름은 보이지 않아요. 학교의 공식 답변은 아니에요</p>
       </> : null}
     </div> : null}
   </section>;
