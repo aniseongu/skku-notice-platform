@@ -22,7 +22,7 @@ BOARDS: list[tuple[str, str, str]] = [
     ("ecostat-notice", "경제대학 공지", "https://ecostat.skku.edu/ecostat/notice_total.do"),
     ("biz-notice", "경영대학 공지", "https://biz.skku.edu/bizskk/notice.do"),
     ("art-notice", "예술대학 공지", "https://art.skku.edu/art/notice.do"),
-    ("cscience-notice", "자연과학대학 공지", "https://cscience.skku.edu/cscience/community/under_notice.do"),
+    ("cscience-notice", "자연과학대학 공지", "https://cscience.skku.edu/cscience/notice.do"),
     ("ice-notice", "정보통신대학 공지", "https://ice.skku.edu/ice/notice.do"),
     ("enc-notice", "공과대학 공지", "https://enc.skku.edu/enc/notice.do"),
     ("biotech-notice", "생명공학대학 공지", "https://biotech.skku.edu/biotech/notice_under.do"),
@@ -122,7 +122,7 @@ DEPARTMENT_BOARD = {
 # 부트캠프 모집 안내(청년도약·첨단산업 인재양성)는 성균관대 공지 전체 게시판에도 올라온다. 아래는 사업단이 따로 올리는 게시판이다.
 OTHER_BOARDS: list[tuple[str, str, str, tuple[str, ...]]] = [
     ("futurecar-notice", "부트캠프", "수강 모집과 행사 안내", ()),
-    ("aibootcamp-news", "부트캠프", "수강 모집과 행사 안내", ()),
+    ("aibootcamp-news", "부트캠프", "교육생 모집과 특강 안내", ()),
     ("aiuniv-notice", "사업단", "AI 교육, 챌린지 안내", ("소프트웨어융합대학",)),
     ("skku-exchange-notice", "국제교류", "교환학생 선발·설명회·장학 안내", ()),
     ("ase-notice", "융합·연계전공", "차세대 반도체 교육과 인턴 안내", ("정보통신대학/반도체시스템공학과", "정보통신대학/반도체융합공학과", "정보통신대학/전자전기공학부", "공과대학/화학공학부", "공과대학/신소재공학부")),
