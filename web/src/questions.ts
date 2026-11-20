@@ -93,9 +93,8 @@ export function qeErrorMessage(error: unknown): string {
 
 /** 질문·경험 RPC가 운영에 아직 없을 때(함수·표 없음)의 오류인지. 일시적인 오류와 구분한다. */
 export function isQeUnavailable(error: unknown): boolean {
-  const e = error as { code?: unknown; message?: unknown } | null;
-  if (e?.code === 'PGRST202' || e?.code === '42883' || e?.code === '42P01' || e?.code === 'PGRST205') return true;
-  return typeof e?.message === 'string' && /qe_[a-z_]+/.test(e.message) && /(could not find the function|does not exist|schema cache)/i.test(e.message);
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === '42883' || code === '42P01';
 }
 
 async function same(guard: AccountGuard): Promise<void> { if (!await guard()) throw new AccountChanged(); }
@@ -109,42 +108,56 @@ async function call(client: SupabaseClient, fn: string, args: Record<string, unk
 const asArray = (data: unknown): unknown[] => (Array.isArray(data) ? data : []);
 const invalid = () => Promise.reject(Object.assign(new Error('qe_invalid_input'), { code: '22023' }));
 
+export interface QuestionsWriteGuard {
+  accessToken: () => Promise<string | null>;
+  signal: AbortSignal;
+}
+
 /** 화면이 쓰는 동작 묶음. 시험에서는 같은 모양의 가짜로 바꿀 수 있다. */
 export interface QuestionsApi {
   listQuestions(noticeId: string, guard: AccountGuard): Promise<Question[]>;
   listExperiences(noticeId: string, guard: AccountGuard): Promise<Experiences>;
-  createQuestion(noticeId: string, body: string, parentId: string | undefined, guard: AccountGuard): Promise<string>;
-  createExperience(noticeId: string, input: ExperienceInput, guard: AccountGuard): Promise<string>;
-  editQuestion(postId: string, body: string, guard: AccountGuard): Promise<void>;
-  editExperience(postId: string, input: ExperienceInput, guard: AccountGuard): Promise<void>;
-  deletePost(postId: string, guard: AccountGuard): Promise<void>;
-  report(postId: string, guard: AccountGuard): Promise<void>;
-  blockAuthor(postId: string, guard: AccountGuard): Promise<string>;
+  createQuestion(noticeId: string, body: string, parentId: string | undefined, guard: QuestionsWriteGuard): Promise<string>;
+  createExperience(noticeId: string, input: ExperienceInput, guard: QuestionsWriteGuard): Promise<string>;
+  editQuestion(postId: string, body: string, guard: QuestionsWriteGuard): Promise<void>;
+  editExperience(postId: string, input: ExperienceInput, guard: QuestionsWriteGuard): Promise<void>;
+  deletePost(postId: string, guard: QuestionsWriteGuard): Promise<void>;
+  report(postId: string, guard: QuestionsWriteGuard): Promise<void>;
+  blockAuthor(postId: string, guard: QuestionsWriteGuard): Promise<string>;
   listBlocks(guard: AccountGuard): Promise<{ id: string; createdAt: string }[]>;
-  unblock(blockId: string, guard: AccountGuard): Promise<void>;
+  unblock(blockId: string, guard: QuestionsWriteGuard): Promise<void>;
 }
 
 export function createQuestionsApi(client: SupabaseClient): QuestionsApi {
-  const run = async (fn: string, args: Record<string, unknown>, guard: AccountGuard) => { await call(client, fn, args, guard); };
+  const write = async (fn: string, args: Record<string, unknown>, guard: QuestionsWriteGuard): Promise<unknown> => {
+    const token = await guard.accessToken();
+    if (!token || guard.signal.aborted) throw new AccountChanged();
+    const { data, error } = await client.rpc(fn, args)
+      .setHeader('Authorization', `Bearer ${token}`).abortSignal(guard.signal);
+    if (guard.signal.aborted) throw new AccountChanged();
+    if (error) throw error;
+    return data;
+  };
+  const run = async (fn: string, args: Record<string, unknown>, guard: QuestionsWriteGuard) => { await write(fn, args, guard); };
   const expArgs = (input: ExperienceInput) => ({ p_satisfaction: input.satisfaction, p_learning: input.learning ?? null, p_difficulty: input.difficulty ?? null, p_body: input.body?.trim() || null, p_participated: input.participated === true });
   return {
     listQuestions: async (noticeId, guard) => asArray(await call(client, 'qe_list_questions', { p_notice_id: noticeId }, guard)).map(parseQuestion).filter((q): q is Question => q !== null),
     listExperiences: async (noticeId, guard) => parseExperiences(await call(client, 'qe_list_experiences', { p_notice_id: noticeId }, guard)),
     createQuestion: async (noticeId, body, parentId, guard) => {
       if (validateQuestionBody(body)) return invalid();
-      const id = await call(client, 'qe_create_question', { p_notice_id: noticeId, p_body: body.trim(), p_parent_id: parentId ?? null }, guard);
+      const id = await write('qe_create_question', { p_notice_id: noticeId, p_body: body.trim(), p_parent_id: parentId ?? null }, guard);
       return typeof id === 'string' ? id : '';
     },
     createExperience: async (noticeId, input, guard) => {
       if (validateExperience(input)) return invalid();
-      const id = await call(client, 'qe_create_experience', { p_notice_id: noticeId, ...expArgs(input) }, guard);
+      const id = await write('qe_create_experience', { p_notice_id: noticeId, ...expArgs(input) }, guard);
       return typeof id === 'string' ? id : '';
     },
     editQuestion: (postId, body, guard) => validateQuestionBody(body) ? invalid() : run('qe_edit', { p_post_id: postId, p_body: body.trim() }, guard),
     editExperience: (postId, input, guard) => validateExperience(input) ? invalid() : run('qe_edit', { p_post_id: postId, ...expArgs(input) }, guard),
     deletePost: (postId, guard) => run('qe_delete', { p_post_id: postId }, guard),
     report: (postId, guard) => run('qe_report', { p_post_id: postId }, guard),
-    blockAuthor: async (postId, guard) => { const id = await call(client, 'qe_block_author', { p_post_id: postId }, guard); return typeof id === 'string' ? id : ''; },
+    blockAuthor: async (postId, guard) => { const id = await write('qe_block_author', { p_post_id: postId }, guard); return typeof id === 'string' ? id : ''; },
     listBlocks: async (guard) => asArray(await call(client, 'qe_list_blocks', {}, guard))
       .flatMap((row) => { const r = row as Record<string, unknown>; return typeof r?.id === 'string' ? [{ id: r.id, createdAt: str(r.created_at) ?? '' }] : []; }),
     unblock: (blockId, guard) => run('qe_unblock', { p_block_id: blockId }, guard),

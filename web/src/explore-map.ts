@@ -12,18 +12,29 @@ export const EXPLORE_DOMAINS: readonly ExploreDomain[] = [
   { id: 'scholarship', label: '장학금', hint: '공지 검색에서 \'장학\'으로 찾아볼 수 있어요', keywords: ['장학'] },
   { id: 'contest', label: '공모전', hint: '공지 검색에서 \'공모전\'으로 찾아볼 수 있어요', keywords: ['공모전', '경진대회', '해커톤', '콘테스트', '아이디어톤'] },
   { id: 'career', label: '취업·인턴', hint: '인턴 탭에서 공고를 찾아볼 수 있어요', keywords: ['인턴', '채용', '현장실습', '취업', '신입'] },
-  { id: 'academic', label: '학사·졸업', hint: '학과 공지 게시판에서 찾아볼 수 있어요', keywords: ['졸업', '수강', '휴학', '복학', '복수전공', '전과', '계절학기', '학사'] },
-  { id: 'extra', label: '비교과', hint: '공지 검색에서 \'비교과\'로 찾아볼 수 있어요', keywords: ['비교과', '특강', '세미나', '멘토링', '워크숍', '부트캠프', '봉사', '동아리'] },
+  { id: 'academic', label: '학사·졸업', hint: '학과 공지 게시판에서 찾아볼 수 있어요', keywords: ['졸업', '조기수료', '학위수여식', '수강', '휴학', '복학', '복수전공', '전과', '계절학기', '학사'] },
+  { id: 'extra', label: '비교과', hint: '공지 검색에서 \'비교과\'로 찾아볼 수 있어요', keywords: ['비교과', '특강', '세미나', '멘토링', '워크숍', '부트캠프', '봉사', '동아리', 'k-mooc', '연구윤리'] },
 ];
 /** 화면에 보여 주는 순서(분류 우선순위와 다르다). */
 export const DISPLAY_ORDER: readonly DomainId[] = ['career', 'academic', 'scholarship', 'exchange', 'contest', 'extra'];
 
 export interface ExploreItem { id: string; title: string; board: string | null; category?: string | null; status: OpportunityStatus }
 
+const KEYWORD_EXCLUSIONS: Partial<Record<string, readonly string[]>> = {
+  학사: ['대학사업단', '대학사업'],
+  신입: ['신입학', '신입생'],
+};
+
+function matchDomain(value: string): DomainId | undefined {
+  const text = value.toLowerCase();
+  return EXPLORE_DOMAINS.find((domain) => domain.keywords.some((word) => {
+    const searchable = KEYWORD_EXCLUSIONS[word]?.reduce((text, excluded) => text.replaceAll(excluded, ' '), text) ?? text;
+    return searchable.includes(word);
+  }))?.id;
+}
+
 export function domainOf(item: { title: string; board?: string | null; category?: string | null }): DomainOrOther {
-  const text = `${item.title} ${item.board ?? ''} ${item.category ?? ''}`.toLowerCase();
-  for (const domain of EXPLORE_DOMAINS) if (domain.keywords.some((word) => text.includes(word))) return domain.id;
-  return 'other';
+  return matchDomain(item.title) ?? matchDomain(`${item.board ?? ''} ${item.category ?? ''}`) ?? 'other';
 }
 
 export type StatusCounts = Record<OpportunityStatus, number>;

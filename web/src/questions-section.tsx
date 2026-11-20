@@ -6,6 +6,7 @@ import { Confirm } from './team-section';
 export interface ReviewDraft { satisfaction: Stars | null; learning: Stars | null; difficulty: Stars | null; participated: boolean; body: string }
 
 export interface QuestionsModel {
+  key: string;
   status: 'loading' | 'ready' | 'failed';
   questions: Question[];
   experiences: Experiences;
@@ -126,17 +127,21 @@ function ReviewCard({ model, post }: { model: QuestionsModel; post: Experience }
   </li>;
 }
 
+function Replies({ model, replies }: { model: QuestionsModel; replies: Question[] }) {
+  return <ul className="m-0 grid list-none gap-[6px] p-0" aria-label="답변">{replies.map((reply) => <li key={reply.id} className="grid gap-[4px] rounded-sm bg-sunken px-[12px] py-[8px]">
+    <div className="flex items-center gap-[6px]"><span className="text-[13px] font-semibold text-ink">익명 {reply.anonNo}</span>{reply.mine ? <span className={BADGE}>내 글</span> : null}</div>
+    <p className="m-0 text-[14px] leading-[21px] text-ink whitespace-pre-wrap [overflow-wrap:anywhere]">{reply.body}</p>
+    <div className="-ml-[8px]"><Actions model={model} mine={reply.mine} postId={reply.id} noun="답" /></div>
+  </li>)}</ul>;
+}
+
 function QuestionItem({ model, question, replies, canReply }: { model: QuestionsModel; question: Question; replies: Question[]; canReply: boolean }) {
   const [replying, setReplying] = useState(false);
   return <li className={CARD}>
     <div className="flex items-center gap-[6px]"><span className="text-[14px] font-semibold text-ink">익명 {question.anonNo}</span>{question.mine ? <span className={BADGE}>내 글</span> : null}</div>
     <p className="m-0 text-[14px] leading-[21px] text-ink whitespace-pre-wrap [overflow-wrap:anywhere]">{question.body}</p>
     {question.hidden ? <p className={NOTE_TEXT} role="status">신고가 쌓여 다른 사람에게는 보이지 않아요</p> : null}
-    {replies.length ? <ul className="m-0 grid list-none gap-[6px] p-0" aria-label="답변">{replies.map((reply) => <li key={reply.id} className="grid gap-[4px] rounded-sm bg-sunken px-[12px] py-[8px]">
-      <div className="flex items-center gap-[6px]"><span className="text-[13px] font-semibold text-ink">익명 {reply.anonNo}</span>{reply.mine ? <span className={BADGE}>내 글</span> : null}</div>
-      <p className="m-0 text-[14px] leading-[21px] text-ink whitespace-pre-wrap [overflow-wrap:anywhere]">{reply.body}</p>
-      {reply.detached ? <p className={NOTE_TEXT}>원래 질문이 사라졌어요</p> : null}
-      <div className="-ml-[8px]"><Actions model={model} mine={reply.mine} postId={reply.id} noun="답" /></div></li>)}</ul> : null}
+    {replies.length ? <Replies model={model} replies={replies} /> : null}
     {replying ? <QuestionForm model={model} parentId={question.id} label="답 남기기" onDone={() => setReplying(false)} />
       : <div className="flex flex-wrap items-center gap-[12px]">
         {canReply ? <div className="-ml-[8px]"><button type="button" className={TEXT_BUTTON} onClick={() => setReplying(true)}>답하기</button></div> : null}
@@ -154,11 +159,14 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
   useEffect(() => {
     if (!autoOpened.current && model.status === 'ready') { autoOpened.current = true; if (model.questions.some((q) => q.mine) || model.experiences.posts.some((p) => p.mine)) setOpen(true); }
   }, [model.status, model.questions, model.experiences]);
-  const top = model.questions.filter((q) => !q.parentId);
-  const repliesOf = (id: string) => model.questions.filter((q) => q.parentId === id);
+  const top = model.questions.filter((q) => !q.parentId && !q.detached);
+  const detached = model.questions.filter((q) => q.detached);
+  const repliesOf = (id: string) => model.questions.filter((q) => q.parentId === id && !q.detached);
   const total = top.length + model.experiences.count;
+  const hasContent = total > 0 || detached.length > 0;
   const reviewed = model.experiences.posts.some((p) => p.mine);
-  const summary = model.status === 'loading' ? '불러오는 중' : model.status === 'failed' ? '불러오지 못했어요' : total ? `${total}` : '아직 글이 없어요';
+  useEffect(() => { if (reviewed) setReviewing(false); }, [reviewed]);
+  const summary = model.status === 'loading' ? '불러오는 중' : model.status === 'failed' ? '불러오지 못했어요' : total ? `${total}` : detached.length ? `답변 ${detached.length}개` : '아직 글이 없어요';
   const { experiences } = model;
   return <section className={`${DETAIL_SECTION} qe`} aria-labelledby="sec-qe">
     <h3 id="sec-qe" className={`${SECTION_TITLE} !mb-0`}>
@@ -169,7 +177,7 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
       {model.status === 'loading' ? <p className={NOTE_TEXT} role="status">불러오고 있어요</p> : null}
       {model.status === 'failed' ? <><p className={NOTE_TEXT} role="status">질문과 후기를 불러오지 못했어요</p><div><button type="button" className={GHOST_BUTTON} onClick={model.load}>다시 불러오기</button></div></> : null}
       {model.status === 'ready' ? <>
-        {!total && !reviewing && !asking ? <div className="grid gap-[8px]"><p className="m-0 text-[14px] leading-[21px] text-ink-2">아직 남은 글이 없어요. 먼저 궁금한 점을 묻거나 경험을 남겨 봐요</p>
+        {!hasContent && !reviewing && !asking ? <div className="grid gap-[8px]"><p className="m-0 text-[14px] leading-[21px] text-ink-2">아직 남은 글이 없어요. 먼저 궁금한 점을 묻거나 경험을 남겨 봐요</p>
           <div className="flex flex-wrap gap-[6px]"><button type="button" className={SOLID_BUTTON} onClick={() => setReviewing(true)}>후기 남기기</button>
             <button type="button" className={GHOST_BUTTON} onClick={() => setAsking(true)}>질문하기</button></div></div> : null}
 
@@ -177,17 +185,21 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
           <h4 className={SUBTITLE}>후기</h4>
           {experiences.count ? <RatingSummaryView experiences={experiences} /> : null}
           {experiences.posts.length ? <ul className="m-0 grid list-none gap-[8px] p-0">{experiences.posts.map((post) => <ReviewCard key={post.id} model={model} post={post} />)}</ul> : null}
-          {reviewing ? <ReviewForm model={model} onDone={() => setReviewing(false)} />
+          {reviewing && !reviewed ? <ReviewForm model={model} onDone={() => setReviewing(false)} />
             : !reviewed ? <div><button type="button" className={GHOST_BUTTON} onClick={() => setReviewing(true)}>후기 남기기</button></div> : null}
         </div> : null}
 
-        {total || asking ? <div className="grid gap-[8px]">
+        {hasContent || asking ? <div className="grid gap-[8px]">
           <h4 className={SUBTITLE}>질문</h4>
           {top.length ? <ul className="m-0 grid list-none gap-[8px] p-0">{top.map((q) => <QuestionItem key={q.id} model={model} question={q} replies={repliesOf(q.id)} canReply={!q.hidden} />)}</ul> : null}
+          {detached.length ? <div className="grid gap-[6px]">
+            <p className={NOTE_TEXT}>원래 질문을 볼 수 없어요</p>
+            <Replies model={model} replies={detached} />
+          </div> : null}
           {asking ? <QuestionForm model={model} label="질문하기" onDone={() => setAsking(false)} />
             : <div><button type="button" className={GHOST_BUTTON} onClick={() => setAsking(true)}>질문하기</button></div>}
         </div> : null}
-        {total && !experiences.count && !experiences.posts.length && !reviewing ? <div><button type="button" className={GHOST_BUTTON} onClick={() => setReviewing(true)}>후기 남기기</button></div> : null}
+        {hasContent && !experiences.count && !experiences.posts.length && !reviewing ? <div><button type="button" className={GHOST_BUTTON} onClick={() => setReviewing(true)}>후기 남기기</button></div> : null}
         <p className={NOTE_TEXT}>이름은 보이지 않아요. 학교의 공식 답변은 아니에요</p>
       </> : null}
     </div> : null}

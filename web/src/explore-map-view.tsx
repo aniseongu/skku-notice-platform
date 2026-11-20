@@ -1,8 +1,12 @@
 // 기회 탐험 지도(설정 하위 쪽 틀: ?view=settings&section=explore). 설계는 docs/design/2026-11-21_explore-map.md.
 // 개수만 보여 준다. 퍼센트·막대·순위·연속 기록은 두지 않는다.
 import { statusLine, type DomainSummary, type ExploreSummary } from './explore-map';
+import { GHOST_BUTTON } from './cls';
 
-export interface ExploreModel { summary: ExploreSummary }
+export type ExploreModel =
+  | { status: 'loading' }
+  | { status: 'failed'; retry: () => void }
+  | { status: 'ready'; summary: ExploreSummary };
 
 const GUTTER = 'px-[var(--gutter)] min-[720px]:px-[24px]';
 
@@ -17,6 +21,15 @@ function DomainCard({ domain }: { domain: DomainSummary }) {
 }
 
 export function ExploreMapPage({ model }: { model: ExploreModel }) {
+  if (model.status === 'loading') {
+    return <p className={`${GUTTER} m-0 pt-[8px] text-[14px] leading-[20px] text-ink-2`} role="status">활동 기록을 불러오고 있어요</p>;
+  }
+  if (model.status === 'failed') {
+    return <div className={`${GUTTER} grid justify-items-start gap-[8px] pt-[8px]`}>
+      <p className="m-0 text-[14px] leading-[20px] text-danger" role="alert">활동 기록을 불러오지 못했어요</p>
+      <button type="button" className={GHOST_BUTTON} onClick={model.retry}>다시 불러오기</button>
+    </div>;
+  }
   const { summary } = model;
   const open = summary.domains.map((domain, index) => ({ domain, index })).filter((entry) => entry.domain.count > 0)
     .sort((a, b) => b.domain.count - a.domain.count || a.index - b.index).map((entry) => entry.domain);

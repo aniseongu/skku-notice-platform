@@ -11,6 +11,7 @@ async function setup(page: Page, records: { id: string; title: string; status: s
     const app = document.querySelector('notice-app') as unknown as App;
     app.profileStatus = 'unavailable'; app.authUserId = 'account-a'; app.onboardingDismissed = true;
     app.opportunitiesStatus = 'ready'; app.subscriptions = app.sources.map((s: { id: string }) => s.id); app.subscriptionsLoading = false;
+    app.controller.exploreSavedStatus = 'ready';
     app.saved = [];
     app.opportunities = new Map(records.map((r) => [r.id, { notice_id: r.id, title: r.title, url: null, board: null, deadline: null, status: r.status, note: null, created_at: '', updated_at: '' }]));
     app.detailOpen = false; app.selectedId = null; app.openedId = null; app.setView('saved');
@@ -120,4 +121,62 @@ test('saved list groups by saved date (today, yesterday) in latest order and has
   });
   await expect(page.locator('section.group[aria-label="저장한 공지"]')).toHaveCount(1);
   await expect(page.locator('section.group[aria-label="오늘"]')).toHaveCount(0);
+});
+
+test('cross-posts share the saved representative and its status on the map', async ({ page }) => {
+  await setup(page, []);
+  const savedRepresentative = await page.evaluate(() => {
+    const controller = (document.querySelector('notice-app') as unknown as App).controller;
+    const base = controller.notices[0];
+    const sourceIds = controller.sources.slice(0, 2).map((source: { id: string }) => source.id);
+    const representative = { ...base, id: 'cross-post-a', title: '하계 인턴 채용', source_id: sourceIds[0], first_seen: '2026-11-19T00:00:00Z', deadline: null, dup_key: 'cross-post', dup_text_key: null };
+    const copy = { ...representative, id: 'cross-post-b', source_id: sourceIds[1], first_seen: '2026-11-20T00:00:00Z' };
+    const opportunityOnly = { ...copy, id: 'cross-post-c', first_seen: '2026-11-18T00:00:00Z' };
+    controller.notices = [representative, copy, opportunityOnly];
+    controller.saved = [representative, copy].map((notice) => ({ ...notice, saved_at: '2026-11-21T00:00:00Z' }));
+    controller.opportunities = new Map([representative, copy, opportunityOnly].map((notice, index) => [notice.id, {
+      notice_id: notice.id, title: notice.title, board: null, status: ['applied', 'preparing', 'result'][index],
+    }]));
+    return controller.visible().map((notice: { id: string }) => notice.id);
+  });
+  expect(savedRepresentative).toEqual(['cross-post-a']);
+  await expect(entry(page)).toHaveAttribute('aria-label', /기록한 활동 1개/);
+  await entry(page).click();
+  await expect(page.locator('.explore-total')).toHaveText('기록한 활동 1개');
+  await expect(page.locator('.explore-status')).toHaveText('지원 1');
+});
+
+test('direct map entry waits for both reads and retries failed reads before showing counts', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1&view=settings&section=explore');
+  await page.evaluate(() => {
+    const controller = (document.querySelector('notice-app') as unknown as App).controller;
+    controller.authUserId = 'account-a';
+    controller.profileStatus = 'unavailable';
+    controller.onboardingDismissed = true;
+    controller.accountDataLoaded = false;
+    controller.settingsCapped = false;
+  });
+  await expect(page.getByRole('heading', { name: '탐험 지도', level: 1 })).toBeVisible();
+  await expect(page.getByText('활동 기록을 불러오고 있어요')).toBeVisible();
+  await expect(page.locator('.explore-total')).toHaveCount(0);
+  await page.evaluate(() => {
+    const controller = (document.querySelector('notice-app') as unknown as App).controller;
+    controller.liveFeedReady = true;
+    controller.opportunitiesStatus = 'ready';
+  });
+  await expect(page.getByText('활동 기록을 불러오고 있어요')).toBeVisible();
+  await page.evaluate(() => {
+    const controller = (document.querySelector('notice-app') as unknown as App).controller;
+    controller.exploreSavedStatus = 'failed';
+    controller.opportunitiesStatus = 'failed';
+    controller.syncStates = async () => { controller.exploreSavedStatus = 'ready'; };
+    controller.refreshOpportunities = async () => {
+      controller.opportunities = new Map([['x1', { notice_id: 'x1', title: '하계 인턴 채용', board: null, status: 'applied' }]]);
+      controller.opportunitiesStatus = 'ready';
+    };
+  });
+  await expect(page.getByRole('alert')).toHaveText('활동 기록을 불러오지 못했어요');
+  await expect(page.locator('.explore-total')).toHaveCount(0);
+  await page.getByRole('button', { name: '다시 불러오기' }).click();
+  await expect(page.locator('.explore-total')).toHaveText('기록한 활동 1개');
 });

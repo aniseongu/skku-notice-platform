@@ -14,7 +14,7 @@ async function setup(page: Page) {
     (window as unknown as { qdb: typeof db }).qdb = db;
     const summary = (key: string) => { const v = db.reviews.map((r) => r[key]).filter(Boolean); return { average: v.length ? v.reduce((a, b) => a + b, 0) / v.length : null, count: v.length }; };
     app.controller.qeApiOverride = {
-      listQuestions: async () => db.questions.map((q) => ({ id: q.id, parentId: q.parentId ?? null, body: q.body, anonNo: 1, createdAt: '', mine: true, hidden: false, detached: false })),
+      listQuestions: async () => db.questions.map((q) => ({ id: q.id, parentId: q.parentId ?? null, body: q.body, anonNo: 1, createdAt: '', mine: true, hidden: false, detached: !!q.detached })),
       listExperiences: async () => ({ posts: db.reviews.map((r) => ({ id: r.id, body: r.body ?? null, satisfaction: r.satisfaction, learning: r.learning ?? null, difficulty: null, participated: !!r.participated, mine: true, hidden: false })),
         count: db.reviews.length, satisfaction: summary('satisfaction'), learning: summary('learning'), difficulty: summary('difficulty') }),
       createQuestion: async (_n: string, body: string, parentId?: string) => { db.questions.push({ id: `q${db.questions.length + 1}`, body, parentId }); return 'x'; },
@@ -125,4 +125,106 @@ test('click budget: review is 4 clicks with no typing, question is 3 clicks plus
   await click(section.getByRole('button', { name: '질문하기' }).last());
   await expect(section.getByText('서류는 언제까지 내나요?')).toBeVisible();
   expect(clicks + 1).toBeLessThanOrEqual(3);
+});
+
+test('stale question models cannot mutate after an account or epoch change, and the form remounts', async ({ page }) => {
+  await setup(page);
+  const section = page.getByRole('region', { name: /질문·경험/ });
+  await section.getByRole('button', { name: /^질문·경험/ }).click();
+  await section.getByRole('button', { name: '질문하기' }).click();
+  await section.getByRole('textbox', { name: '질문하기' }).fill('계정 A의 글');
+  const result = await page.evaluate(async () => {
+    const controller = (document.querySelector('notice-app') as unknown as App).controller;
+    const id = controller.openedId ?? controller.selectedId;
+    const old = controller.questionsModel({ id });
+    let calls = 0;
+    const mutate = async () => { calls++; return 'new-id'; };
+    Object.assign(controller.qeApiOverride, { createQuestion: mutate, createExperience: mutate, deletePost: mutate, report: mutate, blockAuthor: mutate });
+    const writes = () => Promise.all([old.ask('질문'), old.review({ satisfaction: 5 }), old.remove('p'), old.report('p'), old.block('p')]);
+    controller.subscriptionsEpoch++;
+    const changedEpoch = await writes();
+    controller.subscriptionsEpoch--;
+    controller.authUserId = 'account-b';
+    const changedUser = await writes();
+    return { calls, changedEpoch, changedUser };
+  });
+  expect(result).toEqual({ calls: 0, changedEpoch: Array(5).fill(false), changedUser: Array(5).fill(false) });
+  await expect(section.getByRole('button', { name: /^질문·경험/ })).toHaveAttribute('aria-expanded', 'false');
+  await expect(section.getByRole('textbox')).toHaveCount(0);
+});
+
+test('the shared account epoch reset clears an in-flight question write and discards its completion', async ({ page }) => {
+  await setup(page);
+  const result = await page.evaluate(async () => {
+    const controller = (document.querySelector('notice-app') as unknown as App).controller;
+    const id = controller.openedId ?? controller.selectedId;
+    let finish!: (id: string) => void;
+    const response = new Promise<string>((resolve) => { finish = resolve; });
+    let signal: AbortSignal | undefined;
+    controller.qeApiOverride.createQuestion = (_id: string, _body: string, _parent: string | undefined, guard: { signal: AbortSignal }) => {
+      signal = guard.signal;
+      return response;
+    };
+    const pending = controller.questionsModel({ id }).ask('질문');
+    const busyBefore = controller.qeBusy;
+    const epochBefore = controller.subscriptionsEpoch;
+    controller.advanceAccountEpoch();
+    const reset = [controller.subscriptionsEpoch - epochBefore, controller.qeBusy, controller.qeBusyCount, controller.qeState.noticeId, signal?.aborted];
+    finish('new-id');
+    return { busyBefore, reset, result: await pending, busyAfter: controller.qeBusy, countAfter: controller.qeBusyCount };
+  });
+  expect(result).toEqual({ busyBefore: true, reset: [1, false, 0, null, true], result: false, busyAfter: false, countAfter: 0 });
+});
+
+test('reading an existing review clears only its own draft', async ({ page }) => {
+  await setup(page);
+  await page.getByRole('button', { name: /^질문·경험/ }).click();
+  const keys = await page.evaluate(() => {
+    const controller = (document.querySelector('notice-app') as unknown as App).controller;
+    const id = controller.openedId ?? controller.selectedId;
+    const keys = [`qe-draft:account-a:${id}`, `qe-draft:account-b:${id}`, 'qe-draft:account-a:another-notice'];
+    for (const key of keys) localStorage.setItem(key, JSON.stringify({ satisfaction: 3 }));
+    (window as unknown as { qdb: { reviews: unknown[] } }).qdb.reviews.push({ id: 'r1', satisfaction: 4 });
+    controller.questionsModel({ id }).load();
+    return keys;
+  });
+  await expect(page.getByText('내 후기')).toBeVisible();
+  expect(await page.evaluate((keys) => keys.map((key) => localStorage.getItem(key) !== null), keys)).toEqual([false, true, true]);
+});
+
+test('schema cache errors leave the feature available to retry on the next notice', async ({ page }) => {
+  await setup(page);
+  const result = await page.evaluate(async () => {
+    const controller = (document.querySelector('notice-app') as unknown as App).controller;
+    const id = controller.openedId ?? controller.selectedId;
+    let calls = 0;
+    controller.qeApiOverride.listQuestions = async () => {
+      if (++calls === 1) throw { code: 'PGRST202' };
+      return [];
+    };
+    controller.loadQuestions(id);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const failed = controller.qeState.status;
+    const unavailable = controller.qeUnavailable;
+    controller.loadQuestions('next-notice');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return { failed, unavailable, next: controller.qeState.status };
+  });
+  expect(result).toEqual({ failed: 'failed', unavailable: false, next: 'ready' });
+});
+
+test('a detached reply appears below the unavailable-question message and has no reply button', async ({ page }) => {
+  await setup(page);
+  await page.getByRole('button', { name: /^질문·경험/ }).click();
+  await page.evaluate(() => {
+    const controller = (document.querySelector('notice-app') as unknown as App).controller;
+    const id = controller.openedId ?? controller.selectedId;
+    (window as unknown as { qdb: { questions: unknown[] } }).qdb.questions.push({ id: 'detached', body: '남아 있는 답변', detached: true });
+    controller.questionsModel({ id }).load();
+  });
+  const section = page.getByRole('region', { name: /질문·경험/ });
+  const replies = section.getByRole('list', { name: '답변' });
+  await expect(replies).toContainText('남아 있는 답변');
+  await expect(replies.locator('xpath=preceding-sibling::p')).toHaveText('원래 질문을 볼 수 없어요');
+  await expect(section.getByRole('button', { name: '답하기' })).toHaveCount(0);
 });

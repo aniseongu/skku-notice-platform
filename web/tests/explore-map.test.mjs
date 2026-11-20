@@ -20,6 +20,24 @@ test('board name and category count, and the first matching area wins (specific 
   assert.equal(d('인턴 장학생 모집'), 'scholarship');
   assert.equal(d('AI 경진대회 INTERN 공고'.replace('INTERN', 'intern')), 'contest');
 });
+test('title wins over metadata, with keyword exclusions and added terms', () => {
+  const examples = [
+    ['산타봉사단 모집', null, '채용/모집', 'extra'],
+    ['SW라이선스 온라인 특강', 'AI중심대학사업단', null, 'extra'],
+    ['하계 학위수여식 개최 안내', null, null, 'academic'],
+    ['일반대학원 신입학 모집', null, null, 'other'],
+    ['[네이버] 인턴 모집', null, null, 'career'],
+    ['신입생 안내', 'AI중심대학사업단', null, 'other'],
+    ['신입학 및 신입 참여 안내', null, null, 'career'],
+    ['대학사업단 학사 공지', null, null, 'academic'],
+    ['안내', 'AI중심대학사업단', '연구윤리', 'extra'],
+    ['조기수료 안내', null, null, 'academic'],
+    ['학위수여식 기념 세미나', null, null, 'academic'],
+    ['K-MOoC 과정 안내', null, null, 'extra'],
+  ];
+  for (const [title, board, category, expected] of examples) assert.equal(d(title, board, category), expected, title);
+});
+
 test('summarize counts per area and status, counts a notice once and keeps "그 밖" separate from the six areas', () => {
   const s = summarize([
     { id: '1', title: '인턴 채용', board: null, status: 'interested' },

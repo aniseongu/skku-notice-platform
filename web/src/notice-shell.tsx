@@ -16,6 +16,7 @@ import { SavedReorderList, reorderItems } from './saved-reorder';
 import { keywordCounts } from './keyword-counts';
 import type { InboxItem } from './inbox';
 import { summarize } from './explore-map';
+import type { ExploreModel } from './explore-map-view';
 import { type AppController, STALE_MS, TABS, remember, settingsTitle } from './app-controller';
 import type { UserProfile } from './profile';
 import { Avatar } from './ui';
@@ -173,7 +174,7 @@ export function NoticeShell({ app }: { app: AppController }) {
             </header>
           </div>
 
-          {settings ? (app.settingsReady() ? <platform-settings-screen model={settingsModel(app)} /> : null) : <>
+          {settings ? (app.settingsReady() || app.settingsSection === 'explore' ? <platform-settings-screen model={settingsModel(app)} /> : null) : <>
             <div className="tools narrow-only px-[var(--gutter)] pt-[4px] pb-0 min-[720px]:hidden!">
               <label className="search flex h-[44px] items-center gap-[8px] rounded-md bg-sunken px-[16px] text-ink-3 focus-within:outline-2 focus-within:outline-accent [&_.i]:size-[20px] [&_input]:h-full [&_input]:min-w-0 [&_input]:flex-1 [&_input]:border-0 [&_input]:bg-transparent [&_input]:text-ink [&_input]:[outline:0] [&_input]:placeholder:text-ink-3"><Icon name="search" />
                 <input type="search" placeholder="공지 찾기" autoComplete="off" aria-label="공지 검색" value={app.query}
@@ -240,6 +241,13 @@ const boardChoices = (app: AppController) => app.tab() === 'coop'
 const activeChoice = (app: AppController) => app.tab() === 'coop' ? app.activeCoopKind() : app.activeBoard();
 const pickChoice = (app: AppController, id: string) => app.tab() === 'coop' ? app.setCoopKind(id) : app.setBoard(id);
 
+function exploreModel(app: AppController): ExploreModel {
+  const status = app.exploreStatus();
+  if (status === 'failed') return { status, retry: app.retryExplore };
+  if (status === 'ready') return { status, summary: summarize(app.exploreItems()) };
+  return { status };
+}
+
 function settingsModel(app: AppController) {
   return {
     configured: !!authClient, userId: app.authUserId, email: app.authEmail, name: app.authName, avatar: app.authAvatar,
@@ -272,7 +280,7 @@ function settingsModel(app: AppController) {
     devicesInfo: { devices: app.devices, loaded: app.devicesLoaded, thisId: app.thisDeviceId, summaryTime: app.summaryTime, hasCanvasToken: !!app.canvasStatus, busy: app.devicesBusy, error: app.devicesError, loadFailed: app.devicesLoadFailed,
       refresh: () => { void app.refreshDevices(); }, setMode: (mode: string) => { void app.setCanvasMode(mode as CanvasMode); }, setAlertAll: (enabled: boolean) => { void app.setDeviceAlertAll(enabled); }, remove: (id: string) => { void app.removeDevice(id); }, rename: (id: string, name: string) => app.renameDevice(id, name),
       setSummaryTime: (period: 'am' | 'pm', hour: number, minute: number) => { void app.setSummaryTime(period, hour, minute); } },
-    explore: { summary: summarize(app.exploreItems()) },
+    explore: app.settingsSection === 'explore' ? exploreModel(app) : undefined,
     inbox: { items: app.inboxItems, pushOn: app.pushStatus === 'on', open: (item: InboxItem) => app.openInboxItem(item), remove: (id: string) => { void app.changeInbox({ kind: 'remove', ids: [id] }); },
       readAll: () => { void app.changeInbox({ kind: 'read-all' }); }, clear: () => { void app.changeInbox({ kind: 'clear' }); }, goNotifications: () => app.openSettingsSection('notifications') },
     calendar: { auto: app.calendarAuto, id: app.calendarId, syncedAt: app.calendarSyncedAt, busy: app.calendarBusy, message: app.calendarMessage, error: app.calendarError, savedCount: app.saved.length,
