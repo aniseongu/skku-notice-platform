@@ -1,8 +1,8 @@
 // 알림함 쪽(설정 하위 쪽 틀을 쓴다: ?view=settings&section=inbox). 설계는 docs/design/2026-11-20_notification-inbox.md.
 // 행 모양과 읽음 표시는 공지 목록(notice-rows.tsx)과 같다: 구분선만 있는 전체 폭 줄, 안 읽음은 면(surface)+굵은 제목, 읽음은 읽음 면(read)+보통 제목.
-import { useState } from 'react';
-import { NOTE_TEXT, TEXT_BUTTON, TEXT_BUTTON_DANGER } from './cls';
+import { NOTE_TEXT, TEXT_BUTTON } from './cls';
 import { inboxTime, type InboxItem } from './inbox';
+import { Confirm } from './team-section';
 
 export interface InboxModel {
   items: InboxItem[];
@@ -17,7 +17,6 @@ export interface InboxModel {
 const GUTTER = 'px-[var(--gutter)] min-[720px]:px-[24px]';
 
 export function InboxPage({ model }: { model: InboxModel }) {
-  const [confirming, setConfirming] = useState(false);
   const { items } = model;
   const hasUnread = items.some((item) => !item.read);
   return <div className="inbox pb-[calc(var(--tabbar-h)+32px)] min-[720px]:pb-[48px]">
@@ -28,12 +27,8 @@ export function InboxPage({ model }: { model: InboxModel }) {
       {model.pushOn ? null : <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex min-h-[44px] items-center justify-center rounded-md border border-line bg-surface px-[16px] py-0 text-[15px] font-semibold text-ink" onClick={model.goNotifications}>알림 켜기</button>}
     </section> : <section aria-label="받은 알림">
       <div className={`inbox-actions flex min-h-[48px] flex-wrap items-center justify-between gap-x-[4px] ${GUTTER}`}>
-        {confirming
-          ? <div className="flex flex-wrap items-center gap-[4px]"><span className="mr-[4px] text-[13px] text-ink-2">모두 지울까요? 되돌릴 수 없어요</span>
-            <button type="button" className={TEXT_BUTTON_DANGER} onClick={() => { setConfirming(false); model.clear(); }}>지우기</button>
-            <button type="button" className={TEXT_BUTTON} onClick={() => setConfirming(false)}>취소</button></div>
-          : <><button type="button" className={`${TEXT_BUTTON} -ml-[8px]`} disabled={!hasUnread} onClick={model.readAll}>모두 읽음</button>
-            <button type="button" className={`${TEXT_BUTTON_DANGER} -mr-[8px]`} onClick={() => setConfirming(true)}>모두 지우기</button></>}
+        <button type="button" className={`${TEXT_BUTTON} -ml-[8px]`} disabled={!hasUnread} onClick={model.readAll}>모두 읽음</button>
+        <div className="-mr-[8px] ml-auto"><Confirm label="모두 지우기" question="모두 지울까요? 되돌릴 수 없어요" onConfirm={model.clear} /></div>
       </div>
       <div role="list">
         {items.map((item) => <div className={`inbox-row flex items-stretch border-t border-line ${item.read ? 'bg-read' : 'bg-surface'}`} role="listitem" key={item.id} data-read={item.read}>
@@ -43,7 +38,7 @@ export function InboxPage({ model }: { model: InboxModel }) {
             <span className="inbox-body line-clamp-2 text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] min-[720px]:text-[13px] min-[720px]:leading-[19px]">{item.body}</span>
             <span className="inbox-time text-[13px] leading-[18px] text-ink-3 min-[720px]:text-[12px] min-[720px]:leading-[16px]">{inboxTime(item.at)}</span>
           </button>
-          <button type="button" className="[@media(hover:hover)]:hover:bg-hover active:bg-sunken mr-[4px] grid size-[44px] flex-none cursor-pointer place-items-center self-center rounded-pill border-0 bg-transparent text-ink-3 min-[720px]:mr-[16px]" aria-label={`알림 지우기: ${item.title}`} onClick={() => model.remove(item.id)}>
+          <button type="button" className={`${TEXT_BUTTON} mr-[4px] grid size-[44px] flex-none place-items-center self-center min-[720px]:mr-[16px]`} aria-label={`알림 지우기: ${item.title}`} onClick={() => model.remove(item.id)}>
             <svg className="i size-[18px] fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round]" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>)}

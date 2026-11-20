@@ -9,7 +9,7 @@ import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, d
 import { APP_NAME } from './brand';
 import type { FeedbackKind } from './feedback';
 import { installMode, isStandalone } from './install-hint';
-import { CHECKBOX, CHEVRON_RIGHT, CHIP, CHIPS, CHIP_ADD, NOTE_TEXT } from './cls';
+import { CHECKBOX, CHEVRON_RIGHT, CHIP, CHIPS, CHIP_ADD, NOTE_TEXT, TEXT_BUTTON } from './cls';
 import { authClient } from './auth';
 import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, type OpportunityStatus } from './opportunities';
 import { SavedReorderList, reorderItems } from './saved-reorder';
@@ -60,12 +60,11 @@ function InboxButton({ app }: { app: AppController }) {
     <BellIcon />{unread ? <span className="absolute top-[10px] right-[11px] size-[8px] rounded-full bg-accent min-[720px]:top-[6px] min-[720px]:right-[7px]" aria-hidden="true" /> : null}
   </button>;
 }
-const CompassIcon = () => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M15.5 8.5l-2 5-5 2 2-5z" /></svg>;
 /** 저장 화면 머리의 탐험 지도 단추. 로그인했고 기록이 하나라도 있을 때만 보인다. */
 function ExploreButton({ app }: { app: AppController }) {
   const recorded = app.view === 'saved' && app.authUserId ? app.exploreItems().length : 0;
   if (!recorded) return null;
-  return <button type="button" className={`explore-entry ${BELL_BUTTON}`} aria-label={`탐험 지도, 기록한 활동 ${recorded}개`} title="탐험 지도" onClick={app.openExploreMap}><CompassIcon /></button>;
+  return <button type="button" className={`explore-entry ${TEXT_BUTTON} flex-none whitespace-nowrap`} aria-label={`탐험 지도, 기록한 활동 ${recorded}개`} onClick={app.openExploreMap}>탐험 지도</button>;
 }
 const GearIcon = () => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" />
   <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>;
@@ -100,6 +99,8 @@ export function NoticeShell({ app }: { app: AppController }) {
   const counts = Object.fromEntries(TABS.map((t) => [t.id, ready ? app.tabCount(t.id) : null]));
   const list = app.visible();
   const settings = app.view === 'settings';
+  const settingsSection = settings ? app.settingsSection : null;
+  const sidebarTab = settingsSection === 'explore' ? 'saved' : settings ? null : app.tab();
   const keywordScope = app.tab() === 'saved' ? app.savedNotices() : app.notices.filter((notice) =>
     app.kindOf(notice) === app.tab() && (!notice.deadline || !deadlinePassed(notice.deadline)));
   const board = app.activeBoard();
@@ -123,7 +124,7 @@ export function NoticeShell({ app }: { app: AppController }) {
       <aside className="sidebar hidden border-r border-line bg-mica px-[12px] pt-0 pb-[12px] min-[720px]:flex min-[720px]:min-h-0 min-[720px]:flex-col min-[720px]:overflow-y-auto" aria-label="탐색">
         <div className="pane-head brand min-[720px]:-mx-[12px] min-[720px]:mt-0 min-[720px]:mb-[12px] min-[720px]:flex min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:items-center min-[720px]:gap-[8px] min-[720px]:border-b min-[720px]:border-line min-[720px]:px-[24px] min-[720px]:text-[17px] min-[720px]:font-bold min-[720px]:tracking-[-0.02em] min-[720px]:[&_.brand-mark]:text-accent min-[720px]:[&_.brand-mark]:size-[32px]"><Brand />{APP_NAME}</div>
         <nav className="side-group flex flex-col gap-[1px]" aria-label="보기">
-          {app.shownTabs().map((t) => <SideItem key={t.id} label={t.label} count={counts[t.id]} active={!settings && app.tab() === t.id}
+          {app.shownTabs().map((t) => <SideItem key={t.id} label={t.label} count={counts[t.id]} active={sidebarTab === t.id}
             onClick={() => app.openTab(t.id)} shortcut={String(TABS.indexOf(t) + 1)} icon={t.icon} />)}
         </nav>
         {/* 키워드·게시판 묶음은 계정 정보(키워드, 구독)가 온 뒤 한 번에 그린다. 먼저 그리면 늦게 온 항목만큼 길어지며 아래가 밀린다. */}
@@ -142,7 +143,7 @@ export function NoticeShell({ app }: { app: AppController }) {
         </SideGroup>
         </> : null}
         <div className="side-foot mt-auto flex flex-col gap-[1px] pt-[12px]">
-          <SideItem label="설정" count={null} active={settings} onClick={app.openSettingsHome} />
+          <SideItem label="설정" count={null} active={settings && settingsSection !== 'explore' && settingsSection !== 'inbox'} onClick={app.openSettingsHome} />
         </div>
       </aside>
 
@@ -297,7 +298,7 @@ const TOPBAR_TEXT = 'topbar-text min-w-0 flex-1 min-[720px]:min-w-[88px]';
 const TOPBAR_H1 = 'min-[720px]:text-[21px] min-[720px]:leading-[28px]';
 const UPDATED = 'updated text-[13px] leading-[18px] tabular-nums min-[720px]:text-[12px] min-[720px]:leading-[16px]';
 
-// 사이드바(PC 전용) 항목. 현재 항목은 aria-current=page로 표시한다. 설정을 열면 설정만 강조한다(보기·키워드·게시판 강조는 끈다).
+// 사이드바(PC 전용) 항목. 현재 항목은 aria-current=page로 표시한다.
 const SIDE_ITEM = 'flex items-center justify-between gap-[8px] min-h-[40px] px-[12px] py-0 border-0 rounded-sm text-[15px] font-medium text-left select-none [-webkit-user-select:none] [@media(pointer:coarse)]:min-h-[44px]';
 const SIDE_ITEM_IDLE = 'bg-transparent [@media(hover:hover)]:hover:bg-hover active:bg-hover';
 const SIDE_ITEM_CURRENT = 'bg-sunken text-ink font-semibold [&_.i]:text-accent';

@@ -40,7 +40,7 @@ async function setup(page: Page, items: unknown[], opts: { pushOn?: boolean; wit
 }
 const bell = (page: Page) => page.getByRole('button', { name: /^알림함/ });
 
-test('the bell shows an unread dot, opens the inbox in one tap and lists only this account, newest first', async ({ page }) => {
+test('the bell shows an unread dot, opens the inbox in one tap and lists only this account, newest first', async ({ page }, info) => {
   await setup(page, [item('1', 'account-a', 60), item('2', 'account-a', 5), item('3', 'account-b', 1), item('4', 'account-a', 3000, { read: true })]);
   await expect(bell(page)).toHaveAccessibleName('알림함, 안 읽은 알림 2개');
   const box = await bell(page).boundingBox();
@@ -57,6 +57,7 @@ test('the bell shows an unread dot, opens the inbox in one tap and lists only th
   expect(open!.height).toBeGreaterThanOrEqual(44);
   expect(page.url()).toContain('section=inbox');
   await expect(page.getByRole('heading', { name: '알림함', level: 1 })).toBeVisible();
+  if (info.project.name === 'desktop') await expect(page.locator('.sidebar [aria-current="page"]')).toHaveCount(0);
 });
 
 test('tapping a notice alert opens that notice in the app and marks the alert read (the notice read state is separate)', async ({ page }) => {
@@ -76,7 +77,11 @@ test('read-all, single delete and clear-all (with one confirmation) work and per
   await page.getByRole('button', { name: '모두 읽음' }).click();
   await expect(rows.locator('.inbox-title.font-semibold')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '모두 읽음' })).toBeDisabled();
-  await page.getByRole('button', { name: '알림 지우기: 알림 2' }).click();
+  const remove = page.getByRole('button', { name: '알림 지우기: 알림 2' });
+  const box = (await remove.boundingBox())!;
+  expect(box.width).toBeGreaterThanOrEqual(44);
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  await remove.click();
   await expect(rows).toHaveCount(2);
   const stored = await page.evaluate(async () => new Promise<number>((resolve) => {
     const request = indexedDB.open('keyval-store');
@@ -88,10 +93,16 @@ test('read-all, single delete and clear-all (with one confirmation) work and per
 test('clear-all asks once before deleting', async ({ page }) => {
   await setup(page, [item('1', 'account-a', 5), item('2', 'account-a', 9)]);
   await bell(page).click();
-  await page.getByRole('button', { name: '모두 지우기' }).click();
+  const clear = page.getByRole('button', { name: '모두 지우기', exact: true });
+  await expect(clear).toHaveClass(/\btext-ink-2\b/);
+  await clear.click();
   await expect(page.locator('.inbox-row')).toHaveCount(2);                 // 첫 누름은 확인만
-  await expect(page.getByText('모두 지울까요? 되돌릴 수 없어요')).toBeVisible();
-  await page.getByRole('button', { name: '지우기', exact: true }).click();
+  const confirmation = page.getByRole('group', { name: '모두 지우기' });
+  await expect(confirmation.getByText('모두 지울까요? 되돌릴 수 없어요')).toBeVisible();
+  await confirmation.getByRole('button', { name: '취소' }).click();
+  await expect(page.locator('.inbox-row')).toHaveCount(2);
+  await clear.click();
+  await confirmation.getByRole('button', { name: '모두 지우기' }).click();
   await expect(page.getByText('받은 알림이 없어요')).toBeVisible();
 });
 

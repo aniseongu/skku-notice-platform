@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { BADGE, COLLAPSE_HEAD, DETAIL_SECTION, GHOST_BUTTON, NOTE_TEXT, OPTION_CHIP, SECTION_TITLE, SETTINGS_INPUT, SOLID_BUTTON, TEXT_BUTTON } from './cls';
+import { useEffect, useId, useRef, useState } from 'react';
+import { BADGE, COLLAPSE_HEAD, DETAIL_SECTION, GHOST_BUTTON, NOTE_TEXT, OPTION_CHIP, SECTION_TITLE, SETTINGS_INPUT, SOLID_BUTTON, TEXT_BUTTON, TEXT_BUTTON_DANGER } from './cls';
 import { BODY_MAX, formatAverage, validateExperience, validateQuestionBody, type Experience, type ExperienceInput, type Experiences, type Question, type Stars } from './questions';
-import { Confirm } from './team-section';
 
 export interface ReviewDraft { satisfaction: Stars | null; learning: Stars | null; difficulty: Stars | null; participated: boolean; body: string }
 
@@ -28,6 +27,10 @@ const CLAMP_LINES = 4;
 const AREA = `${SETTINGS_INPUT} min-h-[88px] w-full resize-y leading-[22px]`;
 const SUBTITLE = 'm-0 text-[14px] leading-[21px] font-bold text-ink';
 const STAR_VALUES: readonly Stars[] = [1, 2, 3, 4, 5];
+
+function Chevron({ open }: { open: boolean }) {
+  return <svg className={`size-[16px] flex-none fill-none stroke-current [stroke-width:2] [stroke-linecap:round] [stroke-linejoin:round] ${open ? 'rotate-180' : ''}`} viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>;
+}
 
 function RatingSummaryView({ experiences }: { experiences: Experiences }) {
   const { satisfaction, learning, difficulty } = experiences;
@@ -59,6 +62,7 @@ function ReviewForm({ model, onDone }: { model: QuestionsModel; onDone: () => vo
   const [participated, setParticipated] = useState(saved?.participated ?? false);
   const [body, setBody] = useState(saved?.body ?? '');
   const [more, setMore] = useState(!!(saved && (saved.learning || saved.difficulty || saved.body || saved.participated)));
+  const moreId = useId();
   const current: ReviewDraft = { satisfaction, learning, difficulty, participated, body };
   useEffect(() => {
     const empty = !satisfaction && !learning && !difficulty && !participated && !body.trim();
@@ -69,18 +73,20 @@ function ReviewForm({ model, onDone }: { model: QuestionsModel; onDone: () => vo
   const submit = () => { if (input && !problem) void model.review(input).then((ok) => { if (ok) { model.draft.set(null); onDone(); } }); };
   return <form className="grid gap-[10px] rounded-md border border-line bg-surface p-[12px]" aria-label="후기 남기기" onSubmit={(event) => { event.preventDefault(); submit(); }}>
     <StarPicker id="qe-sat" label="업무 만족" value={satisfaction} onChange={setSatisfaction} />
-    {more ? <div className="grid gap-[10px]">
-      <p className="m-0 flex items-center gap-[6px] text-[13px] font-semibold text-ink-2">더 남기기<span className={BADGE}>선택</span></p>
+    <button type="button" className={`${TEXT_BUTTON} flex w-full items-center justify-between text-left`} aria-expanded={more} aria-controls={moreId} onClick={() => setMore(!more)}>
+      더 남기기 (선택)<Chevron open={more} />
+    </button>
+    <div id={moreId} hidden={!more} className={more ? 'grid gap-[10px]' : undefined}>
       <StarPicker id="qe-learn" label="배운 정도" value={learning} onChange={setLearning} optional />
       <StarPicker id="qe-diff" label="전형 난이도" value={difficulty} onChange={setDifficulty} optional />
       <label className="grid gap-[4px] text-[13px] font-medium text-ink-2">한마디
         <textarea className={AREA} maxLength={BODY_MAX} value={body} placeholder="분위기나 하는 일, 준비할 점을 편하게 적어 주세요" onChange={(event) => setBody(event.target.value)} /></label>
       <label className="flex min-h-[44px] items-center gap-[10px] text-[14px] text-ink"><input type="checkbox" className="size-[18px] accent-[var(--accent)]" checked={participated} onChange={(event) => setParticipated(event.target.checked)} />이 활동에 직접 참여했어요</label>
-    </div> : <div className="-ml-[8px]"><button type="button" className={TEXT_BUTTON} aria-expanded={false} onClick={() => setMore(true)}>더 남기기 (선택)</button></div>}
-    <p className={NOTE_TEXT}>이름은 보이지 않아요. 별점만 남겨도 괜찮아요. 쓰던 글은 이 기기에 저장돼요</p>
+    </div>
     {problem ? <p className="m-0 text-[13px] text-danger" role="status">{problem}</p> : null}
     <div className="flex gap-[6px]"><button type="submit" className={SOLID_BUTTON} disabled={model.busy || !input || !!problem}>후기 남기기</button>
       <button type="button" className={GHOST_BUTTON} onClick={onDone}>닫기</button></div>
+    <p className={NOTE_TEXT}>이름은 보이지 않아요. 별점만 남겨도 괜찮아요. 쓰던 글은 이 기기에 저장돼요</p>
   </form>;
 }
 
@@ -96,14 +102,46 @@ function QuestionForm({ model, parentId, onDone, label }: { model: QuestionsMode
   </form>;
 }
 
-function Actions({ model, mine, postId, noun }: { model: QuestionsModel; mine: boolean; postId: string; noun: string }) {
-  const [more, setMore] = useState(false);
-  if (mine) return <div className="-ml-[8px]"><Confirm label="삭제" question={`이 ${noun}을 지울까요?`} disabled={model.busy} onConfirm={() => { void model.remove(postId); }} /></div>;
-  return <div className="-ml-[8px]">{more ? <span className="inline-flex flex-wrap items-center">
-    <Confirm label="신고" question={`이 ${noun}을 신고할까요?`} disabled={model.busy} onConfirm={() => { void model.report(postId); }} />
-    <Confirm label="작성자 차단" question="이 작성자를 차단할까요?" disabled={model.busy} onConfirm={() => { void model.block(postId); }} />
-    <button type="button" className={TEXT_BUTTON} onClick={() => setMore(false)}>닫기</button></span>
-    : <button type="button" className={TEXT_BUTTON} aria-expanded={false} onClick={() => setMore(true)}>신고·차단</button>}</div>;
+function Actions({ model, mine, postId, noun }: { model: QuestionsModel; mine: boolean; postId: string; noun: '후기' | '질문' | '답' }) {
+  const [stage, setStage] = useState<'menu' | 'remove' | 'report' | 'block' | null>(null);
+  const container = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const open = stage !== null;
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!container.current?.contains(event.target as Node)) setStage(null);
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    return () => document.removeEventListener('pointerdown', closeOutside);
+  }, [open]);
+  const close = () => { trigger.current?.focus(); setStage(null); };
+  const target = noun === '후기' ? '후기를' : `${noun}을`;
+  const actions = {
+    remove: { label: '지우기', question: `이 ${target} 지울까요?`, run: model.remove },
+    report: { label: '신고하기', question: `이 ${target} 신고할까요?`, run: model.report },
+    block: { label: '차단하기', question: '이 작성자를 차단할까요?', run: model.block },
+  };
+  const action = stage && stage !== 'menu' ? actions[stage] : null;
+  const choices = mine ? ['remove'] as const : ['report', 'block'] as const;
+  return <div ref={container} className="relative -my-[8px] -mr-[8px] ml-auto shrink-0 self-start"
+    onBlur={(event) => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setStage(null); }}
+    onKeyDown={(event) => { if (open && event.key === 'Escape') { event.stopPropagation(); close(); } }}>
+    <button type="button" ref={trigger} className={`${TEXT_BUTTON} grid size-[44px] place-items-center`} aria-label="더 보기 메뉴" aria-expanded={open}
+      onClick={() => open ? close() : setStage('menu')}>
+      <span className="text-[20px] leading-none" aria-hidden="true">⋯</span>
+    </button>
+    {open ? <div className="absolute top-full right-0 z-10 grid min-w-[112px] gap-[2px] rounded-md border border-line bg-surface p-[4px] shadow-lg">
+      {action ? <div key={stage} role="group" aria-label={action.label} className="grid w-[184px] gap-[2px]">
+        <p className="m-0 px-[8px] pt-[6px] text-[13px] text-ink-2">{action.question}</p>
+        <div className="flex flex-wrap">
+          <button type="button" className={TEXT_BUTTON_DANGER} disabled={model.busy} onClick={() => { close(); void action.run(postId); }}>{action.label}</button>
+          <button type="button" className={TEXT_BUTTON} autoFocus onClick={close}>취소</button>
+        </div>
+      </div> : choices.map((choice, index) => <button type="button" key={choice} className={`${TEXT_BUTTON} text-left`}
+        autoFocus={index === 0} disabled={model.busy} onClick={() => setStage(choice)}>{actions[choice].label}</button>)}
+    </div> : null}
+  </div>;
 }
 
 function ReviewBody({ text }: { text: string }) {
@@ -117,38 +155,39 @@ function ReviewBody({ text }: { text: string }) {
 
 function ReviewCard({ model, post }: { model: QuestionsModel; post: Experience }) {
   return <li className={CARD}>
-    <div className="flex flex-wrap items-center gap-[6px] text-[13px] text-ink-2">
-      <span className="text-[15px] font-semibold tabular-nums text-ink"><span aria-hidden="true">★ </span>{post.satisfaction}</span><span className="mr-[2px]">업무 만족</span>
-      {post.learning ? <span className={BADGE}>배운 정도 {post.learning}</span> : null}
-      {post.difficulty ? <span className={BADGE}>전형 난이도 {post.difficulty}</span> : null}
-      {post.mine ? <span className={BADGE}>내 후기</span> : null}
+    <div className="flex min-h-[28px] items-center justify-between gap-[6px]">
+      <div className="flex min-w-0 flex-wrap items-center gap-[6px] text-[13px] text-ink-2">
+        <span className="text-[15px] font-semibold tabular-nums text-ink"><span aria-hidden="true">★ </span>{post.satisfaction}</span><span className="mr-[2px]">업무 만족</span>
+        {post.learning ? <span className={BADGE}>배운 정도 {post.learning}</span> : null}
+        {post.difficulty ? <span className={BADGE}>전형 난이도 {post.difficulty}</span> : null}
+        {post.mine ? <span className={BADGE}>내 후기</span> : null}
+      </div>
+      <Actions model={model} mine={post.mine} postId={post.id} noun="후기" />
     </div>
     {post.participated ? <p className={NOTE_TEXT}>직접 참여했다고 했어요</p> : null}
     {post.body ? <ReviewBody text={post.body} /> : null}
     {post.hidden ? <p className={NOTE_TEXT} role="status">신고가 쌓여 다른 사람에게는 보이지 않아요</p> : null}
-    <Actions model={model} mine={post.mine} postId={post.id} noun="후기" />
   </li>;
 }
 
 function Replies({ model, replies }: { model: QuestionsModel; replies: Question[] }) {
   return <ul className="m-0 grid list-none gap-[6px] p-0" aria-label="답변">{replies.map((reply) => <li key={reply.id} className="grid gap-[4px] rounded-sm bg-sunken px-[12px] py-[8px]">
-    <div className="flex items-center gap-[6px]"><span className="text-[13px] font-semibold text-ink">익명 {reply.anonNo}</span>{reply.mine ? <span className={BADGE}>내 글</span> : null}</div>
+    <div className="flex min-h-[28px] items-center gap-[6px]"><span className="text-[13px] font-semibold text-ink">익명 {reply.anonNo}</span>{reply.mine ? <span className={BADGE}>내 글</span> : null}
+      <Actions model={model} mine={reply.mine} postId={reply.id} noun="답" /></div>
     <p className="m-0 text-[14px] leading-[21px] text-ink whitespace-pre-wrap [overflow-wrap:anywhere]">{reply.body}</p>
-    <div className="-ml-[8px]"><Actions model={model} mine={reply.mine} postId={reply.id} noun="답" /></div>
   </li>)}</ul>;
 }
 
 function QuestionItem({ model, question, replies, canReply }: { model: QuestionsModel; question: Question; replies: Question[]; canReply: boolean }) {
   const [replying, setReplying] = useState(false);
   return <li className={CARD}>
-    <div className="flex items-center gap-[6px]"><span className="text-[14px] font-semibold text-ink">익명 {question.anonNo}</span>{question.mine ? <span className={BADGE}>내 글</span> : null}</div>
+    <div className="flex min-h-[28px] items-center gap-[6px]"><span className="text-[14px] font-semibold text-ink">익명 {question.anonNo}</span>{question.mine ? <span className={BADGE}>내 글</span> : null}
+      <Actions model={model} mine={question.mine} postId={question.id} noun="질문" /></div>
     <p className="m-0 text-[14px] leading-[21px] text-ink whitespace-pre-wrap [overflow-wrap:anywhere]">{question.body}</p>
     {question.hidden ? <p className={NOTE_TEXT} role="status">신고가 쌓여 다른 사람에게는 보이지 않아요</p> : null}
     {replies.length ? <Replies model={model} replies={replies} /> : null}
     {replying ? <QuestionForm model={model} parentId={question.id} label="답 남기기" onDone={() => setReplying(false)} />
-      : <div className="flex flex-wrap items-center gap-[12px]">
-        {canReply ? <div className="-ml-[8px]"><button type="button" className={TEXT_BUTTON} onClick={() => setReplying(true)}>답하기</button></div> : null}
-        <Actions model={model} mine={question.mine} postId={question.id} noun="질문" /></div>}
+      : canReply ? <div className="-ml-[8px]"><button type="button" className={TEXT_BUTTON} onClick={() => setReplying(true)}>답하기</button></div> : null}
   </li>;
 }
 
@@ -169,13 +208,14 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
   const hasContent = total > 0 || detached.length > 0;
   const reviewed = model.experiences.posts.some((p) => p.mine);
   useEffect(() => { if (reviewed) setReviewing(false); }, [reviewed]);
-  const summary = model.status === 'loading' ? '불러오는 중' : model.status === 'failed' ? '불러오지 못했어요' : total ? `${total}` : detached.length ? `답변 ${detached.length}개` : '아직 글이 없어요';
   const { experiences } = model;
+  const summary = model.status === 'loading' ? '불러오는 중' : model.status === 'failed' ? '불러오지 못했어요' :
+    [experiences.count ? `후기 ${experiences.count}` : '', top.length ? `질문 ${top.length}` : ''].filter(Boolean).join(' · ');
   return <section className={`${DETAIL_SECTION} qe`} aria-labelledby="sec-qe">
     <h3 id="sec-qe" className={`${SECTION_TITLE} !mb-0`}>
       <button type="button" className={COLLAPSE_HEAD} aria-expanded={open} aria-controls="qe-body" onClick={() => setOpen(!open)}>
-        <span>질문·경험</span><span className="flex items-center gap-[8px] font-medium">{summary}
-          <svg className={`size-[16px] flex-none fill-none stroke-current [stroke-width:2] [stroke-linecap:round] [stroke-linejoin:round] ${open ? 'rotate-180' : ''}`} viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg></span></button></h3>
+        <span>질문·경험</span><span className="flex items-center gap-[8px] font-medium">{open ? null : summary}
+          <Chevron open={open} /></span></button></h3>
     {open ? <div id="qe-body" className="mt-[6px] grid gap-[12px]">
       {model.status === 'loading' ? <p className={NOTE_TEXT} role="status">불러오고 있어요</p> : null}
       {model.status === 'failed' ? <><p className={NOTE_TEXT} role="status">질문과 후기를 불러오지 못했어요</p><div><button type="button" className={GHOST_BUTTON} onClick={model.load}>다시 불러오기</button></div></> : null}
@@ -203,7 +243,7 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
             : <div><button type="button" className={GHOST_BUTTON} onClick={() => setAsking(true)}>질문하기</button></div>}
         </div> : null}
         {hasContent && !experiences.count && !experiences.posts.length && !reviewing ? <div><button type="button" className={GHOST_BUTTON} onClick={() => setReviewing(true)}>후기 남기기</button></div> : null}
-        <p className={NOTE_TEXT}>이름은 보이지 않아요. 학교의 공식 답변은 아니에요</p>
+        <p className={NOTE_TEXT}>{reviewing && !reviewed ? '' : '이름은 보이지 않아요. '}학교의 공식 답변은 아니에요</p>
       </> : null}
     </div> : null}
   </section>;
