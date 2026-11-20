@@ -8,6 +8,73 @@ function noticeIdOf(tag) {
   return id.length <= 200 && NOTICE_ID.test(id) ? id : null;
 }
 
+// 알림함: 받은 알림을 이 기기의 IndexedDB에 쌓는다(앱의 src/inbox.ts가 읽는다. 같은 DB·키·정리 규칙).
+// 이 워커는 로그인 사용자를 모른다. 앱이 `inbox:v1` 레코드의 owner에 {userId, endpoint}를 적어 둔다. endpoint는 그 계정으로 서버에 등록한 이 기기 푸시 구독의 주소다.
+// 저장은 지금 이 브라우저의 구독 주소가 owner.endpoint와 같을 때만 한다: 계정을 바꾸는 중(이전 계정으로 보낸 푸시가 늦게 도착, 새 구독 등록 전)에는
+// 알림만 띄우고 저장하지 않는다. 저장이 실패하거나 3초 안에 끝나지 않아도 알림 표시에는 영향이 없다(호출하는 쪽이 따로 시작하고 오류를 삼킨다).
+const INBOX_KEY = 'inbox:v1';
+const INBOX_MAX_ITEMS = 200;
+const INBOX_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const INBOX_TIMEOUT_MS = 3000;
+const GENERIC_TAG = 'skku-notice';
+
+function openKeyval() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('keyval-store');
+    request.onupgradeneeded = () => request.result.createObjectStore('keyval');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error('blocked'));   // 다른 탭이 버전 변경을 막고 있으면 기다리지 않는다
+  });
+}
+
+function pruneInbox(items, now) {
+  return items.filter((item) => now - item.at <= INBOX_MAX_AGE_MS).sort((a, b) => b.at - a.at).slice(0, INBOX_MAX_ITEMS);
+}
+
+async function saveInbox(entry, now) {
+  if (typeof indexedDB === 'undefined') return false;
+  const subscription = await self.registration.pushManager.getSubscription();
+  const endpoint = subscription && subscription.endpoint;
+  if (typeof endpoint !== 'string' || !endpoint) return false;   // 구독이 없으면(해제·전환 중) 저장하지 않는다
+  const db = await openKeyval();
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction('keyval', 'readwrite');
+      const store = tx.objectStore('keyval');
+      let saved = false;
+      const request = store.get(INBOX_KEY);
+      request.onsuccess = () => {
+        const old = request.result;
+        const owner = old && old.version === 1 ? old.owner : null;
+        // 소유자가 없거나, 소유자의 구독 주소가 아니거나(다른 계정으로 보낸 푸시), 아직 등록 전이면 저장하지 않는다
+        if (!owner || typeof owner.userId !== 'string' || !owner.userId || owner.endpoint !== endpoint) return;
+        let items = Array.isArray(old.items) ? old.items : [];
+        if (entry.tag !== GENERIC_TAG) items = items.filter((item) => !(item.owner === owner.userId && item.tag === entry.tag));
+        const id = now.toString(36) + Math.random().toString(36).slice(2, 8);
+        items.push({ id, owner: owner.userId, tag: entry.tag, title: entry.title, body: entry.body, noticeId: entry.noticeId, url: entry.url, at: now, read: false });
+        store.put({ version: 1, owner, items: pruneInbox(items, now) }, INBOX_KEY);
+        saved = true;
+      };
+      tx.oncomplete = () => resolve(saved);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } finally { db.close(); }
+}
+
+async function rememberInbox(entry) {
+  try {
+    let timer;
+    const limit = new Promise((resolve) => { timer = setTimeout(() => resolve(false), INBOX_TIMEOUT_MS); });
+    const saved = await Promise.race([saveInbox(entry, Date.now()), limit]);
+    clearTimeout(timer);
+    if (saved && self.clients && self.clients.matchAll) {
+      for (const client of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) client.postMessage({ type: 'inbox-changed' });
+    }
+  } catch { /* 알림함에 못 쌓아도 알림은 이미 떴다 */ }
+}
+
 self.addEventListener('push', (event) => {
   let payload = {};
   try {
@@ -25,14 +92,18 @@ self.addEventListener('push', (event) => {
       && (candidate.origin === self.location.origin || candidate.hostname === 'skku.edu'
         || candidate.hostname.endsWith('.skku.edu') || internship)) target = candidate;
   } catch { /* 올바르지 않은 주소는 앱으로 연다 */ }
-  event.waitUntil(self.registration.showNotification(title, {
+  const tag = typeof payload.tag === 'string' ? payload.tag : GENERIC_TAG;
+  // 알림 표시를 먼저 시작하고 알림함 저장은 따로 시작한다. 저장이 느리거나 실패해도 알림은 뜬다.
+  const shown = self.registration.showNotification(title, {
     body,
     icon: new URL('icon-192.png', self.registration.scope).href,
     badge: new URL('icon-monochrome-512.png', self.registration.scope).href,
-    tag: typeof payload.tag === 'string' ? payload.tag : 'skku-notice',
+    tag,
     silent: payload.silent === true,
     data: { url: target.href, notice: noticeIdOf(payload.tag) },
-  }));
+  });
+  const kept = rememberInbox({ tag, title, body, noticeId: noticeIdOf(payload.tag), url: target.href });
+  event.waitUntil(Promise.all([shown, kept]));
 });
 
 self.addEventListener('notificationclick', (event) => {

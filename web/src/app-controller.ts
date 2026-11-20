@@ -41,6 +41,7 @@ import { orderNotices, type Sort } from './notice-order';
 import { Reactive, defineReactive } from './reactive';
 import { loadPublicNotice, noticeIdFromSearch, noticeLink, withoutNotice, type PublicNotice } from './deeplink';
 import { clearListCache, loadListCache, saveListCache } from './list-cache';
+import { changeInbox, clearInbox, listenInboxChanged, loadInbox, noticeIdOfItem, pruneStoredInbox, releaseInbox, safeInboxUrl, setInboxOwner, unreadCount, type InboxChange, type InboxItem } from './inbox';
 
 const COOP_KIND_ORDER = ['대기업', '중견기업', '중소기업', '스타트업', '기업', '공공기관', '연구기관', '협회/기타', '기타 기관'];
 /** 기관 구분이 비어 있는 현장실습은 '기타 기관'으로 묶는다. */
@@ -87,7 +88,7 @@ export function settingsSectionFromUrl(): string | null {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'keys';
   const section = params.get('section');
-  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile', 'feedback'].includes(section) ? section : null;
+  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile', 'feedback', 'inbox'].includes(section) ? section : null;
 }
 
 /** 설정 머리의 부제. 쪽마다 그 쪽에서 하는 일을 말한다. */
@@ -100,6 +101,7 @@ export function settingsSubtitle(): string {
     case 'profile': return '내 정보와 AI에게 알려 줄 내용을 적어요';
     case 'keys': return 'AI 키를 관리해요';
     case 'feedback': return '궁금한 점이나 바라는 점을 남겨 주세요';
+    case 'inbox': return '이 기기가 받은 알림을 다시 봐요';
     default: return '알림과 연결을 정해요';
   }
 }
@@ -107,7 +109,7 @@ export function settingsSubtitle(): string {
 export function settingsTitle(): string {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'AI 연결';
-  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정', feedback: '문의하기' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
+  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정', feedback: '문의하기', inbox: '알림함' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
 }
 
 export interface InstallPrompt extends Event { prompt(): Promise<void> }
@@ -204,6 +206,7 @@ export class AppController extends Reactive {
     notices: { state: true }, sources: { state: true }, matched: { state: true }, generatedAt: { state: true },
     view: { state: true }, board: { state: true }, keyword: { state: true }, keywords: { state: true }, query: { state: true },
     loading: { state: true }, devicesLoaded: { state: true }, accountDataLoaded: { state: true }, aiStateLoaded: { state: true }, settingsCapped: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
+    inboxItems: { state: true },
     teamState: { state: true }, teamBusy: { state: true }, teamUnavailable: { state: true },
     opportunities: { state: true }, opportunitiesStatus: { state: true }, opportunityFilter: { state: true },
     toast: { state: true }, linkCopied: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
@@ -322,6 +325,10 @@ export class AppController extends Reactive {
   onboardingError = '';
   private onboardingChain: { key: string; run: () => Promise<void> } | null = null;
   keywordNote = '';
+  // 알림함(이 기기가 받은 푸시, 서버에는 없다). 계정이 바뀌면 비우고 새 계정 것만 다시 읽는다.
+  inboxItems: InboxItem[] = [];
+  private inboxOpenId: string | null = null;
+  private inboxSeq = 0;
   // 내 기회함(상태·메모). 계정이 바뀌면 비운다. 표가 없거나 못 불러오면 'unavailable'로 두고 화면에서 숨긴다.
   opportunities = new Map<string, Opportunity>();
   opportunitiesStatus: 'idle' | 'ready' | 'unavailable' | 'failed' = 'idle';   // unavailable: 표 없음, failed: 일시적 오류(다음 새로고침에 다시 시도)
@@ -476,6 +483,7 @@ export class AppController extends Reactive {
           this.notices = []; this.sources = []; this.generatedAt = null; this.bodies.clear();
           const kept = savedSelection(); this.selectionReady = false;   // 아래에서 계정을 바꾸는 동안 저장된 선택을 덮어쓰지 않는다
           this.authUserId = userId;
+          this.syncInboxOwner(userId, previousUserId);
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); this.detailTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
           this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.devicesLoaded = false; this.thisDeviceId = null; this.devicesBusy = false; this.devicesError = ''; this.devicesLoadFailed = false; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
@@ -555,7 +563,9 @@ export class AppController extends Reactive {
       }).data.subscription;
     } else { void this.refresh(); }
     wide.addEventListener('change', () => { this.isWide = wide.matches; });
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.refresh(); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { this.refresh(); void this.refreshInbox(); } });
+    listenInboxChanged(() => { void this.refreshInbox(); });   // 다른 탭에서 읽음·삭제한 것
+    try { navigator.serviceWorker?.addEventListener('message', (event) => { if ((event.data as { type?: unknown } | null)?.type === 'inbox-changed') void this.refreshInbox(); }); } catch { /* 서비스 워커가 없으면 창이 다시 보일 때만 읽는다 */ }
     window.setInterval(() => { if (document.visibilityState === 'visible') this.refresh(); }, REFRESH_MS);
     window.addEventListener('keydown', (event) => this.onKey(event));
     document.addEventListener('pointerdown', this.closeBoardMenuOutside);
@@ -1812,6 +1822,7 @@ export class AppController extends Reactive {
       const sameAccount = this.authUserId === userId;
       const epoch = sameAccount ? ++this.subscriptionsEpoch : this.subscriptionsEpoch;
       await clearListCache(userId);
+      await releaseInbox(userId);               // 계정 삭제는 비동기 로그아웃에 맡기지 않고 이 기기의 알림함을 바로 비운다
       if (!sameAccount || epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
       await this.releasePush(userId);          // 이 기기의 알림 등록도 풀어 둔다
       if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
@@ -2322,10 +2333,59 @@ export class AppController extends Reactive {
     window.scrollTo({ top: 0 });
   };
 
+  // 알림함. 소유자를 적고(남의 항목은 같은 트랜잭션에서 지운다) 읽는다. 로그아웃이면 이전 계정의 보관분만 지운다.
+  // 소유자의 푸시 주소(endpoint)는 이 계정으로 기기를 서버에 등록한 직후 platform-browser-push가 따로 적는다. 그 전에는 워커가 저장하지 않는다.
+  private syncInboxOwner(userId: string | null, previousUserId: string | null) {
+    this.inboxItems = []; ++this.inboxSeq;
+    void (async () => {
+      if (userId) await setInboxOwner(userId);
+      else if (previousUserId) await releaseInbox(previousUserId);
+      else await clearInbox();
+      await this.refreshInbox();
+    })();
+  }
+
+  async refreshInbox(): Promise<void> {
+    const userId = this.authUserId, seq = ++this.inboxSeq;
+    await pruneStoredInbox();   // 앱을 켜 둔 채 30일이 지난 항목도 실제로 비운다
+    const items = await loadInbox(userId);
+    if (seq !== this.inboxSeq || userId !== this.authUserId) return;   // 그 사이 계정이 바뀌었거나 더 새 읽기가 있다
+    this.inboxItems = items;
+  }
+
+  get inboxUnread(): number { return unreadCount(this.inboxItems); }
+
+  openInbox = () => { this.openSettings('inbox'); };
+
+  async changeInbox(change: InboxChange): Promise<void> {
+    const userId = this.authUserId;
+    if (!userId) return;
+    if (!(await changeInbox(userId, change))) { this.showToast('알림함을 바꾸지 못했어요. 다시 눌러 주세요'); return; }
+    await this.refreshInbox();
+  }
+
+  /** 항목을 누르면 읽음으로 바꾸고 공지는 앱 안의 그 공지로 연다. 그 밖의 알림은 받을 때 검사한 주소로 간다. */
+  openInboxItem(item: InboxItem) {
+    void this.changeInbox({ kind: 'read', ids: [item.id] });
+    const noticeId = noticeIdOfItem(item);
+    if (noticeId) { this.inboxOpenId = noticeId; this.closeSettings(); this.handoffInboxOpen(); return; }
+    // 받을 때 검사한 주소라도 저장소 값을 그대로 믿지 않고 같은 규칙으로 다시 확인한다.
+    const safe = safeInboxUrl(item.url, location.origin);
+    if (!safe) { this.showToast('이 알림의 주소를 열 수 없어요'); return; }
+    if (new URL(safe).origin === location.origin) this.closeSettings();
+    else window.open(safe, '_blank', 'noopener');
+  }
+
+  /** 설정을 나가 목록 화면이 된 뒤에 알림함에서 고른 공지를 딥링크로 연다(설정 화면에서는 열지 않는다). */
+  private handoffInboxOpen() {
+    if (!this.inboxOpenId || this.view === 'settings') return;
+    this.deepId = this.inboxOpenId; this.inboxOpenId = null;
+  }
+
   /** 설정을 한 번에 닫고 들어오기 전에 보던 보기로 돌아간다. 첫 쪽의 X와 Esc가 쓴다. */
   closeSettings = () => {
     const depth = this.settingsDepth();
-    if (depth > 0) { history.go(-depth); return; }
+    if (depth > 0) { history.go(-depth); return; }   // 이동이 끝나면 onPopState가 이어서 알림함의 공지를 연다
     const last = normalizeTab(remember('tab'));
     this.settingsSection = null;
     this.setView(isTab(last) ? last : 'all');
@@ -2359,6 +2419,7 @@ export class AppController extends Reactive {
       // 설정에서 나오거나 탭이 바뀌어 돌아올 때도 상세 칸은 닫힌 채로 연다(setView와 같다). 열어 둔 설정은 그대로 두고 이번만 닫는다.
       if (view !== 'settings') this.detailOpen = false;
     }
+    this.handoffInboxOpen();
   };
 
   /** 목록 조건(보기, 게시판, 키워드, 필터, 정렬)이 바뀌면 상세 칸은 닫힌 채로 새 목록을 보여 준다.

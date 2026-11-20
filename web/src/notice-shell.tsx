@@ -14,6 +14,7 @@ import { authClient } from './auth';
 import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, type OpportunityStatus } from './opportunities';
 import { SavedReorderList, reorderItems } from './saved-reorder';
 import { keywordCounts } from './keyword-counts';
+import type { InboxItem } from './inbox';
 import { type AppController, STALE_MS, TABS, remember, settingsTitle } from './app-controller';
 import type { UserProfile } from './profile';
 import { Avatar } from './ui';
@@ -47,6 +48,16 @@ const Kbd = ({ keys, className = '', onSolid = false }: { keys: string[]; classN
   <span className={`kbd-group inline-flex gap-[4px] ${className}`} aria-hidden="true">{keys.map((key) => <kbd className={`${KBD} ${onSolid ? KBD_ON_SOLID : KBD_IDLE}`} key={key}>{key}</kbd>)}</span>;
 
 const Icon = ({ name }: { name: IconName }) => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href={`icons/sprite.svg#${name}`} /></svg>;
+const BELL_BUTTON = 'icon-button relative grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover';
+const BellIcon = () => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>;
+/** 알림함 열기. 로그인한 계정에만 보이고, 안 읽은 알림이 있으면 점 하나만 더한다. */
+function InboxButton({ app }: { app: AppController }) {
+  if (!app.authUserId) return null;
+  const unread = app.inboxUnread;
+  return <button type="button" className={BELL_BUTTON} aria-label={unread ? `알림함, 안 읽은 알림 ${unread}개` : '알림함'} title="알림함" onClick={app.openInbox}>
+    <BellIcon />{unread ? <span className="absolute top-[10px] right-[11px] size-[8px] rounded-full bg-accent min-[720px]:top-[6px] min-[720px]:right-[7px]" aria-hidden="true" /> : null}
+  </button>;
+}
 const GearIcon = () => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" />
   <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>;
 
@@ -145,6 +156,7 @@ export function NoticeShell({ app }: { app: AppController }) {
                   onClick={() => app.setDetail(true)}><Icon name="panel" /></button>}
                 <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover" aria-label="공지 다시 가져오기" title="공지 다시 가져오기 (R)" aria-keyshortcuts="r"
                   disabled={app.loading} onClick={() => { void app.collectNow(); }}><Icon name="refresh" /></button>
+                <InboxButton app={app} />
               </>}
               {settings ? null : <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover narrow-only min-[720px]:hidden!" aria-label="설정" onClick={app.openSettingsHome}><GearIcon /></button>}
               {settings ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover wide-only min-[720px]:-mr-[11px] max-[719px]:hidden min-[720px]:flex" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} title={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 (Esc)' : '설정 닫기 (Esc)'}
@@ -251,6 +263,8 @@ function settingsModel(app: AppController) {
     devicesInfo: { devices: app.devices, loaded: app.devicesLoaded, thisId: app.thisDeviceId, summaryTime: app.summaryTime, hasCanvasToken: !!app.canvasStatus, busy: app.devicesBusy, error: app.devicesError, loadFailed: app.devicesLoadFailed,
       refresh: () => { void app.refreshDevices(); }, setMode: (mode: string) => { void app.setCanvasMode(mode as CanvasMode); }, setAlertAll: (enabled: boolean) => { void app.setDeviceAlertAll(enabled); }, remove: (id: string) => { void app.removeDevice(id); }, rename: (id: string, name: string) => app.renameDevice(id, name),
       setSummaryTime: (period: 'am' | 'pm', hour: number, minute: number) => { void app.setSummaryTime(period, hour, minute); } },
+    inbox: { items: app.inboxItems, pushOn: app.pushStatus === 'on', open: (item: InboxItem) => app.openInboxItem(item), remove: (id: string) => { void app.changeInbox({ kind: 'remove', ids: [id] }); },
+      readAll: () => { void app.changeInbox({ kind: 'read-all' }); }, clear: () => { void app.changeInbox({ kind: 'clear' }); }, goNotifications: () => app.openSettingsSection('notifications') },
     calendar: { auto: app.calendarAuto, id: app.calendarId, syncedAt: app.calendarSyncedAt, busy: app.calendarBusy, message: app.calendarMessage, error: app.calendarError, savedCount: app.saved.length,
       connect: () => { void app.connectCalendar(); }, sync: () => { void app.syncCalendarNow(); }, disconnect: () => { void app.disconnectCalendar(); } },
   };

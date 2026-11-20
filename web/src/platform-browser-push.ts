@@ -2,6 +2,7 @@ import { missingAlertColumn, suggestDeviceName } from './devices.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { connectionChain } from './connection-chain.ts';
 import { activation, note } from './push-diagnostics.ts';
+import { setInboxOwner } from './inbox.ts';
 
 const OWNER_KEY = 'platform:push-owner';
 // 서버에 올린 구독 주소. 앱 업데이트 등으로 브라우저가 구독을 잃거나 새 주소로 바꾸면 이 값과 달라져서 알아챈다.
@@ -89,6 +90,7 @@ async function saveDevice(client: SupabaseClient, userId: string, subscription: 
   if (error) throw error;
   storage.setItem(OWNER_KEY, userId);
   storage.setItem(ENDPOINT_KEY, data.endpoint);
+  await setInboxOwner(userId, data.endpoint);   // 이 계정으로 등록한 직후에만 워커가 이 구독의 알림을 알림함에 저장한다
   // 이 기기가 예전에 쓰던 주소는 더 이상 받지 못한다. 남겨 두면 기기 목록에 같은 기기가 두 번 보인다.
   if (previous && previous !== data.endpoint) {
     await client.from('user_push_subscriptions').delete().eq('user_id', userId).eq('endpoint', previous).then(() => undefined, () => undefined);
@@ -131,6 +133,7 @@ export async function inspectDevicePush(client: SupabaseClient, userId: string, 
   const subscription = await dropForeign(await readSubscription(registration), userId, storage);
   if (subscription && await registered(client, userId, subscription.endpoint)) {
     storage.setItem(ENDPOINT_KEY, subscription.endpoint);   // 이 값이 없던 예전 등록도 다음부터 바뀜을 알아채게 한다
+    await setInboxOwner(userId, subscription.endpoint);
     return true;
   }
   if (!heal?.vapidKey || heal.permission !== 'granted' || owner(storage) !== userId) return false;
@@ -220,9 +223,10 @@ export async function enableDevicePush(client: SupabaseClient, userId: string, r
 export async function disableDevicePush(client: SupabaseClient, userId: string, registration: ServiceWorkerRegistration,
   storage: Storage): Promise<boolean> {
   const subscription = await readSubscription(registration);
-  if (!subscription) { forget(storage); return true; }
+  if (!subscription) { forget(storage); await setInboxOwner(userId, null); return true; }
   if (!await subscription.unsubscribe()) throw new Error('이 기기의 알림을 끄지 못했어요.');
   forget(storage);
+  await setInboxOwner(userId, null);
   const { error } = await client.from('user_push_subscriptions').delete()
     .eq('user_id', userId).eq('endpoint', subscription.endpoint);
   return !error;

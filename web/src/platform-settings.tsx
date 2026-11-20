@@ -22,6 +22,7 @@ import { FEEDBACK_KINDS, FEEDBACK_LIMIT, feedbackProblem, type FeedbackKind, typ
 import { BADGE, CHEVRON_RIGHT, CHOICE, DANGER_BUTTON, GHOST_BUTTON, SETTINGS_ACTION, SETTINGS_INPUT, SOLID_BUTTON, SWITCH, SWITCH_ONLY } from './cls';
 import { aiKeysLead, connectedAiKeys } from './ai-keys';
 import { BoardRequest, BOARD_TRAILING_ROW } from './board-request';
+import { InboxPage, type InboxModel } from './inbox-view';
 import type { BoardRequestResult, BoardRequestState } from './shared-board-requests';
 
 export interface SettingsModel {
@@ -97,6 +98,7 @@ export interface SettingsModel {
     rename: (id: string, name: string) => Promise<boolean>;
     setSummaryTime: (period: 'am' | 'pm', hour: number, minute: number) => void;
   };
+  inbox?: InboxModel;
   calendar?: {
     auto: { active: boolean; error: string | null; lastRunAt: string | null };
     id: string | null;
@@ -1014,6 +1016,7 @@ export function PlatformSettings({ model }: { model: SettingsModel }) {
     case 'profile': return <Profile model={model} />;
     case 'keys': return <Keys model={model} />;
     case 'feedback': return <Feedback model={model} />;
+    case 'inbox': return model.inbox ? <InboxPage model={model.inbox} /> : <Overview model={model} />;
     default: return <Overview model={model} />;
   }
 }
