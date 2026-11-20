@@ -14,6 +14,8 @@ import { authClient } from './auth';
 import { deadlineIso, isLimitReached, isMissingTable, loadOpportunities, removeOpportunity, saveOpportunity, OPPORTUNITY_LABELS, TITLE_MAX, URL_MAX, type Opportunity, type OpportunityStatus } from './opportunities';
 import { AccountChanged, createTeamApi, isTeamNotice, isTeamUnavailable, teamErrorCode, teamErrorMessage, type TeamApi, type TeamApplicant, type TeamDraft, type TeamPost } from './team';
 import type { TeamModel } from './team-section';
+import { EMPTY_EXPERIENCES, createQuestionsApi, isQeUnavailable, qeErrorMessage, type ExperienceInput, type Experiences, type Question, type QuestionsApi } from './questions';
+import type { QuestionsModel, ReviewDraft } from './questions-section';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadBoardOrderPreference, loadKeywordsPreference, loadSavedOrderPreference, parseKeywords, saveBoardOrderPreference, saveKeywordsPreference, saveSavedOrderPreference } from './preferences';
 import { applyBoardOrder, BOARD_ORDER_LIMIT, parseBoardOrder } from './board-order';
@@ -208,6 +210,7 @@ export class AppController extends Reactive {
     loading: { state: true }, devicesLoaded: { state: true }, accountDataLoaded: { state: true }, aiStateLoaded: { state: true }, settingsCapped: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
     inboxItems: { state: true },
     teamState: { state: true }, teamBusy: { state: true }, teamUnavailable: { state: true },
+    qeState: { state: true }, qeBusy: { state: true }, qeUnavailable: { state: true },
     opportunities: { state: true }, opportunitiesStatus: { state: true }, opportunityFilter: { state: true },
     toast: { state: true }, linkCopied: { state: true }, toastLink: { state: true }, toastLinkLabel: { state: true }, isWide: { state: true }, theme: { state: true },
     detailOpen: { state: true }, openedId: { state: true }, shortcutsOpen: { state: true }, boardMenuOpen: { state: true }, sortMenuOpen: { state: true },
@@ -338,6 +341,13 @@ export class AppController extends Reactive {
   // 공고별 팀원 모집(공고 한 건의 목록만 들고 있는다). 계정이 바뀌면 비운다. 함수가 운영에 없으면 구역을 숨긴다.
   teamState: { noticeId: string | null; status: 'loading' | 'ready' | 'failed'; posts: TeamPost[] } = { noticeId: null, status: 'loading', posts: [] };
   teamBusy = false;
+  qeState: { noticeId: string | null; status: 'loading' | 'ready' | 'failed'; questions: Question[]; experiences: Experiences } = { noticeId: null, status: 'loading', questions: [], experiences: EMPTY_EXPERIENCES };
+  qeBusy = false;
+  private qeBusyCount = 0;
+  qeUnavailable = false;
+  /** 시험에서 서버 대신 메모리 가짜를 끼운다. */
+  qeApiOverride: QuestionsApi | null = null;
+  private qeSeq = 0;
   private teamBusyCount = 0;
   teamUnavailable = false;
   /** 시험에서 서버 대신 쓰는 가짜. 비어 있으면 로그인한 계정의 Supabase를 쓴다. */
@@ -490,6 +500,7 @@ export class AppController extends Reactive {
           this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.devicesLoaded = false; this.thisDeviceId = null; this.devicesBusy = false; this.devicesError = ''; this.devicesLoadFailed = false; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.opportunities = new Map(); this.opportunitiesStatus = 'idle'; this.opportunityFilter = 'all'; this.statusMenuOpen = false; this.reordering = false; this.opportunitySeq = new Map(); this.opportunityQueue = new Map(); this.opportunitiesLoading = false;
           this.teamState = { noticeId: null, status: 'loading', posts: [] }; this.teamBusy = false; this.teamBusyCount = 0; this.teamUnavailable = false; ++this.teamSeq;
+          this.qeState = { noticeId: null, status: 'loading', questions: [], experiences: EMPTY_EXPERIENCES }; this.qeBusy = false; this.qeBusyCount = 0; this.qeUnavailable = false; ++this.qeSeq;
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
           this.pushChain = null;
@@ -942,6 +953,71 @@ export class AppController extends Reactive {
       report: (post) => run((api, guard) => api.report(post.id, guard), '신고했어요. 확인할게요'),
       blockOwner: (post) => run((api, guard) => api.blockOwner(post.id, guard), '이 모집자를 차단했어요'),
       blockApplicant: (applicant) => run((api, guard) => api.blockApplicant(applicant.id, guard), '이 신청자를 차단했어요'),
+    };
+  }
+
+  /** 상세에 질문·경험 구역을 보일지: 로그인했고, 서버에 기능이 있고, 부를 수 있는 연결이 있을 때. */
+  qeShown(notice: Notice): boolean {
+    return !!this.authUserId && !this.qeUnavailable && this.kindOf(notice) !== 'coop' && !!this.qeApi();
+  }
+
+  private qeApi(): QuestionsApi | null { return this.qeApiOverride ?? (authClient ? createQuestionsApi(authClient) : null); }
+
+  loadQuestions(noticeId: string): void {
+    const api = this.qeApi(), userId = this.authUserId;
+    if (!api || !userId) return;
+    const seq = ++this.qeSeq, epoch = this.subscriptionsEpoch;
+    if (this.qeState.noticeId !== noticeId) this.qeState = { noticeId, status: 'loading', questions: [], experiences: EMPTY_EXPERIENCES };
+    else if (this.qeState.status === 'failed') this.qeState = { ...this.qeState, status: 'loading' };
+    const guard = () => epoch === this.subscriptionsEpoch && this.authUserId === userId && seq === this.qeSeq;
+    void Promise.all([api.listQuestions(noticeId, guard), api.listExperiences(noticeId, guard)]).then(([questions, experiences]) => {
+      if (guard()) this.qeState = { noticeId, status: 'ready', questions, experiences };
+    }, (error: unknown) => {
+      if (error instanceof AccountChanged || !guard()) return;
+      if (isQeUnavailable(error)) { this.qeUnavailable = true; return; }
+      this.qeState = { noticeId, status: 'failed', questions: [], experiences: EMPTY_EXPERIENCES };
+    });
+  }
+
+  private async qeRun<T>(noticeId: string, work: (api: QuestionsApi, guard: () => Promise<boolean>) => Promise<T>, done: string | null): Promise<{ ok: true; value: T } | { ok: false }> {
+    const api = this.qeApi(), userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!api || !userId) return { ok: false };
+    const guard = async () => epoch === this.subscriptionsEpoch && this.authUserId === userId && (this.qeApiOverride ? true : !authClient || await sessionIs(authClient, userId));
+    this.qeBusyCount++; this.qeBusy = true;
+    try {
+      const value = await work(api, guard);
+      if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return { ok: false };
+      if (done) this.showToast(done);
+      if (this.qeState.noticeId === noticeId) this.loadQuestions(noticeId);
+      return { ok: true, value };
+    } catch (error) {
+      if (error instanceof AccountChanged || epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return { ok: false };
+      this.showToast(qeErrorMessage(error));
+      if (this.qeState.noticeId === noticeId) this.loadQuestions(noticeId);   // 상태가 어긋났을 수 있으니 다시 읽는다
+      return { ok: false };
+    } finally { if (epoch === this.subscriptionsEpoch && this.authUserId === userId) { this.qeBusyCount = Math.max(0, this.qeBusyCount - 1); this.qeBusy = this.qeBusyCount > 0; } }
+  }
+
+  /** 후기 초안은 이 기기에 계정·공고별로만 둔다(끝나면 지운다). */
+  private qeDraftKey(noticeId: string): string | null { return this.authUserId ? `qe-draft:${this.authUserId}:${noticeId}` : null; }
+
+  questionsModel(notice: Notice): QuestionsModel {
+    const id = notice.id;
+    const mine = this.qeState.noticeId === id;
+    const run = async <T,>(work: (api: QuestionsApi, guard: () => Promise<boolean>) => Promise<T>, done: string | null) => (await this.qeRun(id, work, done)).ok;
+    const key = this.qeDraftKey(id);
+    return {
+      status: mine ? this.qeState.status : 'loading', questions: mine ? this.qeState.questions : [], experiences: mine ? this.qeState.experiences : EMPTY_EXPERIENCES, busy: this.qeBusy,
+      load: () => this.loadQuestions(id),
+      ask: (body: string, parentId?: string) => run((api, guard) => api.createQuestion(id, body, parentId, guard), parentId ? '답을 남겼어요' : '질문을 남겼어요'),
+      review: (input: ExperienceInput) => run(async (api, guard) => { await api.createExperience(id, input, guard); }, '후기를 남겼어요'),
+      remove: (postId) => run((api, guard) => api.deletePost(postId, guard), '지웠어요'),
+      report: (postId) => run((api, guard) => api.report(postId, guard), '신고했어요. 확인할게요'),
+      block: (postId) => run(async (api, guard) => { await api.blockAuthor(postId, guard); }, '이 작성자를 차단했어요'),
+      draft: {
+        get: (): ReviewDraft | null => { try { const raw = key ? localStorage.getItem(key) : null; return raw ? JSON.parse(raw) as ReviewDraft : null; } catch { return null; } },
+        set: (value: ReviewDraft | null) => { try { if (!key) return; if (value) localStorage.setItem(key, JSON.stringify(value)); else localStorage.removeItem(key); } catch { /* 저장소를 못 써도 화면은 그대로 쓴다 */ } },
+      },
     };
   }
 

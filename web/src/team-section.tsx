@@ -27,7 +27,7 @@ const CARD = 'team-post grid gap-[8px] rounded-md border border-line bg-surface 
 const STATE_LABEL = { open: '모집 중', full: '자리 참', closed: '마감' } as const;
 
 /** 확인 한 단계가 필요한 보조 동작(신고, 차단, 삭제). */
-function Confirm({ label, question, danger = true, onConfirm, disabled }: { label: string; question: string; danger?: boolean; onConfirm: () => void; disabled?: boolean }) {
+export function Confirm({ label, question, danger = true, onConfirm, disabled }: { label: string; question: string; danger?: boolean; onConfirm: () => void; disabled?: boolean }) {
   const [asking, setAsking] = useState(false);
   if (!asking) return <button type="button" className={TEXT_BUTTON} disabled={disabled} onClick={() => setAsking(true)}>{label}</button>;
   return <span className="inline-flex flex-wrap items-center gap-[2px]" role="group" aria-label={label}>

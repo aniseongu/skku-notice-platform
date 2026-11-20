@@ -9,6 +9,7 @@ import { GraduationNotes, GraduationSection, type GraduationModel } from './grad
 import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, NOTE_MAX, type OpportunityStatus } from './opportunities';
 import { DETAIL_SECTION, IMAGE_MISSING_CLASS, NOTE_TEXT, OPTION_CHECK, OPTION_CHIP, SECTION_TITLE, SETTINGS_INPUT, SKELETON_BAR, TEXT_BUTTON, TEXT_BUTTON_DANGER } from './cls';
 import { TeamSection, type TeamModel } from './team-section';
+import { QuestionsSection, type QuestionsModel } from './questions-section';
 import { cleanHtml, fileType, IMAGE_MISSING, replaceBrokenImage } from './rich';
 
 export interface NoticeDetailModel {
@@ -36,6 +37,7 @@ export interface NoticeDetailModel {
   /** 소프트웨어학과 원전공이 인턴 공고를 열었을 때만 있다. */
   /** 팀을 꾸릴 만한 공고(공모전·대회 등)에서 로그인했을 때만 있다. */
   team?: TeamModel;
+  questions?: QuestionsModel;
   graduation?: GraduationModel;
   grad?: GradPart[];
 }
@@ -198,6 +200,7 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
       : loaded.translation?.body ? <><section className={`${DETAIL_SECTION} body-text`} aria-label="한국어로 옮긴 본문"><h3 className={SECTION_TITLE}>본문 (한국어로 옮긴 글)</h3><p className={NOTE_BODY}>Gemini 번역이에요. 정확한 내용은 아래 영어 원문을 확인해 주세요</p>{loaded.translation.body.split(/\n+/).filter(Boolean).map((para, index) => <p className={BODY_P} key={index}>{para}</p>)}</section><div className="original-body" lang="en"><Body body={loaded} heading="영어 원문" /></div></> : <Body body={loaded} />}
     {model.coop ? <p className={NOTE}>신청은 톨게이트에 학교 계정으로 로그인한 뒤 할 수 있어요</p> : null}
     {/* 그림에서 읽은 글은 판정에만 쓰고 화면에는 보이지 않는다(틀린 글자가 섞여 있고 그림이 더 정확하다). */}
+    {model.questions ? <QuestionsSection key={`qe-${notice.id}`} model={model.questions} /> : null}
     {loaded?.attachments?.length ? <section className={DETAIL_SECTION} aria-labelledby="sec-files"><h3 id="sec-files" className={SECTION_TITLE}>첨부 {loaded.attachments.length}개</h3><ul className="attachments m-0 p-0 list-none [&>li+li]:border-t [&>li+li]:border-line">{loaded.attachments.map((file, index) => <li key={index}><a className="file flex items-center gap-[10px] min-h-[48px] text-[14px] text-ink no-underline" href={safeUrl(file.url)} target="_blank" rel="noopener"><span className="file-type flex-none min-w-[40px] px-0 py-[2px] border border-line rounded-[4px] text-[11px] font-semibold text-center text-ink-2">{fileType(file.name, file.type)}</span><span className="file-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{file.name}</span>{file.size ? <span className="file-size flex-none text-[12px] text-ink-3 tabular-nums">{file.size}</span> : null}</a></li>)}</ul><p className={NOTE_FIRST}>누르면 학교 공지 사이트의 원본 파일을 받아요</p></section> : null}
     <dl className="facts m-0 mt-[24px] border-t border-line pt-[4px]" aria-label="글 정보"><div className={FACT}><dt className={FACT_DT}>게시일</dt><dd className="m-0">{koreanDate(notice.posted_on)}</dd></div>
       {notice.previous_title ? <div className={FACT}><dt className={FACT_DT}>이전 제목</dt><dd className="m-0">{cleanTitle(notice.previous_title)}</dd></div> : null}

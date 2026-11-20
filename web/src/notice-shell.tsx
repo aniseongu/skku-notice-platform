@@ -614,6 +614,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
     })() : undefined,
     grad: gradDetail,
     team: app.teamShown(notice) ? app.teamModel(notice) : undefined,
+    questions: app.qeShown(notice) ? app.questionsModel(notice) : undefined,
     graduation: app.showsGraduation(notice) ? { connectAi: () => app.openSettings('keys'), aiKeys: (app.byokStatus && !app.byokStatus.disabled ? 1 : 0) + app.aiKeys.filter((key) => !key.disabled).length, tracks: visibleTracks(app.profile), assessment: app.graduationFor(notice), error: app.graduationError } : undefined,
   }} />;
 }
