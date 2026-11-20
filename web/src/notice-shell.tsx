@@ -60,11 +60,12 @@ function InboxButton({ app }: { app: AppController }) {
     <BellIcon />{unread ? <span className="absolute top-[10px] right-[11px] size-[8px] rounded-full bg-accent min-[720px]:top-[6px] min-[720px]:right-[7px]" aria-hidden="true" /> : null}
   </button>;
 }
+const CompassIcon = () => <svg className="size-[20px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M15.5 8.5l-2 5-5 2 2-5z" /></svg>;
 /** 저장 화면 머리의 탐험 지도 단추. 로그인했고 기록이 하나라도 있을 때만 보인다. */
 function ExploreButton({ app }: { app: AppController }) {
   const recorded = app.view === 'saved' && app.authUserId ? app.exploreItems().length : 0;
   if (!recorded) return null;
-  return <button type="button" className={`explore-entry ${TEXT_BUTTON} flex-none whitespace-nowrap`} aria-label={`탐험 지도, 기록한 활동 ${recorded}개`} onClick={app.openExploreMap}>탐험 지도</button>;
+  return <button type="button" className={`explore-entry ${TEXT_BUTTON} inline-flex flex-none items-center gap-[5px] whitespace-nowrap`} aria-label={`탐험 지도, 기록한 활동 ${recorded}개`} onClick={app.openExploreMap}><CompassIcon />탐험 지도</button>;
 }
 const GearIcon = () => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" />
   <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>;
@@ -258,6 +259,7 @@ function settingsModel(app: AppController) {
     listBoardRequests: (userId: string) => app.listBoardRequests(userId),
     submitBoardRequest: (userId: string, name: string, url: string) => app.submitBoardRequest(userId, name, url),
     showToast: (message: string) => app.showToast(message),
+    questionBlocks: app.questionBlocksModel(),
     section: app.settingsSection, openSection: (section: string | null) => app.openSettingsSection(section),
     theme: app.theme, setTheme: (theme: 'auto' | 'light' | 'dark') => app.setTheme(theme),
     canInstall: !!app.install && !isStandalone(), manualInstall: ((mode) => (mode === 'prompt' || mode === 'none' ? null : mode))(installMode(navigator.userAgent, isStandalone(), !!app.install)), install: () => { void app.runInstall(); }, showShortcuts: () => { app.shortcutsOpen = true; },

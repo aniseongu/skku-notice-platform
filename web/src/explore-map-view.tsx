@@ -20,6 +20,14 @@ function AreaRow({ label, status, count }: { label: string; status: string; coun
   </Setting>;
 }
 
+function AreaCard({ label, status, count }: { label: string; status: string; count: number }) {
+  return <li className="explore-card flex min-h-[88px] flex-col justify-center gap-[2px] rounded-md border border-line bg-surface px-[16px] py-[14px]">
+    <div className="flex items-baseline justify-between gap-[12px]"><h3 className="m-0 text-[15px] leading-[22px] font-semibold text-ink">{label}</h3>
+      <span className="explore-count text-[20px] leading-[26px] font-bold tabular-nums text-ink">{count}개</span></div>
+    <p className="explore-status m-0 text-[14px] leading-[20px] text-ink-2">{status}</p>
+  </li>;
+}
+
 export function ExploreMapPage({ model }: { model: ExploreModel }) {
   if (model.status === 'loading') {
     return <p className={`${GUTTER} m-0 pt-[8px] text-[14px] leading-[20px] text-ink-2`} role="status">활동 기록을 불러오고 있어요</p>;
@@ -41,9 +49,9 @@ export function ExploreMapPage({ model }: { model: ExploreModel }) {
       <p className={NOTE_TEXT}>내가 기록한 공고를 제목으로 나눴어요</p>
     </div>
     {summary.total > 0 ? <div className={GUTTER}>
-      <ul className={AREA_LIST} role="list" aria-label="영역별 기록">
-        {open.map((domain) => <li key={domain.id}><AreaRow label={domain.label} status={statusLine(domain.byStatus)} count={domain.count} /></li>)}
-        {summary.other.count > 0 ? <li><AreaRow label="그 밖" status={otherLine} count={summary.other.count} /></li> : null}
+      <ul className="m-0 grid list-none grid-cols-1 gap-[8px] p-0 min-[720px]:grid-cols-2 min-[720px]:gap-[12px]" aria-label="영역별 기록">
+        {open.map((domain) => <AreaCard key={domain.id} label={domain.label} status={statusLine(domain.byStatus)} count={domain.count} />)}
+        {summary.other.count > 0 ? <AreaCard label="그 밖" status={otherLine} count={summary.other.count} /> : null}
       </ul>
     </div> : null}
     {empty.length ? <section className={`explore-empty mt-[20px] ${GUTTER}`} aria-labelledby="explore-empty-title">

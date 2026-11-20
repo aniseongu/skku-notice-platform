@@ -19,7 +19,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
 import { FEEDBACK_KINDS, FEEDBACK_LIMIT, feedbackProblem, type FeedbackKind, type FeedbackResult } from './feedback';
-import { BADGE, CHEVRON_RIGHT, CHOICE, DANGER_BUTTON, GHOST_BUTTON, SEGMENTED_GRID, SETTINGS_ACTION, SETTINGS_INPUT, SOLID_BUTTON, SWITCH, SWITCH_ONLY } from './cls';
+import { BADGE, CHEVRON_RIGHT, CHOICE, DANGER_BUTTON, GHOST_BUTTON, NOTE_TEXT, SEGMENTED_GRID, SETTINGS_ACTION, SETTINGS_INPUT, SOLID_BUTTON, SWITCH, SWITCH_ONLY } from './cls';
 import { aiKeysLead, connectedAiKeys } from './ai-keys';
 import { BoardRequest, BOARD_TRAILING_ROW } from './board-request';
 import { InboxPage, type InboxModel } from './inbox-view';
@@ -47,6 +47,7 @@ export interface SettingsModel {
   listBoardRequests: (userId: string) => Promise<BoardRequestState[] | null>;
   submitBoardRequest: (userId: string, name: string, url: string) => Promise<BoardRequestResult>;
   showToast: (message: string) => void;
+  questionBlocks?: { key: string; load: () => Promise<{ id: string; createdAt: string }[]>; unblock: (id: string) => Promise<boolean> };
   /** iOS Safari: 설치 창이 없어 홈 화면 추가 방법만 알려 준다. */
   /** 설치 창이 없는 브라우저(iOS Safari, 삼성인터넷)에서 홈 화면 추가 방법을 알려 준다. */
   manualInstall?: ManualInstallMode | null;
@@ -233,6 +234,7 @@ function Overview({ model }: { model: SettingsModel }) {
             {model.name && model.email ? <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{model.email}</span> : null}</div>
         </div>
         <SettingsLink model={model} label="프로필 설정" help={profileSummary(model.profile)} section="profile" />
+        <SettingsLink model={model} label="차단 관리" help="질문과 후기에서 차단한 작성자" section="blocks" />
         <Setting name="로그아웃" help="이 기기에서만 나가요. 구독과 저장은 계정에 남아요">
           <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" disabled={model.authBusy} onClick={model.signOut}>이 기기에서 로그아웃</button>
           {model.authError ? <p className="field-note error text-[14px] leading-[20px] text-danger" role="alert">{model.authError}</p> : null}
@@ -279,6 +281,26 @@ function Overview({ model }: { model: SettingsModel }) {
     </div>
     {/* 계정 삭제는 되돌릴 수 없어서 설정의 가장 아래에 따로 둔다. */}
     {model.userId ? <DeleteAccount model={model} /> : null}
+  </div>;
+}
+
+function BlockedAuthors({ model }: { model: NonNullable<SettingsModel['questionBlocks']> }) {
+  const [items, setItems] = useState<{ id: string; createdAt: string }[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const alive = useRef(true);
+  const load = () => { setFailed(false); setItems(null); void model.load().then((rows) => { if (alive.current) setItems(rows); }, () => { if (alive.current) setFailed(true); }); };
+  useEffect(() => { alive.current = true; load(); return () => { alive.current = false; }; }, []); // account key remounts the page
+  return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
+    <Section id="blocked-authors" label="차단한 작성자">
+      <p className={SECTION_NOTE}>익명성을 위해 차단한 날짜만 보여요. 해제하면 이 작성자의 글이 다시 보여요</p>
+      {failed ? <><p role="status" className={NOTE_TEXT}>차단 목록을 불러오지 못했어요</p><button type="button" className={GHOST_BUTTON} onClick={load}>다시 불러오기</button></> : null}
+      {!failed && !items ? <p role="status" className={NOTE_TEXT}>불러오고 있어요</p> : null}
+      {items?.length === 0 ? <p className={NOTE_TEXT}>차단한 작성자가 없어요</p> : null}
+      {items?.map((item, index) => <Setting key={item.id} name={`차단한 작성자 ${index + 1}`} help={Number.isNaN(Date.parse(item.createdAt)) ? '날짜를 알 수 없어요' : new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long', timeZone: 'Asia/Seoul' }).format(new Date(item.createdAt))}>
+        <button type="button" className={GHOST_BUTTON} disabled={busy !== null} onClick={() => { setBusy(item.id); void model.unblock(item.id).then((ok) => { if (alive.current && ok) setItems((old) => old?.filter((row) => row.id !== item.id) ?? null); }, () => { if (alive.current) setFailed(true); }).finally(() => { if (alive.current) setBusy(null); }); }}>차단 해제</button>
+      </Setting>)}
+    </Section>
   </div>;
 }
 
@@ -1030,6 +1052,7 @@ export function PlatformSettings({ model }: { model: SettingsModel }) {
     case 'feedback': return <Feedback model={model} />;
     case 'inbox': return model.inbox ? <InboxPage model={model.inbox} /> : <Overview model={model} />;
     case 'explore': return model.explore ? <ExploreMapPage model={model.explore} /> : <Overview model={model} />;
+    case 'blocks': return model.questionBlocks ? <BlockedAuthors key={model.questionBlocks.key} model={model.questionBlocks} /> : <Overview model={model} />;
     default: return <Overview model={model} />;
   }
 }

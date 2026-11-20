@@ -20,6 +20,8 @@ async function setup(page: Page, otherQuestion = false) {
         count: db.reviews.length, satisfaction: summary('satisfaction'), learning: summary('learning'), difficulty: summary('difficulty') }),
       createQuestion: async (_n: string, body: string, parentId?: string) => { db.questions.push({ id: `q${db.questions.length + 1}`, body, parentId }); return 'x'; },
       createExperience: async (_n: string, input: any) => { db.reviews.push({ id: `r${db.reviews.length + 1}`, ...input }); return 'x'; },
+      editQuestion: async (id: string, body: string) => { const q = db.questions.find((item) => item.id === id); if (q) q.body = body; },
+      editExperience: async (id: string, input: any) => { const r = db.reviews.find((item) => item.id === id); if (r) Object.assign(r, input); },
       deletePost: async (id: string) => { db.questions = db.questions.filter((q) => q.id !== id); db.reviews = db.reviews.filter((r) => r.id !== id); },
       report: async (id: string) => { db.reports.push(id); }, blockAuthor: async () => 'b',
     };
@@ -28,6 +30,83 @@ async function setup(page: Page, otherQuestion = false) {
   }, otherQuestion);
   await page.waitForTimeout(600);
 }
+
+test('authors can edit their review, question and answer in place', async ({ page }) => {
+  await setup(page);
+  const section = page.getByRole('region', { name: /질문·경험/ });
+  await section.getByRole('button', { name: /^질문·경험/ }).click();
+  await section.getByRole('button', { name: '후기 남기기' }).first().click();
+  const reviewForm = section.getByRole('form', { name: '후기 남기기' });
+  await reviewForm.getByRole('radio', { name: '업무 만족 4점' }).click();
+  await reviewForm.getByRole('button', { name: '후기 남기기' }).click();
+  const review = section.getByRole('listitem').filter({ hasText: '내 후기' });
+  await review.getByRole('button', { name: '더 보기 메뉴' }).click();
+  await review.getByRole('button', { name: '수정하기' }).click();
+  const editReview = section.getByRole('form', { name: '후기 수정' });
+  await expect(editReview.getByRole('radio', { name: '업무 만족 4점' })).toHaveAttribute('aria-checked', 'true');
+  await editReview.getByRole('radio', { name: '업무 만족 5점' }).click();
+  await editReview.getByRole('button', { name: '수정 완료' }).click();
+  await expect(section.getByText('5.0').first()).toBeVisible();
+  await section.getByRole('button', { name: '질문하기' }).click();
+  await section.getByRole('textbox', { name: '질문하기' }).fill('원래 질문');
+  await section.getByRole('form', { name: '질문하기' }).getByRole('button', { name: '질문하기' }).click();
+  const question = section.getByRole('listitem').filter({ hasText: '원래 질문' });
+  await question.getByRole('button', { name: '더 보기 메뉴' }).first().click();
+  await question.getByRole('button', { name: '수정하기' }).click();
+  await question.getByRole('textbox', { name: '질문 수정' }).fill('고친 질문');
+  await section.getByRole('form', { name: '질문 수정' }).getByRole('button', { name: '수정 완료' }).click();
+  await expect(section.getByText('고친 질문')).toBeVisible();
+  const updatedQuestion = section.getByRole('listitem').filter({ hasText: '고친 질문' });
+  await updatedQuestion.getByRole('button', { name: '답하기' }).click();
+  await updatedQuestion.getByRole('textbox', { name: '답 남기기' }).fill('원래 답');
+  await updatedQuestion.getByRole('form', { name: '답 남기기' }).getByRole('button', { name: '답 남기기' }).click();
+  const reply = section.getByRole('listitem').filter({ hasText: '원래 답' }).last();
+  await reply.getByRole('button', { name: '더 보기 메뉴' }).click();
+  await reply.getByRole('button', { name: '수정하기' }).click();
+  await reply.getByRole('textbox', { name: '답 수정' }).fill('고친 답');
+  await section.getByRole('form', { name: '답 수정' }).getByRole('button', { name: '수정 완료' }).click();
+  await expect(section.getByText('고친 답')).toBeVisible();
+});
+
+test('blocked authors can be listed and unblocked from settings', async ({ page }) => {
+  await setup(page);
+  await page.evaluate(() => {
+    const app = (document.querySelector('notice-app') as unknown as App).controller;
+    let blocked = [{ id: 'block-one', createdAt: '2026-11-20T03:00:00Z' }];
+    app.qeApiOverride.listBlocks = async (guard: () => boolean) => { if (!guard()) throw new Error('account changed'); return blocked; };
+    app.qeApiOverride.unblock = async (id: string) => { blocked = blocked.filter((item) => item.id !== id); };
+    app.openSettings('blocks');
+  });
+  await expect(page).toHaveURL(/section=blocks/);
+  const pageBody = page.locator('platform-settings-screen');
+  await expect(pageBody.getByText('차단한 작성자 1')).toBeVisible();
+  await expect(pageBody.getByText('2026년 11월 20일')).toBeVisible();
+  await pageBody.getByRole('button', { name: '차단 해제' }).click();
+  await expect(pageBody.getByText('차단한 작성자가 없어요')).toBeVisible();
+});
+
+test('a late block list from the previous account is discarded', async ({ page }) => {
+  await setup(page);
+  await page.evaluate(() => {
+    const app = (document.querySelector('notice-app') as unknown as App).controller;
+    app.qeApiOverride.listBlocks = async (guard: () => boolean) => {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      if (!guard()) throw new Error('account changed');
+      return [{ id: 'old', createdAt: '2026-11-20T03:00:00Z' }];
+    };
+    app.openSettings('blocks');
+  });
+  await expect(page.locator('platform-settings-screen').getByText('불러오고 있어요')).toBeVisible();
+  await page.evaluate(() => {
+    const app = (document.querySelector('notice-app') as unknown as App).controller;
+    app.advanceAccountEpoch(); app.authUserId = 'account-b';
+    app.qeApiOverride.listBlocks = async () => [];
+    app.requestUpdate();
+  });
+  await expect(page.locator('platform-settings-screen').getByText('차단한 작성자가 없어요')).toBeVisible();
+  await page.waitForTimeout(900);
+  await expect(page.locator('platform-settings-screen').getByText('차단한 작성자 1')).toHaveCount(0);
+});
 
 test('empty state, leave a star-only review, ask a question and answer it', async ({ page }) => {
   await setup(page);
@@ -182,8 +261,9 @@ test('stale question models cannot mutate after an account or epoch change, and 
     const old = controller.questionsModel({ id });
     let calls = 0;
     const mutate = async () => { calls++; return 'new-id'; };
-    Object.assign(controller.qeApiOverride, { createQuestion: mutate, createExperience: mutate, deletePost: mutate, report: mutate, blockAuthor: mutate });
-    const writes = () => Promise.all([old.ask('질문'), old.review({ satisfaction: 5 }), old.remove('p'), old.report('p'), old.block('p')]);
+    Object.assign(controller.qeApiOverride, { createQuestion: mutate, createExperience: mutate, editQuestion: mutate, editExperience: mutate, deletePost: mutate, report: mutate, blockAuthor: mutate, unblock: mutate });
+    const oldBlocks = controller.questionBlocksModel();
+    const writes = () => Promise.all([old.ask('질문'), old.review({ satisfaction: 5 }), old.editQuestion('p', '수정'), old.editReview('p', { satisfaction: 4 }), old.remove('p'), old.report('p'), old.block('p'), oldBlocks.unblock('b')]);
     controller.subscriptionsEpoch++;
     const changedEpoch = await writes();
     controller.subscriptionsEpoch--;
@@ -191,7 +271,7 @@ test('stale question models cannot mutate after an account or epoch change, and 
     const changedUser = await writes();
     return { calls, changedEpoch, changedUser };
   });
-  expect(result).toEqual({ calls: 0, changedEpoch: Array(5).fill(false), changedUser: Array(5).fill(false) });
+  expect(result).toEqual({ calls: 0, changedEpoch: Array(8).fill(false), changedUser: Array(8).fill(false) });
   await expect(section.getByRole('button', { name: /^질문·경험/ })).toHaveAttribute('aria-expanded', 'false');
   await expect(section.getByRole('textbox')).toHaveCount(0);
 });

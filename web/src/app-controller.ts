@@ -91,7 +91,7 @@ export function settingsSectionFromUrl(): string | null {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'keys';
   const section = params.get('section');
-  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile', 'feedback', 'inbox', 'explore'].includes(section) ? section : null;
+  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile', 'feedback', 'inbox', 'explore', 'blocks'].includes(section) ? section : null;
 }
 
 /** 설정 머리의 부제. 쪽마다 그 쪽에서 하는 일을 말한다. */
@@ -106,6 +106,7 @@ export function settingsSubtitle(): string {
     case 'feedback': return '궁금한 점이나 바라는 점을 남겨 주세요';
     case 'inbox': return '이 기기가 받은 알림을 다시 봐요';
     case 'explore': return '기록한 활동이 어느 영역에 있는지 봐요';
+    case 'blocks': return '차단한 작성자를 관리해요';
     default: return '알림과 연결을 정해요';
   }
 }
@@ -113,7 +114,7 @@ export function settingsSubtitle(): string {
 export function settingsTitle(): string {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'AI 연결';
-  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정', feedback: '문의하기', inbox: '알림함', explore: '탐험 지도' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
+  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정', feedback: '문의하기', inbox: '알림함', explore: '탐험 지도', blocks: '차단 관리' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
 }
 
 export interface InstallPrompt extends Event { prompt(): Promise<void> }
@@ -1053,6 +1054,8 @@ export class AppController extends Reactive {
       load: () => { if (current()) this.loadQuestions(id); },
       ask: (body: string, parentId?: string) => run((api, guard) => api.createQuestion(id, body, parentId, guard), parentId ? '답을 남겼어요' : '질문을 남겼어요'),
       review: (input: ExperienceInput) => run(async (api, guard) => { await api.createExperience(id, input, guard); }, '후기를 남겼어요'),
+      editQuestion: (postId, body) => run((api, guard) => api.editQuestion(postId, body, guard), '수정했어요'),
+      editReview: (postId, input) => run((api, guard) => api.editExperience(postId, input, guard), '수정했어요'),
       remove: (postId) => run((api, guard) => api.deletePost(postId, guard), '지웠어요'),
       report: (postId) => run((api, guard) => api.report(postId, guard), '신고했어요. 확인할게요'),
       block: (postId) => run(async (api, guard) => { await api.blockAuthor(postId, guard); }, '이 작성자를 차단했어요'),
@@ -1064,6 +1067,20 @@ export class AppController extends Reactive {
           this.writeQeDraft(key, value);
         },
       },
+    };
+  }
+
+  questionBlocksModel() {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    const current = () => !!userId && this.isCurrentAccount(userId, epoch);
+    return {
+      key: `${userId}-${epoch}`,
+      load: async () => {
+        const api = this.qeApi();
+        if (!api || !current()) throw new AccountChanged();
+        return api.listBlocks(current);
+      },
+      unblock: async (blockId: string) => current() && (await this.qeRun('', (api, guard) => api.unblock(blockId, guard), '차단을 해제했어요')).ok,
     };
   }
 

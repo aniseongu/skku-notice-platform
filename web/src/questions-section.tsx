@@ -13,6 +13,8 @@ export interface QuestionsModel {
   load: () => void;
   ask: (body: string, parentId?: string) => Promise<boolean>;
   review: (input: ExperienceInput) => Promise<boolean>;
+  editQuestion: (postId: string, body: string) => Promise<boolean>;
+  editReview: (postId: string, input: ExperienceInput) => Promise<boolean>;
   remove: (postId: string) => Promise<boolean>;
   report: (postId: string) => Promise<boolean>;
   block: (postId: string) => Promise<boolean>;
@@ -54,8 +56,8 @@ function StarPicker({ id, label, value, onChange, optional }: { id: string; labe
         onClick={() => onChange(optional && value === n ? null : n)}><span aria-hidden="true">★</span><span className="tabular-nums">{n}</span></button>)}</div></div>;
 }
 
-function ReviewForm({ model, onDone }: { model: QuestionsModel; onDone: () => void }) {
-  const saved = useRef(model.draft.get()).current;
+function ReviewForm({ model, onDone, post }: { model: QuestionsModel; onDone: () => void; post?: Experience }) {
+  const saved = useRef(post ? { satisfaction: post.satisfaction, learning: post.learning, difficulty: post.difficulty, participated: post.participated, body: post.body ?? '' } : model.draft.get()).current;
   const [satisfaction, setSatisfaction] = useState<Stars | null>(saved?.satisfaction ?? null);
   const [learning, setLearning] = useState<Stars | null>(saved?.learning ?? null);
   const [difficulty, setDifficulty] = useState<Stars | null>(saved?.difficulty ?? null);
@@ -65,13 +67,14 @@ function ReviewForm({ model, onDone }: { model: QuestionsModel; onDone: () => vo
   const moreId = useId();
   const current: ReviewDraft = { satisfaction, learning, difficulty, participated, body };
   useEffect(() => {
+    if (post) return;
     const empty = !satisfaction && !learning && !difficulty && !participated && !body.trim();
     model.draft.set(empty ? null : current);
   }, [satisfaction, learning, difficulty, participated, body]);  // eslint-disable-line react-hooks/exhaustive-deps
   const input: ExperienceInput | null = satisfaction ? { satisfaction, ...(learning ? { learning } : {}), ...(difficulty ? { difficulty } : {}), body, participated } : null;
   const problem = input ? validateExperience(input) : null;
-  const submit = () => { if (input && !problem) void model.review(input).then((ok) => { if (ok) { model.draft.set(null); onDone(); } }); };
-  return <form className="grid gap-[10px] rounded-md border border-line bg-surface p-[12px]" aria-label="후기 남기기" onSubmit={(event) => { event.preventDefault(); submit(); }}>
+  const submit = () => { if (input && !problem) void (post ? model.editReview(post.id, input) : model.review(input)).then((ok) => { if (ok) { if (!post) model.draft.set(null); onDone(); } }); };
+  return <form className="grid gap-[10px] rounded-md border border-line bg-surface p-[12px]" aria-label={post ? '후기 수정' : '후기 남기기'} onSubmit={(event) => { event.preventDefault(); submit(); }}>
     <StarPicker id="qe-sat" label="업무 만족" value={satisfaction} onChange={setSatisfaction} />
     <button type="button" className={`${TEXT_BUTTON} flex w-full items-center justify-between text-left`} aria-expanded={more} aria-controls={moreId} onClick={() => setMore(!more)}>
       더 남기기 (선택)<Chevron open={more} />
@@ -84,25 +87,25 @@ function ReviewForm({ model, onDone }: { model: QuestionsModel; onDone: () => vo
       <label className="flex min-h-[44px] items-center gap-[10px] text-[14px] text-ink"><input type="checkbox" className="size-[18px] accent-[var(--accent)]" checked={participated} onChange={(event) => setParticipated(event.target.checked)} />이 활동에 직접 참여했어요</label>
     </div>
     {problem ? <p className="m-0 text-[13px] text-danger" role="status">{problem}</p> : null}
-    <div className="flex gap-[6px]"><button type="submit" className={SOLID_BUTTON} disabled={model.busy || !input || !!problem}>후기 남기기</button>
+    <div className="flex gap-[6px]"><button type="submit" className={SOLID_BUTTON} disabled={model.busy || !input || !!problem}>{post ? '수정 완료' : '후기 남기기'}</button>
       <button type="button" className={GHOST_BUTTON} onClick={onDone}>닫기</button></div>
-    <p className={NOTE_TEXT}>이름은 보이지 않아요. 별점만 남겨도 괜찮아요. 쓰던 글은 이 기기에 저장돼요</p>
+    <p className={NOTE_TEXT}>{post ? '이름은 보이지 않아요. 별점만 남겨도 괜찮아요' : '이름은 보이지 않아요. 별점만 남겨도 괜찮아요. 쓰던 글은 이 기기에 저장돼요'}</p>
   </form>;
 }
 
-function QuestionForm({ model, parentId, onDone, label }: { model: QuestionsModel; parentId?: string; onDone: () => void; label: string }) {
-  const [body, setBody] = useState('');
+function QuestionForm({ model, parentId, onDone, label, post }: { model: QuestionsModel; parentId?: string; onDone: () => void; label: string; post?: Question }) {
+  const [body, setBody] = useState(post?.body ?? '');
   const problem = body ? validateQuestionBody(body) : null;
   const ok = !!body.trim() && !validateQuestionBody(body);
-  return <form className="grid gap-[8px]" aria-label={label} onSubmit={(event) => { event.preventDefault(); if (ok) void model.ask(body, parentId).then((done) => { if (done) onDone(); }); }}>
+  return <form className="grid gap-[8px]" aria-label={label} onSubmit={(event) => { event.preventDefault(); if (ok) void (post ? model.editQuestion(post.id, body) : model.ask(body, parentId)).then((done) => { if (done) onDone(); }); }}>
     <textarea autoFocus className={AREA} aria-label={label} maxLength={BODY_MAX} value={body} placeholder={parentId ? '아는 만큼 답해 주세요' : '궁금한 점을 적어 주세요'} onChange={(event) => setBody(event.target.value)} />
     {problem ? <p className="m-0 text-[13px] text-danger" role="status">{problem}</p> : null}
-    <div className="flex gap-[6px]"><button type="submit" className={GHOST_BUTTON} disabled={model.busy || !ok}>{parentId ? '답 남기기' : '질문하기'}</button>
+    <div className="flex gap-[6px]"><button type="submit" className={GHOST_BUTTON} disabled={model.busy || !ok}>{post ? '수정 완료' : parentId ? '답 남기기' : '질문하기'}</button>
       <button type="button" className={GHOST_BUTTON} onClick={onDone}>닫기</button></div>
   </form>;
 }
 
-function Actions({ model, mine, postId, noun }: { model: QuestionsModel; mine: boolean; postId: string; noun: '후기' | '질문' | '답' }) {
+function Actions({ model, mine, postId, noun, onEdit, hidden = false }: { model: QuestionsModel; mine: boolean; postId: string; noun: '후기' | '질문' | '답'; onEdit: () => void; hidden?: boolean }) {
   const [stage, setStage] = useState<'menu' | 'remove' | 'report' | 'block' | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -138,8 +141,9 @@ function Actions({ model, mine, postId, noun }: { model: QuestionsModel; mine: b
           <button type="button" className={TEXT_BUTTON_DANGER} disabled={model.busy} onClick={() => { close(); void action.run(postId); }}>{action.label}</button>
           <button type="button" className={TEXT_BUTTON} autoFocus onClick={close}>취소</button>
         </div>
-      </div> : choices.map((choice, index) => <button type="button" key={choice} className={`${TEXT_BUTTON} text-left`}
-        autoFocus={index === 0} disabled={model.busy} onClick={() => setStage(choice)}>{actions[choice].label}</button>)}
+      </div> : <>{mine && !hidden ? <button type="button" className={`${TEXT_BUTTON} text-left`} autoFocus disabled={model.busy} onClick={() => { setStage(null); onEdit(); }}>수정하기</button> : null}
+        {choices.map((choice, index) => <button type="button" key={choice} className={`${TEXT_BUTTON} text-left`}
+        autoFocus={(!mine || hidden) && index === 0} disabled={model.busy} onClick={() => setStage(choice)}>{actions[choice].label}</button>)}</>}
     </div> : null}
   </div>;
 }
@@ -154,6 +158,8 @@ function ReviewBody({ text }: { text: string }) {
 }
 
 function ReviewCard({ model, post }: { model: QuestionsModel; post: Experience }) {
+  const [editing, setEditing] = useState(false);
+  if (editing) return <li><ReviewForm model={model} post={post} onDone={() => setEditing(false)} /></li>;
   return <li className={CARD}>
     <div className="flex min-h-[28px] items-center justify-between gap-[6px]">
       <div className="flex min-w-0 flex-wrap items-center gap-[6px] text-[13px] text-ink-2">
@@ -162,7 +168,7 @@ function ReviewCard({ model, post }: { model: QuestionsModel; post: Experience }
         {post.difficulty ? <span className={BADGE}>전형 난이도 {post.difficulty}</span> : null}
         {post.mine ? <span className={BADGE}>내 후기</span> : null}
       </div>
-      <Actions model={model} mine={post.mine} postId={post.id} noun="후기" />
+      <Actions model={model} mine={post.mine} postId={post.id} noun="후기" hidden={post.hidden} onEdit={() => setEditing(true)} />
     </div>
     {post.participated ? <p className={NOTE_TEXT}>직접 참여했다고 했어요</p> : null}
     {post.body ? <ReviewBody text={post.body} /> : null}
@@ -170,20 +176,26 @@ function ReviewCard({ model, post }: { model: QuestionsModel; post: Experience }
   </li>;
 }
 
-function Replies({ model, replies }: { model: QuestionsModel; replies: Question[] }) {
-  return <ul className="m-0 grid list-none gap-[6px] p-0" aria-label="답변">{replies.map((reply) => <li key={reply.id} className="grid gap-[4px] rounded-sm bg-sunken px-[12px] py-[8px]">
+function Reply({ model, reply }: { model: QuestionsModel; reply: Question }) {
+  const [editing, setEditing] = useState(false);
+  return <li className="grid gap-[4px] rounded-sm bg-sunken px-[12px] py-[8px]">
     <div className="flex min-h-[28px] items-center gap-[6px]"><span className="text-[13px] font-semibold text-ink">익명 {reply.anonNo}</span>{reply.mine ? <span className={BADGE}>내 글</span> : null}
-      <Actions model={model} mine={reply.mine} postId={reply.id} noun="답" /></div>
-    <p className="m-0 text-[14px] leading-[21px] text-ink whitespace-pre-wrap [overflow-wrap:anywhere]">{reply.body}</p>
-  </li>)}</ul>;
+      <Actions model={model} mine={reply.mine} postId={reply.id} noun="답" hidden={reply.hidden} onEdit={() => setEditing(true)} /></div>
+    {editing ? <QuestionForm model={model} post={reply} label="답 수정" onDone={() => setEditing(false)} /> : <p className="m-0 text-[14px] leading-[21px] text-ink whitespace-pre-wrap [overflow-wrap:anywhere]">{reply.body}</p>}
+  </li>;
+}
+
+function Replies({ model, replies }: { model: QuestionsModel; replies: Question[] }) {
+  return <ul className="m-0 grid list-none gap-[6px] p-0" aria-label="답변">{replies.map((reply) => <Reply key={reply.id} model={model} reply={reply} />)}</ul>;
 }
 
 function QuestionItem({ model, question, replies, canReply }: { model: QuestionsModel; question: Question; replies: Question[]; canReply: boolean }) {
   const [replying, setReplying] = useState(false);
+  const [editing, setEditing] = useState(false);
   return <li className={CARD}>
     <div className="flex min-h-[28px] items-center gap-[6px]"><span className="text-[14px] font-semibold text-ink">익명 {question.anonNo}</span>{question.mine ? <span className={BADGE}>내 글</span> : null}
-      <Actions model={model} mine={question.mine} postId={question.id} noun="질문" /></div>
-    <p className="m-0 text-[14px] leading-[21px] text-ink whitespace-pre-wrap [overflow-wrap:anywhere]">{question.body}</p>
+      <Actions model={model} mine={question.mine} postId={question.id} noun="질문" hidden={question.hidden} onEdit={() => setEditing(true)} /></div>
+    {editing ? <QuestionForm model={model} post={question} label="질문 수정" onDone={() => setEditing(false)} /> : <p className="m-0 text-[14px] leading-[21px] text-ink whitespace-pre-wrap [overflow-wrap:anywhere]">{question.body}</p>}
     {question.hidden ? <p className={NOTE_TEXT} role="status">신고가 쌓여 다른 사람에게는 보이지 않아요</p> : null}
     {replies.length ? <Replies model={model} replies={replies} /> : null}
     {replying ? <QuestionForm model={model} parentId={question.id} label="답 남기기" onDone={() => setReplying(false)} />

@@ -27,6 +27,7 @@ test('saved screen shows the header button, one tap opens the map with counts, b
     { id: 'x3', title: '국가장학금 신청', status: 'preparing' }, { id: 'x4', title: '도서관 이용 안내', status: 'result' },
   ]);
   await expect(entry(page)).toHaveText('탐험 지도');
+  await expect(entry(page).locator('svg[aria-hidden=true]')).toHaveCount(1);
   await expect(entry(page)).toHaveAttribute('aria-label', /기록한 활동 4개/);
   const box = (await entry(page).boundingBox())!;
   expect(box.height).toBeGreaterThanOrEqual(44);
@@ -77,7 +78,7 @@ test('saved notices without a record count as "관심" and the same notice is co
   await expect(entry(page)).toHaveAttribute('aria-label', /기록한 활동 2개/);
 });
 
-test('the map page stays within the viewport and areas stack as non-interactive settings rows', async ({ page }) => {
+test('the map page stays within the viewport and areas use non-interactive cards', async ({ page }, info) => {
   await setup(page, [{ id: 'x1', title: '교환학생 파견 안내', status: 'interested' }, { id: 'x2', title: '하계 인턴 채용', status: 'interested' }]);
   await entry(page).click();
   const rows = recordedAreas(page);
@@ -86,10 +87,10 @@ test('the map page stays within the viewport and areas stack as non-interactive 
   expect(overflow).toBeLessThanOrEqual(0);
   const first = (await rows.first().boundingBox())!;
   const second = (await rows.last().boundingBox())!;
-  expect(second.x).toBe(first.x);
-  expect(second.y).toBeGreaterThan(first.y);
+  if (info.project.name === 'mobile') { expect(second.x).toBe(first.x); expect(second.y).toBeGreaterThan(first.y); }
+  else { expect(second.x).toBeGreaterThan(first.x); expect(second.y).toBe(first.y); }
   await expect(rows.locator('button, a, .settings-chevron')).toHaveCount(0);
-  const title = (await rows.first().locator('.setting-name').boundingBox())!;
+  const title = (await rows.first().getByRole('heading').boundingBox())!;
   const status = (await rows.first().locator('.explore-status').boundingBox())!;
   const count = (await rows.first().locator('.explore-count').boundingBox())!;
   expect(status.y).toBeGreaterThan(title.y);
