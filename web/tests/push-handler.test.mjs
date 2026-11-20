@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
@@ -137,13 +138,13 @@ test('canvas, required-info, forged and old alerts keep opening the checked url'
   assert.equal(w.opened.at(-1), url);
 });
 
-// 알림함: 받은 알림을 이 기기의 IndexedDB(키 inbox:v1, owner {userId, endpoint} + items)에 쌓는다. 날 IndexedDB를 흉내 낸 가짜로 워커 코드를 그대로 돌린다.
-function fakeIndexedDb(data, { hang = false, blocked = false } = {}) {
+// 알림함: 받은 알림을 이 기기의 IndexedDB(키 inbox:v1, owner {userId, endpoint, recipientHash} + items)에 쌓는다. 날 IndexedDB를 흉내 낸 가짜로 워커 코드를 그대로 돌린다.
+function fakeIndexedDb(data, { hang = false, blocked = false, openGate = Promise.resolve() } = {}) {
   return {
     open() {
       const request = {};
       if (hang) return request;
-      setTimeout(() => {
+      void openGate.then(() => setTimeout(() => {
         if (blocked) { request.onblocked?.(); return; }
         request.result = {
           createObjectStore() {}, close() {},
@@ -159,22 +160,24 @@ function fakeIndexedDb(data, { hang = false, blocked = false } = {}) {
           },
         };
         request.onsuccess?.();
-      }, 0);
+      }, 0));
       return request;
     },
   };
 }
 const EP_A = 'https://push.example/a';
 const EP_B = 'https://push.example/b';
+const recipient = (userId) => createHash('sha256').update('skku-inbox:' + userId).digest('hex').slice(0, 16);
+const inboxOwner = (userId, endpoint) => ({ userId, endpoint, recipientHash: recipient(userId) });
 const recordOf = (owner) => new Map([['inbox:v1', JSON.stringify({ version: 1, owner, items: [] })]]);
 const inboxOf = (data) => (data.has('inbox:v1') ? JSON.parse(data.get('inbox:v1')).items : []);
 const registered = (data, endpoint, extra = {}) => worker([], { indexedDB: fakeIndexedDb(data), endpoint, ...extra });
 
 test('a received alert is kept in the inbox for the owner whose subscription received it, newest first', async () => {
-  const data = recordOf({ userId: 'user-a', endpoint: EP_A });
+  const data = recordOf(inboxOwner('user-a', EP_A));
   const w = registered(data, EP_A);
-  await w.push({ title: '첫 공지', body: '본문', url: 'https://cse.skku.edu/a', tag: `notice:${APP_ID}` });
-  await w.push({ title: '두 번째', body: '본문2', tag: 'skku-notice' });
+  await w.push({ to: recipient('user-a'), title: '첫 공지', body: '본문', url: 'https://cse.skku.edu/a', tag: `notice:${APP_ID}` });
+  await w.push({ to: recipient('user-a'), title: '두 번째', body: '본문2', tag: 'skku-notice' });
   const items = inboxOf(data);
   assert.deepEqual(items.map((item) => item.title), ['두 번째', '첫 공지']);
   assert.equal(items[1].owner, 'user-a');
@@ -182,48 +185,59 @@ test('a received alert is kept in the inbox for the owner whose subscription rec
   assert.equal(items[1].url, 'https://cse.skku.edu/a');
   assert.equal(items[1].read, false);
   assert.equal(items[0].noticeId, null);
-  assert.deepEqual(JSON.parse(data.get('inbox:v1')).owner, { userId: 'user-a', endpoint: EP_A });   // 소유자는 그대로 보존된다
+  assert.deepEqual(JSON.parse(data.get('inbox:v1')).owner, inboxOwner('user-a', EP_A));   // 소유자는 그대로 보존된다
 });
 
 test('a push for account A arriving after B logged in is shown but never stored under B', async () => {
   // A가 이 기기를 EP_A로 등록해 둔 채 B로 바꿨다. 앱은 B를 소유자로 적었지만(endpoint null) 아직 B의 구독을 등록하기 전이다.
-  const data = recordOf({ userId: 'user-b', endpoint: null });
+  const data = recordOf(inboxOwner('user-b', null));
   const late = registered(data, EP_A);
-  await late.push({ title: 'A에게 온 장학 안내', body: 'A의 알림', tag: `notice:${APP_ID}` });
+  await late.push({ to: recipient('user-a'), title: 'A에게 온 장학 안내', body: 'A의 알림', tag: `notice:${APP_ID}` });
   assert.equal(late.notifications.length, 1);
   assert.deepEqual(inboxOf(data), []);
   // 구독 주소가 아직 A 것인데 owner가 B의 옛 주소를 가리켜도 저장하지 않는다
-  const other = recordOf({ userId: 'user-b', endpoint: EP_B });
-  await registered(other, EP_A).push({ title: 'A에게 온 알림' });
+  const other = recordOf(inboxOwner('user-b', EP_B));
+  await registered(other, EP_A).push({ to: recipient('user-a'), title: 'A에게 온 알림' });
   assert.deepEqual(inboxOf(other), []);
   // B가 자기 구독을 등록해 앱이 owner.endpoint를 EP_B로 기록한 뒤에는 저장된다
-  const after = recordOf({ userId: 'user-b', endpoint: EP_B });
-  await registered(after, EP_B).push({ title: 'B에게 온 알림' });
+  const after = recordOf(inboxOwner('user-b', EP_B));
+  await registered(after, EP_B).push({ to: recipient('user-b'), title: 'B에게 온 알림' });
   assert.deepEqual(inboxOf(after).map((item) => [item.title, item.owner]), [['B에게 온 알림', 'user-b']]);
+});
+
+test('an endpoint re-registered to B stores only pushes addressed to B', async () => {
+  const data = recordOf(inboxOwner('user-b', EP_A));
+  const w = registered(data, EP_A);
+  await w.push({ title: 'A에게 온 지연 알림', to: recipient('user-a') });
+  await w.push({ title: '이전 서버의 알림' });
+  await w.push({ title: 'B에게 온 알림', to: recipient('user-b') });
+  assert.equal(w.notifications.length, 3);
+  assert.deepEqual(inboxOf(data).map((item) => [item.title, item.owner]), [['B에게 온 알림', 'user-b']]);
 });
 
 test('without an owner, a subscription or a stored record nothing is kept, but the alert still shows', async () => {
   const cases = [
     [new Map(), EP_A],
+    [recordOf({ userId: 'user-a', endpoint: EP_A }), EP_A], // old owner record has no hash
     [recordOf(null), EP_A],
-    [recordOf({ userId: 'user-a', endpoint: EP_A }), null],     // 구독이 없다(해제·전환 중)
+    [recordOf(inboxOwner('user-a', EP_A)), null],     // 구독이 없다(해제·전환 중)
     [recordOf({ userId: '', endpoint: EP_A }), EP_A],
   ];
   for (const [data, endpoint] of cases) {
     const w = registered(data, endpoint);
-    await w.push({ title: '공지', tag: `notice:${APP_ID}` });
+    await w.push({ to: recipient('user-a'), title: '공지', tag: `notice:${APP_ID}` });
     assert.equal(w.notifications.length, 1);
     assert.deepEqual(inboxOf(data), []);
   }
 });
 
 test('the same notice tag replaces its earlier entry and comes back unread; the generic tag does not merge', async () => {
-  const data = recordOf({ userId: 'user-a', endpoint: EP_A });
+  const data = recordOf(inboxOwner('user-a', EP_A));
   const w = registered(data, EP_A);
-  await w.push({ title: '장학', tag: `notice:${APP_ID}` });
-  await w.push({ title: '장학 (수정됨)', tag: `notice:${APP_ID}` });
-  await w.push({ title: 'a', tag: 'skku-notice' });
-  await w.push({ title: 'b' });
+  await w.push({ to: recipient('user-a'), title: '장학', tag: `notice:${APP_ID}` });
+  await w.push({ to: recipient('user-a'), title: '장학 (수정됨)', tag: `notice:${APP_ID}` });
+  await w.push({ to: recipient('user-a'), title: 'a', tag: 'skku-notice' });
+  await w.push({ to: recipient('user-a'), title: 'b' });
   assert.deepEqual(inboxOf(data).map((item) => item.title).sort(), ['a', 'b', '장학 (수정됨)']);
 });
 
@@ -231,9 +245,9 @@ test('old entries (30 days) are dropped and at most 200 are kept; other owners a
   const now = Date.now();
   const make = (i, at, owner = 'user-a') => ({ id: `i${i}`, owner, tag: `t${i}`, title: `제목${i}`, body: '', noticeId: null, url: 'https://x', at, read: true });
   const items = [make(0, now - 31 * 86400000), ...Array.from({ length: 205 }, (_, i) => make(i + 1, now - i * 1000))];
-  const data = new Map([['inbox:v1', JSON.stringify({ version: 1, owner: { userId: 'user-a', endpoint: EP_A }, items })]]);
+  const data = new Map([['inbox:v1', JSON.stringify({ version: 1, owner: inboxOwner('user-a', EP_A), items })]]);
   const w = registered(data, EP_A);
-  await w.push({ title: '새 알림', tag: 'skku-notice' });
+  await w.push({ to: recipient('user-a'), title: '새 알림', tag: 'skku-notice' });
   const kept = inboxOf(data);
   assert.equal(kept.length, 200);
   assert.equal(kept[0].title, '새 알림');
@@ -241,28 +255,28 @@ test('old entries (30 days) are dropped and at most 200 are kept; other owners a
 });
 
 test('a failing, blocked or hanging inbox write never blocks or fails the notification', async () => {
-  const data = recordOf({ userId: 'user-a', endpoint: EP_A });
+  const data = recordOf(inboxOwner('user-a', EP_A));
   const failing = { open() { const request = {}; setTimeout(() => request.onerror?.(), 0); request.error = new Error('x'); return request; } };
   const broken = worker([], { indexedDB: failing, endpoint: EP_A });
-  await broken.push({ title: '공지', tag: `notice:${APP_ID}` });
+  await broken.push({ to: recipient('user-a'), title: '공지', tag: `notice:${APP_ID}` });
   assert.equal(broken.notifications.length, 1);
   const blocked = registered(data, EP_A, { indexedDB: fakeIndexedDb(data, { blocked: true }) });
-  await blocked.push({ title: '공지' });
+  await blocked.push({ to: recipient('user-a'), title: '공지' });
   assert.equal(blocked.notifications.length, 1);
   assert.deepEqual(inboxOf(data), []);
   const noDb = worker([], { endpoint: EP_A });
-  await noDb.push({ title: '공지' });
+  await noDb.push({ to: recipient('user-a'), title: '공지' });
   assert.equal(noDb.notifications.length, 1);
   const noPush = worker();
-  await noPush.push({ title: '공지' });
+  await noPush.push({ to: recipient('user-a'), title: '공지' });
   assert.equal(noPush.notifications.length, 1);
 });
 
 test('a hung inbox open gives up after about three seconds while the alert is already shown', async () => {
-  const data = recordOf({ userId: 'user-a', endpoint: EP_A });
+  const data = recordOf(inboxOwner('user-a', EP_A));
   const w = registered(data, EP_A, { indexedDB: fakeIndexedDb(data, { hang: true }) });
   const started = Date.now();
-  await w.push({ title: '공지' });
+  await w.push({ to: recipient('user-a'), title: '공지' });
   const elapsed = Date.now() - started;
   assert.equal(w.notifications.length, 1);
   assert.ok(elapsed >= 2500 && elapsed < 6000, `elapsed ${elapsed}`);
@@ -271,11 +285,28 @@ test('a hung inbox open gives up after about three seconds while the alert is al
 
 test('open windows are told the inbox changed only when something was stored', async () => {
   const messages = [];
-  const data = recordOf({ userId: 'user-a', endpoint: EP_A });
+  const data = recordOf(inboxOwner('user-a', EP_A));
   const windows = [{ url: 'https://example.github.io/skku-notice-alert/', postMessage: (message) => messages.push(message) }];
-  await worker(windows, { indexedDB: fakeIndexedDb(data), endpoint: EP_A }).push({ title: '공지' });
+  await worker(windows, { indexedDB: fakeIndexedDb(data), endpoint: EP_A }).push({ to: recipient('user-a'), title: '공지' });
   assert.deepEqual(JSON.parse(JSON.stringify(messages)), [{ type: 'inbox-changed' }]);
   messages.length = 0;
-  await worker(windows, { indexedDB: fakeIndexedDb(data), endpoint: EP_B }).push({ title: '다른 구독' });
+  await worker(windows, { indexedDB: fakeIndexedDb(data), endpoint: EP_B }).push({ to: recipient('user-a'), title: '다른 구독' });
   assert.deepEqual(messages, []);
+});
+
+test('a write completing after the cap still tells open windows', { timeout: 1000 }, async () => {
+  const data = recordOf(inboxOwner('user-a', EP_A));
+  const open = Promise.withResolvers();
+  const message = Promise.withResolvers();
+  const w = worker([{ postMessage: message.resolve }], {
+    indexedDB: fakeIndexedDb(data, { openGate: open.promise }),
+    endpoint: EP_A,
+    setTimeout: (callback) => setTimeout(callback, 0),
+  });
+  await w.push({ to: recipient('user-a'), title: '늦게 저장된 알림' });
+  assert.equal(w.notifications.length, 1);
+  assert.deepEqual(inboxOf(data), []);
+  open.resolve();
+  assert.equal((await message.promise).type, 'inbox-changed');
+  assert.equal(inboxOf(data)[0].title, '늦게 저장된 알림');
 });

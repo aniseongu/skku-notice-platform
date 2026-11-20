@@ -52,7 +52,10 @@ class PushStore(NoticeStore):
         return self._request(
             "GET",
             "user_push_subscriptions",
-            params={"select": "id,endpoint,p256dh,auth_secret,canvas_mode", "user_id": f"eq.{user_id}"},
+            params={
+                "select": "id,user_id,endpoint,p256dh,auth_secret,canvas_mode",
+                "user_id": f"eq.{user_id}",
+            },
         ).json()
 
     def required_reminders(self) -> list[dict]:
@@ -214,6 +217,7 @@ def run_batch(store: PushStore, private_key: str, subject: str, now: datetime) -
             subscription,
             private_key,
             subject,
+            user_id=candidate["user_id"],
             title=title,
             body=body,
             url=candidate["url"],
@@ -252,6 +256,7 @@ def run_canvas_batch(store: PushStore, private_key: str, subject: str, now: date
             outcome = send_one(
                 {"endpoint": device["endpoint"], "keys": keys},
                 private_key, subject, title=alert["title"], body=alert["body"], url=alert["url"],
+                user_id=device["user_id"],
                 tag=f"canvas:{alert['id']}",
             )
             if outcome == "expired":
@@ -293,6 +298,7 @@ def run_required_batch(
             outcome = send_one(
                 {"endpoint": device["endpoint"], "keys": keys},
                 private_key, subject, title=title, body=body, url=url, tag="required",
+                user_id=device["user_id"],
             )
             if outcome == "expired":
                 store.remove_expired(device["id"], row["user_id"])

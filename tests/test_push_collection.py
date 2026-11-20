@@ -77,9 +77,12 @@ def test_external_intern_notices_are_sent_to_each_candidates_device(monkeypatch)
     store = MemoryStore([linkareer, jasoseol])
     sent = []
     monkeypatch.setattr(worker, 'send_one', lambda subscription, *_args, **kw:
-                        sent.append((subscription['endpoint'], kw['url'])) or 'sent')
+                        sent.append((subscription['endpoint'], kw['url'], kw['user_id'])) or 'sent')
     assert worker.run_batch(store, 'key', 'https://example.com', NOW)['sent'] == 2
-    assert sent == [(linkareer['endpoint'], linkareer['url']), (jasoseol['endpoint'], jasoseol['url'])]
+    assert sent == [
+        (linkareer['endpoint'], linkareer['url'], 'user-a'),
+        (jasoseol['endpoint'], jasoseol['url'], 'user-b'),
+    ]
     assert store.marks == [(1, 'sent', NOW), (2, 'sent', NOW)]
 
 
@@ -313,9 +316,25 @@ class RequiredStore:
         self.removed.append((subscription_id, user_id))
 
 
-def _device(device_id):
+def _device(device_id, user_id):
     endpoint = "https://fcm.googleapis.com/fcm/send/x"
-    return {"id": device_id, "endpoint": endpoint, "p256dh": "p", "auth_secret": "a"}
+    return {"id": device_id, "user_id": user_id, "endpoint": endpoint, "p256dh": "p", "auth_secret": "a"}
+
+
+def test_canvas_push_passes_the_device_recipient(monkeypatch):
+    class Store(RequiredStore):
+        def canvas_alerts(self):
+            return [{"id": "alert", "user_id": "u1", "title": "수업", "body": "본문",
+                     "url": "https://canvas.skku.edu/", "kind": "summary", "attempts": 0}]
+
+        def mark_canvas(self, alert_id, status, attempts, now):
+            self.marked.append((alert_id, status, attempts, now))
+
+    store = Store([], {"u1": [_device("d1", "u1")]})
+    sent = []
+    monkeypatch.setattr(worker, "send_one", lambda *args, **kwargs: sent.append(kwargs) or "sent")
+    assert worker.run_canvas_batch(store, "key", "https://example.com", NOW)["canvas_sent"] == 1
+    assert [(message["tag"], message["user_id"]) for message in sent] == [("canvas:alert", "u1")]
 
 
 def test_required_message_names_missing_items():
@@ -330,13 +349,17 @@ def test_required_batch_sends_to_every_device_marks_once_and_removes_expired(mon
         {"user_id": "u2", "missing": ["인턴십"], "missing_key": "인턴십"},
         {"user_id": "u3", "missing": ["주전공"], "missing_key": "주전공"},
     ]
-    devices = {"u1": [_device("d1"), _device("d2")], "u2": [_device("d3")], "u3": [_device("d4")]}
+    devices = {
+        "u1": [_device("d1", "u1"), _device("d2", "u1")],
+        "u2": [_device("d3", "u2")],
+        "u3": [_device("d4", "u3")],
+    }
     store = RequiredStore(rows, devices)
     results = {"d1": "sent", "d2": "expired", "d3": "retry", "d4": "expired"}
     sent = []
 
     def fake(subscription, *_args, **kwargs):
-        sent.append((kwargs["tag"], kwargs["url"]))
+        sent.append((kwargs["tag"], kwargs["url"], kwargs["user_id"]))
         return results[f"d{len(sent)}"]
 
     monkeypatch.setattr(worker, "send_one", fake)
@@ -344,7 +367,7 @@ def test_required_batch_sends_to_every_device_marks_once_and_removes_expired(mon
     assert counts == {"required_sent": 1, "required_failed": 2}
     assert store.marked == [("u1", "AI 키")]  # 실패한 계정은 표시하지 않아 다음 실행에서 다시 시도한다
     assert store.removed == [("d2", "u1"), ("d4", "u3")]
-    assert all(item == ("required", worker.APP_URL) for item in sent) and len(sent) == 4
+    assert sent == [("required", worker.APP_URL, user_id) for user_id in ("u1", "u1", "u2", "u3")]
 
 
 def test_required_batch_without_devices_or_rows_does_nothing(monkeypatch):
@@ -358,7 +381,7 @@ def test_required_batch_without_devices_or_rows_does_nothing(monkeypatch):
 
 def test_required_batch_failed_send_only_records_the_attempt(monkeypatch):
     row = {"user_id": "u1", "missing": ["AI 키"], "missing_key": "AI 키"}
-    store = RequiredStore([row], {"u1": [_device("d1")]})
+    store = RequiredStore([row], {"u1": [_device("d1", "u1")]})
     monkeypatch.setattr(worker, "send_one", lambda *args, **kwargs: "retry")
     counts = worker.run_required_batch(store, "key", "mailto:x@example.com", datetime.now(UTC))
     assert counts == {"required_sent": 0, "required_failed": 1}

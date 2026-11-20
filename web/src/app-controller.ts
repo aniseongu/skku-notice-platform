@@ -483,6 +483,7 @@ export class AppController extends Reactive {
           this.notices = []; this.sources = []; this.generatedAt = null; this.bodies.clear();
           const kept = savedSelection(); this.selectionReady = false;   // 아래에서 계정을 바꾸는 동안 저장된 선택을 덮어쓰지 않는다
           this.authUserId = userId;
+          const epoch = ++this.subscriptionsEpoch;
           this.syncInboxOwner(userId, previousUserId);
           this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); this.detailTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
@@ -491,10 +492,10 @@ export class AppController extends Reactive {
           this.teamState = { noticeId: null, status: 'loading', posts: [] }; this.teamBusy = false; this.teamBusyCount = 0; this.teamUnavailable = false; ++this.teamSeq;
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
-          const staleChain = this.pushChain; this.pushChain = null;
-          if (staleChain) void staleChain.chain.discard();
-          if (previousUserId) setTimeout(() => { void this.releasePush(previousUserId); }, 0);
-          const epoch = ++this.subscriptionsEpoch;
+          this.pushChain = null;
+          if (previousUserId) setTimeout(() => {
+            void this.releasePush(previousUserId, () => this.isCurrentAccount(userId, epoch));
+          }, 0);
           this.subscriptions = [];
           this.subscriptionsError = '';
           this.subscriptionsLoading = !!userId;
@@ -712,12 +713,15 @@ export class AppController extends Reactive {
 
   async signOut() {
     if (!authClient || this.authBusy) return;
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    const isCurrent = () => this.isCurrentAccount(userId, epoch);
     this.authBusy = true; this.authError = '';
     try {
       // 세션이 살아 있을 때 이 기기의 알림을 먼저 끈다. 실패해도 로그아웃은 막지 않는다.
-      if (this.authUserId && this.pushStatus === 'on' && this.pushRegistration) {
-        await disableDevicePush(authClient, this.authUserId, this.pushRegistration, localStorage).catch(() => false);
+      if (userId && this.pushStatus === 'on' && this.pushRegistration) {
+        await disableDevicePush(authClient, userId, this.pushRegistration, localStorage, isCurrent).catch(() => false);
       }
+      if (!isCurrent()) return;
       const { error } = await authClient.auth.signOut({ scope: 'local' });
       if (error) throw error;
       // 다시 로그인하면 설정이 아니라 공지 목록에서 시작하게 주소를 첫 화면으로 돌려놓는다.
@@ -1814,18 +1818,18 @@ export class AppController extends Reactive {
   submitBoardRequest(userId: string, name: string, url: string) { return submitBoardRequest(authClient, userId, name, url); }
 
   async deleteAccount(): Promise<void> {
-    const userId = this.authUserId;
+    const userId = this.authUserId, requestedEpoch = this.subscriptionsEpoch;
     if (!authClient || !userId || this.accountBusy) return;
     this.accountBusy = true; this.accountError = '';
     try {
       await deleteMyAccount(authClient);
-      const sameAccount = this.authUserId === userId;
-      const epoch = sameAccount ? ++this.subscriptionsEpoch : this.subscriptionsEpoch;
+      if (!this.isCurrentAccount(userId, requestedEpoch)) return;
+      const epoch = ++this.subscriptionsEpoch;
+      const isCurrent = () => this.isCurrentAccount(userId, epoch);
       await clearListCache(userId);
-      await releaseInbox(userId);               // 계정 삭제는 비동기 로그아웃에 맡기지 않고 이 기기의 알림함을 바로 비운다
-      if (!sameAccount || epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
-      await this.releasePush(userId);          // 이 기기의 알림 등록도 풀어 둔다
-      if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
+      await releaseInbox(userId, { isCurrent });
+      await this.releasePush(userId, isCurrent);
+      if (!isCurrent()) return;
       await authClient.auth.signOut({ scope: 'local' }).catch(() => undefined);
       this.showToast('계정과 저장된 정보를 모두 지웠어요');
     } catch (error) {
@@ -1907,17 +1911,23 @@ export class AppController extends Reactive {
     }
   }
 
-  async releasePush(userId: string): Promise<void> {
+  private isCurrentAccount(userId: string | null, epoch: number): boolean {
+    return this.authUserId === userId && this.subscriptionsEpoch === epoch;
+  }
+
+  async releasePush(userId: string, isCurrent: () => boolean): Promise<void> {
     try {
+      if (!isCurrent()) return;
       const registration = this.pushRegistration ?? await navigator.serviceWorker?.getRegistration() ?? null;
-      if (registration) await releaseDevicePush(userId, registration, localStorage);
+      if (registration) await releaseDevicePush(userId, registration, localStorage, isCurrent);
     } catch { /* 다음 로그인에서 소유자 표시로 다시 정리한다 */ }
   }
 
   async refreshPush(userId: string, epoch: number): Promise<void> {
     if (!authClient) return;
+    const isCurrent = () => this.isCurrentAccount(userId, epoch);
     const supported = isSecureContext && 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
-    if (!supported) { if (epoch === this.subscriptionsEpoch) this.pushStatus = 'unsupported'; return; }
+    if (!supported) { if (isCurrent()) this.pushStatus = 'unsupported'; return; }
     try {
       // 서비스 워커가 끝내 준비되지 않으면(바꿔 끼우는 중 등) "확인하고 있어요"에 멈추지 않게 끊는다.
       const ready = new Promise<ServiceWorkerRegistration>((resolve, reject) => {
@@ -1928,17 +1938,17 @@ export class AppController extends Reactive {
         ready,
         withTimeout(fetch(new URL('push-config.json', document.baseURI), { cache: 'no-store' }).then((r) => r.ok ? r.json() as Promise<{ vapidPublicKey?: string }> : null), PUSH_CHECK_MS).catch(() => null),
       ]);
-      if (epoch !== this.subscriptionsEpoch) return;
+      if (!isCurrent()) return;
       this.pushRegistration = registration;
       this.pushVapidKey = config?.vapidPublicKey ?? null;
       // 켜 둔 기기인데 앱 업데이트 등으로 브라우저가 구독을 잃었으면 여기서 조용히 다시 등록한다.
       // 서버 조회가 응답하지 않아도 "확인하고 있어요"에 멈추지 않게 끊는다(첫 설정 알림 단계가 이 상태를 기다린다).
       const on = await withTimeout(inspectDevicePush(authClient, userId, registration, localStorage,
-        { vapidKey: this.pushVapidKey, permission: Notification.permission }), PUSH_CHECK_MS);
-      if (epoch !== this.subscriptionsEpoch) { if (on) void this.releasePush(userId); return; }
+        { vapidKey: this.pushVapidKey, permission: Notification.permission }, isCurrent), PUSH_CHECK_MS);
+      if (!isCurrent()) return;
       this.pushStatus = on ? 'on' : Notification.permission === 'denied' ? 'denied' : 'off';
     } catch (error) {
-      if (epoch === this.subscriptionsEpoch) {
+      if (isCurrent()) {
         this.pushStatus = Notification.permission === 'denied' ? 'denied' : 'off';
         this.pushError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '알림 상태를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.';
       }
@@ -1951,19 +1961,21 @@ export class AppController extends Reactive {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch, registration = this.pushRegistration;
     if (!authClient || !userId || this.pushStatus !== 'off') return;
     if (!registration || !this.pushVapidKey) { this.pushError = '알림 설정을 아직 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.'; return; }
+    const isCurrent = () => this.isCurrentAccount(userId, epoch);
     if (!this.pushChain || this.pushChain.userId !== userId || this.pushChain.epoch !== epoch) {
       this.pushChain = { chain: createEnableChain(authClient, userId, registration, localStorage, this.pushVapidKey,
         // 이미 허용했으면 묻지 않는다. 일부 브라우저는 허용된 상태에서 다시 물으면 답하지 않는다.
-        () => Notification.permission === 'granted' ? Promise.resolve('granted' as NotificationPermission) : Notification.requestPermission()), userId, epoch };
+        () => Notification.permission === 'granted' ? Promise.resolve('granted' as NotificationPermission) : Notification.requestPermission(),
+        undefined, isCurrent), userId, epoch };
     }
     const current = this.pushChain;
     this.pushStatus = 'busy'; this.pushError = '';
     try {
       await current.chain.run();
-      if (epoch === this.subscriptionsEpoch) { this.pushStatus = 'on'; this.pushRetry = false; }
+      if (isCurrent()) { this.pushStatus = 'on'; this.pushRetry = false; }
       if (this.pushChain === current) this.pushChain = null;
     } catch (error) {
-      if (epoch === this.subscriptionsEpoch) {
+      if (isCurrent()) {
         const denied = Notification.permission === 'denied';
         this.pushStatus = denied ? 'denied' : 'off';
         this.pushRetry = !denied;
@@ -1971,14 +1983,7 @@ export class AppController extends Reactive {
         this.pushError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '알림을 켜지 못했어요';
         if (!denied) this.watchPermission(userId, epoch);
         pushNote(`failed ${error instanceof Error ? `${error.name}:${error.message.slice(0, 40)}` : String(error)}`);
-      } else {
-        // 기다리는 동안 계정이 바뀌었다면 서버에 못 올린 구독을 이 기기에서 끊는다.
-        if (this.pushChain === current) this.pushChain = null;
-        void current.chain.discard();
       }
-    } finally {
-      // 성공했어도 그 사이 계정이 바뀌었다면 이전 사용자 소유로 남은 구독을 이 기기에서 끊는다.
-      if (epoch !== this.subscriptionsEpoch) void this.releasePush(userId);
     }
   }
 
@@ -2023,7 +2028,7 @@ export class AppController extends Reactive {
     if (!authClient || !userId || !registration || this.pushStatus !== 'on') return;
     this.pushStatus = 'busy'; this.pushError = '';
     try {
-      const cleaned = await disableDevicePush(authClient, userId, registration, localStorage);
+      const cleaned = await disableDevicePush(authClient, userId, registration, localStorage, () => this.isCurrentAccount(userId, epoch));
       if (epoch === this.subscriptionsEpoch) {
         this.pushStatus = 'off';
         if (!cleaned) this.pushError = '이 기기의 알림은 껐지만 서버 정리는 끝나지 않았어요. 다시 확인해 주세요.';
@@ -2293,6 +2298,7 @@ export class AppController extends Reactive {
 
   /** 어느 화면에서든 설정의 해당 쪽으로 바로 간다(키워드 관리하기, 게시판 고르기 같은 단축). */
   openSettings(section: string | null) {
+    if (section === 'inbox') void this.refreshInbox();
     if (this.view === 'settings') {
       if (!section) { this.openSettingsSection(section); return; }
       // 설정 안에서 왼쪽 바로가기를 눌러도 X 한 번에 설정에 들어오기 전 화면으로 나간다(사용자 요청 2026-11-09).
@@ -2337,11 +2343,13 @@ export class AppController extends Reactive {
   // 소유자의 푸시 주소(endpoint)는 이 계정으로 기기를 서버에 등록한 직후 platform-browser-push가 따로 적는다. 그 전에는 워커가 저장하지 않는다.
   private syncInboxOwner(userId: string | null, previousUserId: string | null) {
     this.inboxItems = []; ++this.inboxSeq;
+    const epoch = this.subscriptionsEpoch;
+    const isCurrent = () => this.isCurrentAccount(userId, epoch);
     void (async () => {
-      if (userId) await setInboxOwner(userId);
-      else if (previousUserId) await releaseInbox(previousUserId);
-      else await clearInbox();
-      await this.refreshInbox();
+      if (userId) await setInboxOwner(userId, undefined, { isCurrent });
+      else if (previousUserId) await releaseInbox(previousUserId, { isCurrent });
+      else await clearInbox({ isCurrent });
+      if (isCurrent()) await this.refreshInbox();
     })();
   }
 

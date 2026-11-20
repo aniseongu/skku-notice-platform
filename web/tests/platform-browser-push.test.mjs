@@ -144,6 +144,54 @@ test('a device deleted from another device list is not revived', async () => {
   assert.equal(f.records.length, 0);
 });
 
+test('a registration lookup finishing after an account switch cannot restore the old endpoint', async () => {
+  const f = fixture({ owner: 'a', endpoint: 'a-endpoint' });
+  f.setCurrent(f.makeSubscription('a-endpoint'));
+  const reading = Promise.withResolvers();
+  const response = Promise.withResolvers();
+  const query = { select: () => query, eq: () => query, maybeSingle: () => { reading.resolve(); return response.promise; } };
+  let currentUser = 'a';
+  const pending = inspectDevicePush({ from: () => query }, 'a', f.registration, f.storage, heal, () => currentUser === 'a');
+  await reading.promise;
+  currentUser = 'b';
+  f.values.set('platform:push-owner', 'b');
+  f.values.set('platform:push-endpoint', 'b-endpoint');
+  response.resolve({ data: { id: 'a-device' }, error: null });
+  assert.equal(await pending, false);
+  assert.equal(f.values.get('platform:push-owner'), 'b');
+  assert.equal(f.values.get('platform:push-endpoint'), 'b-endpoint');
+});
+
+test('a late registration and a late unsubscribe cannot overwrite the next account storage', async () => {
+  const f = fixture({ owner: 'a', endpoint: 'a-endpoint' });
+  const saving = Promise.withResolvers();
+  const saved = Promise.withResolvers();
+  const query = {
+    select: () => query, eq: () => query, maybeSingle: async () => ({ data: { id: 'a-device' }, error: null }),
+    upsert: () => { saving.resolve(); return saved.promise; },
+  };
+  let epoch = 1;
+  const chain = createEnableChain({ from: () => query }, 'a', f.registration, f.storage, publicKey,
+    async () => 'granted', () => 'granted', () => epoch === 1);
+  const pendingSave = chain.run();
+  await saving.promise;
+  const unsubscribing = Promise.withResolvers();
+  const unsubscribed = Promise.withResolvers();
+  f.setCurrent({ ...f.getCurrent(), unsubscribe: () => { unsubscribing.resolve(); return unsubscribed.promise; } });
+  const pendingDisable = disableDevicePush(f.client, 'a', f.registration, f.storage, () => epoch === 1);
+  await unsubscribing.promise;
+  epoch = 2;
+  f.values.set('platform:push-owner', 'b');
+  f.values.set('platform:push-endpoint', 'b-endpoint');
+  saved.resolve({ error: null });
+  unsubscribed.resolve(true);
+  await pendingSave;
+  assert.equal(await pendingDisable, false);
+  assert.equal(f.values.get('platform:push-owner'), 'b');
+  assert.equal(f.values.get('platform:push-endpoint'), 'b-endpoint');
+  assert.deepEqual(f.deleted, []);
+});
+
 test('no silent re-registration without permission, for another owner, or after turning off', async () => {
   for (const [owner, permission] of [['a', 'default'], ['b', 'granted'], [null, 'granted']]) {
     const f = fixture({ owner });
@@ -303,4 +351,44 @@ test('an existing row for the new endpoint is not overwritten with the old mode'
   f.setCurrent(next);
   assert.equal(await inspectDevicePush(f.client, 'a', f.registration, f.storage, heal), true);
   assert.equal(f.records.find((row) => row.endpoint === next.endpoint).canvas_mode, 'summary');
+});
+
+test('a missing device row or a failed lookup clears the inbox endpoint', async (t) => {
+  const f = fixture({ owner: 'a', endpoint: 'a-endpoint' });
+  f.setCurrent(f.makeSubscription('a-endpoint'));
+  const initial = { version: 1, owner: { userId: 'a', endpoint: 'a-endpoint' }, items: [] };
+  let record = initial;
+  const db = {
+    transaction() {
+      const tx = { objectStore: () => ({
+        transaction: tx,
+        get() {
+          const request = { result: record };
+          queueMicrotask(() => request.onsuccess());
+          return request;
+        },
+        put(value) {
+          record = value;
+          queueMicrotask(() => tx.oncomplete());
+        },
+      }) };
+      return tx;
+    },
+  };
+  globalThis.indexedDB = {
+    open() {
+      const request = { result: db };
+      queueMicrotask(() => request.onsuccess());
+      return request;
+    },
+  };
+  t.after(() => { db.onclose?.(); delete globalThis.indexedDB; });
+  assert.equal(await inspectDevicePush(f.client, 'a', f.registration, f.storage, heal), false);
+  assert.equal(record.owner.endpoint, null);
+  assert.equal(f.records.length, 0);
+
+  record = initial;
+  const query = { select: () => query, eq: () => query, maybeSingle: async () => ({ data: null, error: new Error('offline') }) };
+  await assert.rejects(inspectDevicePush({ from: () => query }, 'a', f.registration, f.storage, heal), /offline/);
+  assert.equal(record.owner.endpoint, null);
 });

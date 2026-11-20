@@ -1,6 +1,7 @@
 """Validate and send one user web-push message without logging capabilities."""
 
 import base64
+import hashlib
 import ipaddress
 import json
 import socket
@@ -62,6 +63,7 @@ def send_one(
     private_key: str,
     subject: str,
     *,
+    user_id: str,
     title: str,
     url: str,
     tag: str,
@@ -73,7 +75,10 @@ def send_one(
         # DNS failures are indistinguishable here from invalid endpoints; never delete on uncertainty.
         return "retry"
     payload = json.dumps(
-        {"title": title[:180], "body": body[:600], "url": url, "tag": tag, "silent": silent},
+        {
+            "title": title[:180], "body": body[:600], "url": url, "tag": tag, "silent": silent,
+            "to": hashlib.sha256(f"skku-inbox:{user_id}".encode()).hexdigest()[:16],
+        },
         ensure_ascii=False,
     )
     try:

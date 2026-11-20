@@ -9,9 +9,8 @@ function noticeIdOf(tag) {
 }
 
 // 알림함: 받은 알림을 이 기기의 IndexedDB에 쌓는다(앱의 src/inbox.ts가 읽는다. 같은 DB·키·정리 규칙).
-// 이 워커는 로그인 사용자를 모른다. 앱이 `inbox:v1` 레코드의 owner에 {userId, endpoint}를 적어 둔다. endpoint는 그 계정으로 서버에 등록한 이 기기 푸시 구독의 주소다.
-// 저장은 지금 이 브라우저의 구독 주소가 owner.endpoint와 같을 때만 한다: 계정을 바꾸는 중(이전 계정으로 보낸 푸시가 늦게 도착, 새 구독 등록 전)에는
-// 알림만 띄우고 저장하지 않는다. 저장이 실패하거나 3초 안에 끝나지 않아도 알림 표시에는 영향이 없다(호출하는 쪽이 따로 시작하고 오류를 삼킨다).
+// 수신자 해시와 현재 구독 주소가 모두 inbox:v1의 소유자와 일치할 때 저장한다.
+// 구형 서버 알림도 표시한다. 알림함 저장은 별도로 최대 3초 기다린다.
 const INBOX_KEY = 'inbox:v1';
 const INBOX_MAX_ITEMS = 200;
 const INBOX_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -33,7 +32,7 @@ function pruneInbox(items, now) {
 }
 
 async function saveInbox(entry, now) {
-  if (typeof indexedDB === 'undefined') return false;
+  if (typeof indexedDB === 'undefined' || typeof entry.to !== 'string' || !/^[0-9a-f]{16}$/.test(entry.to)) return false;
   const subscription = await self.registration.pushManager.getSubscription();
   const endpoint = subscription && subscription.endpoint;
   if (typeof endpoint !== 'string' || !endpoint) return false;   // 구독이 없으면(해제·전환 중) 저장하지 않는다
@@ -47,8 +46,8 @@ async function saveInbox(entry, now) {
       request.onsuccess = () => {
         const old = request.result;
         const owner = old && old.version === 1 ? old.owner : null;
-        // 소유자가 없거나, 소유자의 구독 주소가 아니거나(다른 계정으로 보낸 푸시), 아직 등록 전이면 저장하지 않는다
-        if (!owner || typeof owner.userId !== 'string' || !owner.userId || owner.endpoint !== endpoint) return;
+        if (!owner || typeof owner.userId !== 'string' || !owner.userId
+          || owner.endpoint !== endpoint || owner.recipientHash !== entry.to) return;
         let items = Array.isArray(old.items) ? old.items : [];
         if (entry.tag !== GENERIC_TAG) items = items.filter((item) => !(item.owner === owner.userId && item.tag === entry.tag));
         const id = now.toString(36) + Math.random().toString(36).slice(2, 8);
@@ -64,15 +63,17 @@ async function saveInbox(entry, now) {
 }
 
 async function rememberInbox(entry) {
+  let timer;
   try {
-    let timer;
-    const limit = new Promise((resolve) => { timer = setTimeout(() => resolve(false), INBOX_TIMEOUT_MS); });
-    const saved = await Promise.race([saveInbox(entry, Date.now()), limit]);
-    clearTimeout(timer);
-    if (saved && self.clients && self.clients.matchAll) {
-      for (const client of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) client.postMessage({ type: 'inbox-changed' });
-    }
+    const limit = new Promise((resolve) => { timer = setTimeout(resolve, INBOX_TIMEOUT_MS); });
+    const write = saveInbox(entry, Date.now()).then(async (saved) => {
+      if (saved && self.clients?.matchAll) {
+        for (const client of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) client.postMessage({ type: 'inbox-changed' });
+      }
+    });
+    await Promise.race([write, limit]);
   } catch { /* 알림함에 못 쌓아도 알림은 이미 떴다 */ }
+  finally { clearTimeout(timer); }
 }
 
 self.addEventListener('push', (event) => {
@@ -102,7 +103,7 @@ self.addEventListener('push', (event) => {
     silent: payload.silent === true,
     data: { url: target.href, notice: noticeIdOf(payload.tag) },
   });
-  const kept = rememberInbox({ tag, title, body, noticeId: noticeIdOf(payload.tag), url: target.href });
+  const kept = rememberInbox({ to: payload.to, tag, title, body, noticeId: noticeIdOf(payload.tag), url: target.href });
   event.waitUntil(Promise.all([shown, kept]));
 });
 

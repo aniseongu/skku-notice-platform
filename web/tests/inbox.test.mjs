@@ -31,38 +31,75 @@ test('only the current owner sees entries and nobody sees them when logged out',
 
 test('switching the owner removes the previous account entries and forgets its push endpoint in one write', async () => {
   const store = fakeStore([[INBOX_KEY, record([make('1', 'a', NOW - 1000), make('2', 'b', NOW - 500)], { userId: 'a', endpoint: 'ep-a' })]]);
-  await setInboxOwner('b', undefined, store, NOW);
+  await setInboxOwner('b', undefined, { store, now: NOW });
   assert.deepEqual(stored(store).owner, { userId: 'b', endpoint: null });   // A의 구독 주소는 B의 것이 아니다
   assert.deepEqual(stored(store).items.map((item) => item.id), ['2']);
-  await setInboxOwner('a', undefined, store, NOW);
+  await setInboxOwner('a', undefined, { store, now: NOW });
   assert.deepEqual(stored(store).items, []);
 });
 
 test('the owner endpoint is recorded for the same user, kept on reload, and cleared by an explicit null', async () => {
   const store = fakeStore();
-  await setInboxOwner('a', undefined, store, NOW);
-  assert.deepEqual(stored(store).owner, { userId: 'a', endpoint: null });
-  await setInboxOwner('a', 'ep-a', store, NOW);                // 이 계정으로 기기를 등록한 직후
-  assert.deepEqual(stored(store).owner, { userId: 'a', endpoint: 'ep-a' });
-  await setInboxOwner('a', undefined, store, NOW);             // 새로고침: 같은 사용자의 주소는 유지
-  assert.deepEqual(stored(store).owner, { userId: 'a', endpoint: 'ep-a' });
-  await setInboxOwner('a', null, store, NOW);                  // 알림 끄기
-  assert.deepEqual(stored(store).owner, { userId: 'a', endpoint: null });
+  await setInboxOwner('user-a', undefined, { store, now: NOW });
+  assert.deepEqual(stored(store).owner, { userId: 'user-a', endpoint: null });
+  await setInboxOwner('user-a', 'ep-a', { store, now: NOW });                // 이 계정으로 기기를 등록한 직후
+  assert.deepEqual(stored(store).owner, { userId: 'user-a', endpoint: 'ep-a', recipientHash: 'e7a006640ea62fac' });
+  await setInboxOwner('user-a', undefined, { store, now: NOW });             // 새로고침: 같은 사용자의 주소는 유지
+  assert.deepEqual(stored(store).owner, { userId: 'user-a', endpoint: 'ep-a', recipientHash: 'e7a006640ea62fac' });
+  await setInboxOwner('user-a', null, { store, now: NOW });                  // 알림 끄기
+  assert.deepEqual(stored(store).owner, { userId: 'user-a', endpoint: null, recipientHash: 'e7a006640ea62fac' });
 });
 
 test('a late logout cleanup of A never wipes B who already logged in', async () => {
   const store = fakeStore([[INBOX_KEY, record([make('1', 'a', NOW - 1000), make('2', 'b', NOW - 500)], { userId: 'b', endpoint: 'ep-b' })]]);
-  assert.equal(await releaseInbox('a', store), true);
+  assert.equal(await releaseInbox('a', { store }), true);
   assert.deepEqual(stored(store).owner, { userId: 'b', endpoint: 'ep-b' });
   assert.deepEqual(stored(store).items.map((item) => item.id), ['2']);
 });
 
+test('device responses cannot change a different inbox owner even with the same endpoint', async () => {
+  const owner = { userId: 'b', endpoint: 'shared' };
+  const store = fakeStore([[INBOX_KEY, record([make('1', 'b', NOW)], owner)]]);
+  assert.equal(await setInboxOwner('a', 'shared', { store, now: NOW }), false);
+  assert.equal(await setInboxOwner('a', null, { store, now: NOW }), false);
+  assert.deepEqual(stored(store), record([make('1', 'b', NOW)], owner));
+});
+
+test('queued owner writes and cleanup recheck the account epoch inside the transaction', async () => {
+  const owner = { userId: 'a', endpoint: 'new' };
+  const current = record([make('1', 'a', NOW)], owner);
+  for (const write of [
+    (options) => setInboxOwner('a', 'old', options),
+    (options) => releaseInbox('a', options),
+    (options) => clearInbox(options),
+  ]) {
+    const store = fakeStore([[INBOX_KEY, current]]);
+    const queued = Promise.withResolvers();
+    const resume = Promise.withResolvers();
+    const delayed = {
+      ...store,
+      async update(key, updater) {
+        queued.resolve();
+        await resume.promise;
+        await store.update(key, updater);
+      },
+    };
+    let epoch = 1;
+    const pending = write({ store: delayed, now: NOW, isCurrent: () => epoch === 1 });
+    await queued.promise;
+    epoch = 3; // A → B → A
+    resume.resolve();
+    await pending;
+    assert.deepEqual(stored(store), current);
+  }
+});
+
 test('logging out or deleting the account clears that owner entries and the owner', async () => {
   const store = fakeStore([[INBOX_KEY, record([make('1', 'a', NOW), make('2', 'b', NOW)], { userId: 'a', endpoint: 'ep-a' })]]);
-  assert.equal(await releaseInbox('a', store), true);
+  assert.equal(await releaseInbox('a', { store }), true);
   assert.equal(stored(store).owner, null);
   assert.deepEqual(stored(store).items.map((item) => item.id), ['2']);
-  assert.equal(await clearInbox(store), true);
+  assert.equal(await clearInbox({ store }), true);
   assert.deepEqual(stored(store), { version: 1, owner: null, items: [] });
 });
 
@@ -96,9 +133,9 @@ test('corrupt or foreign records are ignored and storage failures do not throw',
   const broken = { get: async () => { throw new Error('x'); }, update: async () => { throw new Error('x'); } };
   assert.deepEqual(await loadInbox('a', broken, NOW), []);
   assert.equal(await changeInbox('a', { kind: 'read-all' }, broken), false);
-  assert.equal(await setInboxOwner('a', undefined, broken, NOW), false);
-  assert.equal(await releaseInbox('a', broken), false);
-  assert.equal(await clearInbox(broken), false);
+  assert.equal(await setInboxOwner('a', undefined, { store: broken, now: NOW }), false);
+  assert.equal(await releaseInbox('a', { store: broken }), false);
+  assert.equal(await clearInbox({ store: broken }), false);
 });
 
 test('a change in one tab is announced to the others', async () => {

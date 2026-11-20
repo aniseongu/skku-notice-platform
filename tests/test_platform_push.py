@@ -57,6 +57,7 @@ def test_push_outcomes_do_not_expose_endpoint_or_send_on_invalid_input(monkeypat
             subscription(),
             "private",
             "mailto:test@example.invalid",
+            user_id="user-a",
             title="공지",
             url="https://www.skku.edu/",
             tag="notice",
@@ -69,6 +70,7 @@ def test_push_outcomes_do_not_expose_endpoint_or_send_on_invalid_input(monkeypat
             subscription("https://bad.invalid/"),
             "private",
             "mailto:test@example.invalid",
+            user_id="user-a",
             title="공지",
             url="https://www.skku.edu/",
             tag="notice",
@@ -100,6 +102,7 @@ def test_expired_push_service_response_is_distinct_from_temporary_failure(monkey
             subscription(),
             "private",
             "mailto:test@example.invalid",
+            user_id="user-a",
             title="공지",
             url="https://www.skku.edu/",
             tag="notice",
@@ -121,7 +124,11 @@ def test_silent_flag_and_original_ttl_are_sent(monkeypatch):
     for silent in (False, True):
         push.send_one(
             subscription(), "private", "mailto:test@example.invalid",
-            title="공지", url="https://www.skku.edu/", tag="notice", silent=silent,
+            user_id="user-a", title="공지", url="https://www.skku.edu/", tag="notice", silent=silent,
         )
     assert [json.loads(call["data"])["silent"] for call in calls] == [False, True]
     assert {call["ttl"] for call in calls} == {86400}
+    for call in calls:
+        payload = json.loads(call["data"])
+        assert payload["to"] == "e7a006640ea62fac"
+        assert "user_id" not in payload and "user-a" not in call["data"]

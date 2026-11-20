@@ -7,6 +7,7 @@ import { setInboxOwner } from './inbox.ts';
 const OWNER_KEY = 'platform:push-owner';
 // 서버에 올린 구독 주소. 앱 업데이트 등으로 브라우저가 구독을 잃거나 새 주소로 바꾸면 이 값과 달라져서 알아챈다.
 const ENDPOINT_KEY = 'platform:push-endpoint';
+const alwaysCurrent = () => true;
 // 일부 브라우저(삼성 인터넷 등)는 getSubscription·ready가 끝나지 않을 때가 있다. 확인 중에 멈춰 있지 않게 끊는다.
 const CHECK_MS = 10_000;
 const SUBSCRIBE_MS = 30_000;
@@ -75,26 +76,34 @@ async function carryOver(client: SupabaseClient, userId: string, previous: strin
   };
 }
 
-async function saveDevice(client: SupabaseClient, userId: string, subscription: PushSubscription, storage: Storage, previous: string | null): Promise<void> {
+async function saveDevice(client: SupabaseClient, userId: string, subscription: PushSubscription, storage: Storage, previous: string | null,
+  isCurrent: () => boolean): Promise<boolean> {
+  if (!isCurrent()) return false;
   const data = subscription.toJSON();
   if (!data.endpoint || !data.keys?.p256dh || !data.keys.auth) throw new Error('알림 기기 정보를 확인하지 못했어요.');
   // 주소가 바뀐 기기는 새 줄이 기본값(요약과 마감)으로 만들어지고 옛 줄이 지워져 아이캠퍼스 알림 설정과 바꾼 이름이 사라졌다.
   const carried = await carryOver(client, userId, previous, data.endpoint);
+  if (!isCurrent()) return false;
+  const name = carried.exists ? undefined : carried.device_name ?? await deviceName();
+  if (!isCurrent()) return false;
   const { error } = await withTimeout(Promise.resolve(client.from('user_push_subscriptions').upsert({
     user_id: userId, endpoint: data.endpoint, p256dh: data.keys.p256dh, auth_secret: data.keys.auth,
-    ...(carried.exists ? {} : { device_name: carried.device_name ?? await deviceName() }),
+    ...(name !== undefined ? { device_name: name } : {}),
     ...(carried.canvas_mode ? { canvas_mode: carried.canvas_mode } : {}),
     ...(carried.alert_all_new !== undefined ? { alert_all_new: carried.alert_all_new } : {}),
     updated_at: new Date().toISOString(),
   }, { onConflict: 'endpoint' })), SAVE_MS, '서버에 이 기기를 등록하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.');
+  if (!isCurrent()) return false;
   if (error) throw error;
   storage.setItem(OWNER_KEY, userId);
   storage.setItem(ENDPOINT_KEY, data.endpoint);
-  await setInboxOwner(userId, data.endpoint);   // 이 계정으로 등록한 직후에만 워커가 이 구독의 알림을 알림함에 저장한다
+  await setInboxOwner(userId, data.endpoint, { isCurrent });
+  if (!isCurrent()) return false;
   // 이 기기가 예전에 쓰던 주소는 더 이상 받지 못한다. 남겨 두면 기기 목록에 같은 기기가 두 번 보인다.
   if (previous && previous !== data.endpoint) {
     await client.from('user_push_subscriptions').delete().eq('user_id', userId).eq('endpoint', previous).then(() => undefined, () => undefined);
   }
+  return true;
 }
 
 function decodeVapid(value: string): Uint8Array<ArrayBuffer> {
@@ -108,16 +117,21 @@ function owner(storage: Storage): string | null {
   try { return storage.getItem(OWNER_KEY); } catch { throw new Error('이 브라우저에서 알림 설정을 저장할 수 없어요.'); }
 }
 
-async function dropForeign(subscription: PushSubscription | null, userId: string, storage: Storage): Promise<PushSubscription | null> {
-  if (!subscription || owner(storage) === userId) return subscription;
-  if (!await subscription.unsubscribe()) throw new Error('이 기기의 이전 알림을 끄지 못했어요.');
-  forget(storage);
+async function dropForeign(subscription: PushSubscription | null, userId: string, storage: Storage, isCurrent: () => boolean): Promise<PushSubscription | null> {
+  if (!isCurrent() || !subscription) return null;
+  const previousOwner = owner(storage);
+  if (previousOwner === userId) return subscription;
+  const previousEndpoint = storage.getItem(ENDPOINT_KEY);
+  const unsubscribed = await subscription.unsubscribe();
+  if (!isCurrent()) return null;
+  if (!unsubscribed) throw new Error('이 기기의 이전 알림을 끄지 못했어요.');
+  if (owner(storage) === previousOwner && storage.getItem(ENDPOINT_KEY) === previousEndpoint) forget(storage);
   return null;
 }
 
 async function registered(client: SupabaseClient, userId: string, endpoint: string): Promise<boolean> {
-  const { data, error } = await client.from('user_push_subscriptions').select('id')
-    .eq('user_id', userId).eq('endpoint', endpoint).maybeSingle();
+  const { data, error } = await withTimeout(Promise.resolve(client.from('user_push_subscriptions').select('id')
+    .eq('user_id', userId).eq('endpoint', endpoint).maybeSingle()), CHECK_MS, '알림 상태를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
   if (error) throw error;
   return !!data;
 }
@@ -129,27 +143,40 @@ async function registered(client: SupabaseClient, userId: string, endpoint: stri
  * 다른 기기 목록에서 지운 경우는 브라우저 구독이 그대로라서 되살리지 않는다. 권한은 이미 허용된 때만 쓰므로 묻는 창이 뜨지 않는다.
  */
 export async function inspectDevicePush(client: SupabaseClient, userId: string, registration: ServiceWorkerRegistration, storage: Storage,
-  heal?: { vapidKey: string | null; permission: NotificationPermission }): Promise<boolean> {
-  const subscription = await dropForeign(await readSubscription(registration), userId, storage);
-  if (subscription && await registered(client, userId, subscription.endpoint)) {
-    storage.setItem(ENDPOINT_KEY, subscription.endpoint);   // 이 값이 없던 예전 등록도 다음부터 바뀜을 알아채게 한다
-    await setInboxOwner(userId, subscription.endpoint);
-    return true;
+  heal?: { vapidKey: string | null; permission: NotificationPermission }, isCurrent = alwaysCurrent): Promise<boolean> {
+  if (!isCurrent()) return false;
+  let subscription: PushSubscription | null;
+  let found: boolean;
+  try {
+    subscription = await dropForeign(await readSubscription(registration), userId, storage, isCurrent);
+    if (!isCurrent()) return false;
+    found = !!subscription && await registered(client, userId, subscription.endpoint);
+  } catch (error) {
+    await setInboxOwner(userId, null, { isCurrent });
+    throw error;
   }
+  if (!isCurrent()) return false;
+  if (subscription && found) {
+    storage.setItem(ENDPOINT_KEY, subscription.endpoint);   // 이 값이 없던 예전 등록도 다음부터 바뀜을 알아채게 한다
+    await setInboxOwner(userId, subscription.endpoint, { isCurrent });
+    return isCurrent();
+  }
+  // 알림함 주소는 비우고, 브라우저가 주소를 바꿨는지 판별할 마지막 등록 주소는 따로 유지한다.
+  await setInboxOwner(userId, null, { isCurrent });
+  if (!isCurrent()) return false;
   if (!heal?.vapidKey || heal.permission !== 'granted' || owner(storage) !== userId) return false;
   const previous = storage.getItem(ENDPOINT_KEY);
   const lost = !subscription;
   const replaced = !!subscription && !!previous && subscription.endpoint !== previous;
   if (!lost && !replaced) return false;
-  await saveDevice(client, userId, subscription ?? await newSubscription(registration, decodeVapid(heal.vapidKey)), storage, previous);
-  return true;
+  return saveDevice(client, userId, subscription ?? await newSubscription(registration, decodeVapid(heal.vapidKey)), storage, previous, isCurrent);
 }
 
 // 권한 요청 → 구독 생성 → 서버 등록을 순서대로 실행한다. 실패하면 다시 run()할 때 끝난 단계는 건너뛰고 실패한 단계부터 이어 간다.
 // 첫 단계(권한 요청)는 run()을 부른 같은 호출 안에서 시작되므로 클릭 동작 안에서 실행된다.
 export function createEnableChain(client: SupabaseClient, userId: string, registration: ServiceWorkerRegistration,
   storage: Storage, vapidKey: string, requestPermission: () => Promise<NotificationPermission>,
-  permission: () => NotificationPermission = currentPermission) {
+  permission: () => NotificationPermission = currentPermission, isCurrent = alwaysCurrent) {
   const key = decodeVapid(vapidKey);
   let subscription: PushSubscription | null = null;
   let previous: string | null = null;
@@ -158,6 +185,7 @@ export function createEnableChain(client: SupabaseClient, userId: string, regist
   let asked = 0;
   const chain = connectionChain([
     async () => {
+      if (!isCurrent()) return;
       note(`step0 perm=${permission()} act=${activation()} vis=${typeof document === 'undefined' ? '?' : document.visibilityState}`);
       if (permission() === 'granted') return;
       // 두 번째부터는 권한을 따로 묻지 않고 다음 단계의 구독 요청이 직접 묻게 한다. 크로미움은 권한이 없으면
@@ -173,8 +201,10 @@ export function createEnableChain(client: SupabaseClient, userId: string, regist
       throw new Error(result === 'denied' ? DECLINED : '알림 허용을 고르지 않았어요. 다시 눌러 허용해 주세요.');
     },
     async () => {
+      if (!isCurrent()) return;
       previous = owner(storage) === userId ? storage.getItem(ENDPOINT_KEY) : null;
-      const existing = await dropForeign(await readSubscription(registration), userId, storage);
+      const existing = await dropForeign(await readSubscription(registration), userId, storage, isCurrent);
+      if (!isCurrent()) return;
       // 꺼져 있는 상태에서 켜는 것이므로 남아 있는 구독은 서버에 없거나 이미 끊긴 주소일 수 있다(앱 업데이트 뒤 실제로 있었다).
       // 다시 쓰지 않고 새로 만든다.
       if (existing) {
@@ -182,6 +212,7 @@ export function createEnableChain(client: SupabaseClient, userId: string, regist
         // 끊긴 구독은 해제도 답이 없을 수 있다. 기다리다 넘어가도 새 구독을 만들면 브라우저가 바꿔 끼운다.
         await withTimeout(existing.unsubscribe(), CHECK_MS, '').catch(() => false);
       }
+      if (!isCurrent()) return;
       note(`step1 perm=${permission()} act=${activation()} existing=${!!existing}`);
       if (permission() === 'granted') {
         subscription = await newSubscription(registration, key).catch((error: unknown) => {
@@ -200,16 +231,16 @@ export function createEnableChain(client: SupabaseClient, userId: string, regist
       created = true;
     },
     async () => {
+      if (!isCurrent()) return;
       note('step2 save');
-      await saveDevice(client, userId, subscription!, storage, previous);
-      saved = true;
+      saved = await saveDevice(client, userId, subscription!, storage, previous, isCurrent);
     },
   ]);
   return {
     run: () => chain.run(),
-    // 사용자가 그만두거나 계정이 바뀌면, 서버에 등록하지 못한 채 새로 만든 구독만 이 기기에서 끊는다.
+    // 현재 계정에서 서버에 등록하지 못한 구독을 정리한다.
     async discard(): Promise<void> {
-      if (created && !saved && subscription) await subscription.unsubscribe().catch(() => false);
+      if (isCurrent() && created && !saved && subscription) await subscription.unsubscribe().catch(() => false);
     },
   };
 }
@@ -221,12 +252,14 @@ export async function enableDevicePush(client: SupabaseClient, userId: string, r
 }
 
 export async function disableDevicePush(client: SupabaseClient, userId: string, registration: ServiceWorkerRegistration,
-  storage: Storage): Promise<boolean> {
+  storage: Storage, isCurrent = alwaysCurrent): Promise<boolean> {
   const subscription = await readSubscription(registration);
-  if (!subscription) { forget(storage); await setInboxOwner(userId, null); return true; }
-  if (!await subscription.unsubscribe()) throw new Error('이 기기의 알림을 끄지 못했어요.');
+  if (!isCurrent()) return false;
+  if (subscription && !await subscription.unsubscribe()) throw new Error('이 기기의 알림을 끄지 못했어요.');
+  if (!isCurrent()) return false;
   forget(storage);
-  await setInboxOwner(userId, null);
+  await setInboxOwner(userId, null, { isCurrent });
+  if (!isCurrent() || !subscription) return isCurrent();
   const { error } = await client.from('user_push_subscriptions').delete()
     .eq('user_id', userId).eq('endpoint', subscription.endpoint);
   return !error;
@@ -234,9 +267,13 @@ export async function disableDevicePush(client: SupabaseClient, userId: string, 
 
 // 계정이 바뀌거나 세션이 사라졌을 때 쓴다. 서버 행은 세션 없이 지울 수 없으므로 이 브라우저의 구독만 끊는다.
 // 남은 서버 행은 발송 실패 정리로 닫힌다. 다른 사용자 소유의 구독은 건드리지 않는다.
-export async function releaseDevicePush(userId: string, registration: ServiceWorkerRegistration, storage: Storage): Promise<void> {
-  if (owner(storage) !== userId) return;
+export async function releaseDevicePush(userId: string, registration: ServiceWorkerRegistration, storage: Storage,
+  isCurrent = alwaysCurrent): Promise<void> {
+  const endpoint = storage.getItem(ENDPOINT_KEY);
+  const stillOwned = () => isCurrent() && owner(storage) === userId && storage.getItem(ENDPOINT_KEY) === endpoint;
+  if (!stillOwned()) return;
   const subscription = await readSubscription(registration);
+  if (!stillOwned()) return;
   if (subscription && !await subscription.unsubscribe()) throw new Error('이 기기의 알림을 끄지 못했어요.');
-  forget(storage);
+  if (stillOwned()) forget(storage);
 }
