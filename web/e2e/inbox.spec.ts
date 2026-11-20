@@ -52,7 +52,7 @@ test('the bell shows an unread dot, opens the inbox in one tap and lists only th
   await expect(rows.nth(1)).toContainText('알림 1');
   await expect(rows.nth(2)).toContainText('알림 4');
   await expect(rows.nth(0)).toContainText('5분 전');
-  await expect(page.getByText('이 기기에 30일 동안, 최대 200개까지 보관해요')).toBeVisible();
+  await expect(page.getByText('이 기기에 최대 200개, 30일 동안 보관해요')).toBeVisible();
   const open = await rows.nth(0).locator('.inbox-open').boundingBox();
   expect(open!.height).toBeGreaterThanOrEqual(44);
   expect(page.url()).toContain('section=inbox');
@@ -74,7 +74,7 @@ test('read-all, single delete and clear-all (with one confirmation) work and per
   await bell(page).click();
   const rows = page.locator('.inbox-row');
   await page.getByRole('button', { name: '모두 읽음' }).click();
-  await expect(rows.locator('.inbox-title.font-bold')).toHaveCount(0);
+  await expect(rows.locator('.inbox-title.font-semibold')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '모두 읽음' })).toBeDisabled();
   await page.getByRole('button', { name: '알림 지우기: 알림 2' }).click();
   await expect(rows).toHaveCount(2);
@@ -90,7 +90,8 @@ test('clear-all asks once before deleting', async ({ page }) => {
   await bell(page).click();
   await page.getByRole('button', { name: '모두 지우기' }).click();
   await expect(page.locator('.inbox-row')).toHaveCount(2);                 // 첫 누름은 확인만
-  await page.getByRole('button', { name: /정말 지울까요/ }).click();
+  await expect(page.getByText('모두 지울까요? 되돌릴 수 없어요')).toBeVisible();
+  await page.getByRole('button', { name: '지우기', exact: true }).click();
   await expect(page.getByText('받은 알림이 없어요')).toBeVisible();
 });
 
@@ -101,7 +102,7 @@ test('empty states: alerts on and alerts off with a way to turn them on', async 
   await expect(page.getByText('새 공지 알림을 놓쳐도 여기서 다시 볼 수 있어요')).toBeVisible();
   await page.evaluate(() => { (document.querySelector('notice-app') as unknown as App).pushStatus = 'off'; });
   await expect(page.getByText('알림이 꺼져 있어요')).toBeVisible();
-  await page.getByRole('button', { name: '알림 켜러 가기' }).click();
+  await page.getByRole('button', { name: '알림 켜기' }).click();
   expect(page.url()).toContain('section=notifications');
 });
 
