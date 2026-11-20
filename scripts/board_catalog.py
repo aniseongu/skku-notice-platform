@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# (id, 이름, 주소). 이미 운영 중인 4개(skku-notice01, cse-notice, sw-notice, futurecar-notice)는 sources.yaml에 따로 있다.
+# (id, 이름, 주소). 기본 게시판과 별도 파서가 필요한 게시판은 sources.yaml에 따로 있다.
 BOARDS: list[tuple[str, str, str]] = [
     ("liberalarts-notice", "문과대학 공지", "https://liberalarts.skku.edu/liberal/community/under_notice.do"),
     ("sscience-notice", "사회과학대학 공지", "https://sscience.skku.edu/sscience/community/under_notice.do"),
@@ -118,22 +118,23 @@ DEPARTMENT_BOARD = {
 
 # 전공과 상관없이 누구나 고를 수 있는 게시판(온보딩의 "기타 게시판" 단계). (id, 묶음, 설명, 추천 대학)
 # 추천 대상은 "대학" 또는 "대학/학과"다. 주전공·복수전공 중 하나라도 맞으면 게시판 추천에 들어가 켜진 채로 시작한다. 비워 두면 누구에게도 추천하지 않는다.
-# 묶음은 설정과 첫 설정에서 "기타" 아래 소제목이 된다. 2026-11-12 조사: 인공지능·디스플레이 부트캠프 사업단은 따로 공지 게시판을 찾지 못했다(공지는 성균관대 공지에 올라온다).
+# 묶음은 설정과 첫 설정에서 "기타" 아래 소제목이 된다.
 # 부트캠프 모집 안내(청년도약·첨단산업 인재양성)는 성균관대 공지 전체 게시판에도 올라온다. 아래는 사업단이 따로 올리는 게시판이다.
-# 디스플레이 부트캠프 사업단은 공개 공지 게시판을 찾지 못했고, 인공지능·반도체 사업단은 주소가 확인되지 않아 넣지 않았다.
 OTHER_BOARDS: list[tuple[str, str, str, tuple[str, ...]]] = [
     ("futurecar-notice", "부트캠프", "수강 모집과 행사 안내", ()),
+    ("aibootcamp-news", "부트캠프", "수강 모집과 행사 안내", ()),
     ("aiuniv-notice", "사업단", "AI 교육, 챌린지 안내", ("소프트웨어융합대학",)),
     ("skku-exchange-notice", "국제교류", "교환학생 선발·설명회·장학 안내", ()),
     ("ase-notice", "융합·연계전공", "차세대 반도체 교육과 인턴 안내", ("정보통신대학/반도체시스템공학과", "정보통신대학/반도체융합공학과", "정보통신대학/전자전기공학부", "공과대학/화학공학부", "공과대학/신소재공학부")),
     ("fabtech-notice", "융합·연계전공", "반도체 공정과 팹 교육, 학위 안내", ("정보통신대학/반도체시스템공학과", "정보통신대학/반도체융합공학과", "정보통신대학/전자전기공학부", "공과대학/화학공학부", "공과대학/신소재공학부")),
 ]
 
-# 이미 운영 중인 기본 게시판(모든 사용자에게 추천). sources.yaml의 앞쪽 4개는 이 스크립트가 건드리지 않는다.
+# sources.yaml의 자동 생성 구역 바깥에서 관리하는 게시판.
 DEFAULT_BOARD = "skku-notice01"
 EXISTING = {
     "skku-notice01": "성균관대 공지", "cse-notice": "소프트웨어학과 공지", "sw-notice": "소프트웨어융합대학 공지",
     "futurecar-notice": "미래차 부트캠프 공지",
+    "aibootcamp-news": "인공지능 부트캠프 공지",
 }
 
 BOARD_NAMES = {**EXISTING, **{i: n for i, n, _ in BOARDS}}

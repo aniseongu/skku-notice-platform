@@ -76,6 +76,23 @@ test('background push opens an allowed internship original', async () => {
   }
 });
 
+test('bootcamp push accepts the original and opens the app notice', async () => {
+  const w = worker();
+  const url = 'https://aibootcamp-skku.co.kr/news/45';
+  await w.push({ url, tag: 'notice:aibootcamp-news/45' });
+  assert.equal(w.notifications.at(-1).data.url, url);
+  await w.click(w.notifications.at(-1));
+  assert.equal(w.opened.at(-1), w.scope + '?notice=aibootcamp-news%2F45');
+  for (const bad of [url.replace('.kr/', '.kr.evil.com/'), url.replace('://', '://user@'),
+    url.replace('.kr/', '.kr:443/'), url.replace('.kr/', '.kr:8443/'),
+    url.replace('/45', '/write'), url.replace('https:', 'http:'), url + '?page=2']) {
+    await w.push({ url: bad });
+    assert.equal(w.notifications.at(-1).data.url, w.scope, bad);
+    await w.click({ tag: 'old', data: { url: bad } });
+    assert.equal(w.opened.at(-1), w.scope, bad);
+  }
+});
+
 test('a lost subscription is recreated with the same server key when the browser changes it', async () => {
   const events = new Map();
   const made = [];

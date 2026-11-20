@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 import requests
 from py_vapid import Vapid
 
+from skku_notice import aibootcamp
 from skku_notice.deadline import KST
 from skku_notice.platform_push import send_one
 from skku_notice.scheduled_collection import NoticeStore
@@ -103,10 +104,12 @@ class PushStore(NoticeStore):
 
 
 def safe_notice_url(value: str) -> bool:
-    """Match the service worker's school and approved internship notification targets."""
+    """Match the service worker's approved notice targets."""
     try:
         url = urlsplit(value)
         host = (url.hostname or "").lower()
+        if host == aibootcamp.HOST:
+            return aibootcamp.article_no(url) is not None
         school = host == "skku.edu" or host.endswith(".skku.edu")
         internship = (
             (host == "linkareer.com" and re.fullmatch(r"/activity/[0-9]+/?", url.path) is not None)

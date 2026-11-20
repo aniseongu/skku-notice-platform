@@ -74,6 +74,7 @@ export interface OtherBoard { id: string; name: string; group: string; help: str
 // 같은 묶음 안에서는 이 순서대로 보인다(융합·연계전공은 차세대반도체가 팹테크보다 위, 사용자 지시 2026-11-12).
 export const OTHER_BOARDS: readonly OtherBoard[] = [
   { id: 'futurecar-notice', name: '미래차 부트캠프 공지', group: '부트캠프', help: '수강 모집과 행사 안내', recommendFor: [] },
+  { id: 'aibootcamp-news', name: '인공지능 부트캠프 공지', group: '부트캠프', help: '수강 모집과 행사 안내', recommendFor: [] },
   { id: 'aiuniv-notice', name: 'AI중심대학사업단 공지', group: '사업단', help: 'AI 교육, 챌린지 안내', recommendFor: ['소프트웨어융합대학'] },
   { id: 'skku-exchange-notice', name: '교환학생 공지', group: '국제교류', help: '교환학생 선발·설명회·장학 안내', recommendFor: [] },
   { id: 'ase-notice', name: '차세대반도체공학연계전공 공지', group: '융합·연계전공', help: '차세대 반도체 교육과 인턴 안내', recommendFor: ['정보통신대학/반도체시스템공학과', '정보통신대학/반도체융합공학과', '정보통신대학/전자전기공학부', '공과대학/화학공학부', '공과대학/신소재공학부'] },

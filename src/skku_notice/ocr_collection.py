@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 
 import yaml
 
+from skku_notice import aibootcamp
 from skku_notice.board_probe import BoardProbeError, fetch_shared_image
 from skku_notice.fetch import EXTERNAL_IMAGE_HOSTS, _external_source_hosts, _source_hosts, fetch_image
 from skku_notice.grad_intern_facts import lacks_key_facts, lacks_work_hours
@@ -49,6 +50,8 @@ def allowed_image_url(url: str, *, shared: bool) -> bool:
     try:
         parsed = urlsplit(url)
         host = parsed.hostname or ""
+        if host == aibootcamp.HOST:
+            return not shared and aibootcamp.is_image(parsed)
         hosts = set() if shared else (_source_hosts() - _external_source_hosts()) | EXTERNAL_IMAGE_HOSTS
         return (parsed.scheme == "https" and bool(host) and parsed.username is None
                 and parsed.password is None and parsed.port in (None, 443)

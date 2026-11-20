@@ -1,11 +1,17 @@
 // 서버가 nh3로 정제한 본문 HTML을 화면에 그리기 전에 한 번 더 거른다(D-016).
 // 학교 게시판에서 온 내용이라 허용 목록 밖의 태그, 속성, 주소는 모두 버린다.
 import DOMPurify from 'dompurify';
+import { allowAiBootcampBodyUrl } from './aibootcamp-url.ts';
 import { IMAGE_MISSING_CLASS } from './cls';
 
 const ALLOWED_TAGS = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
   'a', 'img', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'hr', 'span', 'div'];
 const ALLOWED_ATTR = ['href', 'src', 'alt', 'colspan', 'rowspan'];
+
+DOMPurify.addHook('uponSanitizeAttribute', (_node, attr) => {
+  if ((attr.attrName === 'href' || attr.attrName === 'src')
+    && !allowAiBootcampBodyUrl(attr.attrValue, attr.attrName === 'src')) attr.keepAttr = false;
+});
 
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   // 링크는 새 탭에서, 이 앱의 창을 건드리지 못하게 연다. 그림은 볼 때만 받는다.

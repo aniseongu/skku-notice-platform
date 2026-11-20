@@ -5,6 +5,67 @@ import pytest
 
 from skku_notice import fetch
 from skku_notice.fetch import UnsafeURL
+from skku_notice.ocr_collection import allowed_image_url
+from skku_notice.push_collection import safe_notice_url
+
+
+@pytest.mark.parametrize("origin", [
+    "http://aibootcamp-skku.co.kr",
+    "https://aibootcamp-skku.co.kr.evil.com",
+    "https://user@aibootcamp-skku.co.kr",
+    "https://aibootcamp-skku.co.kr@evil.com",
+    "https://aibootcamp-skku.co.kr:443",
+    "https://aibootcamp-skku.co.kr:8443",
+])
+def test_aibootcamp_rejects_unsafe_authorities(monkeypatch, origin):
+    article = f"{origin}/news/45"
+    image = f"{origin}/data/file/news/post.png"
+    monkeypatch.setattr(fetch, "_resolve_addresses", lambda host: pytest.fail("DNS queried"))
+    with pytest.raises(UnsafeURL):
+        fetch.fetch_list(f"{origin}/news", "agent", 10, bootcamp=True)
+    with pytest.raises(UnsafeURL):
+        fetch.fetch_detail(article, "agent", 10)
+    assert fetch.fetch_image(image, "agent") is None
+    assert not allowed_image_url(image, shared=False)
+    assert not safe_notice_url(article)
+
+
+def test_aibootcamp_fetch_ocr_and_push_use_separate_path_rules(monkeypatch):
+    origin = "https://aibootcamp-skku.co.kr"
+    article = f"{origin}/news/45"
+    image = f"{origin}/data/file/news/post.png"
+    monkeypatch.setattr(fetch, "_resolve_addresses", lambda host: {"8.8.8.8"})
+    fetch._validate_notice_url(f"{origin}/news?page=2", list_page=True)
+    fetch._validate_notice_url(article)
+    fetch._validate_notice_url(image, https_only=True)
+    assert allowed_image_url(image, shared=False)
+    assert not allowed_image_url(image, shared=True)
+    assert safe_notice_url(article)
+    for url in (f"{article}?page=2", f"{origin}/news/abc", image, f"{origin}/bbs/download.php"):
+        with pytest.raises(UnsafeURL):
+            fetch._validate_notice_url(url)
+        assert not safe_notice_url(url)
+    assert not allowed_image_url(f"{origin}/data/other/post.png", shared=False)
+    assert not allowed_image_url(article, shared=False)
+
+
+def test_aibootcamp_list_does_not_follow_redirects(monkeypatch):
+    monkeypatch.setattr(fetch, "_resolve_addresses", lambda host: {"8.8.8.8"})
+    requests = []
+
+    def respond(request):
+        requests.append(str(request.url))
+        return httpx.Response(302, headers={"Location": "https://evil.com/"})
+
+    transport = httpx.MockTransport(respond)
+    original_client = httpx.Client
+    monkeypatch.setattr(
+        fetch.httpx, "Client", lambda **kwargs: original_client(transport=transport, **kwargs)
+    )
+    url = "https://aibootcamp-skku.co.kr/news"
+    with pytest.raises(fetch.FetchError, match="HTTP 302"):
+        fetch.fetch_list(url, "agent", 10, bootcamp=True)
+    assert requests == [url]
 
 
 @pytest.mark.parametrize("url", [

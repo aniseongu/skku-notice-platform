@@ -157,6 +157,17 @@ test('stored alert urls are re-checked with the same rules as when they were rec
     assert.equal(safeInboxUrl(bad, app), null, bad);
 });
 
+test('bootcamp originals in the inbox require an exact HTTPS article URL', () => {
+  const app = 'https://skku-notice-platform.pages.dev';
+  const url = 'https://aibootcamp-skku.co.kr/news/45';
+  assert.equal(safeInboxUrl(url, app), url);
+  for (const bad of [url.replace('.kr/', '.kr.evil.com/'), url.replace('://', '://user@'),
+    url.replace('.kr/', '.kr:443/'), url.replace('.kr/', '.kr:8443/'),
+    url.replace('/45', '/write'), url.replace('https:', 'http:'), url + '?page=2']) {
+    assert.equal(safeInboxUrl(bad, app), null, bad);
+  }
+});
+
 test('unread count, notice id check and short time labels', () => {
   assert.equal(unreadCount([make('1', 'a', 1), make('2', 'a', 1, { read: true })]), 1);
   assert.equal(noticeIdOfItem({ noticeId: 'skku-notice01/123' }), 'skku-notice01/123');

@@ -3,7 +3,62 @@ from pathlib import Path
 
 import pytest
 
-from skku_notice.parse import ParseError, parse_list
+from skku_notice.parse import ParseError, parse_detail, parse_list
+
+BOOTCAMP = "https://aibootcamp-skku.co.kr/news"
+
+
+def test_aibootcamp_list_keeps_pinned_notices_and_canonical_article_numbers():
+    html = Path("tests/fixtures/aibootcamp_news_list_2026-11-21.html").read_text(encoding="utf-8")
+    notices = parse_list(html, "aibootcamp-news", BOOTCAMP)
+    pinned, regular = notices[0], notices[6]
+    assert len(notices) == 15
+    assert sum(notice.pinned for notice in notices) == 6
+    assert (pinned.article_no, pinned.posted_on, pinned.url, pinned.pinned) == (
+        "45", date(2026, 11, 20), f"{BOOTCAMP}/45", True,
+    )
+    assert pinned.title.startswith("반도체설계교육센터(IDEC) 수강생 모집")
+    assert (regular.article_no, regular.posted_on, regular.pinned) == ("41", date(2026, 10, 12), False)
+    second_page = html.replace("/news/45", "/news/45?page=2")
+    assert parse_list(second_page, "aibootcamp-news", BOOTCAMP + "?page=2") == notices
+    with pytest.raises(ParseError):
+        parse_list(html.replace(".co.kr/news/45", ".co.kr.evil.com/news/45"), "aibootcamp-news", BOOTCAMP)
+
+
+def test_aibootcamp_detail_reads_the_body_and_images_above_the_editor():
+    html = Path("tests/fixtures/aibootcamp_news_detail_2026-11-21.html").read_text(encoding="utf-8")
+    detail = parse_detail(html, f"{BOOTCAMP}/41")
+    assert "이수 신청" in detail.body_text
+    assert len(detail.images) == 1
+    assert detail.images[0].startswith("https://aibootcamp-skku.co.kr/data/file/news/thumb-")
+    assert "<p>" in detail.body_html
+    assert "style=" not in detail.body_html
+
+
+def test_aibootcamp_attachments_link_to_the_original_and_detail_filters_unsafe_urls():
+    url = f"{BOOTCAMP}/31"
+    detail = parse_detail("""
+        <div id="bo_v_con"><p>안내</p>
+          <a href="/news/45">공지</a><a href="/bbs/login.php">다른 경로</a>
+          <a href="https://aibootcamp-skku.co.kr.evil.com/news/45">위장</a>
+          <a href="https://forms.gle/example">신청</a>
+          <img src="https://aibootcamp-skku.co.kr:443/data/file/news/bad.png">
+          <img src="/data/editor/2611/post.png">
+        </div>
+        <section id="bo_v_file">
+          <a href="/bbs/download.php?bo_table=news&amp;wr_id=31&amp;no=0&amp;nonce=sample">
+            <strong>양식.hwp</strong> (58.0K)
+          </a>
+          <a href="/bbs/download.php?bo_table=news&amp;wr_id=30&amp;no=0&amp;nonce=sample">
+            <strong>다른 글.hwp</strong>
+          </a>
+        </section>
+    """, url)
+    assert detail.attachments == (("양식.hwp", f"{url}#bo_v_file", "HWP", "58.0K"),)
+    assert detail.images == ("https://aibootcamp-skku.co.kr/data/editor/2611/post.png",)
+    assert f'href="{BOOTCAMP}/45"' in detail.body_html
+    assert 'href="https://forms.gle/example"' in detail.body_html
+    assert all(bad not in detail.body_html for bad in ("login.php", "evil.com", "bad.png"))
 
 
 @pytest.mark.parametrize(

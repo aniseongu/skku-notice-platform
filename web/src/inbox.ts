@@ -2,6 +2,7 @@
 // 계정 분리: 워커는 받은 푸시의 수신자 해시와 구독 주소를 현재 소유자와 비교한다.
 // 소유자가 바뀌면 남의 항목은 지운다. 설계는 docs/design/2026-11-20_notification-inbox.md.
 import { get, update } from 'idb-keyval';
+import { isAiBootcampArticle } from './aibootcamp-url.ts';
 import { isNoticeId } from './deeplink.ts';
 
 export const INBOX_KEY = 'inbox:v1';
@@ -153,12 +154,12 @@ export async function changeInbox(owner: string, change: InboxChange, store: Inb
   } catch { return false; }
 }
 
-/** 알림함 항목의 원문 주소를 다시 확인한다. 받을 때(push-handler.js)와 같은 규칙: https, 사용자 정보·포트 없음, 이 앱·학교 도메인·허용된 외부 인턴 경로만. */
+/** 알림함 항목의 원문 주소를 수신 때(push-handler.js)와 같은 규칙으로 다시 확인한다. */
 export function safeInboxUrl(value: string, appOrigin: string): string | null {
   try {
     const url = new URL(value);
     const internship = (url.hostname === 'linkareer.com' && /^\/activity\/\d+\/?$/.test(url.pathname)) || (url.hostname === 'jasoseol.com' && /^\/recruit\/\d+\/?$/.test(url.pathname));
-    const allowed = url.origin === appOrigin || url.hostname === 'skku.edu' || url.hostname.endsWith('.skku.edu') || internship;
+    const allowed = url.origin === appOrigin || url.hostname === 'skku.edu' || url.hostname.endsWith('.skku.edu') || internship || isAiBootcampArticle(value);
     return url.protocol === 'https:' && !url.username && !url.password && !url.port && allowed ? url.href : null;
   } catch { return null; }
 }

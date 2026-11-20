@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urljoin, urlsplit
 import nh3
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
+from skku_notice import aibootcamp
 from skku_notice.model import Notice
 
 ROW_SELECTOR = "ul.board-list-wrap > li"
@@ -97,6 +98,8 @@ def _parse_row(row: LexborNode, source_id: str, board_url: str) -> Notice:
 
 def parse_list(html: str, source_id: str, board_url: str) -> list[Notice]:
     tree = LexborHTMLParser(html)
+    if aibootcamp.is_list(urlsplit(board_url)):
+        return _parse_gnuboard_list(tree, source_id, board_url)
     if tree.css_first("ul.board-list-wrap") is None:
         table = tree.css_first("table.board_list")
         if table is not None:
@@ -130,6 +133,30 @@ def parse_list(html: str, source_id: str, board_url: str) -> list[Notice]:
     return [_parse_row(row, source_id, board_url) for row in rows]
 
 
+def _parse_gnuboard_list(tree: LexborHTMLParser, source_id: str, board_url: str) -> list[Notice]:
+    notices = []
+    for row in tree.css("#bo_list tbody tr"):
+        link = row.css_first(".bo_tit a[href]")
+        date_node = row.css_first(".td_datetime")
+        if link is None or date_node is None:
+            raise ParseError("Gnuboard row without title link or date")
+        url = urljoin(board_url, link.attributes["href"])
+        number = aibootcamp.article_no(urlsplit(url), from_list=True)
+        title = _clean(link)
+        if not number or not title:
+            raise ParseError("Gnuboard row without article number or title")
+        try:
+            posted_on = date.fromisoformat(_clean(date_node))
+        except ValueError as exc:
+            raise ParseError("Gnuboard row with invalid date") from exc
+        pinned = "bo_notice" in row.attributes.get("class", "").split()
+        canonical_url = f"{aibootcamp.ORIGIN}/news/{number}"
+        notices.append(Notice(source_id, number, title, None, canonical_url, posted_on, pinned))
+    if not notices:
+        raise ParseError("Gnuboard list has no articles")
+    return notices
+
+
 def _body(node: LexborNode) -> str:
     if node.tag in {"script", "style"}:
         return ""
@@ -148,8 +175,11 @@ def _body(node: LexborNode) -> str:
 
 def _image_url(src: str, base_url: str) -> str | None:
     url = urljoin(base_url, src.strip())
-    path = urlsplit(url).path.lower()
-    if (urlsplit(url).scheme not in {"http", "https"}
+    parsed = urlsplit(url)
+    path = parsed.path.lower()
+    if (parsed.scheme not in {"http", "https"}
+            or ((aibootcamp.is_origin(urlsplit(base_url)) or parsed.hostname == aibootcamp.HOST)
+                and not aibootcamp.is_image(parsed))
             or re.search(r"/_res/[^/]+/img/common/", path)
             or re.search(r"(?:^|[/_-])(?:sns|icon|ico)(?:[/_.-]|$)", path)):
         return None
@@ -197,8 +227,11 @@ def _html_body(body: LexborNode, base_url: str) -> str:
         attr = "href" if node.tag == "a" else "src"
         raw = node.attrs.get(attr, "").strip()
         url = urljoin(base_url, raw)
-        if urlsplit(url).scheme not in {"http", "https", "mailto"} or (node.tag == "img" and
-                _image_url(raw, base_url) is None):
+        parsed = urlsplit(url)
+        bootcamp_link = node.tag == "a" and aibootcamp.HOST in parsed.netloc.lower()
+        if (parsed.scheme not in {"http", "https", "mailto"}
+                or (node.tag == "img" and _image_url(raw, base_url) is None)
+                or (bootcamp_link and not aibootcamp.article_no(parsed))):
             if node.tag == "img":
                 node.decompose()
             else:
@@ -228,7 +261,9 @@ def _unwrap_encoded_editor(body: LexborNode) -> LexborNode:
 
 def parse_detail(html: str, base_url: str) -> Detail:
     tree = LexborHTMLParser(html)
-    body = next((tree.css_first(selector) for selector in DETAIL_SELECTORS if tree.css_first(selector)), None)
+    number = aibootcamp.article_no(urlsplit(base_url))
+    selectors = ("#bo_v_con",) if number else DETAIL_SELECTORS
+    body = next((tree.css_first(selector) for selector in selectors if tree.css_first(selector)), None)
     if body is None:
         raise ParseError("detail body not found")
     body = _unwrap_encoded_editor(body)
@@ -246,8 +281,19 @@ def parse_detail(html: str, base_url: str) -> Detail:
         for link in tree.css(ATTACHMENT_SELECTOR)
         if _clean(link)
     )
+    image_nodes = body.css("img[src]")
+    if number:
+        # GnuBoard downloads require a page visit and a fresh nonce in the reader's session.
+        attachments = tuple(
+            (_clean(name), f"{base_url}#bo_v_file", _clean(name).rsplit(".", 1)[-1].upper(),
+             match.group(1) if (match := re.search(r"\(([0-9.]+[KMGT]?)\)$", _clean(link), re.I)) else None)
+            for link in tree.css("#bo_v_file a[href]")
+            if (name := link.css_first("strong")) and _clean(name)
+            and aibootcamp.is_attachment(urlsplit(urljoin(base_url, link.attributes["href"])), number)
+        )
+        image_nodes = [*tree.css("#bo_v_img img[src]"), *image_nodes]
     images = []
-    for image in body.css("img[src]"):
+    for image in image_nodes:
         src = image.attributes["src"].strip()
         if not src:
             continue

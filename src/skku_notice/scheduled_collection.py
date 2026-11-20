@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 import httpx
 import yaml
 
+from skku_notice import aibootcamp
 from skku_notice.board_probe import BoardProbeError, fetch_shared_page, probe_board
 from skku_notice.deadline import KST, extract_deadline
 from skku_notice.fetch import FetchError, fetch_detail, fetch_json_post, fetch_list
@@ -186,7 +187,8 @@ DETAIL_BUDGET = 60
 
 
 def school_sources(settings: dict) -> list[dict]:
-    sources = [s for s in settings["sources"] if s.get("kind") == "skku-cms" and not s.get("external")]
+    sources = [s for s in settings["sources"]
+               if s.get("kind") in {"skku-cms", "gnuboard"} and not s.get("external")]
     if not sources or len({s["id"] for s in sources}) != len(sources):
         raise ValueError("invalid school sources")
     return sources
@@ -224,8 +226,12 @@ def run_collection(
     for source in sources:
         try:
             pace()
-            html = (fetch_shared_page(source["url"], source["url"]) if source.get("shared")
-                    else fetch_list(source["url"], agent, timeout))
+            if source.get("shared"):
+                html = fetch_shared_page(source["url"], source["url"])
+            elif source.get("kind") == "gnuboard":
+                html = fetch_list(source["url"], agent, timeout, bootcamp=True)
+            else:
+                html = fetch_list(source["url"], agent, timeout)
             notices = parse_list(html, source["id"], source["url"])
             # A pinned notice can also appear in the regular list. Keep it only once.
             notices = list({n.article_no: n for n in reversed(notices)}.values())
@@ -362,7 +368,12 @@ def recheck_candidates(rows: list[dict], important: set[str], now: datetime) -> 
     for row in rows:
         fetched, seen = _when(row.get("fetched_at")), _when(row.get("first_seen"))
         deadline = _when(row.get("deadline"))
-        if fetched is None or ".skku.edu/" not in str(row.get("url", "")) or (deadline and deadline < now):
+        try:
+            url = urlsplit(str(row.get("url") or ""))
+            school = (url.hostname or "").endswith(".skku.edu")
+        except ValueError:
+            continue
+        if fetched is None or not (school or aibootcamp.article_no(url)) or (deadline and deadline < now):
             continue
         age = now - fetched
         is_recent = seen is not None and now - seen < RECHECK_RECENT_WINDOW

@@ -76,6 +76,20 @@ async function rememberInbox(entry) {
   finally { clearTimeout(timer); }
 }
 
+function checkedTarget(value) {
+  try {
+    const candidate = new URL(value);
+    const internship = (candidate.hostname === 'linkareer.com' && /^\/activity\/\d+\/?$/.test(candidate.pathname))
+      || (candidate.hostname === 'jasoseol.com' && /^\/recruit\/\d+\/?$/.test(candidate.pathname));
+    const bootcamp = /^https:\/\/aibootcamp-skku\.co\.kr\/news\/[0-9]+$/i.test(value)
+      && /^\/news\/[0-9]+$/.test(candidate.pathname) && !/[\r\n]/.test(value);
+    if (candidate.protocol === 'https:' && !candidate.username && !candidate.password && !candidate.port
+      && (candidate.origin === self.location.origin || candidate.hostname === 'skku.edu'
+        || candidate.hostname.endsWith('.skku.edu') || internship || bootcamp)) return candidate.href;
+  } catch { /* 올바르지 않은 주소는 앱으로 연다 */ }
+  return self.registration.scope;
+}
+
 self.addEventListener('push', (event) => {
   let payload = {};
   try {
@@ -84,15 +98,7 @@ self.addEventListener('push', (event) => {
   } catch { /* 비어 있으면 앱으로 연다 */ }
   const title = typeof payload.title === 'string' ? payload.title : '성공';
   const body = typeof payload.body === 'string' ? payload.body : '새 공지가 도착했어요';
-  let target = new URL('./', self.registration.scope);
-  try {
-    const candidate = new URL(payload.url);
-    const internship = (candidate.hostname === 'linkareer.com' && /^\/activity\/\d+\/?$/.test(candidate.pathname))
-      || (candidate.hostname === 'jasoseol.com' && /^\/recruit\/\d+\/?$/.test(candidate.pathname));
-    if (candidate.protocol === 'https:' && !candidate.username && !candidate.password && !candidate.port
-      && (candidate.origin === self.location.origin || candidate.hostname === 'skku.edu'
-        || candidate.hostname.endsWith('.skku.edu') || internship)) target = candidate;
-  } catch { /* 올바르지 않은 주소는 앱으로 연다 */ }
+  const target = checkedTarget(payload.url);
   const tag = typeof payload.tag === 'string' ? payload.tag : GENERIC_TAG;
   // 알림 표시를 먼저 시작하고 알림함 저장은 따로 시작한다. 저장이 느리거나 실패해도 알림은 뜬다.
   const shown = self.registration.showNotification(title, {
@@ -101,9 +107,9 @@ self.addEventListener('push', (event) => {
     badge: new URL('icon-monochrome-512.png', self.registration.scope).href,
     tag,
     silent: payload.silent === true,
-    data: { url: target.href, notice: noticeIdOf(payload.tag) },
+    data: { url: target, notice: noticeIdOf(payload.tag) },
   });
-  const kept = rememberInbox({ to: payload.to, tag, title, body, noticeId: noticeIdOf(payload.tag), url: target.href });
+  const kept = rememberInbox({ to: payload.to, tag, title, body, noticeId: noticeIdOf(payload.tag), url: target });
   event.waitUntil(Promise.all([shown, kept]));
 });
 
@@ -125,7 +131,7 @@ self.addEventListener('notificationclick', (event) => {
     })());
     return;
   }
-  const target = event.notification.data?.url || self.registration.scope;
+  const target = checkedTarget(event.notification.data?.url);
   event.waitUntil(self.clients.openWindow(target));
 });
 

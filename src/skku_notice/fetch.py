@@ -12,6 +12,8 @@ from urllib.parse import urlsplit
 import httpx
 import yaml
 
+from skku_notice import aibootcamp
+
 RETRY_STATUS = {429, 500, 502, 503, 504}
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 SOURCES_PATH = Path("config/sources.yaml")
@@ -53,12 +55,18 @@ def _external_source_hosts() -> set[str]:
 
 
 def _validate_notice_url(
-    url: str, *, allowed_hosts: set[str] | None = None, https_only: bool = False,
+    url: str, *, allowed_hosts: set[str] | None = None, https_only: bool = False, list_page: bool = False,
 ) -> None:
     try:
         parsed = urlsplit(url)
         host = parsed.hostname
         safe_label = f"{parsed.scheme}://{host}" if host else "invalid URL"
+        if list_page and not aibootcamp.is_list(parsed):
+            raise UnsafeURL(safe_label)
+        if not list_page and host == aibootcamp.HOST:
+            permitted = aibootcamp.is_image(parsed) if https_only else aibootcamp.article_no(parsed)
+            if not permitted:
+                raise UnsafeURL(safe_label)
         if (
             parsed.scheme not in ({"https"} if https_only else {"http", "https"})
             or not host
@@ -88,9 +96,11 @@ def _validate_notice_url(
 LIST_ATTEMPTS = 4  # 학교 서버의 일시 지연으로 수집이 실패 처리되지 않게 목록만 한 번 더 시도한다.
 
 
-def fetch_list(url: str, user_agent: str, timeout_seconds: float) -> str:
+def fetch_list(url: str, user_agent: str, timeout_seconds: float, *, bootcamp: bool = False) -> str:
+    if bootcamp:
+        _validate_notice_url(url, list_page=True)
     headers = {"User-Agent": user_agent, "Accept-Language": "ko"}
-    with httpx.Client(headers=headers, timeout=timeout_seconds, follow_redirects=True) as client:
+    with httpx.Client(headers=headers, timeout=timeout_seconds, follow_redirects=not bootcamp) as client:
         for attempt in range(LIST_ATTEMPTS):
             try:
                 response = client.get(url)
