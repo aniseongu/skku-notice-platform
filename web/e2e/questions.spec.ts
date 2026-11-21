@@ -73,7 +73,7 @@ test('blocked authors can be listed and unblocked from settings', async ({ page 
   await page.evaluate(() => {
     const app = (document.querySelector('notice-app') as unknown as App).controller;
     let blocked = [{ id: 'block-one', createdAt: '2026-11-20T03:00:00Z' }];
-    app.qeApiOverride.listBlocks = async (guard: () => boolean) => { if (!guard()) throw new Error('account changed'); return blocked; };
+    app.qeApiOverride.listBlocks = async () => blocked;
     app.qeApiOverride.unblock = async (id: string) => { blocked = blocked.filter((item) => item.id !== id); };
     app.openSettings('blocks');
   });
@@ -85,13 +85,74 @@ test('blocked authors can be listed and unblocked from settings', async ({ page 
   await expect(pageBody.getByText('차단한 작성자가 없어요')).toBeVisible();
 });
 
+test('reopening settings waits for an in-flight unblock', async ({ page }) => {
+  await setup(page);
+  await page.evaluate(() => {
+    const app = (document.querySelector('notice-app') as unknown as App).controller;
+    let blocked = [{ id: 'block-one', createdAt: '2026-11-20T03:00:00Z' }];
+    app.qeApiOverride.listBlocks = async () => blocked;
+    app.qeApiOverride.unblock = () => new Promise<void>((resolve) => {
+      app.finishUnblock = () => { blocked = []; resolve(); };
+    });
+    app.openSettingsHome();
+  });
+  const settings = page.locator('platform-settings-screen');
+  const manageLink = settings.getByRole('link', { name: /차단 관리/ });
+  await manageLink.click();
+  await settings.getByRole('button', { name: '차단 해제' }).click();
+  await page.getByRole('button', { name: '설정으로 돌아가기' }).click();
+  await manageLink.click();
+  await expect(settings.getByText('불러오고 있어요')).toBeVisible();
+  await page.evaluate(() => (document.querySelector('notice-app') as unknown as App).controller.finishUnblock());
+  await expect(settings.getByText('차단한 작성자가 없어요')).toBeVisible();
+});
+
+test('a failed edit preserves the input and can be retried', async ({ page }) => {
+  await setup(page);
+  const section = page.getByRole('region', { name: /질문·경험/ });
+  await section.getByRole('button', { name: /^질문·경험/ }).click();
+  await section.getByRole('button', { name: '질문하기' }).click();
+  await section.getByRole('textbox', { name: '질문하기' }).fill('원래 질문');
+  await section.getByRole('form', { name: '질문하기' }).getByRole('button', { name: '질문하기' }).click();
+  await expect(section.getByText('원래 질문')).toBeVisible();
+  await page.evaluate(() => {
+    const app = (document.querySelector('notice-app') as unknown as App).controller;
+    const db = (window as unknown as { qdb: { questions: { id: string; body: string }[] } }).qdb;
+    const listQuestions = app.qeApiOverride.listQuestions;
+    let failed = false;
+    app.qeApiOverride.listQuestions = () => failed ? Promise.reject(new Error('read failed')) : listQuestions();
+    app.qeApiOverride.editQuestion = (_id: string, body: string) => {
+      if (failed) {
+        db.questions[0].body = body;
+        failed = false;
+        return Promise.resolve();
+      }
+      return new Promise<void>((_resolve, reject) => {
+        app.failEdit = () => { failed = true; reject(new Error('write failed')); };
+      });
+    };
+  });
+  await section.getByRole('button', { name: '더 보기 메뉴' }).click();
+  await section.getByRole('button', { name: '수정하기' }).click();
+  const input = section.getByRole('textbox', { name: '질문 수정' });
+  const submit = section.getByRole('button', { name: '수정 완료' });
+  await input.fill('입력한 수정 내용');
+  await submit.click();
+  await expect(input).toBeDisabled();
+  await page.evaluate(() => (document.querySelector('notice-app') as unknown as App).controller.failEdit());
+  await expect(input).toBeEnabled();
+  await expect(input).toHaveValue('입력한 수정 내용');
+  await submit.click();
+  await expect(section.getByText('입력한 수정 내용', { exact: true })).toBeVisible();
+});
+
 test('a late block list from the previous account is discarded', async ({ page }) => {
   await setup(page);
   await page.evaluate(() => {
     const app = (document.querySelector('notice-app') as unknown as App).controller;
-    app.qeApiOverride.listBlocks = async (guard: () => boolean) => {
+    app.qeApiOverride.listBlocks = async ({ signal }: { signal: AbortSignal }) => {
       await new Promise((resolve) => setTimeout(resolve, 700));
-      if (!guard()) throw new Error('account changed');
+      if (signal.aborted) throw new Error('account changed');
       return [{ id: 'old', createdAt: '2026-11-20T03:00:00Z' }];
     };
     app.openSettings('blocks');

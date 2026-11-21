@@ -11,30 +11,41 @@ test('cached list appears before the feed and stays isolated by account', async 
     let authCallback;
     export const authClient = { auth: { onAuthStateChange(cb) { authCallback = cb; setTimeout(() => cb('INITIAL_SESSION', session()), 0); return {data: {subscription: {unsubscribe() {}}}}; }, getSession: async () => ({data: {session: session()}}), signOut: async () => { authCallback('SIGNED_OUT', null); return {error: null}; } }, from: query, rpc: async () => ({data: [], error: null}), functions: {invoke: async () => ({data: null, error: null})} };
   ` }));
-  let delay = 1800;
-  await page.route('**/sample/api/v1/notices.json', async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    await route.continue().catch(() => {});
+  const feedPath = '**/sample/api/v1/notices.json';
+  let feedGate: Promise<void> | undefined;
+  const holdFeed = () => {
+    let release!: () => void;
+    feedGate = new Promise<void>((resolve) => { release = resolve; });
+    return release;
+  };
+  await page.route(feedPath, async (route) => {
+    await feedGate;
+    await route.continue();
   });
   await page.addInitScript(() => { localStorage.setItem('platform:onboarded:a', '1'); localStorage.setItem('platform:onboarded:b', '1'); });
-  let start = Date.now();
   await page.goto('/?api=sample/api/v1');
   const rows = page.locator('notice-rows-screen a.row');
   await expect(rows.first()).toBeVisible();
-  const cold = Date.now() - start;
   await page.waitForFunction(async () => {
     const { loadListCache } = await import('/src/list-cache.ts');
     return !!(await loadListCache('a'));
   });
-  start = Date.now();
-  await page.reload();
-  await expect(rows.first()).toBeVisible({ timeout: 1500 });
-  const warm = Date.now() - start;
-  expect(warm).toBeLessThan(delay);
+  const releaseWarmFeed = holdFeed();
+  try {
+    await page.reload();
+    await expect(rows.first()).toBeVisible();
+  } finally {
+    releaseWarmFeed();
+  }
   await page.evaluate(() => localStorage.setItem('test-user', 'b'));
-  await page.reload();
-  await expect(rows).toHaveCount(0);
-  await expect(rows.first()).toBeVisible({ timeout: 10000 });
+  const releaseNewAccountFeed = holdFeed();
+  try {
+    await Promise.all([page.waitForRequest(feedPath), page.reload()]);
+    await expect(rows).toHaveCount(0);
+  } finally {
+    releaseNewAccountFeed();
+  }
+  await expect(rows.first()).toBeVisible();
   await page.waitForFunction(async () => {
     const { loadListCache } = await import('/src/list-cache.ts');
     return !!(await loadListCache('b'));
@@ -44,5 +55,4 @@ test('cached list appears before the feed and stays isolated by account', async 
     const { loadListCache } = await import('/src/list-cache.ts');
     return await loadListCache('b');
   })).toBeNull();
-  console.log(`first row cold=${cold}ms cached=${warm}ms`);
 });

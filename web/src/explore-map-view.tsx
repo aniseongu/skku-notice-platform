@@ -49,7 +49,7 @@ export function ExploreMapPage({ model }: { model: ExploreModel }) {
       <p className={NOTE_TEXT}>내가 기록한 공고를 제목으로 나눴어요</p>
     </div>
     {summary.total > 0 ? <div className={GUTTER}>
-      <ul className="m-0 grid list-none grid-cols-1 gap-[8px] p-0 min-[720px]:grid-cols-2 min-[720px]:gap-[12px]" aria-label="영역별 기록">
+      <ul className="m-0 grid list-none grid-cols-1 gap-[8px] p-0 min-[720px]:grid-cols-2 min-[720px]:gap-[12px]" role="list" aria-label="영역별 기록">
         {open.map((domain) => <AreaCard key={domain.id} label={domain.label} status={statusLine(domain.byStatus)} count={domain.count} />)}
         {summary.other.count > 0 ? <AreaCard label="그 밖" status={otherLine} count={summary.other.count} /> : null}
       </ul>

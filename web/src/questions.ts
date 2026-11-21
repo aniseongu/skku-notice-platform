@@ -108,7 +108,7 @@ async function call(client: SupabaseClient, fn: string, args: Record<string, unk
 const asArray = (data: unknown): unknown[] => (Array.isArray(data) ? data : []);
 const invalid = () => Promise.reject(Object.assign(new Error('qe_invalid_input'), { code: '22023' }));
 
-export interface QuestionsWriteGuard {
+export interface QuestionsSessionGuard {
   accessToken: () => Promise<string | null>;
   signal: AbortSignal;
 }
@@ -117,19 +117,19 @@ export interface QuestionsWriteGuard {
 export interface QuestionsApi {
   listQuestions(noticeId: string, guard: AccountGuard): Promise<Question[]>;
   listExperiences(noticeId: string, guard: AccountGuard): Promise<Experiences>;
-  createQuestion(noticeId: string, body: string, parentId: string | undefined, guard: QuestionsWriteGuard): Promise<string>;
-  createExperience(noticeId: string, input: ExperienceInput, guard: QuestionsWriteGuard): Promise<string>;
-  editQuestion(postId: string, body: string, guard: QuestionsWriteGuard): Promise<void>;
-  editExperience(postId: string, input: ExperienceInput, guard: QuestionsWriteGuard): Promise<void>;
-  deletePost(postId: string, guard: QuestionsWriteGuard): Promise<void>;
-  report(postId: string, guard: QuestionsWriteGuard): Promise<void>;
-  blockAuthor(postId: string, guard: QuestionsWriteGuard): Promise<string>;
-  listBlocks(guard: AccountGuard): Promise<{ id: string; createdAt: string }[]>;
-  unblock(blockId: string, guard: QuestionsWriteGuard): Promise<void>;
+  createQuestion(noticeId: string, body: string, parentId: string | undefined, guard: QuestionsSessionGuard): Promise<string>;
+  createExperience(noticeId: string, input: ExperienceInput, guard: QuestionsSessionGuard): Promise<string>;
+  editQuestion(postId: string, body: string, guard: QuestionsSessionGuard): Promise<void>;
+  editExperience(postId: string, input: ExperienceInput, guard: QuestionsSessionGuard): Promise<void>;
+  deletePost(postId: string, guard: QuestionsSessionGuard): Promise<void>;
+  report(postId: string, guard: QuestionsSessionGuard): Promise<void>;
+  blockAuthor(postId: string, guard: QuestionsSessionGuard): Promise<string>;
+  listBlocks(guard: QuestionsSessionGuard): Promise<{ id: string; createdAt: string }[]>;
+  unblock(blockId: string, guard: QuestionsSessionGuard): Promise<void>;
 }
 
 export function createQuestionsApi(client: SupabaseClient): QuestionsApi {
-  const write = async (fn: string, args: Record<string, unknown>, guard: QuestionsWriteGuard): Promise<unknown> => {
+  const callWithSession = async (fn: string, args: Record<string, unknown>, guard: QuestionsSessionGuard): Promise<unknown> => {
     const token = await guard.accessToken();
     if (!token || guard.signal.aborted) throw new AccountChanged();
     const { data, error } = await client.rpc(fn, args)
@@ -138,28 +138,34 @@ export function createQuestionsApi(client: SupabaseClient): QuestionsApi {
     if (error) throw error;
     return data;
   };
-  const run = async (fn: string, args: Record<string, unknown>, guard: QuestionsWriteGuard) => { await write(fn, args, guard); };
+  const run = async (fn: string, args: Record<string, unknown>, guard: QuestionsSessionGuard) => { await callWithSession(fn, args, guard); };
   const expArgs = (input: ExperienceInput) => ({ p_satisfaction: input.satisfaction, p_learning: input.learning ?? null, p_difficulty: input.difficulty ?? null, p_body: input.body?.trim() || null, p_participated: input.participated === true });
   return {
     listQuestions: async (noticeId, guard) => asArray(await call(client, 'qe_list_questions', { p_notice_id: noticeId }, guard)).map(parseQuestion).filter((q): q is Question => q !== null),
     listExperiences: async (noticeId, guard) => parseExperiences(await call(client, 'qe_list_experiences', { p_notice_id: noticeId }, guard)),
     createQuestion: async (noticeId, body, parentId, guard) => {
       if (validateQuestionBody(body)) return invalid();
-      const id = await write('qe_create_question', { p_notice_id: noticeId, p_body: body.trim(), p_parent_id: parentId ?? null }, guard);
+      const id = await callWithSession('qe_create_question', { p_notice_id: noticeId, p_body: body.trim(), p_parent_id: parentId ?? null }, guard);
       return typeof id === 'string' ? id : '';
     },
     createExperience: async (noticeId, input, guard) => {
       if (validateExperience(input)) return invalid();
-      const id = await write('qe_create_experience', { p_notice_id: noticeId, ...expArgs(input) }, guard);
+      const id = await callWithSession('qe_create_experience', { p_notice_id: noticeId, ...expArgs(input) }, guard);
       return typeof id === 'string' ? id : '';
     },
     editQuestion: (postId, body, guard) => validateQuestionBody(body) ? invalid() : run('qe_edit', { p_post_id: postId, p_body: body.trim() }, guard),
     editExperience: (postId, input, guard) => validateExperience(input) ? invalid() : run('qe_edit', { p_post_id: postId, ...expArgs(input) }, guard),
     deletePost: (postId, guard) => run('qe_delete', { p_post_id: postId }, guard),
     report: (postId, guard) => run('qe_report', { p_post_id: postId }, guard),
-    blockAuthor: async (postId, guard) => { const id = await write('qe_block_author', { p_post_id: postId }, guard); return typeof id === 'string' ? id : ''; },
-    listBlocks: async (guard) => asArray(await call(client, 'qe_list_blocks', {}, guard))
-      .flatMap((row) => { const r = row as Record<string, unknown>; return typeof r?.id === 'string' ? [{ id: r.id, createdAt: str(r.created_at) ?? '' }] : []; }),
+    blockAuthor: async (postId, guard) => { const id = await callWithSession('qe_block_author', { p_post_id: postId }, guard); return typeof id === 'string' ? id : ''; },
+    listBlocks: async (guard) => {
+      const data = await callWithSession('qe_list_blocks', {}, guard);
+      if (!await guard.accessToken() || guard.signal.aborted) throw new AccountChanged();
+      return asArray(data).flatMap((row) => {
+        const r = row as Record<string, unknown>;
+        return typeof r?.id === 'string' ? [{ id: r.id, createdAt: str(r.created_at) ?? '' }] : [];
+      });
+    },
     unblock: (blockId, guard) => run('qe_unblock', { p_block_id: blockId }, guard),
   };
 }

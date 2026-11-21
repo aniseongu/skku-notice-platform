@@ -20,5 +20,7 @@ test('board search keeps its position when the result list shrinks', async ({ pa
   const after = await search.evaluate((input) => input.getBoundingClientRect().top);
   expect(Math.abs(after - before)).toBeLessThan(2);
   await search.fill('');
-  await expect(details.getByRole('group', { name: '단과대와 기타 묶음 선택' })).toBeVisible();
+  const groups = details.getByRole('group', { name: '단과대와 기타 묶음 선택' });
+  await groups.getByRole('button', { name: '기타 · 부트캠프' }).click();
+  await expect(details.getByRole('button', { name: '인공지능 부트캠프 추가' })).toBeVisible();
 });

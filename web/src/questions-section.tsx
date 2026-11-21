@@ -73,22 +73,24 @@ function ReviewForm({ model, onDone, post }: { model: QuestionsModel; onDone: ()
   }, [satisfaction, learning, difficulty, participated, body]);  // eslint-disable-line react-hooks/exhaustive-deps
   const input: ExperienceInput | null = satisfaction ? { satisfaction, ...(learning ? { learning } : {}), ...(difficulty ? { difficulty } : {}), body, participated } : null;
   const problem = input ? validateExperience(input) : null;
-  const submit = () => { if (input && !problem) void (post ? model.editReview(post.id, input) : model.review(input)).then((ok) => { if (ok) { if (!post) model.draft.set(null); onDone(); } }); };
+  const submit = () => { if (!model.busy && input && !problem) void (post ? model.editReview(post.id, input) : model.review(input)).then((ok) => { if (ok) { if (!post) model.draft.set(null); onDone(); } }); };
   return <form className="grid gap-[10px] rounded-md border border-line bg-surface p-[12px]" aria-label={post ? '후기 수정' : '후기 남기기'} onSubmit={(event) => { event.preventDefault(); submit(); }}>
-    <StarPicker id="qe-sat" label="업무 만족" value={satisfaction} onChange={setSatisfaction} />
-    <button type="button" className={`${TEXT_BUTTON} flex w-full items-center justify-between text-left`} aria-expanded={more} aria-controls={moreId} onClick={() => setMore(!more)}>
-      더 남기기 (선택)<Chevron open={more} />
-    </button>
-    <div id={moreId} hidden={!more} className={more ? 'grid gap-[10px]' : undefined}>
-      <StarPicker id="qe-learn" label="배운 정도" value={learning} onChange={setLearning} optional />
-      <StarPicker id="qe-diff" label="전형 난이도" value={difficulty} onChange={setDifficulty} optional />
-      <label className="grid gap-[4px] text-[13px] font-medium text-ink-2">한마디
-        <textarea className={AREA} maxLength={BODY_MAX} value={body} placeholder="분위기나 하는 일, 준비할 점을 편하게 적어 주세요" onChange={(event) => setBody(event.target.value)} /></label>
-      <label className="flex min-h-[44px] items-center gap-[10px] text-[14px] text-ink"><input type="checkbox" className="size-[18px] accent-[var(--accent)]" checked={participated} onChange={(event) => setParticipated(event.target.checked)} />이 활동에 직접 참여했어요</label>
-    </div>
-    {problem ? <p className="m-0 text-[13px] text-danger" role="status">{problem}</p> : null}
-    <div className="flex gap-[6px]"><button type="submit" className={SOLID_BUTTON} disabled={model.busy || !input || !!problem}>{post ? '수정 완료' : '후기 남기기'}</button>
-      <button type="button" className={GHOST_BUTTON} onClick={onDone}>닫기</button></div>
+    <fieldset className="contents" disabled={!!post && model.busy}>
+      <StarPicker id="qe-sat" label="업무 만족" value={satisfaction} onChange={setSatisfaction} />
+      <button type="button" className={`${TEXT_BUTTON} flex w-full items-center justify-between text-left`} aria-expanded={more} aria-controls={moreId} onClick={() => setMore(!more)}>
+        더 남기기 (선택)<Chevron open={more} />
+      </button>
+      <div id={moreId} hidden={!more} className={more ? 'grid gap-[10px]' : undefined}>
+        <StarPicker id="qe-learn" label="배운 정도" value={learning} onChange={setLearning} optional />
+        <StarPicker id="qe-diff" label="전형 난이도" value={difficulty} onChange={setDifficulty} optional />
+        <label className="grid gap-[4px] text-[13px] font-medium text-ink-2">한마디
+          <textarea className={AREA} maxLength={BODY_MAX} value={body} placeholder="분위기나 하는 일, 준비할 점을 편하게 적어 주세요" onChange={(event) => setBody(event.target.value)} /></label>
+        <label className="flex min-h-[44px] items-center gap-[10px] text-[14px] text-ink"><input type="checkbox" className="size-[18px] accent-[var(--accent)]" checked={participated} onChange={(event) => setParticipated(event.target.checked)} />이 활동에 직접 참여했어요</label>
+      </div>
+      {problem ? <p className="m-0 text-[13px] text-danger" role="status">{problem}</p> : null}
+      <div className="flex gap-[6px]"><button type="submit" className={SOLID_BUTTON} disabled={model.busy || !input || !!problem}>{post ? '수정 완료' : '후기 남기기'}</button>
+        <button type="button" className={GHOST_BUTTON} onClick={onDone}>닫기</button></div>
+    </fieldset>
     <p className={NOTE_TEXT}>{post ? '이름은 보이지 않아요. 별점만 남겨도 괜찮아요' : '이름은 보이지 않아요. 별점만 남겨도 괜찮아요. 쓰던 글은 이 기기에 저장돼요'}</p>
   </form>;
 }
@@ -97,11 +99,13 @@ function QuestionForm({ model, parentId, onDone, label, post }: { model: Questio
   const [body, setBody] = useState(post?.body ?? '');
   const problem = body ? validateQuestionBody(body) : null;
   const ok = !!body.trim() && !validateQuestionBody(body);
-  return <form className="grid gap-[8px]" aria-label={label} onSubmit={(event) => { event.preventDefault(); if (ok) void (post ? model.editQuestion(post.id, body) : model.ask(body, parentId)).then((done) => { if (done) onDone(); }); }}>
-    <textarea autoFocus className={AREA} aria-label={label} maxLength={BODY_MAX} value={body} placeholder={parentId ? '아는 만큼 답해 주세요' : '궁금한 점을 적어 주세요'} onChange={(event) => setBody(event.target.value)} />
-    {problem ? <p className="m-0 text-[13px] text-danger" role="status">{problem}</p> : null}
-    <div className="flex gap-[6px]"><button type="submit" className={GHOST_BUTTON} disabled={model.busy || !ok}>{post ? '수정 완료' : parentId ? '답 남기기' : '질문하기'}</button>
-      <button type="button" className={GHOST_BUTTON} onClick={onDone}>닫기</button></div>
+  return <form className="grid gap-[8px]" aria-label={label} onSubmit={(event) => { event.preventDefault(); if (!model.busy && ok) void (post ? model.editQuestion(post.id, body) : model.ask(body, parentId)).then((done) => { if (done) onDone(); }); }}>
+    <fieldset className="contents" disabled={!!post && model.busy}>
+      <textarea autoFocus className={AREA} aria-label={label} maxLength={BODY_MAX} value={body} placeholder={parentId ? '아는 만큼 답해 주세요' : '궁금한 점을 적어 주세요'} onChange={(event) => setBody(event.target.value)} />
+      {problem ? <p className="m-0 text-[13px] text-danger" role="status">{problem}</p> : null}
+      <div className="flex gap-[6px]"><button type="submit" className={GHOST_BUTTON} disabled={model.busy || !ok}>{post ? '수정 완료' : parentId ? '답 남기기' : '질문하기'}</button>
+        <button type="button" className={GHOST_BUTTON} onClick={onDone}>닫기</button></div>
+    </fieldset>
   </form>;
 }
 

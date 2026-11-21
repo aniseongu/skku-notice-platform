@@ -14,7 +14,7 @@ import { authClient } from './auth';
 import { deadlineIso, isLimitReached, isMissingTable, loadOpportunities, removeOpportunity, saveOpportunity, OPPORTUNITY_LABELS, TITLE_MAX, URL_MAX, type Opportunity, type OpportunityStatus } from './opportunities';
 import { AccountChanged, createTeamApi, isTeamNotice, isTeamUnavailable, teamErrorCode, teamErrorMessage, type TeamApi, type TeamApplicant, type TeamDraft, type TeamPost } from './team';
 import type { TeamModel } from './team-section';
-import { EMPTY_EXPERIENCES, createQuestionsApi, isQeUnavailable, qeErrorMessage, type ExperienceInput, type Experiences, type Question, type QuestionsApi, type QuestionsWriteGuard } from './questions';
+import { EMPTY_EXPERIENCES, createQuestionsApi, isQeUnavailable, qeErrorMessage, type ExperienceInput, type Experiences, type Question, type QuestionsApi, type QuestionsSessionGuard } from './questions';
 import type { QuestionsModel, ReviewDraft } from './questions-section';
 import { loadSubscriptions, setSubscription } from './source-subscriptions';
 import { loadBoardOrderPreference, loadKeywordsPreference, loadSavedOrderPreference, parseKeywords, saveBoardOrderPreference, saveKeywordsPreference, saveSavedOrderPreference } from './preferences';
@@ -350,6 +350,7 @@ export class AppController extends Reactive {
   qeBusy = false;
   private qeBusyCount = 0;
   private qeWrites = new AbortController();
+  private qeUnblockPending: Promise<boolean> | null = null;
   qeUnavailable = false;
   /** 시험에서 서버 대신 메모리 가짜를 끼운다. */
   qeApiOverride: QuestionsApi | null = null;
@@ -974,6 +975,7 @@ export class AppController extends Reactive {
     const epoch = ++this.subscriptionsEpoch;
     this.qeWrites.abort();
     this.qeWrites = new AbortController();
+    this.qeUnblockPending = null;
     ++this.qeSeq;
     this.qeState = { noticeId: null, status: 'loading', questions: [], experiences: EMPTY_EXPERIENCES };
     this.qeBusyCount = 0;
@@ -1004,10 +1006,8 @@ export class AppController extends Reactive {
     });
   }
 
-  private async qeRun<T>(noticeId: string, work: (api: QuestionsApi, guard: QuestionsWriteGuard) => Promise<T>, done: string | null): Promise<{ ok: true; value: T } | { ok: false }> {
-    const api = this.qeApi(), userId = this.authUserId, epoch = this.subscriptionsEpoch;
-    if (!api || !userId) return { ok: false };
-    const guard: QuestionsWriteGuard = {
+  private qeSessionGuard(userId: string, epoch: number): QuestionsSessionGuard {
+    return {
       signal: this.qeWrites.signal,
       accessToken: async () => {
         if (!authClient || !this.isCurrentAccount(userId, epoch)) return null;
@@ -1015,6 +1015,12 @@ export class AppController extends Reactive {
         return !error && session?.user.id === userId && this.isCurrentAccount(userId, epoch) ? session.access_token : null;
       },
     };
+  }
+
+  private async qeRun<T>(noticeId: string, work: (api: QuestionsApi, guard: QuestionsSessionGuard) => Promise<T>, done: string | null, reloadOnError = true): Promise<{ ok: true; value: T } | { ok: false }> {
+    const api = this.qeApi(), userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!api || !userId) return { ok: false };
+    const guard = this.qeSessionGuard(userId, epoch);
     this.qeBusyCount++; this.qeBusy = true;
     try {
       const value = await work(api, guard);
@@ -1025,7 +1031,7 @@ export class AppController extends Reactive {
     } catch (error) {
       if (error instanceof AccountChanged || epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return { ok: false };
       this.showToast(qeErrorMessage(error));
-      if (this.qeState.noticeId === noticeId) this.loadQuestions(noticeId);   // 상태가 어긋났을 수 있으니 다시 읽는다
+      if (reloadOnError && this.qeState.noticeId === noticeId) this.loadQuestions(noticeId);
       return { ok: false };
     } finally { if (epoch === this.subscriptionsEpoch && this.authUserId === userId) { this.qeBusyCount = Math.max(0, this.qeBusyCount - 1); this.qeBusy = this.qeBusyCount > 0; } }
   }
@@ -1046,7 +1052,7 @@ export class AppController extends Reactive {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     const current = () => this.isCurrentAccount(userId, epoch);
     const mine = this.qeState.noticeId === id;
-    const run = async <T,>(work: (api: QuestionsApi, guard: QuestionsWriteGuard) => Promise<T>, done: string | null) => current() && (await this.qeRun(id, work, done)).ok;
+    const run = async <T,>(work: (api: QuestionsApi, guard: QuestionsSessionGuard) => Promise<T>, done: string | null, reloadOnError = true) => current() && (await this.qeRun(id, work, done, reloadOnError)).ok;
     const key = this.qeDraftKey(id);
     return {
       key: `qe-${userId}-${epoch}-${id}`,
@@ -1054,8 +1060,8 @@ export class AppController extends Reactive {
       load: () => { if (current()) this.loadQuestions(id); },
       ask: (body: string, parentId?: string) => run((api, guard) => api.createQuestion(id, body, parentId, guard), parentId ? '답을 남겼어요' : '질문을 남겼어요'),
       review: (input: ExperienceInput) => run(async (api, guard) => { await api.createExperience(id, input, guard); }, '후기를 남겼어요'),
-      editQuestion: (postId, body) => run((api, guard) => api.editQuestion(postId, body, guard), '수정했어요'),
-      editReview: (postId, input) => run((api, guard) => api.editExperience(postId, input, guard), '수정했어요'),
+      editQuestion: (postId, body) => run((api, guard) => api.editQuestion(postId, body, guard), '수정했어요', false),
+      editReview: (postId, input) => run((api, guard) => api.editExperience(postId, input, guard), '수정했어요', false),
       remove: (postId) => run((api, guard) => api.deletePost(postId, guard), '지웠어요'),
       report: (postId) => run((api, guard) => api.report(postId, guard), '신고했어요. 확인할게요'),
       block: (postId) => run(async (api, guard) => { await api.blockAuthor(postId, guard); }, '이 작성자를 차단했어요'),
@@ -1076,11 +1082,21 @@ export class AppController extends Reactive {
     return {
       key: `${userId}-${epoch}`,
       load: async () => {
+        if (this.qeUnblockPending) await this.qeUnblockPending;
         const api = this.qeApi();
-        if (!api || !current()) throw new AccountChanged();
-        return api.listBlocks(current);
+        if (!api || !userId || !current()) throw new AccountChanged();
+        return api.listBlocks(this.qeSessionGuard(userId, epoch));
       },
-      unblock: async (blockId: string) => current() && (await this.qeRun('', (api, guard) => api.unblock(blockId, guard), '차단을 해제했어요')).ok,
+      unblock: async (blockId: string) => {
+        if (!current() || this.qeUnblockPending) return false;
+        const pending = this.qeRun('', (api, guard) => api.unblock(blockId, guard), '차단을 해제했어요').then(({ ok }) => ok);
+        this.qeUnblockPending = pending;
+        try {
+          return await pending;
+        } finally {
+          if (this.qeUnblockPending === pending) this.qeUnblockPending = null;
+        }
+      },
     };
   }
 

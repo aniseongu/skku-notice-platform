@@ -76,6 +76,20 @@ test('every write sends the checked token even if the SDK resolves a different t
   assert.deepEqual(requests, names.map((name) => [`qe_${name}`, 'Bearer checked-token', guard.signal]));
 });
 
+test('block list pins the checked token and discards rows after a storage session switch', async () => {
+  let token = 'account-a';
+  const client = createClient('https://tests.invalid', 'test-key', {
+    accessToken: async () => 'account-b',
+    global: { fetch: async (_url, init) => {
+      assert.equal(init.headers.get('Authorization'), 'Bearer account-a');
+      token = null;
+      return Response.json([{ id: 'block-a', created_at: 'date' }]);
+    } },
+  });
+  const guard = { signal: new AbortController().signal, accessToken: async () => token };
+  await assert.rejects(createQuestionsApi(client).listBlocks(guard), AccountChanged);
+});
+
 test('a missing session or an account change before dispatch prevents writing', async () => {
   let calls = 0;
   const api = createQuestionsApi({ rpc: () => { calls++; return builder({ data: null, error: null }); } });
