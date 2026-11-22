@@ -359,7 +359,8 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
     return <Empty title="목록을 불러오지 못했어요" body="공지 데이터를 연결하는 중이에요. 잠시 뒤 다시 확인해 주세요" action="다시 불러오기" onAction={() => { void app.refresh(); }} />;
   }
   if (!list.length) {
-    const picker = (app.tab() === 'all' && app.noBoards()) ? null : <div className="group-head empty-head mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-end min-[720px]:m-0 min-[720px]:min-h-0 min-[720px]:px-[24px] min-[720px]:py-[6px]"><span></span><BoardSelect app={app} /></div>;
+    // 저장 탭의 게시판 고르기는 위쪽 옵션 줄에 있다(같은 id가 두 번 생기지 않게 여기서는 두지 않는다).
+    const picker = ((app.tab() === 'all' && app.noBoards()) || app.view === 'saved') ? null : <div className="group-head empty-head mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-end min-[720px]:m-0 min-[720px]:min-h-0 min-[720px]:px-[24px] min-[720px]:py-[6px]"><span></span><BoardSelect app={app} /></div>;
     const waiting = app.waitingCount();
     const note = (() => {
       // 보여 줄 공지가 모두 AI 확인을 기다리는 중이면 빈 목록 문구 대신 그 사실을 말한다.
@@ -397,7 +398,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
     groups.set(key, [...(groups.get(key) ?? []), notice]);
   }
   return <>{[...groups].map(([heading, items], index) => <section className={`group ${index > 0 ? 'mt-[20px] min-[720px]:mt-[8px]' : ''}`} aria-label={heading} key={heading}>
-    <div className="group-head [&>.board-picker]:ml-auto mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-between min-[720px]:m-0 min-[720px]:min-h-0 min-[720px]:px-[24px] min-[720px]:py-[6px]"><h2 className={`text-[13px] leading-[18px] font-semibold text-ink-3 min-[720px]:text-[12px] min-[720px]:leading-[16px] ${app.view === 'saved' && heading === '저장한 공지' ? 'visually-hidden' : ''}`}>{heading}</h2>{index === 0 && !app.selecting ? <BoardSelect app={app} /> : null}</div>
+    <div className={`group-head [&>.board-picker]:ml-auto mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-between min-[720px]:m-0 min-[720px]:min-h-0 min-[720px]:px-[24px] min-[720px]:py-[6px] ${app.view === 'saved' && heading === '저장한 공지' ? 'max-[719px]:hidden!' : ''}`}><h2 className={`text-[13px] leading-[18px] font-semibold text-ink-3 min-[720px]:text-[12px] min-[720px]:leading-[16px] ${app.view === 'saved' && heading === '저장한 공지' ? 'visually-hidden' : ''}`}>{heading}</h2>{index === 0 && !app.selecting && app.view !== 'saved' ? <BoardSelect app={app} /> : null}</div>
     {index === 0 && app.view === 'saved' && app.savedNotices().length >= 2 && app.savedFilterOn() ? <p id="reorder-why" className={`${NOTE_TEXT} mx-[var(--gutter)] mb-[8px] min-[720px]:mx-0 min-[720px]:px-[24px]`}>전체 보기에서 순서를 바꿀 수 있어요</p> : null}
     <notice-rows-screen model={{
       rows: items.map((notice) => {
@@ -460,7 +461,10 @@ function ViewFilters({ app }: { app: AppController }) {
     const total = app.savedNotices().length;
     const reorderOk = total >= 2 && app.canReorderSaved();
     return <>
-      <div className={`view-options saved-options ${VIEW_ROW} justify-end`}><div className={VIEW_ACTIONS}>
+      {/* 휴대폰: 게시판 고르기(목록 전체에 적용)를 선택·진행 상태·정렬과 한 줄에 둔다. 왼쪽은 범위, 오른쪽은 조작. 360px에서도 한 줄이 되도록 넘치면 게시판 이름만 줄인다. */}
+      <div className={`view-options saved-options ${VIEW_ROW} justify-between max-[719px]:flex-nowrap!`}>
+        {app.reordering ? null : <BoardSelect app={app} toolbar />}
+        <div className={`${VIEW_ACTIONS} flex-none`}>
         {app.reordering
           ? <button type="button" className={`${OPTION_ACTION} font-semibold! text-ink!`} onClick={() => { app.reordering = false; }}>완료</button>
           : select}
@@ -573,25 +577,26 @@ function StatusSelect({ app }: { app: AppController }) {
   </div>;
 }
 
-function BoardSelect({ app }: { app: AppController }) {
+/** `toolbar`: 저장 탭 휴대폰의 옵션 줄 왼쪽에 놓는 모양. 왼쪽 끝에 붙고, 폭이 모자라면 이름만 줄여 보이며(낭독 이름은 그대로), 목록은 왼쪽에서 펼친다. */
+function BoardSelect({ app, toolbar = false }: { app: AppController; toolbar?: boolean }) {
   const boards = boardChoices(app);
   const current = boards.find((b) => b.id === activeChoice(app))?.label ?? boards[0].label;
   const aria = app.tab() === 'coop' ? '기관 구분' : '게시판';
-  return <div className="board-picker narrow-only relative flex-none min-[720px]:hidden!" onBlur={(event) => {
+  return <div className={`board-picker narrow-only relative min-[720px]:hidden! ${toolbar ? 'min-w-[64px] flex-initial' : 'flex-none'}`} onBlur={(event) => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) app.boardMenuOpen = false;
   }}>
-    <button type="button" className={`${MENU_TRIGGER} font-semibold`} aria-label={`${aria}: ${current}`} aria-expanded={app.boardMenuOpen}
+    <button type="button" className={`${MENU_TRIGGER} font-semibold ${toolbar ? 'max-w-full min-w-0 justify-start! pl-0!' : ''}`} aria-label={`${aria}: ${current}`} aria-expanded={app.boardMenuOpen}
       aria-controls="board-options" onClick={() => {
         app.boardMenuOpen = !app.boardMenuOpen;
         if (app.boardMenuOpen) void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.board-option[aria-pressed="true"]')?.focus());
       }}>
-      {current}<span className={MENU_CHEVRON} aria-hidden="true" />
+      {toolbar ? <span className="min-w-0 truncate">{current}</span> : current}<span className={`${MENU_CHEVRON} ${toolbar ? 'shrink-0' : ''}`} aria-hidden="true" />
     </button>
-    {app.boardMenuOpen ? <div id="board-options" className={`${MENU_OPTIONS} min-w-[max(100%,180px)]`} role="group" aria-label={`${aria} 선택`}
+    {app.boardMenuOpen ? <div id="board-options" className={`${MENU_OPTIONS} min-w-[max(100%,180px)] ${toolbar ? 'right-auto! left-0! w-max max-w-[calc(100vw-2*var(--gutter))]' : ''}`} role="group" aria-label={`${aria} 선택`}
       onKeyDown={(event) => moveFocus(event, '.board-option')}>
-      {boards.map((b) => <button type="button" className={`board-option ${MENU_OPTION}`} key={b.id} aria-pressed={activeChoice(app) === b.id}
+      {boards.map((b) => <button type="button" className={`board-option ${MENU_OPTION} ${toolbar ? 'py-[10px]! whitespace-normal! [overflow-wrap:anywhere]' : ''}`} key={b.id} aria-pressed={activeChoice(app) === b.id}
         onClick={() => { pickChoice(app, b.id); void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.board-picker .board-trigger')?.focus()); }}>
-        <span>{b.label}</span>{activeChoice(app) === b.id ? <span className={MENU_CHECK} aria-hidden="true" /> : null}</button>)}
+        <span className="min-w-0">{b.label}</span>{activeChoice(app) === b.id ? <span className={`${MENU_CHECK} flex-none`} aria-hidden="true" /> : null}</button>)}
       {app.tab() === 'all' ? <button type="button" className={`board-more ${MENU_OPTION}`} onClick={() => app.openSettings('notifications')}><span>게시판 더 고르기</span></button> : null}
     </div> : null}
   </div>;
