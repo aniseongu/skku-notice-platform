@@ -53,6 +53,9 @@ test('authors can edit their review, question and answer in place', async ({ pag
   const question = section.getByRole('listitem').filter({ hasText: '원래 질문' });
   await question.getByRole('button', { name: '더 보기 메뉴' }).first().click();
   await question.getByRole('button', { name: '수정하기' }).click();
+  await expect(section.getByRole('button', { name: '답하기' })).toHaveCount(0);
+  await expect(section.getByRole('button', { name: '질문하기' })).toHaveCount(0);
+  await expect(section.getByRole('form', { name: '질문 수정' }).getByRole('button', { name: '취소' })).toBeVisible();
   await question.getByRole('textbox', { name: '질문 수정' }).fill('고친 질문');
   await section.getByRole('form', { name: '질문 수정' }).getByRole('button', { name: '수정 완료' }).click();
   await expect(section.getByText('고친 질문')).toBeVisible();

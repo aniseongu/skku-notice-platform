@@ -78,7 +78,7 @@ function OpportunitySection({ model }: { model: OpportunityModel }) {
     : <button type="button" className={`${TEXT_BUTTON_DANGER} flex-none`} onClick={() => setConfirming(true)}>상태와 메모 지우기</button>;
   return <section className={`${DETAIL_SECTION} opportunity`} aria-labelledby="sec-opportunity">
     <h3 id="sec-opportunity" className={`${SECTION_TITLE} !mb-[2px]`}>내 진행 상태</h3>
-    <p className={`${NOTE_TEXT} mb-[8px]`}>고른 상태와 메모는 저장을 해제해도 남아요</p>
+    <p className="m-0 mb-[8px] text-[14px] leading-[20px] text-ink-2">저장을 해제해도 상태와 메모는 남아요</p>
     <div role="radiogroup" aria-labelledby="sec-opportunity" className={`${SEGMENTED_GRID} grid-cols-4`} onKeyDown={move}>
       {OPPORTUNITY_STATUSES.map((status) => <button type="button" role="radio" key={status} className="inline-flex min-h-[44px]! items-center justify-center gap-[2px] whitespace-nowrap [@media(hover:hover)]:[&:hover:not([aria-checked=true])]:bg-line active:[&:not([aria-checked=true])]:bg-line" aria-checked={model.status === status}
         tabIndex={status === focusable ? 0 : -1} onClick={() => model.onStatus(status)}>{model.status === status ? <svg className={OPTION_CHECK} aria-hidden="true"><use href="icons/sprite.svg#check" /></svg> : null}{OPPORTUNITY_LABELS[status]}</button>)}

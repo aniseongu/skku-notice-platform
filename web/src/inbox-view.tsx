@@ -19,7 +19,7 @@ const GUTTER = 'px-[var(--gutter)] min-[720px]:px-[24px]';
 export function InboxPage({ model }: { model: InboxModel }) {
   const { items } = model;
   const hasUnread = items.some((item) => !item.read);
-  return <div className="inbox pb-[calc(var(--tabbar-h)+32px)] min-[720px]:pb-[48px]">
+  return <div className="inbox pb-[calc(var(--tabbar-h)+32px)] min-[720px]:mx-auto min-[720px]:max-w-[768px] min-[720px]:pb-[48px]">
     {items.length === 0 ? <section aria-label="알림함" className="empty flex flex-col items-center gap-[4px] px-[24px] pt-[64px] pb-[12px] text-center text-ink-3">
       <svg className="i mb-[8px] size-[36px] flex-none fill-none stroke-current [stroke-width:1.5] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href="icons/sprite.svg#ginkgo" /></svg>
       <h2 className="m-0 text-[16px] leading-[23px] font-bold text-ink-2">{model.pushOn ? '받은 알림이 없어요' : '알림이 꺼져 있어요'}</h2>
@@ -27,7 +27,7 @@ export function InboxPage({ model }: { model: InboxModel }) {
       {model.pushOn ? null : <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex min-h-[44px] items-center justify-center rounded-md border border-line bg-surface px-[16px] py-0 text-[15px] font-semibold text-ink" onClick={model.goNotifications}>알림 켜기</button>}
     </section> : <section aria-label="받은 알림">
       <div className={`inbox-actions flex min-h-[48px] flex-wrap items-center justify-between gap-x-[4px] ${GUTTER}`}>
-        <button type="button" className={`${TEXT_BUTTON} -ml-[8px]`} disabled={!hasUnread} onClick={model.readAll}>모두 읽음</button>
+        <button type="button" className={`${TEXT_BUTTON} -ml-[8px]`} disabled={!hasUnread} onClick={model.readAll}>모두 읽음으로 표시</button>
         <div className="-mr-[8px] ml-auto"><Confirm label="모두 지우기" question="모두 지울까요? 되돌릴 수 없어요" onConfirm={model.clear} /></div>
       </div>
       <div role="list">
@@ -38,8 +38,8 @@ export function InboxPage({ model }: { model: InboxModel }) {
             <span className="inbox-body line-clamp-2 text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] min-[720px]:text-[13px] min-[720px]:leading-[19px]">{item.body}</span>
             <span className="inbox-time text-[13px] leading-[18px] text-ink-3 min-[720px]:text-[12px] min-[720px]:leading-[16px]">{inboxTime(item.at)}</span>
           </button>
-          <button type="button" className={`${TEXT_BUTTON} mr-[4px] grid size-[44px] flex-none place-items-center self-center min-[720px]:mr-[16px]`} aria-label={`알림 지우기: ${item.title}`} onClick={() => model.remove(item.id)}>
-            <svg className="i size-[18px] fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round]" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          <button type="button" className={`${TEXT_BUTTON} mr-[4px] grid size-[44px] flex-none place-items-center self-center min-[720px]:mr-[16px]`} aria-label={`알림 지우기: ${item.title}`} title="알림 지우기" onClick={() => model.remove(item.id)}>
+            <svg className="i size-[18px] fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round]" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg>
           </button>
         </div>)}
       </div>

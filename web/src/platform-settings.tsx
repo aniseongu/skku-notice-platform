@@ -291,13 +291,13 @@ function BlockedAuthors({ model }: { model: NonNullable<SettingsModel['questionB
   const alive = useRef(true);
   const load = () => { setFailed(false); setItems(null); void model.load().then((rows) => { if (alive.current) setItems(rows); }, () => { if (alive.current) setFailed(true); }); };
   useEffect(() => { alive.current = true; load(); return () => { alive.current = false; }; }, []); // account key remounts the page
-  return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
+  return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:mx-auto min-[720px]:max-w-[648px] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Section id="blocked-authors" label="차단한 작성자">
-      <p className={SECTION_NOTE}>익명성을 위해 차단한 날짜만 보여요. 해제하면 이 작성자의 글이 다시 보여요</p>
+      <p className={SECTION_NOTE}>차단을 해제하면 이 작성자의 글이 다시 보여요</p>
       {failed ? <><p role="status" className={NOTE_TEXT}>차단 목록을 불러오지 못했어요</p><button type="button" className={GHOST_BUTTON} onClick={load}>다시 불러오기</button></> : null}
       {!failed && !items ? <p role="status" className={NOTE_TEXT}>불러오고 있어요</p> : null}
       {items?.length === 0 ? <p className={NOTE_TEXT}>차단한 작성자가 없어요</p> : null}
-      {items?.map((item, index) => <Setting key={item.id} name={`차단한 작성자 ${index + 1}`} help={Number.isNaN(Date.parse(item.createdAt)) ? '날짜를 알 수 없어요' : new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long', timeZone: 'Asia/Seoul' }).format(new Date(item.createdAt))}>
+      {items?.map((item, index) => <Setting key={item.id} className="flex! flex-row! items-center! justify-between gap-[12px]! [&>.setting-control]:w-auto! [&>.setting-control]:shrink-0" name={`차단한 작성자 ${index + 1}`} help={Number.isNaN(Date.parse(item.createdAt)) ? '날짜를 알 수 없어요' : `차단한 날 · ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long', timeZone: 'Asia/Seoul' }).format(new Date(item.createdAt))}`}>
         <button type="button" className={GHOST_BUTTON} disabled={busy !== null} onClick={() => { setBusy(item.id); void model.unblock(item.id).then((ok) => { if (alive.current && ok) setItems((old) => old?.filter((row) => row.id !== item.id) ?? null); }, () => { if (alive.current) setFailed(true); }).finally(() => { if (alive.current) setBusy(null); }); }}>차단 해제</button>
       </Setting>)}
     </Section>

@@ -9,7 +9,7 @@ import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, d
 import { APP_NAME } from './brand';
 import type { FeedbackKind } from './feedback';
 import { installMode, isStandalone } from './install-hint';
-import { CHECKBOX, CHEVRON_RIGHT, CHIP, CHIPS, CHIP_ADD, NOTE_TEXT, TEXT_BUTTON } from './cls';
+import { CHECKBOX, CHEVRON_RIGHT, CHIP, CHIPS, CHIP_ADD, NOTE_TEXT } from './cls';
 import { authClient } from './auth';
 import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, type OpportunityStatus } from './opportunities';
 import { SavedReorderList, reorderItems } from './saved-reorder';
@@ -50,22 +50,25 @@ const Kbd = ({ keys, className = '', onSolid = false }: { keys: string[]; classN
   <span className={`kbd-group inline-flex gap-[4px] ${className}`} aria-hidden="true">{keys.map((key) => <kbd className={`${KBD} ${onSolid ? KBD_ON_SOLID : KBD_IDLE}`} key={key}>{key}</kbd>)}</span>;
 
 const Icon = ({ name }: { name: IconName }) => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href={`icons/sprite.svg#${name}`} /></svg>;
-const BELL_BUTTON = 'icon-button relative grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover';
+const HEADER_ICON_BUTTON = 'icon-button relative grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover';
 const BellIcon = () => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>;
 /** 알림함 열기. 로그인한 계정에만 보이고, 안 읽은 알림이 있으면 점 하나만 더한다. */
 function InboxButton({ app }: { app: AppController }) {
   if (!app.authUserId) return null;
   const unread = app.inboxUnread;
-  return <button type="button" className={BELL_BUTTON} aria-label={unread ? `알림함, 안 읽은 알림 ${unread}개` : '알림함'} title="알림함" onClick={app.openInbox}>
+  return <button type="button" className={HEADER_ICON_BUTTON} aria-label={unread ? `알림함, 안 읽은 알림 ${unread}개` : '알림함'} title="알림함" onClick={app.openInbox}>
     <BellIcon />{unread ? <span className="absolute top-[10px] right-[11px] size-[8px] rounded-full bg-accent min-[720px]:top-[6px] min-[720px]:right-[7px]" aria-hidden="true" /> : null}
   </button>;
 }
-const CompassIcon = () => <svg className="size-[20px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M15.5 8.5l-2 5-5 2 2-5z" /></svg>;
+const CompassIcon = () => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M15.5 8.5l-2 5-5 2 2-5z" /></svg>;
 /** 저장 화면 머리의 탐험 지도 단추. 로그인했고 기록이 하나라도 있을 때만 보인다. */
 function ExploreButton({ app }: { app: AppController }) {
   const recorded = app.view === 'saved' && app.authUserId ? app.exploreItems().length : 0;
   if (!recorded) return null;
-  return <button type="button" className={`explore-entry ${TEXT_BUTTON} inline-flex flex-none items-center gap-[5px] whitespace-nowrap`} aria-label={`탐험 지도, 기록한 활동 ${recorded}개`} onClick={app.openExploreMap}><CompassIcon />탐험 지도</button>;
+  return <button type="button" className={`${HEADER_ICON_BUTTON} group/map`} aria-label={`탐험 지도, 기록한 활동 ${recorded}개`} onClick={app.openExploreMap}>
+    <CompassIcon />
+    <span aria-hidden="true" className="explore-tooltip pointer-events-none invisible absolute top-full left-1/2 z-20 -translate-x-1/2 rounded-sm bg-ink px-[8px] py-[3px] text-[12px] whitespace-nowrap text-bg [@media(hover:hover)]:group-hover/map:visible group-focus-visible/map:visible">탐험 지도</span>
+  </button>;
 }
 const GearIcon = () => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" />
   <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>;
@@ -156,7 +159,9 @@ export function NoticeShell({ app }: { app: AppController }) {
               {settings ? null : <Brand className="brand-mark narrow-only min-[720px]:hidden! mr-[8px] h-[36px] w-[36px] flex-none text-accent" />}
               <div className={TOPBAR_TEXT}>
                 <h1 className={`${TOPBAR_H1} ${settings ? '' : 'max-[719px]:text-[24px] max-[719px]:leading-[32px] max-[719px]:font-bold'}`}>{title}</h1>
-                {settings ? null : <UpdatedLine app={app} count={list.length} />}
+                {settings ? null : app.view === 'saved' && ready
+                  ? <p className={`${UPDATED} text-ink-2`}>저장한 공지 {list.length}개</p>
+                  : <UpdatedLine app={app} count={list.length} />}
               </div>
               {settings ? null : <>
                 <label className="search flex h-[44px] items-center gap-[8px] rounded-md bg-sunken px-[16px] text-ink-3 focus-within:outline-2 focus-within:outline-accent [&_.i]:size-[20px] [&_input]:h-full [&_input]:min-w-0 [&_input]:flex-1 [&_input]:border-0 [&_input]:bg-transparent [&_input]:text-ink [&_input]:[outline:0] [&_input]:placeholder:text-ink-3 wide-only max-[719px]:hidden min-[720px]:flex min-[720px]:h-[36px] min-[720px]:min-w-[120px] min-[720px]:w-[260px] min-[720px]:flex-[0_1_260px] min-[720px]:px-[12px] min-[720px]:py-0"><Icon name="search" />
@@ -652,7 +657,7 @@ function ReadingView({ app, notice }: { app: AppController; notice: Notice }) {
     <div className="read-actions glass fixed inset-x-0 bottom-0 z-[3] flex gap-[8px] border-t border-line px-[var(--gutter)] pt-[12px] pb-[calc(12px+env(safe-area-inset-bottom))] [&>*]:flex-1 [&>:is(.save-button,.share-button)]:flex-none">
       <SaveButton app={app} notice={notice} />
       <ShareButton app={app} notice={notice} />
-      <a className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" href={safeUrl(notice.url)} target="_blank" rel="noopener">{openLabel(app, notice)}</a>
+      <a className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 [.list-pane:has([data-qe-editing])_&]:bg-sunken [.list-pane:has([data-qe-editing])_&]:text-ink [.list-pane:has([data-qe-editing])_&]:active:bg-hover" href={safeUrl(notice.url)} target="_blank" rel="noopener">{openLabel(app, notice)}</a>
     </div>
   </Fragment>;
 }

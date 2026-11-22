@@ -74,8 +74,9 @@ function ReviewForm({ model, onDone, post }: { model: QuestionsModel; onDone: ()
   const input: ExperienceInput | null = satisfaction ? { satisfaction, ...(learning ? { learning } : {}), ...(difficulty ? { difficulty } : {}), body, participated } : null;
   const problem = input ? validateExperience(input) : null;
   const submit = () => { if (!model.busy && input && !problem) void (post ? model.editReview(post.id, input) : model.review(input)).then((ok) => { if (ok) { if (!post) model.draft.set(null); onDone(); } }); };
-  return <form className="grid gap-[10px] rounded-md border border-line bg-surface p-[12px]" aria-label={post ? '후기 수정' : '후기 남기기'} onSubmit={(event) => { event.preventDefault(); submit(); }}>
+  return <form className="grid gap-[10px] rounded-md border border-line bg-surface p-[12px]" data-qe-editing={post ? '' : undefined} aria-label={post ? '후기 수정' : '후기 남기기'} onSubmit={(event) => { event.preventDefault(); submit(); }}>
     <fieldset className="contents" disabled={!!post && model.busy}>
+      {post ? <p className="m-0 text-[14px] font-semibold text-ink">후기 수정</p> : null}
       <StarPicker id="qe-sat" label="업무 만족" value={satisfaction} onChange={setSatisfaction} />
       <button type="button" className={`${TEXT_BUTTON} flex w-full items-center justify-between text-left`} aria-expanded={more} aria-controls={moreId} onClick={() => setMore(!more)}>
         더 남기기 (선택)<Chevron open={more} />
@@ -89,7 +90,7 @@ function ReviewForm({ model, onDone, post }: { model: QuestionsModel; onDone: ()
       </div>
       {problem ? <p className="m-0 text-[13px] text-danger" role="status">{problem}</p> : null}
       <div className="flex gap-[6px]"><button type="submit" className={SOLID_BUTTON} disabled={model.busy || !input || !!problem}>{post ? '수정 완료' : '후기 남기기'}</button>
-        <button type="button" className={GHOST_BUTTON} onClick={onDone}>닫기</button></div>
+        <button type="button" className={GHOST_BUTTON} onClick={onDone}>{post ? '취소' : '닫기'}</button></div>
     </fieldset>
     <p className={NOTE_TEXT}>{post ? '이름은 보이지 않아요. 별점만 남겨도 괜찮아요' : '이름은 보이지 않아요. 별점만 남겨도 괜찮아요. 쓰던 글은 이 기기에 저장돼요'}</p>
   </form>;
@@ -99,17 +100,18 @@ function QuestionForm({ model, parentId, onDone, label, post }: { model: Questio
   const [body, setBody] = useState(post?.body ?? '');
   const problem = body ? validateQuestionBody(body) : null;
   const ok = !!body.trim() && !validateQuestionBody(body);
-  return <form className="grid gap-[8px]" aria-label={label} onSubmit={(event) => { event.preventDefault(); if (!model.busy && ok) void (post ? model.editQuestion(post.id, body) : model.ask(body, parentId)).then((done) => { if (done) onDone(); }); }}>
+  return <form className="grid gap-[8px]" data-qe-editing={post ? '' : undefined} aria-label={label} onSubmit={(event) => { event.preventDefault(); if (!model.busy && ok) void (post ? model.editQuestion(post.id, body) : model.ask(body, parentId)).then((done) => { if (done) onDone(); }); }}>
     <fieldset className="contents" disabled={!!post && model.busy}>
+      {post ? <p className="m-0 text-[14px] font-semibold text-ink">{label}</p> : null}
       <textarea autoFocus className={AREA} aria-label={label} maxLength={BODY_MAX} value={body} placeholder={parentId ? '아는 만큼 답해 주세요' : '궁금한 점을 적어 주세요'} onChange={(event) => setBody(event.target.value)} />
       {problem ? <p className="m-0 text-[13px] text-danger" role="status">{problem}</p> : null}
-      <div className="flex gap-[6px]"><button type="submit" className={GHOST_BUTTON} disabled={model.busy || !ok}>{post ? '수정 완료' : parentId ? '답 남기기' : '질문하기'}</button>
-        <button type="button" className={GHOST_BUTTON} onClick={onDone}>닫기</button></div>
+      <div className="flex gap-[6px]"><button type="submit" className={post ? SOLID_BUTTON : GHOST_BUTTON} disabled={model.busy || !ok}>{post ? '수정 완료' : parentId ? '답 남기기' : '질문하기'}</button>
+        <button type="button" className={GHOST_BUTTON} onClick={onDone}>{post ? '취소' : '닫기'}</button></div>
     </fieldset>
   </form>;
 }
 
-function Actions({ model, mine, postId, noun, onEdit, hidden = false }: { model: QuestionsModel; mine: boolean; postId: string; noun: '후기' | '질문' | '답'; onEdit: () => void; hidden?: boolean }) {
+function Actions({ model, mine, postId, noun, onEdit, hidden = false }: { model: QuestionsModel; mine: boolean; postId: string; noun: '후기' | '질문' | '답'; onEdit?: () => void; hidden?: boolean }) {
   const [stage, setStage] = useState<'menu' | 'remove' | 'report' | 'block' | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -145,9 +147,9 @@ function Actions({ model, mine, postId, noun, onEdit, hidden = false }: { model:
           <button type="button" className={TEXT_BUTTON_DANGER} disabled={model.busy} onClick={() => { close(); void action.run(postId); }}>{action.label}</button>
           <button type="button" className={TEXT_BUTTON} autoFocus onClick={close}>취소</button>
         </div>
-      </div> : <>{mine && !hidden ? <button type="button" className={`${TEXT_BUTTON} text-left`} autoFocus disabled={model.busy} onClick={() => { setStage(null); onEdit(); }}>수정하기</button> : null}
+      </div> : <>{mine && !hidden && onEdit ? <button type="button" className={`${TEXT_BUTTON} text-left`} autoFocus disabled={model.busy} onClick={() => { setStage(null); onEdit(); }}>수정하기</button> : null}
         {choices.map((choice, index) => <button type="button" key={choice} className={`${TEXT_BUTTON} text-left`}
-        autoFocus={(!mine || hidden) && index === 0} disabled={model.busy} onClick={() => setStage(choice)}>{actions[choice].label}</button>)}</>}
+        autoFocus={(!mine || hidden || !onEdit) && index === 0} disabled={model.busy} onClick={() => setStage(choice)}>{actions[choice].label}</button>)}</>}
     </div> : null}
   </div>;
 }
@@ -198,12 +200,12 @@ function QuestionItem({ model, question, replies, canReply }: { model: Questions
   const [editing, setEditing] = useState(false);
   return <li className={CARD}>
     <div className="flex min-h-[28px] items-center gap-[6px]"><span className="text-[14px] font-semibold text-ink">익명 {question.anonNo}</span>{question.mine ? <span className={BADGE}>내 글</span> : null}
-      <Actions model={model} mine={question.mine} postId={question.id} noun="질문" hidden={question.hidden} onEdit={() => setEditing(true)} /></div>
+      <Actions model={model} mine={question.mine} postId={question.id} noun="질문" hidden={question.hidden} onEdit={replying || editing ? undefined : () => setEditing(true)} /></div>
     {editing ? <QuestionForm model={model} post={question} label="질문 수정" onDone={() => setEditing(false)} /> : <p className="m-0 text-[14px] leading-[21px] text-ink whitespace-pre-wrap [overflow-wrap:anywhere]">{question.body}</p>}
     {question.hidden ? <p className={NOTE_TEXT} role="status">신고가 쌓여 다른 사람에게는 보이지 않아요</p> : null}
     {replies.length ? <Replies model={model} replies={replies} /> : null}
     {replying ? <QuestionForm model={model} parentId={question.id} label="답 남기기" onDone={() => setReplying(false)} />
-      : canReply ? <div className="-ml-[8px]"><button type="button" className={TEXT_BUTTON} onClick={() => setReplying(true)}>답하기</button></div> : null}
+      : canReply && !editing ? <div className="-ml-[8px]"><button type="button" className={TEXT_BUTTON} onClick={() => setReplying(true)}>답하기</button></div> : null}
   </li>;
 }
 
@@ -227,7 +229,7 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
   const { experiences } = model;
   const summary = model.status === 'loading' ? '불러오는 중' : model.status === 'failed' ? '불러오지 못했어요' :
     [experiences.count ? `후기 ${experiences.count}` : '', top.length ? `질문 ${top.length}` : ''].filter(Boolean).join(' · ');
-  return <section className={`${DETAIL_SECTION} qe`} aria-labelledby="sec-qe">
+  return <section className={`${DETAIL_SECTION} qe [&:has([data-qe-editing])_.qe-create]:hidden`} aria-labelledby="sec-qe">
     <h3 id="sec-qe" className={`${SECTION_TITLE} !mb-0`}>
       <button type="button" className={COLLAPSE_HEAD} aria-expanded={open} aria-controls="qe-body" onClick={() => setOpen(!open)}>
         <span>질문·경험</span><span className="flex items-center gap-[8px] font-medium">{open ? null : summary}
@@ -238,14 +240,14 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
       {model.status === 'ready' ? <>
         {!hasContent && !reviewing && !asking ? <div className="grid gap-[8px]"><p className="m-0 text-[14px] leading-[21px] text-ink-2">아직 남은 글이 없어요. 먼저 궁금한 점을 묻거나 경험을 남겨 봐요</p>
           <div className="flex flex-wrap gap-[6px]"><button type="button" className={SOLID_BUTTON} onClick={() => setReviewing(true)}>후기 남기기</button>
-            <button type="button" className={GHOST_BUTTON} onClick={() => setAsking(true)}>질문하기</button></div></div> : null}
+            <button type="button" className={`qe-create ${GHOST_BUTTON}`} onClick={() => setAsking(true)}>질문하기</button></div></div> : null}
 
         {experiences.count || experiences.posts.length || reviewing ? <div className="grid gap-[8px]">
           <h4 className={SUBTITLE}>후기</h4>
           {experiences.count ? <RatingSummaryView experiences={experiences} /> : null}
           {experiences.posts.length ? <ul className="m-0 grid list-none gap-[8px] p-0">{experiences.posts.map((post) => <ReviewCard key={post.id} model={model} post={post} />)}</ul> : null}
           {reviewing && !reviewed ? <ReviewForm model={model} onDone={() => setReviewing(false)} />
-            : !reviewed ? <div><button type="button" className={GHOST_BUTTON} onClick={() => setReviewing(true)}>후기 남기기</button></div> : null}
+            : !reviewed ? <div><button type="button" className={`qe-create ${GHOST_BUTTON}`} onClick={() => setReviewing(true)}>후기 남기기</button></div> : null}
         </div> : null}
 
         {hasContent || asking ? <div className="grid gap-[8px]">
@@ -256,9 +258,9 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
             <Replies model={model} replies={detached} />
           </div> : null}
           {asking ? <QuestionForm model={model} label="질문하기" onDone={() => setAsking(false)} />
-            : <div><button type="button" className={GHOST_BUTTON} onClick={() => setAsking(true)}>질문하기</button></div>}
+            : <div><button type="button" className={`qe-create ${GHOST_BUTTON}`} onClick={() => setAsking(true)}>질문하기</button></div>}
         </div> : null}
-        {hasContent && !experiences.count && !experiences.posts.length && !reviewing ? <div><button type="button" className={GHOST_BUTTON} onClick={() => setReviewing(true)}>후기 남기기</button></div> : null}
+        {hasContent && !experiences.count && !experiences.posts.length && !reviewing ? <div><button type="button" className={`qe-create ${GHOST_BUTTON}`} onClick={() => setReviewing(true)}>후기 남기기</button></div> : null}
         <p className={NOTE_TEXT}>{reviewing && !reviewed ? '' : '이름은 보이지 않아요. '}학교의 공식 답변은 아니에요</p>
       </> : null}
     </div> : null}

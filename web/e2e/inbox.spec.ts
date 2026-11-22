@@ -74,9 +74,9 @@ test('read-all, single delete and clear-all (with one confirmation) work and per
   await setup(page, [item('1', 'account-a', 5), item('2', 'account-a', 9), item('3', 'account-a', 20)]);
   await bell(page).click();
   const rows = page.locator('.inbox-row');
-  await page.getByRole('button', { name: '모두 읽음' }).click();
+  await page.getByRole('button', { name: '모두 읽음으로 표시' }).click();
   await expect(rows.locator('.inbox-title.font-semibold')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '모두 읽음' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '모두 읽음으로 표시' })).toBeDisabled();
   const remove = page.getByRole('button', { name: '알림 지우기: 알림 2' });
   const box = (await remove.boundingBox())!;
   expect(box.width).toBeGreaterThanOrEqual(44);
@@ -152,7 +152,7 @@ test('reading or deleting in one tab updates the other tab without waiting for t
   });
   await expect.poll(() => other.evaluate(() => (document.querySelector('notice-app') as unknown as App).inboxUnread)).toBe(2);
   await bell(page).click();
-  await page.getByRole('button', { name: '모두 읽음' }).click();
+  await page.getByRole('button', { name: '모두 읽음으로 표시' }).click();
   await expect.poll(() => other.evaluate(() => (document.querySelector('notice-app') as unknown as App).inboxUnread)).toBe(0);
   await other.close();
 });

@@ -21,7 +21,7 @@ function AreaRow({ label, status, count }: { label: string; status: string; coun
 }
 
 function AreaCard({ label, status, count }: { label: string; status: string; count: number }) {
-  return <li className="explore-card flex min-h-[88px] flex-col justify-center gap-[2px] rounded-md border border-line bg-surface px-[16px] py-[14px]">
+  return <li className="explore-card flex min-h-[88px] flex-col justify-center gap-[2px] rounded-md bg-sunken px-[16px] py-[14px]">
     <div className="flex items-baseline justify-between gap-[12px]"><h3 className="m-0 text-[15px] leading-[22px] font-semibold text-ink">{label}</h3>
       <span className="explore-count text-[20px] leading-[26px] font-bold tabular-nums text-ink">{count}개</span></div>
     <p className="explore-status m-0 text-[14px] leading-[20px] text-ink-2">{status}</p>
@@ -43,10 +43,10 @@ export function ExploreMapPage({ model }: { model: ExploreModel }) {
     .sort((a, b) => b.domain.count - a.domain.count || a.index - b.index).map((entry) => entry.domain);
   const empty = summary.domains.filter((domain) => domain.count === 0);
   const otherLine = statusLine(summary.other.byStatus);
-  return <div className="explore-map pb-[calc(var(--tabbar-h)+32px)] min-[720px]:pb-[48px]">
-    <div className={`pt-[8px] pb-[12px] ${GUTTER}`}>
+  return <div className="explore-map pb-[calc(var(--tabbar-h)+32px)] min-[720px]:mx-auto min-[720px]:max-w-[768px] min-[720px]:pb-[48px]">
+    <div className={`pt-[16px] pb-[12px] ${GUTTER}`}>
       <p className="explore-total m-0 text-[15px] leading-[22px] font-medium text-ink">기록한 활동 {summary.total}개</p>
-      <p className={NOTE_TEXT}>내가 기록한 공고를 제목으로 나눴어요</p>
+      <p className={NOTE_TEXT}>공고 제목과 게시판 정보로 영역을 나눴어요</p>
     </div>
     {summary.total > 0 ? <div className={GUTTER}>
       <ul className="m-0 grid list-none grid-cols-1 gap-[8px] p-0 min-[720px]:grid-cols-2 min-[720px]:gap-[12px]" role="list" aria-label="영역별 기록">

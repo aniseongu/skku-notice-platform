@@ -26,14 +26,24 @@ test('saved screen shows the header button, one tap opens the map with counts, b
     { id: 'x1', title: '하계 인턴 채용', status: 'interested' }, { id: 'x2', title: '신입 채용 공고', status: 'applied' },
     { id: 'x3', title: '국가장학금 신청', status: 'preparing' }, { id: 'x4', title: '도서관 이용 안내', status: 'result' },
   ]);
-  await expect(entry(page)).toHaveText('탐험 지도');
+  const tooltip = entry(page).getByText('탐험 지도', { exact: true });
+  await expect(tooltip).toBeHidden();
   await expect(entry(page).locator('svg[aria-hidden=true]')).toHaveCount(1);
   await expect(entry(page)).toHaveAttribute('aria-label', /기록한 활동 4개/);
   const box = (await entry(page).boundingBox())!;
-  expect(box.height).toBeGreaterThanOrEqual(44);
+  const bell = (await page.getByRole('button', { name: /^알림함/ }).boundingBox())!;
+  expect({ width: box.width, height: box.height }).toEqual({ width: bell.width, height: bell.height });
+  if (info.project.name === 'mobile') expect(Math.min(box.width, box.height)).toBeGreaterThanOrEqual(44);
   const refresh = (await page.getByRole('button', { name: '공지 다시 가져오기' }).boundingBox())!;
   expect(Math.abs((box.y + box.height / 2) - (refresh.y + refresh.height / 2))).toBeLessThan(1);
-  await entry(page).click();                                              // 진입: 1탭
+  if (info.project.name === 'desktop') {
+    await entry(page).focus();
+    await expect(entry(page)).toBeFocused();
+    await expect(tooltip).toBeVisible();
+    await page.keyboard.press('Enter');
+  } else {
+    await entry(page).click();
+  }
   expect(page.url()).toContain('section=explore');
   await expect(page.getByRole('heading', { name: '탐험 지도', level: 1 })).toBeVisible();
   await expect(page.locator('.explore-total')).toHaveText('기록한 활동 4개');
