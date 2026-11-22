@@ -84,7 +84,19 @@ test('blocked authors can be listed and unblocked from settings', async ({ page 
   const pageBody = page.locator('platform-settings-screen');
   await expect(pageBody.getByText('차단한 작성자 1')).toBeVisible();
   await expect(pageBody.getByText('2026년 11월 20일')).toBeVisible();
-  await pageBody.getByRole('button', { name: '차단 해제' }).click();
+  // 공통 Setting 배치 그대로: 1280px 미만은 날짜 아래 왼쪽, 1280px 이상은 같은 줄 오른쪽 끝.
+  const unblock = pageBody.getByRole('button', { name: '차단 해제: 차단한 작성자 1' });
+  const nameBox = (await pageBody.getByText('차단한 작성자 1', { exact: true }).boundingBox())!;
+  const dateBox = (await pageBody.getByText('2026년 11월 20일').boundingBox())!;
+  const buttonBox = (await unblock.boundingBox())!;
+  if ((page.viewportSize()?.width ?? 0) >= 1280) {
+    expect(buttonBox.x).toBeGreaterThan(dateBox.x + dateBox.width);
+    expect(buttonBox.y).toBeLessThan(dateBox.y + dateBox.height);
+  } else {
+    expect(buttonBox.y).toBeGreaterThanOrEqual(dateBox.y + dateBox.height);
+    expect(Math.abs(buttonBox.x - nameBox.x)).toBeLessThanOrEqual(1);
+  }
+  await unblock.click();
   await expect(pageBody.getByText('차단한 작성자가 없어요')).toBeVisible();
 });
 

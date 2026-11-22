@@ -57,7 +57,19 @@ test('the bell shows an unread dot, opens the inbox in one tap and lists only th
   expect(open!.height).toBeGreaterThanOrEqual(44);
   expect(page.url()).toContain('section=inbox');
   await expect(page.getByRole('heading', { name: '알림함', level: 1 })).toBeVisible();
-  if (info.project.name === 'desktop') await expect(page.locator('.sidebar [aria-current="page"]')).toHaveCount(0);
+  if (info.project.name === 'desktop') {
+    await expect(page.locator('.sidebar [aria-current="page"]')).toHaveCount(0);
+    // 데스크톱: 가운데 좁은 판이 아니라 본문 영역 전체 폭을 쓰고, 왼쪽은 공용 머리 여백(24px)에 맞춘다
+    const inbox = (await page.locator('.inbox').boundingBox())!;
+    const parent = (await page.locator('.inbox').evaluate((el) => { const r = el.parentElement!.getBoundingClientRect(); return { x: r.x, width: r.width }; }));
+    expect(inbox.width).toBeGreaterThan(768);
+    expect(Math.abs(inbox.x - parent.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(inbox.width - parent.width)).toBeLessThanOrEqual(1);
+    const text = (await rows.nth(0).locator('.inbox-title').boundingBox())!;
+    expect(Math.abs(text.x - inbox.x - 24)).toBeLessThanOrEqual(1);
+    const del = (await rows.nth(0).getByRole('button', { name: /^알림 지우기/ }).boundingBox())!;
+    expect(Math.abs(inbox.x + inbox.width - (del.x + del.width) - 16)).toBeLessThanOrEqual(1);
+  }
 });
 
 test('tapping a notice alert opens that notice in the app and marks the alert read (the notice read state is separate)', async ({ page }) => {

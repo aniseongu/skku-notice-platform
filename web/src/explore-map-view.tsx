@@ -43,7 +43,7 @@ export function ExploreMapPage({ model }: { model: ExploreModel }) {
     .sort((a, b) => b.domain.count - a.domain.count || a.index - b.index).map((entry) => entry.domain);
   const empty = summary.domains.filter((domain) => domain.count === 0);
   const otherLine = statusLine(summary.other.byStatus);
-  return <div className="explore-map pb-[calc(var(--tabbar-h)+32px)] min-[720px]:mx-auto min-[720px]:max-w-[768px] min-[720px]:pb-[48px]">
+  return <div className="explore-map pb-[calc(var(--tabbar-h)+32px)] min-[720px]:pb-[48px]">
     <div className={`pt-[16px] pb-[12px] ${GUTTER}`}>
       <p className="explore-total m-0 text-[15px] leading-[22px] font-medium text-ink">기록한 활동 {summary.total}개</p>
       <p className={NOTE_TEXT}>공고 제목과 게시판 정보로 영역을 나눴어요</p>

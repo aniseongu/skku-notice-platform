@@ -265,7 +265,7 @@ function Overview({ model }: { model: SettingsModel }) {
         <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" aria-keyshortcuts="?" onClick={model.showShortcuts}>단축키 보기</button>
       </Setting>
     </Section>
-    <div className="box rounded-lg bg-surface px-[var(--gutter)] min-[720px]:rounded-none min-[720px]:border-t min-[720px]:border-line min-[720px]:bg-transparent min-[720px]:p-0 mt-[24px]">
+    <Section id="s-info" label="안내">
         <a className="settings-link [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href="privacy.html">
         <span><span className="setting-name text-[15px] leading-[22px] font-medium">개인정보 처리방침</span>
           <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">어떤 정보를 어디에 쓰고 어떻게 지우는지 알려 드려요</span></span>
@@ -278,7 +278,7 @@ function Overview({ model }: { model: SettingsModel }) {
           <span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">GitHub에서 코드를 볼 수 있어요 · 버전 {__APP_VERSION__}<span className="visually-hidden"> (새 창으로 열려요)</span></span></span>
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mr-[2px] flex-none text-ink-3"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>
       </a>
-    </div>
+    </Section>
     {/* 계정 삭제는 되돌릴 수 없어서 설정의 가장 아래에 따로 둔다. */}
     {model.userId ? <DeleteAccount model={model} /> : null}
   </div>;
@@ -291,14 +291,14 @@ function BlockedAuthors({ model }: { model: NonNullable<SettingsModel['questionB
   const alive = useRef(true);
   const load = () => { setFailed(false); setItems(null); void model.load().then((rows) => { if (alive.current) setItems(rows); }, () => { if (alive.current) setFailed(true); }); };
   useEffect(() => { alive.current = true; load(); return () => { alive.current = false; }; }, []); // account key remounts the page
-  return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:mx-auto min-[720px]:max-w-[648px] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
+  return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Section id="blocked-authors" label="차단한 작성자">
       <p className={SECTION_NOTE}>차단을 해제하면 이 작성자의 글이 다시 보여요</p>
       {failed ? <><p role="status" className={NOTE_TEXT}>차단 목록을 불러오지 못했어요</p><button type="button" className={GHOST_BUTTON} onClick={load}>다시 불러오기</button></> : null}
       {!failed && !items ? <p role="status" className={NOTE_TEXT}>불러오고 있어요</p> : null}
       {items?.length === 0 ? <p className={NOTE_TEXT}>차단한 작성자가 없어요</p> : null}
-      {items?.map((item, index) => <Setting key={item.id} className="flex! flex-row! items-center! justify-between gap-[12px]! [&>.setting-control]:w-auto! [&>.setting-control]:shrink-0" name={`차단한 작성자 ${index + 1}`} help={Number.isNaN(Date.parse(item.createdAt)) ? '날짜를 알 수 없어요' : `차단한 날 · ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long', timeZone: 'Asia/Seoul' }).format(new Date(item.createdAt))}`}>
-        <button type="button" className={GHOST_BUTTON} disabled={busy !== null} onClick={() => { setBusy(item.id); void model.unblock(item.id).then((ok) => { if (alive.current && ok) setItems((old) => old?.filter((row) => row.id !== item.id) ?? null); }, () => { if (alive.current) setFailed(true); }).finally(() => { if (alive.current) setBusy(null); }); }}>차단 해제</button>
+      {items?.map((item, index) => <Setting key={item.id} name={`차단한 작성자 ${index + 1}`} help={Number.isNaN(Date.parse(item.createdAt)) ? '날짜를 알 수 없어요' : `차단한 날 · ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long', timeZone: 'Asia/Seoul' }).format(new Date(item.createdAt))}`}>
+        <button type="button" className={GHOST_BUTTON} disabled={busy !== null} aria-label={`차단 해제: 차단한 작성자 ${index + 1}`} onClick={() => { setBusy(item.id); void model.unblock(item.id).then((ok) => { if (alive.current && ok) setItems((old) => old?.filter((row) => row.id !== item.id) ?? null); }, () => { if (alive.current) setFailed(true); }).finally(() => { if (alive.current) setBusy(null); }); }}>차단 해제</button>
       </Setting>)}
     </Section>
   </div>;
@@ -532,7 +532,7 @@ function Notifications({ model }: { model: SettingsModel }) {
   return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Back model={model} />
     <Section id="s-notify" title="이 기기">
-      {!model.userId ? <Setting name="이 기기 알림" help="로그인하면 이 기기로 알림을 받을 수 있어요" /> : <>
+      {!model.userId ? <Setting name="이 기기 알림" help="로그인하면 이 기기로 알림을 받을 수 있어요" /> : <div className="[&_.switch-note]:text-[14px] [&_.switch-note]:leading-[20px] [&>.switch-row:first-child]:border-t-0">
         {/* 켜기·끄기는 다른 설정과 같은 스위치다. 눌렀을 때의 흐름(허용 창, 등록)은 그대로이고, 상태는 설명 한 줄로만 말한다. */}
         <SwitchRow label="이 기기 알림" description={pushLine(model.pushStatus)} checked={on} disabled={!canToggle} onChange={(next) => (next ? model.enablePush() : model.disablePush())} />
         {model.pushError ? <p className="field-note error pb-[8px] text-[14px] leading-[20px] text-danger" role="alert">{model.pushError}</p> : null}
@@ -544,7 +544,7 @@ function Notifications({ model }: { model: SettingsModel }) {
         {on ? <Setting name="테스트 알림" help="이 기기에 알림이 뜨는지 확인해요" className="border-t border-line"><button type="button" className={GHOST_BUTTON} aria-label="테스트 알림 보내기" onClick={model.testNotification}>보내기</button></Setting> : null}
         {/* 기기 설정을 저장하지 못했을 때의 안내는 이 구역에서 한 번만 보인다. */}
         {info?.error ? <p className="field-note error pb-[12px] text-[14px] leading-[20px] text-danger" role="alert">{info.error}</p> : null}
-      </>}
+      </div>}
     </Section>
     {/* 기기 목록을 받기 전에는 받을 게시판과 알림 기기 구역을 그리지 않는다. 이 기기 구역의 줄이 나중에 늘어 아래가 밀리지 않게. 보통은 로그인 때 미리 받아 둔다. */}
     {waitDevices ? null : <>
