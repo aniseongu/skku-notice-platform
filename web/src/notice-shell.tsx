@@ -576,7 +576,7 @@ function StatusSelect({ app }: { app: AppController }) {
         app.statusMenuOpen = !app.statusMenuOpen;
         if (app.statusMenuOpen) void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.status-option[aria-pressed="true"]')?.focus());
       }}>{filter === 'all' ? '진행 상태' : label}<span className={MENU_CHEVRON} aria-hidden="true" /></button>
-    {app.statusMenuOpen ? <div id="status-options" className={`status-options ${MENU_OPTIONS} min-w-[180px]`} role="group" aria-label="진행 상태 선택"
+    {app.statusMenuOpen ? <div id="status-options" className={`status-options ${MENU_OPTIONS} right-auto! left-0! min-w-[180px]`} role="group" aria-label="진행 상태 선택"
       onKeyDown={(event) => moveFocus(event, '.status-option')}
       onBlur={(event) => { if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) app.statusMenuOpen = false; }}>
       {items.map((item) => <button type="button" className={`status-option ${MENU_OPTION}`} key={item.id} aria-pressed={filter === item.id} onClick={() => pick(item.id)}>
