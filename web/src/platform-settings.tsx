@@ -24,6 +24,8 @@ import { aiKeysLead, connectedAiKeys } from './ai-keys';
 import { BoardRequest, BOARD_TRAILING_ROW } from './board-request';
 import { InboxPage, type InboxModel } from './inbox-view';
 import { ExploreMapPage, type ExploreModel } from './explore-map-view';
+import { WorldcupPage, type WorldcupModel } from './worldcup-view';
+import { CUP_MIN } from './worldcup';
 import type { BoardRequestResult, BoardRequestState } from './shared-board-requests';
 
 export interface SettingsModel {
@@ -102,6 +104,7 @@ export interface SettingsModel {
   };
   inbox?: InboxModel;
   explore?: ExploreModel;
+  worldcup?: WorldcupModel;
   calendar?: {
     auto: { active: boolean; error: string | null; lastRunAt: string | null };
     id: string | null;
@@ -145,7 +148,7 @@ const CANVAS_SWITCH_LABEL = '아이캠퍼스 알림';
 const CANVAS_SWITCH_HELP = '과제 마감과 하루 요약을 이 기기로 받아요';
 function canvasModeAfterToggle(next: boolean, current: CanvasMode): CanvasMode { return next ? (current === 'off' ? 'reminders' : current) : 'off'; }
 
-const SETTING_ROW_CLASS = 'setting flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[1280px]:grid min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,520px)] min-[1280px]:[align-items:start] min-[1280px]:gap-[24px] min-[1280px]:has-[>.setting-control>.rule-list]:grid-cols-[minmax(0,1fr)] min-[1280px]:has-[>.setting-control>.rule-list]:gap-[8px] min-[1280px]:has-[>.setting-control>.connection-summary]:[&>.setting-text]:pt-[11px] min-[1280px]:has-[>.setting-control>.segmented]:[&>.setting-text]:pt-[14px]';
+const SETTING_ROW_CLASS = 'setting flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line [.settings-link+&]:border-t [.settings-link+&]:border-line min-[1280px]:grid min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,520px)] min-[1280px]:[align-items:start] min-[1280px]:gap-[24px] min-[1280px]:has-[>.setting-control>.rule-list]:grid-cols-[minmax(0,1fr)] min-[1280px]:has-[>.setting-control>.rule-list]:gap-[8px] min-[1280px]:has-[>.setting-control>.connection-summary]:[&>.setting-text]:pt-[11px] min-[1280px]:has-[>.setting-control>.segmented]:[&>.setting-text]:pt-[14px]';
 
 /** 구역 제목 바로 아래 한 줄 설명. 어느 설정 쪽이든 14px 한 가지이고 아래에 구분선을 두지 않는다. */
 const SECTION_NOTE = 'settings-lead m-0 pt-[16px] pb-[12px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]';
@@ -185,7 +188,7 @@ function SettingsLink({ model, label, help, section }: { model: SettingsModel; l
     event.preventDefault();
     model.openSection(section);
   };
-  return <a className="settings-link [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href={href} onClick={open}>
+  return <a className="settings-link [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[64px] items-center justify-between gap-[16px] py-[16px] text-ink no-underline focus-visible:rounded-sm [.settings-link+&]:border-t [.settings-link+&]:border-line [.setting+&]:border-t [.setting+&]:border-line [&_.setting-name]:block [&_.setting-help]:block" href={href} onClick={open}>
     <span><span className="setting-name text-[15px] leading-[22px] font-medium">{label}</span><span className="setting-help mt-[2px] text-[14px] leading-[20px] text-ink-2 [word-break:keep-all] [text-wrap:pretty]">{help}</span></span>
     <span className={`settings-chevron ${CHEVRON_RIGHT}`} aria-hidden="true" />
   </a>;
@@ -225,6 +228,7 @@ function Overview({ model }: { model: SettingsModel }) {
     <Section id="s-preferences" title="내 설정">
       <SettingsLink model={model} label="알림" help="받을 게시판과 이 기기 알림" section="notifications" />
       <SettingsLink model={model} label="관심 키워드" help={model.keywords.length ? `${model.keywords.length}개 키워드를 쓰고 있어요` : '관심 있는 공지를 골라 봐요'} section="keywords" />
+      {model.userId && model.worldcup && model.worldcup.candidates.length >= CUP_MIN ? <SettingsLink model={model} label="공지 월드컵" help="공지 둘 중 마음에 드는 쪽을 골라 봐요" section="worldcup" /> : null}
     </Section>
     <Section id="s-account" title="계정">
       {model.userId ? <>
@@ -1054,6 +1058,7 @@ export function PlatformSettings({ model }: { model: SettingsModel }) {
     case 'feedback': return <Feedback model={model} />;
     case 'inbox': return model.inbox ? <InboxPage model={model.inbox} /> : <Overview model={model} />;
     case 'explore': return model.explore ? <ExploreMapPage model={model.explore} /> : <Overview model={model} />;
+    case 'worldcup': return model.worldcup && model.worldcup.candidates.length >= CUP_MIN ? <WorldcupPage model={model.worldcup} /> : <Overview model={model} />;
     case 'blocks': return model.questionBlocks ? <BlockedAuthors key={model.questionBlocks.key} model={model.questionBlocks} /> : <Overview model={model} />;
     default: return <Overview model={model} />;
   }

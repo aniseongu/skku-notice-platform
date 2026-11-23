@@ -40,6 +40,7 @@ import { isRememberedOnboarded, rememberOnboarded } from './onboarded-flag.ts';
 import type { Subscription } from '@supabase/supabase-js';
 import { dropDuplicates, groupMates } from './dup-notices';
 import type { ExploreItem } from './explore-map';
+import { pickCandidates, type CupNotice } from './worldcup';
 import { orderNotices, type Sort } from './notice-order';
 import { Reactive, defineReactive } from './reactive';
 import { loadPublicNotice, noticeIdFromSearch, noticeLink, withoutNotice, type PublicNotice } from './deeplink';
@@ -91,7 +92,7 @@ export function settingsSectionFromUrl(): string | null {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'keys';
   const section = params.get('section');
-  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile', 'feedback', 'inbox', 'explore', 'blocks'].includes(section) ? section : null;
+  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile', 'feedback', 'inbox', 'explore', 'worldcup', 'blocks'].includes(section) ? section : null;
 }
 
 /** 설정 머리의 부제. 쪽마다 그 쪽에서 하는 일을 말한다. */
@@ -106,6 +107,7 @@ export function settingsSubtitle(): string {
     case 'feedback': return '궁금한 점이나 바라는 점을 남겨 주세요';
     case 'inbox': return '이 기기가 받은 알림을 다시 봐요';
     case 'explore': return '기록한 활동이 어느 영역에 있는지 봐요';
+    case 'worldcup': return '공지 둘 중 마음에 드는 쪽을 골라 봐요';
     case 'blocks': return '차단한 작성자를 관리해요';
     default: return '알림과 연결을 정해요';
   }
@@ -114,7 +116,7 @@ export function settingsSubtitle(): string {
 export function settingsTitle(): string {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'AI 연결';
-  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정', feedback: '문의하기', inbox: '알림함', explore: '탐험 지도', blocks: '차단 관리' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
+  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정', feedback: '문의하기', inbox: '알림함', explore: '탐험 지도', worldcup: '공지 월드컵', blocks: '차단 관리' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
 }
 
 export interface InstallPrompt extends Event { prompt(): Promise<void> }
@@ -2578,6 +2580,31 @@ export class AppController extends Reactive {
   get inboxUnread(): number { return unreadCount(this.inboxItems); }
 
   openExploreMap = () => { this.openSettings('explore'); };
+
+  /** 공지 월드컵 후보. 저장한 공지를 먼저, 모자라면 받는 게시판의 최근 공지. 로그인하지 않았거나 공지를 아직 못 받았으면 비어 있다. */
+  worldcupCandidates(): CupNotice[] {
+    if (!this.authUserId || this.loading || !this.notices.length) return [];
+    const sources = new Map(this.sources.map((source) => [source.id, source]));
+    const live = (notice: Notice) => !isExpired(notice, sources.get(notice.source_id));
+    const toCup = (notice: Notice, saved: boolean): CupNotice => ({ id: notice.id, title: cleanTitle(notice.title_ko || notice.title), board: boardName(sources.get(notice.source_id), notice.source_id), deadline: notice.deadline, saved });
+    const saved = dropDuplicates(this.decorated(this.savedNotices())).map((notice) => toCup(notice, true));
+    const savedIds = new Set(saved.map((item) => item.id));
+    const recent = dropDuplicates(this.decorated(this.notices.filter((notice) => live(notice) && this.inChosenBoards(notice) && !this.isSaved(notice))))
+      .sort((a, b) => (b.posted_on > a.posted_on ? 1 : b.posted_on < a.posted_on ? -1 : 0))
+      .filter((notice) => !savedIds.has(notice.id)).map((notice) => toCup(notice, false));
+    return pickCandidates(saved, recent);
+  }
+  openWorldcup = () => { this.openSettings('worldcup'); };
+  /** 우승 공지를 앱 안의 공지로 연다(알림함과 같은 경로). */
+  openWorldcupNotice(id: string) { this.inboxOpenId = id; this.closeSettings(); this.handoffInboxOpen(); }
+  saveWorldcupNotice(id: string) {
+    const notice = this.notices.find((item) => item.id === id);
+    if (notice && !this.isSaved(notice)) this.toggleSave(notice);
+  }
+  shareWorldcupNotice(id: string) {
+    const notice = this.notices.find((item) => item.id === id);
+    if (notice) void this.share(notice);
+  }
   openInbox = () => { this.openSettings('inbox'); };
 
   async changeInbox(change: InboxChange): Promise<void> {
