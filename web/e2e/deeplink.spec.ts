@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 // 로그인 모의: test-user가 localStorage에 있으면 로그인 상태, 없으면 비로그인. get_public_notice는 skku-notice01/777만 돌려준다.
-async function mockAuth(page: Page, user: string | null, long = false, fresh = false) {
+async function mockAuth(page: Page, user: string | null, long = false, fresh = false, external = false) {
   await page.route('**/src/auth.ts*', (route) => route.fulfill({ contentType: 'application/javascript', body: `
     const session = () => localStorage.getItem('test-user') ? { user: { id: localStorage.getItem('test-user'), user_metadata: {} } } : null;
     const query = (table) => {
@@ -9,7 +9,7 @@ async function mockAuth(page: Page, user: string | null, long = false, fresh = f
       const q = new Proxy({}, { get(_, prop) { if (prop === 'then') return (resolve) => resolve(result()); if (prop === 'maybeSingle' || prop === 'single') return () => Promise.resolve(result()); return () => q; } });
       return q;
     };
-    const row = { id: 'skku-notice01/777', source_id: 'skku-notice01', source_name: '성대 공지', external: false, title: '공유받은 장학 안내', category: '장학', url: 'https://www.skku.edu/a', posted_on: '2026-11-18', deadline: null, body: '공유 본문입니다', body_html: '<p>공유 본문입니다</p>' };
+    const row = { id: 'skku-notice01/777', source_id: 'skku-notice01', source_name: ${external ? "'외부 게시판'" : "'성대 공지'"}, external: ${external}, title: '공유받은 장학 안내', category: '장학', url: 'https://www.skku.edu/a', posted_on: '2026-11-18', deadline: null, body: '공유 본문입니다', body_html: '<p>공유 본문입니다</p>' };
     if (${long}) row.body_html = Array.from({ length: 40 }, (_, i) => '<p>긴 본문 ' + i + '번째 줄이에요</p>').join('') + '<p>마지막 줄이에요</p>';
     window.__rpc = []; window.__oauth = [];
     export const authClient = { auth: {
@@ -100,6 +100,73 @@ test('a signed-in user sees a note, not a crash, when the shared notice is gone'
   await open(page, '&notice=skku-notice01%2F999');
   await expect(page.locator('notice-rows-screen a.row').first()).toBeVisible();
   await expect(page.locator('.toast')).toContainText('공지를 찾지 못했어요');
+});
+
+test('a push link opens the notice while the full feed is still blocked', async ({ page }) => {
+  await mockAuth(page, 'a', false, false, true);
+  let release = () => {};
+  const blocked = new Promise<void>((resolve) => { release = resolve; });
+  await page.route('**/sample/api/v1/notices.json', async (route) => {
+    await blocked;
+    await route.continue();
+  });
+  try {
+    await open(page, '&notice=skku-notice01%2F777&push=1');
+    await expect(page.getByRole('heading', { name: '공유받은 장학 안내' }).first()).toBeVisible();
+    await expect(page.getByText('공유 본문입니다')).toBeVisible();
+    await expect(page.getByText('외부 게시판', { exact: true })).toBeVisible();
+    expect(new URL(page.url()).searchParams.has('push')).toBe(false);
+    expect(await page.evaluate(() => {
+      const app = document.querySelector('notice-app') as unknown as { loading: boolean; deepNotice: { notice: unknown }; kindOf(notice: unknown): string };
+      return { loading: app.loading, kind: app.kindOf(app.deepNotice.notice) };
+    })).toEqual({ loading: true, kind: 'intern' });
+  } finally { release(); }
+});
+
+test('a missing push notice reports the result even when the feed never returns', async ({ page }) => {
+  await mockAuth(page, 'a');
+  let release = () => {};
+  const blocked = new Promise<void>((resolve) => { release = resolve; });
+  await page.route('**/sample/api/v1/notices.json', async (route) => {
+    await blocked;
+    await route.continue();
+  });
+  try {
+    await open(page, '&notice=skku-notice01%2F999&push=1');
+    await expect(page.locator('.toast')).toContainText('공지를 찾지 못했어요');
+    expect(new URL(page.url()).searchParams.has('notice')).toBe(false);
+  } finally { release(); }
+});
+
+test('the service worker hands an open tab the notice without reloading the page', async ({ page, context }, testInfo) => {
+  await mockAuth(page, 'a');
+  await open(page, '');
+  const workerReady = context.waitForEvent('serviceworker');
+  await page.evaluate(() => navigator.serviceWorker.register('/push-handler.js').then(() => navigator.serviceWorker.ready).then(() => true));
+  const worker = await workerReady;
+  await page.reload();
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  if (testInfo.project.name === 'desktop') {
+    await page.getByRole('button', { name: '설정', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '내 설정' })).toBeVisible();
+  }
+  expect(await page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  const before = await page.evaluate(() => performance.timeOrigin);
+  const accepted = await worker.evaluate(async () => {
+    const scope = globalThis as unknown as {
+      clients: { matchAll(options: { type: string }): Promise<unknown[]> };
+      openInApp(client: unknown, id: string): Promise<boolean>;
+    };
+    const [tab] = await scope.clients.matchAll({ type: 'window' });
+    return scope.openInApp(tab, 'skku-notice01/777');
+  });
+  expect(accepted).toBe(true);
+  await expect(page.getByRole('heading', { name: '공유받은 장학 안내' }).first()).toBeVisible();
+  expect(await page.evaluate(() => performance.timeOrigin)).toBe(before);
+  if (testInfo.project.name === 'mobile') {
+    await page.getByRole('button', { name: '목록으로' }).click();
+    await expect(page.locator('notice-rows-screen a.row').first()).toBeVisible();
+  }
 });
 
 test('the sheet never covers the last line of a long notice, and on a wide screen it lines up with the text column', async ({ page }) => {

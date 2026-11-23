@@ -11,7 +11,7 @@ export const onRequestGet = async (context: { request: Request; env: Env }): Pro
     const url = new URL(request.url);
     const id = url.searchParams.get('notice');
     const type = original.headers.get('content-type') ?? '';
-    if (!isNoticeId(id) || !env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY || !original.ok || !type.includes('text/html')) return original;
+    if (url.searchParams.get('push') === '1' || !isNoticeId(id) || !env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY || !original.ok || !type.includes('text/html')) return original;
     const notice = await fetchNotice(id, env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY);
     if (!notice) return original;
     const html = injectMeta(await original.clone().text(), notice, `${url.origin}/?notice=${encodeURIComponent(id)}`);

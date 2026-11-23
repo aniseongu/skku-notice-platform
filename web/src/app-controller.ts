@@ -42,7 +42,7 @@ import { dropDuplicates, groupMates } from './dup-notices';
 import type { ExploreItem } from './explore-map';
 import { orderNotices, type Sort } from './notice-order';
 import { Reactive, defineReactive } from './reactive';
-import { loadPublicNotice, noticeIdFromSearch, noticeLink, withoutNotice, type PublicNotice } from './deeplink';
+import { isNoticeId, loadPublicNotice, noticeIdFromSearch, noticeLink, withoutNotice, type PublicNotice } from './deeplink';
 import { clearSettingsCache, loadSettingsCache, saveSettingsCache, type SettingsData, type SettingsPush } from './settings-cache';
 import { clearListCache, loadListCache, saveListCache } from './list-cache';
 import { changeInbox, clearInbox, listenInboxChanged, loadInbox, noticeIdOfItem, pruneStoredInbox, releaseInbox, safeInboxUrl, setInboxOwner, unreadCount, type InboxChange, type InboxItem } from './inbox';
@@ -372,6 +372,7 @@ export class AppController extends Reactive {
   preview: { status: 'idle' | 'loading' | 'ready' | 'missing' | 'error'; data?: PublicNotice } = { status: 'idle' };
   /** 딥링크로 열었는데 목록에 없는 공지 한 건. 목록·캐시에는 섞지 않는다. */
   deepNotice: PublicNotice | null = null;
+  private deepLookup: { id: string; result?: PublicNotice | null; failed?: boolean; feedWaitEnded?: boolean } | null = null;
   private previewRequest = 0;
   authReady = !authClient;
   authEmail: string | null = null;
@@ -568,6 +569,10 @@ export class AppController extends Reactive {
         const loggedIn = !!userId && userId !== this.authUserId && this.authReady;
         if (!this.authReady || userId !== this.authUserId) {
           const previousUserId = this.authUserId;
+          if (previousUserId) {
+            this.deepId = noticeIdFromSearch(location.search);
+            this.inboxOpenId = null;
+          }
           if (previousUserId && !userId) {
             void clearListCache(previousUserId);
             void clearSettingsCache(previousUserId);
@@ -577,6 +582,8 @@ export class AppController extends Reactive {
           this.cacheReady = false; this.liveFeedReady = false; this.liveAccountReady = false;
           this.saveCounts = new Map(); ++this.saveCountRevision;
           this.notices = []; this.sources = []; this.generatedAt = null; this.abortBodies(); this.bodies.clear();
+          this.deepNotice = null; this.deepLookup = null; ++this.previewRequest;
+          this.preview = { status: 'idle' };
           const kept = savedSelection(); this.selectionReady = false;   // 아래에서 계정을 바꾸는 동안 저장된 선택을 덮어쓰지 않는다
           this.authUserId = userId;
           const epoch = this.advanceAccountEpoch();
@@ -656,14 +663,15 @@ export class AppController extends Reactive {
         const name = meta.full_name ?? meta.name;
         this.authName = typeof name === 'string' && name.trim() ? name.trim().slice(0, 60) : null;
         this.authAvatar = safeAvatarUrl(meta.avatar_url ?? meta.picture);
-        if (!this.authReady) { this.authReady = true; if (!userId && this.deepId) void this.loadPreview(); void this.refresh(true); }
+        if (!userId && this.deepId && (!this.authReady || this.preview.status === 'idle')) void this.loadPreview();
+        if (!this.authReady) { this.authReady = true; void this.refresh(true); }
         else if (loggedIn) void this.refresh(true);
       }).data.subscription;
     } else { void this.refresh(); }
     wide.addEventListener('change', () => { this.isWide = wide.matches; });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { this.refresh(); void this.refreshInbox(); } });
     listenInboxChanged(() => { void this.refreshInbox(); });   // 다른 탭에서 읽음·삭제한 것
-    try { navigator.serviceWorker?.addEventListener('message', (event) => { if ((event.data as { type?: unknown } | null)?.type === 'inbox-changed') void this.refreshInbox(); }); } catch { /* 서비스 워커가 없으면 창이 다시 보일 때만 읽는다 */ }
+    try { navigator.serviceWorker?.addEventListener('message', this.onWorkerMessage); } catch { /* 서비스 워커가 없으면 창이 다시 보일 때만 읽는다 */ }
     window.setInterval(() => { if (document.visibilityState === 'visible') this.refresh(); }, REFRESH_MS);
     window.addEventListener('keydown', (event) => this.onKey(event));
     document.addEventListener('pointerdown', this.closeBoardMenuOutside);
@@ -676,7 +684,32 @@ export class AppController extends Reactive {
     this.authSubscription?.unsubscribe();
     this.authSubscription = null;
     document.removeEventListener('pointerdown', this.closeBoardMenuOutside);
+    try { navigator.serviceWorker?.removeEventListener('message', this.onWorkerMessage); } catch { /* 서비스 워커 사용 불가 */ }
   }
+
+  private onWorkerMessage = (event: MessageEvent) => {
+    const message = event.data as { type?: unknown; noticeId?: unknown } | null;
+    if (message?.type === 'inbox-changed') { void this.refreshInbox(); return; }
+    if (message?.type !== 'open-notice' || !isNoticeId(message.noticeId) || !this.authReady
+      || !event.source || event.source !== navigator.serviceWorker.controller || !event.ports[0]) return;
+    const id = message.noticeId;
+    this.deepLookup = null;
+    if (this.gated) {
+      const url = noticeLink(id, location.href);
+      if (url !== location.href) history.pushState(null, '', url);
+      this.deepId = id;
+      void this.loadPreview();
+    } else if (this.view === 'settings') {
+      this.inboxOpenId = id;
+      this.closeSettings();
+      this.handoffInboxOpen();
+    } else {
+      this.deepId = id;
+      this.resumeDeepLink();
+    }
+    event.ports[0].postMessage(true);
+    event.ports[0].close();
+  };
 
   closeBoardMenuOutside = (event: PointerEvent) => {
     if (this.boardMenuOpen && !(event.target as Element).closest('.board-picker')) this.boardMenuOpen = false;
@@ -705,7 +738,6 @@ export class AppController extends Reactive {
       this.notices = notices!.notices.filter((notice) => !isExpired(notice, bySource.get(notice.source_id)));
       this.sources = notices!.sources;
       if (userId) void this.refreshSaveCounts(userId, epoch);
-      if (this.deepId) void this.openDeepLink(userId, epoch);
       this.liveFeedReady = true;
       if (userId) this.saveCurrentListCache(userId, epoch);
       remember('has-coop', this.hasCoop() ? '1' : '0');
@@ -736,7 +768,7 @@ export class AppController extends Reactive {
       if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.loading = false;
     }
     // 현장실습이 모두 마감돼 메뉴에서 사라졌는데 그 보기에 있으면 성대 공지로 옮긴다.
-    if (!this.failed && this.tab() === 'coop' && !this.hasCoop()) {
+    if (!this.failed && this.tab() === 'coop' && !this.hasCoop() && !this.openedId && !(this.detailOpen && this.selectedId)) {
       if (this.view === 'settings') this.listTab = 'all'; else this.setView('all');
     }
   }
@@ -755,45 +787,62 @@ export class AppController extends Reactive {
     }
   }
 
-  /** 로그인 사용자의 딥링크: 목록에 있으면 그 공지를, 없으면 한 건을 받아 상세로 연다.
-   *  첫 설정이 필요한 계정은 끝난 뒤에 연다(deepId를 보존하고 화면이 다시 부른다). 조회 중 계정이 바뀌면 deepId를 지우지 않고 다음에 다시 시도한다. */
-  private deepBusy = false;
-  async openDeepLink(userId: string | null, epoch: number) {
+  /** 캐시·목록에 있는 공지는 바로 연다. 단건 조회와 목록 중 먼저 찾은 쪽으로 상세를 그린다. */
+  resumeDeepLink() {
     const id = this.deepId;
-    if (!id || this.gated || this.deepBusy) return;
+    if (!id || !this.authReady || this.gated || this.view === 'settings') return;
+    const cached = this.notices.find((notice) => notice.id === id);
+    if (!cached && authClient && this.deepLookup?.id !== id) {
+      const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+      const lookup: NonNullable<AppController['deepLookup']> = { id };
+      this.deepLookup = lookup;
+      void withTimeout(loadPublicNotice(authClient, id), 8_000).then(
+        (notice) => { lookup.result = notice; },
+        () => { lookup.result = null; lookup.failed = true; },
+      ).then(() => {
+        if (this.deepLookup === lookup && this.isCurrentAccount(userId, epoch)) this.resumeDeepLink();
+        if (this.deepLookup === lookup && !lookup.result) setTimeout(() => {
+          if (this.deepLookup !== lookup) return;
+          lookup.feedWaitEnded = true;
+          this.resumeDeepLink();
+        }, 2_000);
+      });
+    }
     if (this.awaitingProfile() || this.needsOnboarding()) return;
-    this.deepBusy = true;
-    try {
-      let notice = this.notices.find((n) => n.id === id) ?? null;
-      let failed = false;
-      if (!notice && authClient) {
-        try {
-          const found = await loadPublicNotice(authClient, id);
-          if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;   // 계정이 바뀌었다: deepId를 남겨 다시 시도한다
-          if (found) { this.deepNotice = found; this.bodies.set(id, found.body); notice = found.notice; }
-        } catch { failed = true; }
-      }
-      if (this.deepId !== id) return;
-      this.deepId = null;
-      history.replaceState(history.state, '', withoutNotice(location.href));
-      if (!notice) { this.showToast(failed ? '공지를 열지 못했어요. 잠시 뒤 다시 시도해 주세요' : '공지를 찾지 못했어요. 지워졌거나 기한이 지났을 수 있어요'); return; }
-      this.markRead(notice);
-      if (this.isWide) { this.selectedId = id; this.detailOpen = true; return; }
-      this.openedId = id;
-      history.pushState({ notice: id }, '');
-      window.scrollTo({ top: 0 });
-    } finally { this.deepBusy = false; }
+    const found = this.deepLookup?.id === id ? this.deepLookup.result : undefined;
+    const notice = cached ?? found?.notice;
+    if (!notice && ((this.loading && !this.liveFeedReady && !this.deepLookup?.feedWaitEnded) || (authClient && found === undefined))) return;
+    const failed = this.deepLookup?.failed || this.failed;
+    this.clearDeepLink();
+    if (!notice) {
+      this.showToast(failed ? '공지를 열지 못했어요. 잠시 뒤 다시 시도해 주세요' : '공지를 찾지 못했어요. 지워졌거나 기한이 지났을 수 있어요');
+      return;
+    }
+    if (found) this.deepNotice = found;
+    this.markRead(notice);
+    if (this.isWide) { this.selectedId = id; this.detailOpen = true; return; }
+    this.openedId = id;
+    if (history.state?.notice) history.replaceState({ notice: id }, '');
+    else history.pushState({ notice: id }, '');
+    window.scrollTo({ top: 0 });
   }
 
-  /** 첫 설정·불러오기가 끝난 뒤 미뤄 둔 딥링크를 연다(화면이 반영될 때마다 부른다). */
-  resumeDeepLink() {
-    if (this.deepId && !this.gated && this.generatedAt && !this.deepBusy) void this.openDeepLink(this.authUserId, this.subscriptionsEpoch);
+  private clearDeepLink() {
+    if (!this.deepId) return;
+    this.deepId = null;
+    this.deepLookup = null;
+    if (noticeIdFromSearch(location.search)) history.replaceState(history.state, '', withoutNotice(location.href));
   }
 
   /** 딥링크로 연 공지(목록에 없어도 상세에 보이게). */
   deepShown(id: string | null): Notice | undefined {
     if (!id) return undefined;
     return this.notices.find((n) => n.id === id) ?? (this.deepNotice?.notice.id === id ? this.deepNotice.notice : undefined);
+  }
+
+  sourceName(notice: Notice): string {
+    const fallback = this.deepNotice?.notice.id === notice.id ? this.deepNotice.source : notice.source_id;
+    return boardName(this.sources.find((source) => source.id === notice.source_id), fallback);
   }
 
   async signIn() {
@@ -2554,9 +2603,14 @@ export class AppController extends Reactive {
     return this.subscriptions.includes(notice.source_id);
   }
 
-  isExternal(notice: Notice): boolean { return Boolean(this.sources.find((s) => s.id === notice.source_id)?.external); }
+  isExternal(notice: Notice): boolean {
+    return this.sources.find((s) => s.id === notice.source_id)?.external ?? (this.deepNotice?.notice.id === notice.id && this.deepNotice.external);
+  }
   /** 공지가 속한 보기: 성대 공지(all), 인턴 공고(intern), 현장실습(coop). */
-  kindOf(notice: Notice): 'all' | 'intern' | 'coop' { return noticeKind(this.sources.find((s) => s.id === notice.source_id)); }
+  kindOf(notice: Notice): 'all' | 'intern' | 'coop' {
+    return noticeKind(this.sources.find((s) => s.id === notice.source_id)
+      ?? (this.deepNotice?.notice.id === notice.id ? { external: this.deepNotice.external, coop: notice.source_id === 'skku-coop' } : undefined));
+  }
 
   byTab(list: Notice[], tab: Tab, allKinds = false): Notice[] {
     if (tab === 'saved') return list;
@@ -2646,6 +2700,7 @@ export class AppController extends Reactive {
 
   /** 보기 탭을 직접 고르면 이전 목록 조건을 지우고 해당 보기의 전체를 보여 준다. */
   openTab(tab: Tab) {
+    this.clearDeepLink();
     this.query = ''; this.keyword = null;
     this.board = 'all'; this.coopKind = 'all';
     this.unreadOnly = false; this.graduationOnly = false;
@@ -2795,6 +2850,7 @@ export class AppController extends Reactive {
 
   /** 설정을 한 번에 닫고 들어오기 전에 보던 보기로 돌아간다. 첫 쪽의 X와 Esc가 쓴다. */
   closeSettings = () => {
+    if (this.closingSettings) return;
     const depth = this.settingsDepth();
     if (depth > 0) { this.closingSettings = true; history.go(-depth); return; }   // 이동이 끝나면 onPopState가 이어서 알림함의 공지를 연다
     const last = normalizeTab(remember('tab'));
@@ -2816,6 +2872,14 @@ export class AppController extends Reactive {
       if (this.settingsDepth() === 1 && this.settingsSection) this.replaceWithSettingsHome();
     }
     const params = new URLSearchParams(location.search);
+    if (this.gated) {
+      const id = noticeIdFromSearch(location.search);
+      if (id !== this.deepId) {
+        this.deepId = id; ++this.previewRequest;
+        this.preview = { status: 'idle' };
+        if (id) void this.loadPreview();
+      }
+    }
     if (this.closingSettings) {
       this.closingSettings = false;
       if (params.get('view') === 'settings' && this.settingsDepth() === 0) {
@@ -2974,6 +3038,7 @@ export class AppController extends Reactive {
     const move = (step: number) => {
       const next = list[Math.max(0, Math.min(list.length - 1, index + step))];
       if (!next) return;
+      this.clearDeepLink();
       this.selectedId = next.id;
       if (this.isWide) { this.setDetail(true); this.markRead(next); }
       this.updateComplete.then(() => qsel(`[data-id="${CSS.escape(next.id)}"]`)?.scrollIntoView({ block: 'nearest' }));
@@ -2996,6 +3061,7 @@ export class AppController extends Reactive {
     this.markRead(notice);
     if (event.ctrlKey || event.metaKey || event.shiftKey) return;
     event.preventDefault();
+    this.clearDeepLink();
     if (this.isWide) {
       if (this.detailOpen && this.shownId === notice.id) { this.setDetail(false); return; }
       this.selectedId = notice.id; this.setDetail(true); return;
@@ -3158,7 +3224,8 @@ export class AppController extends Reactive {
   body(notice: Notice): NoticeBody | null | 'loading' {
     const { bodies, generatedAt: generation, subscriptionsEpoch: epoch } = this;
     const cached = bodies.get(notice.id);
-    if (cached !== undefined) return cached;
+    const fallback = this.deepNotice?.notice.id === notice.id ? this.deepNotice.body : null;
+    if (cached !== undefined) return !cached || cached === 'loading' ? fallback ?? cached : cached;
     bodies.set(notice.id, 'loading');
     const controller = new AbortController();
     this.bodyAborts.set(notice.id, controller);
@@ -3171,7 +3238,7 @@ export class AppController extends Reactive {
       else bodies.set(notice.id, body);
       this.requestUpdate();
     });
-    return 'loading';
+    return fallback ?? 'loading';
   }
 
   /** 진행 중인 본문 요청을 모두 끊는다(계정 전환·새 수집 결과). */

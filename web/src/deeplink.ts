@@ -20,10 +20,11 @@ export function noticeIdFromSearch(search: string): string | null {
   return isNoticeId(value) ? value : null;
 }
 
-/** 현재 주소에서 notice만 지운 주소(다른 쿼리는 유지). */
+/** 공지 진입에 쓰인 쿼리를 지운 주소(다른 쿼리는 유지). */
 export function withoutNotice(href: string): string {
   const url = new URL(href);
   url.searchParams.delete('notice');
+  if (url.searchParams.get('push') === '1') url.searchParams.delete('push');
   return url.href;
 }
 

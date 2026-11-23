@@ -648,7 +648,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
   return <notice-detail-screen key={app.authUserId} model={{
     // 같은 공지 묶음은 글마다 따로 저장되므로, 겹쳐 세지 않게 가장 큰 수를 보인다.
     saveCount: Math.max(...[notice, ...app.mates(notice.id)].map((member) => app.saveCounts.get(member.id) ?? 0)) || undefined,
-    notice: shown, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
+    notice: shown, source: app.sourceName(notice),
     today: todayKst(), body: shownBody, mySummary: mine?.summary ?? null,
     aiHint: app.aiHintShown() ? { connect: () => app.openSettings('keys'), dismiss: () => app.dismissAiHint() } : undefined, summarizing: app.summarizing === notice.id, interests,
     ai: judgement?.ai ?? mine?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,

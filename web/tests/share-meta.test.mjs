@@ -40,6 +40,15 @@ test('핸들러: 성공하면 메타 삽입, RPC 본문 id만', async () => {
   assert.equal(res.headers.get('cache-control'), 'public, max-age=300');
   globalThis.fetch = realFetch;
 });
+
+test('알림 링크는 공유 메타 RPC 없이 바로 앱 HTML을 돌려준다', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = () => { assert.fail('알림 진입에 공유 메타 조회를 요청했어요'); };
+  try {
+    const res = await call('?notice=a%2F1&push=1', { ASSETS: assets(), SUPABASE_URL: 'https://s.co', SUPABASE_PUBLISHABLE_KEY: 'k' });
+    assert.equal(await res.text(), HTML);
+  } finally { globalThis.fetch = originalFetch; }
+});
 test('핸들러: RPC 실패·예외·빈 결과·환경변수 없음이면 원본', async () => {
   for (const f of [async () => new Response('x', { status: 500 }), async () => { throw new Error('net'); }, async () => new Response('[]')]) {
     globalThis.fetch = f;

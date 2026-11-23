@@ -8,6 +8,22 @@ function noticeIdOf(tag) {
   return id.length <= 200 && NOTICE_ID.test(id) ? id : null;
 }
 
+function openInApp(client, noticeId) {
+  if (typeof MessageChannel === 'undefined' || typeof client.postMessage !== 'function') return Promise.resolve(false);
+  const { port1, port2 } = new MessageChannel();
+  return new Promise((resolve) => {
+    const finish = (accepted) => {
+      clearTimeout(timeout);
+      port1.close();
+      resolve(accepted);
+    };
+    const timeout = setTimeout(() => finish(false), 250);
+    port1.onmessage = (event) => finish(event.data === true);
+    try { client.postMessage({ type: 'open-notice', noticeId }, [port2]); }
+    catch { port2.close(); finish(false); }
+  });
+}
+
 // 알림함: 받은 알림을 이 기기의 IndexedDB에 쌓는다(앱의 src/inbox.ts가 읽는다. 같은 DB·키·정리 규칙).
 // 수신자 해시와 현재 구독 주소가 모두 inbox:v1의 소유자와 일치할 때 저장한다.
 // 구형 서버 알림도 표시한다. 알림함 저장은 별도로 최대 3초 기다린다.
@@ -130,21 +146,31 @@ self.addEventListener('push', (event) => {
   event.waitUntil(Promise.all([shown, kept]));
 });
 
+let latestNoticeClick = 0;
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   // 공지 알림은 원문이 아니라 앱 안의 그 공지(./?notice=<id>)로 연다. 열린 앱 창이 있으면 그 창을 앞으로 가져와 이동한다.
   // 그 밖의 알림(아이캠퍼스, 필수 정보, 옛 알림)은 push 수신 때 검사한 URL을 그대로 연다.
-  const noticeId = noticeIdOf(event.notification.tag) ?? (NOTICE_ID.test(event.notification.data?.notice || '') ? event.notification.data.notice : null);
+  const noticeId = noticeIdOf(event.notification.tag) ?? noticeIdOf('notice:' + (event.notification.data?.notice ?? ''));
   if (noticeId) {
+    const click = ++latestNoticeClick;
     const link = new URL('./', self.registration.scope);
     link.searchParams.set('notice', noticeId);
+    link.searchParams.set('push', '1');
     event.waitUntil((async () => {
       try {
         const windows = self.clients.matchAll ? await self.clients.matchAll({ type: 'window', includeUncontrolled: true }) : [];
-        const open = windows.find((client) => typeof client.url === 'string' && client.url.startsWith(self.registration.scope));
-        if (open) { await open.focus(); await open.navigate(link.href); return; }
+        if (click !== latestNoticeClick) return;
+        const open = windows.find((client) => typeof client.url === 'string' && client.url.split(/[?#]/, 1)[0] === self.registration.scope);
+        if (open) {
+          await open.focus();
+          if (click !== latestNoticeClick) return;
+          if (await openInApp(open, noticeId)) return;
+          if (click !== latestNoticeClick) return;
+          if (await open.navigate(link.href)) return;
+        }
       } catch { /* 창을 옮기지 못하면 새 창으로 연다 */ }
-      await self.clients.openWindow(link.href);
+      if (click === latestNoticeClick) await self.clients.openWindow(link.href);
     })());
     return;
   }

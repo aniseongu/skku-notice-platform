@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { MessageChannel } from 'node:worker_threads';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
@@ -82,7 +83,7 @@ test('bootcamp push accepts the original and opens the app notice', async () => 
   await w.push({ url, tag: 'notice:aibootcamp-news/45' });
   assert.equal(w.notifications.at(-1).data.url, url);
   await w.click(w.notifications.at(-1));
-  assert.equal(w.opened.at(-1), w.scope + '?notice=aibootcamp-news%2F45');
+  assert.equal(w.opened.at(-1), w.scope + '?notice=aibootcamp-news%2F45&push=1');
   for (const bad of [url.replace('.kr/', '.kr.evil.com/'), url.replace('://', '://user@'),
     url.replace('.kr/', '.kr:443/'), url.replace('.kr/', '.kr:8443/'),
     url.replace('/45', '/write'), url.replace('https:', 'http:'), url + '?page=2']) {
@@ -112,7 +113,7 @@ test('a lost subscription is recreated with the same server key when the browser
 });
 
 const APP_ID = 'skku-notice01/12345';
-const appUrl = (w) => `${w.scope}?notice=skku-notice01%2F12345`;
+const appUrl = (w) => `${w.scope}?notice=skku-notice01%2F12345&push=1`;
 
 test('clicking a notice alert opens that notice inside the app, not the original page', async () => {
   const w = worker();
@@ -123,15 +124,51 @@ test('clicking a notice alert opens that notice inside the app, not the original
   assert.deepEqual(w.opened, [appUrl(w)]);
 });
 
-test('an open app window is focused and moved to the notice instead of opening another window', async () => {
+test('an older open app window falls back to browser navigation', async () => {
   const calls = [];
   const scope = 'https://example.github.io/skku-notice-alert/';
-  const window = { url: scope + '?tab=all', focus: async () => calls.push('focus'), navigate: async (url) => calls.push(['navigate', url]) };
+  const window = { url: scope + '?tab=all', focus: async () => calls.push('focus'), navigate: async (url) => { calls.push(['navigate', url]); return window; } };
   const other = { url: 'https://example.github.io/other/', focus: async () => calls.push('wrong'), navigate: async () => calls.push('wrong') };
   const w = worker([other, window]);
   await w.push({ title: '장학', tag: `notice:${APP_ID}` });
   await w.click(w.notifications[0]);
   assert.deepEqual(calls, ['focus', ['navigate', appUrl(w)]]);
+  assert.deepEqual(w.opened, []);
+});
+
+test('a ready app tab opens the notice without a new document or window', async () => {
+  const seen = [];
+  const window = {
+    url: 'https://example.github.io/skku-notice-alert/?tab=all',
+    focus: async () => { seen.push('focus'); },
+    postMessage(message, [reply]) { seen.push(message.type, message.noticeId); reply.postMessage(true); reply.close(); },
+    navigate: async () => assert.fail('The page already accepted the notice'),
+  };
+  const w = worker([window], { MessageChannel });
+  await w.push({ tag: `notice:${APP_ID}` });
+  await w.click(w.notifications[0]);
+  assert.deepEqual(seen, ['focus', 'open-notice', APP_ID]);
+  assert.deepEqual(w.opened, []);
+});
+
+test('an older click cannot reload a window after a newer notice was accepted', async () => {
+  let firstSent;
+  const firstMessage = new Promise((resolve) => { firstSent = resolve; });
+  const window = {
+    url: 'https://example.github.io/skku-notice-alert/',
+    focus: async () => {},
+    postMessage({ noticeId }, [reply]) {
+      if (noticeId === APP_ID) firstSent();
+      else reply.postMessage(true);
+      reply.close();
+    },
+    navigate: async () => assert.fail('The earlier click must not navigate'),
+  };
+  const w = worker([window], { MessageChannel });
+  const first = w.click({ tag: `notice:${APP_ID}` });
+  await firstMessage;
+  await w.click({ tag: 'notice:skku-notice01/2' });
+  await first;
   assert.deepEqual(w.opened, []);
 });
 
