@@ -26,7 +26,10 @@ export const SWITCH = 'switch relative h-[28px] w-[46px] flex-none rounded-pill 
 export const BADGE = 'badge rounded-pill bg-sunken px-[8px] py-[1px] text-[12px] font-semibold text-ink-2';
 
 /** 같은 폭으로 나누는 세그먼트. 열 수는 쓰는 화면에서 정한다. */
-export const SEGMENTED_GRID = 'segmented grid w-full gap-[2px] rounded-md bg-sunken p-[3px] [align-self:flex-start] [&_button]:px-0 [&_button]:min-h-[38px] [&_button]:rounded-[8px] [&_button]:border-0 [&_button]:bg-transparent [&_button]:py-0 [&_button]:text-[14px] [&_button]:font-medium [&_button]:text-ink-2 max-[719px]:[&_button]:min-h-[44px] [@media(pointer:coarse)]:[&_button]:min-h-[44px] [&_button[aria-checked=true]]:bg-surface [&_button[aria-checked=true]]:font-semibold [&_button[aria-checked=true]]:text-ink [&_button[aria-checked=true]]:[box-shadow:0_1px_2px_oklch(0.2_0.02_var(--h)/0.12)] [&_button[aria-pressed=true]]:bg-surface [&_button[aria-pressed=true]]:font-semibold [&_button[aria-pressed=true]]:text-ink [&_button[aria-pressed=true]]:[box-shadow:0_1px_2px_oklch(0.2_0.02_var(--h)/0.12)]';
+const SEGMENTED = 'segmented rounded-md bg-sunken p-[3px] [align-self:flex-start]';
+export const SEGMENTED_GRID = `${SEGMENTED} grid w-full gap-[2px]`;
+export const SEGMENTED_INLINE = `${SEGMENTED} inline-flex [&_button]:px-[14px]`;
+export const SEGMENTED_OPTION = 'min-h-[38px] rounded-[8px] border-0 bg-transparent p-0 text-[14px] font-medium text-ink-2 max-[719px]:min-h-[44px] [@media(pointer:coarse)]:min-h-[44px] [@media(hover:hover)]:[&:hover:enabled:not([aria-checked=true])]:bg-hover active:[&:enabled:not([aria-checked=true])]:bg-hover aria-checked:bg-[light-dark(var(--surface),var(--line))] aria-checked:font-semibold aria-checked:text-ink aria-checked:[box-shadow:inset_0_0_0_1px_light-dark(var(--line),var(--text-3))]';
 
 export const CHOICE = 'choice group/ch [@media(hover:hover)]:[&:hover:not([aria-checked=true])]:bg-hover active:[&:not([aria-checked=true])]:bg-hover relative flex min-h-[56px] items-center justify-between gap-[12px] rounded-none border-0 bg-surface px-[16px] py-[8px] text-left text-[15px] font-normal text-ink aria-checked:font-bold [.choice+&]:before:absolute [.choice+&]:before:top-0 [.choice+&]:before:right-[16px] [.choice+&]:before:left-[16px] [.choice+&]:before:h-[1px] [.choice+&]:before:bg-line [.choice+&]:before:content-[\'\']';
 export const CHOICE_CHECK = 'choice-check grid size-[20px] flex-none place-items-center rounded-[50%] border-[1.5px] border-ink-3 group-aria-checked/ch:border-ink group-aria-checked/ch:after:size-[8px] group-aria-checked/ch:after:rounded-[50%] group-aria-checked/ch:after:bg-ink group-aria-checked/ch:after:content-[\'\']';
@@ -54,7 +57,7 @@ const TEXT_BUTTON_BASE = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active
 export const TEXT_BUTTON = `${TEXT_BUTTON_BASE} py-0 text-[14px] font-medium text-ink-2`;
 export const TEXT_BUTTON_DANGER = `${TEXT_BUTTON_BASE} py-0 text-[14px] font-semibold text-danger`;
 /** 눌러서 수정하는 본문 글. */
-export const TEXT_BUTTON_BODY = `${TEXT_BUTTON_BASE} py-[8px] text-left text-[15px] font-normal text-ink whitespace-pre-wrap [overflow-wrap:anywhere]`;
+export const TEXT_BUTTON_BODY = `${TEXT_BUTTON_BASE} py-[8px] text-left text-[15px] font-normal text-ink underline decoration-ink-3 underline-offset-[3px] whitespace-pre-wrap [overflow-wrap:anywhere]`;
 /** 구역·카드 안의 안내 한 줄(13px). 구역 제목(13px ink-3)보다 진하되 크지 않다. */
 export const NOTE_TEXT = 'm-0 text-[13px] leading-[19px] text-ink-2';
 /** 고르는 칩(상태·인원 등 하나를 고르는 것). 고른 것은 채움이 아니라 중립 면+굵기+체크다. aria-checked로 정한다. */

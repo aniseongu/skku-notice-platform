@@ -7,7 +7,7 @@ import { summaryLines } from './summary-lines';
 import type { GradPart } from './graduation-assessment';
 import { GraduationNotes, GraduationSection, type GraduationModel } from './graduation-assessment-view';
 import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, NOTE_MAX, type OpportunityStatus } from './opportunities';
-import { DETAIL_SECTION, IMAGE_MISSING_CLASS, NOTE_TEXT, SECTION_TITLE, SEGMENTED_GRID, SETTINGS_INPUT, SKELETON_BAR, TEXT_BUTTON, TEXT_BUTTON_BODY } from './cls';
+import { DETAIL_SECTION, IMAGE_MISSING_CLASS, NOTE_TEXT, SECTION_TITLE, SEGMENTED_GRID, SEGMENTED_OPTION, SETTINGS_INPUT, SKELETON_BAR, TEXT_BUTTON, TEXT_BUTTON_BODY } from './cls';
 import { MoreMenu } from './more-menu';
 import { TeamSection, type TeamModel } from './team-section';
 import { QuestionsSection, type QuestionsModel } from './questions-section';
@@ -91,7 +91,7 @@ function OpportunitySection({ model }: { model: OpportunityModel }) {
       }]} /> : null}
     </div>
     <div role="radiogroup" aria-labelledby="sec-opportunity" className={`${SEGMENTED_GRID} grid-cols-4`} onKeyDown={move}>
-      {OPPORTUNITY_STATUSES.map((status) => <button type="button" role="radio" key={status} className="min-h-[44px]! whitespace-nowrap text-ink! shadow-none! [@media(hover:hover)]:[&:hover:not([aria-checked=true])]:bg-hover active:[&:not([aria-checked=true])]:bg-hover" aria-checked={model.status === status}
+      {OPPORTUNITY_STATUSES.map((status) => <button type="button" role="radio" key={status} className={`${SEGMENTED_OPTION} min-h-[44px]! whitespace-nowrap`} aria-checked={model.status === status}
         tabIndex={status === focusable ? 0 : -1} onClick={() => model.onStatus(status)}>{OPPORTUNITY_LABELS[status]}</button>)}
     </div>
     <div className="mt-[6px]">

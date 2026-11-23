@@ -37,7 +37,10 @@ test('saved notice: one tap sets the status, the memo can be edited, and the men
   await page.getByRole('button', { name: '저장하기' }).click();
   await expect(section).toBeVisible();
   expect(await saves(page)).toEqual([expect.objectContaining({ status: 'interested' })]);   // 저장하면 입력 없이 관심으로 기록된다
-  await expect(section.getByRole('radio', { name: '관심 있음' })).toHaveAttribute('aria-checked', 'true');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  const interested = section.getByRole('radio', { name: '관심 있음' });
+  await expect(interested).toHaveAttribute('aria-checked', 'true');
+  await expect(interested).toHaveCSS('box-shadow', /inset/);
   await expect(section.getByRole('textbox', { name: '메모' })).toHaveCount(0);   // 메모는 접혀 있다
   await expect(section.getByText('저장을 해제해도 상태와 메모는 남아요')).toHaveCount(0);
   const prepare = section.getByRole('radio', { name: '준비 중' });
@@ -58,6 +61,7 @@ test('saved notice: one tap sets the status, the memo can be edited, and the men
   await expect(memoText).toBeFocused();
   await expect(memoText).toHaveCSS('font-size', '15px');
   await expect(memoText).toHaveCSS('white-space', 'pre-wrap');
+  await expect(memoText).toHaveCSS('text-decoration-line', 'underline');
   await expect(memo).toHaveCount(0);
   await memoText.click();
   await expect(memo).toBeFocused();

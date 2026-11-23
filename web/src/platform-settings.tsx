@@ -19,7 +19,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
 import { FEEDBACK_KINDS, FEEDBACK_LIMIT, feedbackProblem, type FeedbackKind, type FeedbackResult } from './feedback';
-import { BADGE, CHEVRON_RIGHT, CHOICE, DANGER_BUTTON, GHOST_BUTTON, NOTE_TEXT, SEGMENTED_GRID, SETTINGS_ACTION, SETTINGS_INPUT, SOLID_BUTTON, SWITCH, SWITCH_ONLY } from './cls';
+import { BADGE, CHEVRON_RIGHT, CHOICE, DANGER_BUTTON, GHOST_BUTTON, NOTE_TEXT, SEGMENTED_GRID, SEGMENTED_INLINE, SEGMENTED_OPTION, SETTINGS_ACTION, SETTINGS_INPUT, SOLID_BUTTON, SWITCH, SWITCH_ONLY } from './cls';
 import { aiKeysLead, connectedAiKeys } from './ai-keys';
 import { BoardRequest, BOARD_TRAILING_ROW } from './board-request';
 import { InboxPage, type InboxModel } from './inbox-view';
@@ -176,8 +176,8 @@ export function Choice<T extends string | number>({ label, options, value, onPic
 }) {
   const cols = columns === 3 ? 'grid-cols-3' : 'grid-cols-4';
   // 선택지가 많으면(입학 연도) 한 줄로 늘어놓지 않고 4열 격자로 칸 안에 담는다.
-  return <div className={grid ? `${SEGMENTED_GRID} ${cols}` : 'segmented inline-flex rounded-md bg-sunken p-[3px] [align-self:flex-start] [&_button]:px-[14px] [&_button]:min-h-[38px] [&_button]:rounded-[8px] [&_button]:border-0 [&_button]:bg-transparent [&_button]:py-0 [&_button]:text-[14px] [&_button]:font-medium [&_button]:text-ink-2 max-[719px]:[&_button]:min-h-[44px] [@media(pointer:coarse)]:[&_button]:min-h-[44px] [&_button[aria-checked=true]]:bg-surface [&_button[aria-checked=true]]:font-semibold [&_button[aria-checked=true]]:text-ink [&_button[aria-checked=true]]:[box-shadow:0_1px_2px_oklch(0.2_0.02_var(--h)/0.12)] [&_button[aria-pressed=true]]:bg-surface [&_button[aria-pressed=true]]:font-semibold [&_button[aria-pressed=true]]:text-ink [&_button[aria-pressed=true]]:[box-shadow:0_1px_2px_oklch(0.2_0.02_var(--h)/0.12)]'} role="radiogroup" aria-label={label}>
-    {options.map(([option, text]) => <button type="button" role="radio" className="[@media(hover:hover)]:[&:hover:not([aria-checked=true]):not(:disabled)]:bg-line active:[&:not([aria-checked=true])]:bg-line" key={String(option)} aria-checked={value === option}
+  return <div className={grid ? `${SEGMENTED_GRID} ${cols}` : SEGMENTED_INLINE} role="radiogroup" aria-label={label}>
+    {options.map(([option, text]) => <button type="button" role="radio" className={SEGMENTED_OPTION} key={String(option)} aria-checked={value === option}
       disabled={disabled} onClick={() => onPick(option)}>{text}</button>)}
   </div>;
 }
