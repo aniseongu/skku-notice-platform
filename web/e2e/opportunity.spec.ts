@@ -480,3 +480,49 @@ test('the saved rows keep the feed title alignment and a uniform mobile meta gap
   if (mobile) await checkMobile();
   else expect((await title.boundingBox())!.x).toBeCloseTo(feedX);
 });
+
+// 저장 탭도 다른 탭과 같은 옵션 줄이다: 읽지 않은 공지만 거르기가 같은 자리에 있고, 진행 상태는 그 묶음 끝에 더해진다.
+for (const [name, size] of [['pc', { width: 1440, height: 900 }], ['phone', { width: 412, height: 860 }]] as const) {
+  test(`saved tab filters like other tabs (${name})`, async ({ page }) => {
+    await page.setViewportSize(size);
+    await setup(page);
+    await saveSome(page, 4, { 0: 'applied', 1: 'preparing' });
+    const rows = page.locator('notice-rows-screen a.row');
+    await expect(rows).toHaveCount(4);
+    // 같은 접근 이름 순서: 다른 탭의 거르기 묶음(읽지 않은 공지만)으로 시작하고 선택·정렬이 오른쪽이다.
+    const names = async () => page.locator('.view-options').first().getByRole('button').evaluateAll((els) => els.map((el) => el.getAttribute('aria-label') ?? el.textContent?.trim()));
+    const savedNames = await names();
+    expect(savedNames[0]).toBe('읽지 않은 공지만');
+    expect(savedNames.slice(1)).toEqual([expect.stringMatching(/^진행 상태/), '선택', expect.stringMatching(/^정렬:/)]);
+    await page.evaluate(() => (document.querySelector('notice-app') as unknown as App).openTab('all'));
+    const otherNames = await names();
+    expect(otherNames[0]).toBe('읽지 않은 공지만');
+    expect(otherNames.slice(1)).toEqual(['선택', expect.stringMatching(/^정렬:/)]);
+    await saveSome(page, 4, { 0: 'applied', 1: 'preparing' });
+    // 읽지 않은 공지만 → 읽은 저장 공지가 빠진다.
+    await page.evaluate(() => {
+      const app = document.querySelector('notice-app') as unknown as App;
+      const ids = app.saved.map((n: { id: string }) => n.id);
+      const read = new Set(ids.slice(0, 2));
+      app.isRead = (n: { id: string }) => read.has(n.id);   // 읽음 저장소 대신 고정 값으로 둔다
+      app.requestUpdate?.();
+      app.listChanged();
+    });
+    const unreadBefore = await page.evaluate(() => { const app = document.querySelector('notice-app') as unknown as App; return app.visible().filter((n: unknown) => !app.isRead(n)).length; });
+    await page.getByRole('button', { name: '읽지 않은 공지만' }).click();
+    await expect(page.getByRole('button', { name: '읽지 않은 공지만' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(rows).toHaveCount(unreadBefore);
+    // 진행 상태 묶음도 같은 줄에서 조합된다.
+    await page.getByRole('button', { name: /^진행 상태: 전체/ }).click();
+    await page.getByRole('group', { name: '진행 상태 선택' }).getByRole('button', { name: /지원함/ }).click();
+    await expect(page.getByRole('button', { name: '진행 상태: 지원함' })).toBeVisible();
+    // 해제하면 거르기만 풀린다(다른 탭과 같은 방식).
+    await page.getByRole('button', { name: '읽지 않은 공지만' }).click();
+    await expect(page.getByRole('button', { name: '읽지 않은 공지만' })).toHaveAttribute('aria-pressed', 'false');
+    await page.getByRole('button', { name: '진행 상태: 지원함' }).click();
+    await page.getByRole('group', { name: '진행 상태 선택' }).getByRole('button', { name: /^전체/ }).click();
+    await expect(rows).toHaveCount(4);
+    const fits = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+    expect(fits).toBe(true);
+  });
+}

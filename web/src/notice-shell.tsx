@@ -391,10 +391,11 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
       }
       if (app.view === 'saved' && app.opportunityFilter !== 'all' && app.opportunitiesStatus === 'ready') return <Empty title="이 상태의 공지가 없어요" body="다른 상태를 골라 보세요" action="전체 보기" onAction={() => { app.opportunityFilter = 'all'; app.listChanged(); }} />;
       if (app.query) return <Empty title={`'${app.query}'에 맞는 공지가 없어요`} body="다른 단어로 찾아보세요" action="검색어 지우기" onAction={() => { app.query = ''; app.listChanged(); }} />;
-      if (app.keyword && app.view !== 'saved' && app.unreadOnly) return <Empty title={`'${app.keyword}'에 맞는 읽지 않은 공지가 없어요`} body="읽지 않은 공지만 보기를 끄면 모든 공지를 볼 수 있어요" />;
+      const nothingSaved = app.view === 'saved' && app.savedNotices().length === 0;
+      if (app.keyword && app.unreadOnly) return <Empty title={`'${app.keyword}'에 맞는 읽지 않은 공지가 없어요`} body="읽지 않은 공지만 보기를 끄면 모든 공지를 볼 수 있어요" />;
       if (app.keyword) return <Empty title={`'${app.keyword}'에 맞는 공지가 아직 없어요`} body="새 글이 오면 여기에 모여요" />;
-      if (app.view !== 'saved' && app.graduationOnly && app.gradEnabled()) return <Empty title="인턴십 요건에 맞는 공고가 아직 없어요" body="인턴십 충족만 보기를 끄면 모든 공고를 볼 수 있어요" />;
-      if (app.view !== 'saved' && app.unreadOnly) return <Empty title="읽지 않은 공지가 없어요" body="읽지 않은 공지만 보기를 끄면 모든 공지를 볼 수 있어요" />;
+      if (!nothingSaved && app.graduationOnly && app.gradEnabled()) return <Empty title="인턴십 요건에 맞는 공고가 아직 없어요" body="인턴십 충족만 보기를 끄면 모든 공고를 볼 수 있어요" />;
+      if (!nothingSaved && app.unreadOnly) return <Empty title="읽지 않은 공지가 없어요" body="읽지 않은 공지만 보기를 끄면 모든 공지를 볼 수 있어요" />;
       const [heading, body] = {
         all: ['이 게시판에 공지가 없어요', '다른 게시판을 골라 보세요'],
         intern: ['이 사이트에 공고가 없어요', '다른 사이트를 골라 보세요'],
@@ -475,37 +476,27 @@ function ViewFilters({ app }: { app: AppController }) {
       app.selecting = true; app.selectedReads = [];
       if (event.detail === 0) void app.updateComplete.then(() => document.querySelector<HTMLInputElement>('.select-all input')?.focus({ preventScroll: true }));
     }}><Icon name="select-list" />선택</button>;
-  if (app.view === 'saved') {
-    const total = app.savedNotices().length;
-    const reorderOk = total >= 2 && app.canReorderSaved();
-    return <>
-      {/* 휴대폰: 게시판 고르기(목록 전체에 적용)를 선택·진행 상태·정렬과 한 줄에 둔다. 왼쪽은 범위, 오른쪽은 조작. 360px에서도 한 줄이 되도록 넘치면 게시판 이름만 줄인다. */}
-      <div className={`view-options saved-options ${VIEW_ROW} justify-between max-[719px]:flex-nowrap!`}>
-        {app.reordering ? null : <BoardSelect app={app} toolbar />}
-        <div className={`${VIEW_ACTIONS} flex-none`}>
-        {app.reordering
-          ? <button type="button" className={`${OPTION_ACTION} font-semibold! text-ink!`} onClick={() => { app.reordering = false; }}>완료</button>
-          : select}
-        <StatusSelect app={app} /><SortSelect app={app} />
-      </div></div>
-    </>;
-  }
-  return <div className={`view-options ${VIEW_ROW} justify-between`} role="group" aria-label="공지 보기 조건">
-    {/* 두 조건이 다 있어도 선택·정렬과 한 줄에 둔다. 520px 미만에서는 조건 이름을 줄여 한 줄에 들어가게 하고, 그래도 모자라는 아주 좁은 폭에서만 다음 줄로 간다. */}
-    <div className={`view-filters flex min-w-0 flex-wrap items-center gap-x-[4px] gap-y-0 min-[520px]:gap-x-[12px]`}>
-      <button type="button" className={VIEW_TOGGLE} aria-label="읽지 않은 공지만" aria-pressed={app.unreadOnly} onClick={() => {
-        app.unreadOnly = !app.unreadOnly;
-        app.listChanged();
-        remember('view-unread', app.unreadOnly ? '1' : '0');
-      }}><span className={FILTER_CHECK} aria-hidden="true"></span>{app.gradEnabled() ? <><span aria-hidden="true" className="min-[520px]:hidden">안 읽음</span><span aria-hidden="true" className="max-[519px]:hidden">읽지 않은 공지만</span></> : '읽지 않은 공지만'}</button>
-      {app.gradEnabled() ? <button type="button" className={VIEW_TOGGLE} aria-label="인턴십 충족만" aria-pressed={app.graduationOnly} onClick={() => {
-        app.graduationOnly = !app.graduationOnly;
-        app.listChanged();
-        remember('view-grad', app.graduationOnly ? '1' : '0');
-      }}><span className={FILTER_CHECK} aria-hidden="true"></span><span aria-hidden="true" className="min-[520px]:hidden">인턴십 충족</span><span aria-hidden="true" className="max-[519px]:hidden">인턴십 충족만</span></button> : null}
+  // 저장 탭도 다른 탭과 같은 옵션 줄이다: 왼쪽 거르기(읽지 않은 공지만·인턴십 충족만), 오른쪽 선택·정렬.
+  // 저장 탭에만 진행 상태 거르기가 거르기 묶음 끝에 더해지고, 순서 바꾸기 중에는 선택 대신 완료가 나온다.
+  const saved = app.view === 'saved';
+  const frozen = saved && app.reordering;
+  const toggle = (label: string, narrow: string, wide: string, pressed: boolean, onClick: () => void) => <button type="button" className={`${VIEW_TOGGLE} disabled:text-ink-3`} aria-label={label} aria-pressed={pressed} disabled={frozen} onClick={onClick}>
+    <span className={FILTER_CHECK} aria-hidden="true"></span><span aria-hidden="true" className="min-[520px]:hidden">{narrow}</span><span aria-hidden="true" className="max-[519px]:hidden">{wide}</span></button>;
+  return <>
+    {saved && !frozen ? <div className="group-head empty-head mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-end min-[720px]:hidden"><BoardSelect app={app} /></div> : null}
+    <div className={`view-options ${saved ? 'saved-options ' : ''}${VIEW_ROW} justify-between`} role="group" aria-label="공지 보기 조건">
+      {/* 두 조건이 다 있어도 선택·정렬과 한 줄에 둔다. 520px 미만에서는 조건 이름을 줄여 한 줄에 들어가게 하고, 그래도 모자라는 아주 좁은 폭에서만 다음 줄로 간다. */}
+      <div className={`view-filters flex min-w-0 flex-wrap items-center gap-x-[4px] gap-y-0 min-[520px]:gap-x-[12px]`}>
+        {toggle('읽지 않은 공지만', app.gradEnabled() || saved ? '안 읽음' : '읽지 않은 공지만', '읽지 않은 공지만', app.unreadOnly, () => { app.unreadOnly = !app.unreadOnly; app.listChanged(); remember('view-unread', app.unreadOnly ? '1' : '0'); })}
+        {app.gradEnabled() ? toggle('인턴십 충족만', '인턴십 충족', '인턴십 충족만', app.graduationOnly, () => { app.graduationOnly = !app.graduationOnly; app.listChanged(); remember('view-grad', app.graduationOnly ? '1' : '0'); }) : null}
+        {saved ? <StatusSelect app={app} /> : null}
+      </div>
+      <div className={VIEW_ACTIONS}>
+        {frozen ? <button type="button" className={`${OPTION_ACTION} font-semibold! text-ink!`} onClick={() => { app.reordering = false; }}>완료</button> : select}
+        <SortSelect app={app} />
+      </div>
     </div>
-    <div className={VIEW_ACTIONS}>{select}<SortSelect app={app} /></div>
-  </div>;
+  </>;
 }
 
 const OPTION_ACTION = 'select-trigger inline-flex min-h-[44px] min-w-[44px] items-center gap-[6px] border-0 bg-transparent px-[4px] py-0 text-[14px] font-medium whitespace-nowrap text-ink-2 disabled:text-ink-3 [&_.i]:size-[18px]';
@@ -610,9 +601,9 @@ function BoardSelect({ app, toolbar = false }: { app: AppController; toolbar?: b
       }}>
       {toolbar ? <span className="min-w-0 truncate">{current}</span> : current}<span className={`${MENU_CHEVRON} ${toolbar ? 'shrink-0' : ''}`} aria-hidden="true" />
     </button>
-    {app.boardMenuOpen ? <div id="board-options" className={`${MENU_OPTIONS} min-w-[max(100%,180px)] ${toolbar ? 'right-auto! left-0! w-max max-w-[calc(100vw-2*var(--gutter))]' : ''}`} role="group" aria-label={`${aria} 선택`}
+    {app.boardMenuOpen ? <div id="board-options" className={`${MENU_OPTIONS} min-w-[max(100%,180px)] ${toolbar ? 'right-auto! left-0!' : ''} w-max max-w-[calc(100vw-2*var(--gutter))]`} role="group" aria-label={`${aria} 선택`}
       onKeyDown={(event) => moveFocus(event, '.board-option')}>
-      {boards.map((b) => <button type="button" className={`board-option ${MENU_OPTION} ${toolbar ? 'py-[10px]! whitespace-normal! [overflow-wrap:anywhere]' : ''}`} key={b.id} aria-pressed={activeChoice(app) === b.id}
+      {boards.map((b) => <button type="button" className={`board-option ${MENU_OPTION} py-[10px]! whitespace-normal! [overflow-wrap:anywhere]`} key={b.id} aria-pressed={activeChoice(app) === b.id}
         onClick={() => { pickChoice(app, b.id); void app.updateComplete.then(() => document.querySelector<HTMLButtonElement>('.board-picker .board-trigger')?.focus()); }}>
         <span className="min-w-0">{b.label}</span>{activeChoice(app) === b.id ? <span className={`${MENU_CHECK} flex-none`} aria-hidden="true" /> : null}</button>)}
       {app.tab() === 'all' ? <button type="button" className={`board-more ${MENU_OPTION}`} onClick={() => app.openSettings('notifications')}><span>게시판 더 고르기</span></button> : null}

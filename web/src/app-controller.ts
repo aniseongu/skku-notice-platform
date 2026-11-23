@@ -1635,7 +1635,7 @@ export class AppController extends Reactive {
   savedFilterOn(): boolean { return !this.canReorderSaved(); }
 
   canReorderSaved(): boolean {
-    if (this.opportunityFilter !== 'all' || this.query || this.keyword) return false;
+    if (this.opportunityFilter !== 'all' || this.query || this.keyword || this.unreadOnly || (this.graduationOnly && this.gradEnabled())) return false;
     return this.visible().length === dropDuplicates(this.decorated(this.savedNotices())).length;
   }
 
@@ -2772,8 +2772,16 @@ export class AppController extends Reactive {
    *  보고 있지 않은 탭은 그 탭의 전체(모든 게시판, 현장실습은 모든 기관) 개수다. */
   tabCount(tab: Tab): number {
     const current = tab === this.tab();
-    if (tab === 'saved') return this.filtered(this.savedNotices(), !current).length;
+    if (tab === 'saved') return this.savedConditions(this.filtered(this.savedNotices(), !current), !current).length;
     return this.byTab(this.filtered(this.notices, !current), tab, !current).length;
+  }
+
+  /** 다른 탭과 같은 거르기(읽지 않은 공지만, 인턴십 충족만)를 저장 목록에도 건다. 읽고 있는 글은 남긴다. */
+  private savedConditions(list: Notice[], ignore = false): Notice[] {
+    if (ignore) return list;
+    return list
+      .filter((n) => !this.unreadOnly || !this.isRead(n) || this.keepReading(n.id))
+      .filter((n) => !this.graduationOnly || !this.gradEnabled() || this.gradPartsFor(n, this.judgement(n)?.ai?.verdict).some((part) => part.met) || this.keepReading(n.id));
   }
 
   private scopeTab(list: Notice[], tab: Tab, allKinds = false): Notice[] {
@@ -2818,7 +2826,7 @@ export class AppController extends Reactive {
     const decorate = (items: Notice[]) => this.decorated(items);
     if (this.tab() === 'saved') {
       // 같은 공지의 사본을 따로 저장해 두었어도 한 번만 보여 준다(저장한 목록 안에서만 거르므로 하나만 저장한 공지는 그대로다)
-      const saved = this.filtered(decorate(this.savedNotices()));
+      const saved = this.savedConditions(this.filtered(decorate(this.savedNotices())));
       const firstSeen = new Set(dropDuplicates(saved).map((n) => n.id));
       const unique = saved.filter((n) => firstSeen.has(n.id) || this.keepReading(n.id));
       return this.opportunityFilter === 'all' || this.opportunitiesStatus !== 'ready' ? unique : unique.filter((n) => this.statusOf(n) === this.opportunityFilter);

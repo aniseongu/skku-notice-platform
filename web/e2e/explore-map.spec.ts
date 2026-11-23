@@ -168,7 +168,7 @@ const LONG_BOARD = '차세대 인공지능 융합전공 및 산학협력 교육�
 // 공유 게시판 이름이 길어도 저장 탭 도구 줄의 게시판 목록이 화면 밖으로 나가지 않는다. 화면 이름은 boardName이 끝의 '공지'를 뗀 값이다.
 const LONG_BOARD_LABEL = LONG_BOARD.replace(/\s*공지$/, '');
 for (const width of [360, 412]) {
-  test(`phone saved tab keeps the board picker in the same toolbar row as select, status and sort, and a long board name wraps inside the popup (${width}px)`, async ({ page }) => {
+  test(`phone saved tab puts the board picker on its own row like other tabs, the toolbar row keeps filter, status, select and sort, and a long board name wraps inside the popup (${width}px)`, async ({ page }) => {
     await page.setViewportSize({ width, height: 780 });
     await setup(page, []);
     const longName = LONG_BOARD_LABEL;
@@ -186,19 +186,17 @@ for (const width of [360, 412]) {
       app.opportunities = new Map(picked.map((n, i) => [n.id as string, { notice_id: n.id, title: n.title, url: null, board: null, deadline: null, status: statuses[i], note: null, created_at: '', updated_at: '' }]));
     }, LONG_BOARD);
     const toolbar = page.locator('.saved-options');
-    const picker = toolbar.getByRole('button', { name: /^게시판: / });
+    const picker = page.getByRole('button', { name: /^게시판: / });
     const select = toolbar.getByRole('button', { name: '선택' });
     const status = toolbar.getByRole('button', { name: /^진행 상태: / });
     const sort = toolbar.getByRole('button', { name: /^정렬: / });
     await expect(picker).toBeVisible();
     await expect(status).toBeVisible();                            // 네 조작이 모두 보인다
-    await expect(page.locator('.group-head .board-picker')).toHaveCount(0);
     await expect(page.locator('.board-picker')).toHaveCount(1);
     const [p, s, st, o] = await Promise.all([picker.boundingBox(), select.boundingBox(), status.boundingBox(), sort.boundingBox()]);
-    expect(Math.abs(p!.y - s!.y)).toBeLessThan(2);                 // 같은 줄
+    expect(p!.y + p!.height).toBeLessThanOrEqual(s!.y + 1);        // 게시판은 다른 탭처럼 도구 줄 위 자기 줄
     expect(Math.abs(st!.y - s!.y)).toBeLessThan(2);
     expect(Math.abs(o!.y - s!.y)).toBeLessThan(2);
-    expect(p!.x).toBeLessThan(s!.x);                               // 범위(왼쪽) → 조작(오른쪽)
     expect(p!.height).toBeGreaterThanOrEqual(44);
     expect(o!.x + o!.width).toBeLessThanOrEqual(width);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
@@ -220,7 +218,7 @@ for (const width of [360, 412]) {
     await expect(menuBox.locator('.board-option[aria-pressed="true"]')).toBeFocused();   // 열면 현재 선택 항목에 초점
     await longOption.click();
     await expect(page.locator('notice-rows-screen a.row')).toHaveCount(1);
-    await expect(toolbar.getByRole('button', { name: /^게시판: / })).toHaveAttribute('aria-label', `게시판: ${longName}`);
+    await expect(page.getByRole('button', { name: /^게시판: / })).toHaveAttribute('aria-label', `게시판: ${longName}`);
     await expect(picker).toBeFocused();                            // 닫히면 초점은 단추로
     await picker.click();                                          // 다시 열어 선택 표시를 확인
     await expect(menuBox.getByRole('button', { name: longName })).toHaveAttribute('aria-pressed', 'true');
