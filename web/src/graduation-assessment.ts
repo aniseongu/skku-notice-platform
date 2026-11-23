@@ -112,14 +112,17 @@ export async function loadGraduation(client: SupabaseClient, userId: string, not
 
 /** 확인을 요청한다(다시 확인도 같다). 결과는 워커가 채우고, 같은 입력이면 저장된 결과를 다시 쓴다. */
 /** 새 요청은 insert, 이미 있으면 update로 다시 요청한다. 사용자는 요청 열만 쓸 수 있어서 upsert는 권한 오류(403)가 난다. */
-export async function requestGraduation(client: SupabaseClient, userId: string, noticeId: string): Promise<void> {
+export async function requestGraduation(client: SupabaseClient, userId: string, noticeId: string, options: { ifAbsent?: boolean } = {}): Promise<boolean> {
   const table = 'user_notice_graduation_assessments';
   const requestedAt = new Date().toISOString();
   let { error } = await client.from(table).insert({ user_id: userId, notice_id: noticeId, status: 'PENDING', requested_at: requestedAt });
+  // 자동 요청(행이 없어서 처음 만드는 경우)은 다른 탭이 먼저 만들어 둔 행을 PENDING으로 되돌리지 않는다.
+  if (error?.code === '23505' && options.ifAbsent) return false;
   if (error?.code === '23505') {
     ({ error } = await client.from(table).update({ status: 'PENDING', requested_at: requestedAt }).eq('user_id', userId).eq('notice_id', noticeId));
   }
   if (error) throw error;
+  return true;
 }
 
 const SW = { college: '소프트웨어융합대학', department: '소프트웨어학과' };

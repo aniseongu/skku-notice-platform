@@ -42,3 +42,30 @@ test('a successful detail read wins over a stale cached list judgement, includin
   app.summaries.set('n', null);
   assert.equal(app.detailAi(notice), null);                          // 빈 결과도 우선
 });
+
+function summaryApp(locks, calls, existing = null) {
+  const Controller = build(['  async makeSummary('], {
+    authClient: {}, sessionIs: async () => true,
+    requestNoticeSummary: async () => { calls.push('summarize'); return { summary: '요약', deadline: null, deadlineKind: null }; },
+    loadMyNoticeInfo: async () => existing,
+    navigator: { locks }, setTimeout: () => 0,
+  });
+  return Object.assign(new Controller(), {
+    authUserId: 'u', subscriptionsEpoch: 1, summarizing: null, summaryError: '', summaryErrorId: null,
+    summaries: new Map(), missingSummaries: new Set(['n']), isCurrentAccount: () => true, detailIsOpen: () => true, cacheDetail() {},
+    requestUpdate() {},
+  });
+}
+
+test('two tabs do not both call the summary API for the same account and notice', async () => {
+  const calls = [];
+  const busy = { request: async (_name, _options, callback) => callback(null) };     // 다른 탭이 이미 만드는 중
+  await summaryApp(busy, calls).makeSummary({ id: 'n' });
+  assert.deepEqual(calls, []);
+  const free = { request: async (_name, _options, callback) => callback({ name: 'lock' }) };
+  await summaryApp(free, calls).makeSummary({ id: 'n' });
+  assert.deepEqual(calls, ['summarize']);
+  // 잠금을 얻은 뒤 서버에 이미 요약이 생겼으면 다시 만들지 않는다.
+  await summaryApp(free, calls, { summary: '다른 탭이 만든 요약', deadline: null, deadlineKind: null, ai: null }).makeSummary({ id: 'n' });
+  assert.deepEqual(calls, ['summarize']);
+});

@@ -3335,7 +3335,7 @@ export class AppController extends Reactive {
             this.autoGraduations.delete(notice.id);
             return;
           }
-          void this.requestGraduation(notice);
+          void this.requestGraduation(notice, true);
         }, 0);
       }
       return cached === 'loading' ? null : cached;
@@ -3371,14 +3371,15 @@ export class AppController extends Reactive {
       this.graduationPolls.set(noticeId, setTimeout(() => { void this.reloadGraduation(noticeId, userId, epoch, attempt + 1); }, 20000));
     }
   }
-  async requestGraduation(notice: Notice): Promise<void> {
+  async requestGraduation(notice: Notice, auto = false): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     if (!authClient || !userId || this.graduationBusy) return;
     this.graduationBusy = notice.id; this.graduationError = '';
     try {
       if (!await sessionIs(authClient, userId) || !this.isCurrentAccount(userId, epoch) || !this.detailIsOpen(notice.id)) return;
-      await requestGraduation(authClient, userId, notice.id);
+      const created = await requestGraduation(authClient, userId, notice.id, { ifAbsent: auto });
       if (!this.isCurrentAccount(userId, epoch)) return;
+      if (!created) { void this.reloadGraduation(notice.id, userId, epoch, 0); return; }   // 이미 행이 있다: 덮지 않고 있는 그대로 읽는다
       const before = this.graduations.get(notice.id);
       const pending = { ...(typeof before === 'object' && before ? before : { aiStatus: null, department: null, university3p: null, facts: null }), state: 'pending' as const };
       this.graduations.set(notice.id, pending);
@@ -3488,7 +3489,17 @@ export class AppController extends Reactive {
     this.summarizing = notice.id; this.summaryError = ''; this.summaryErrorId = null;
     try {
       if (!await sessionIs(authClient, userId) || !this.isCurrentAccount(userId, epoch) || !this.detailIsOpen(notice.id)) return;
-      const made = await requestNoticeSummary(authClient, notice.id);
+      // 같은 계정의 다른 탭이 같은 공지의 요약을 만드는 중이면 건너뛴다(Web Locks). 잠금을 얻은 뒤에도 서버에 이미 요약이 생겼으면 다시 호출하지 않는다.
+      const client = authClient;
+      const create = async () => {
+        const row = await loadMyNoticeInfo(client, userId, notice.id).catch(() => null);
+        return row?.summary ? { summary: row.summary, deadline: row.deadline, deadlineKind: row.deadlineKind } : await requestNoticeSummary(client, notice.id);
+      };
+      const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+      const made = locks
+        ? await locks.request(`notice-summary:${userId}:${notice.id}`, { ifAvailable: true }, (lock) => (lock ? create() : null))
+        : await create();
+      if (!made) return;
       if (!this.isCurrentAccount(userId, epoch)) return;
       const before = this.summaries.get(notice.id);
       const info = { ai: typeof before === 'object' && before ? before.ai : null, ...made };

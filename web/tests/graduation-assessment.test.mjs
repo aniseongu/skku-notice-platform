@@ -73,6 +73,18 @@ test('requesting again updates only status and requested_at (never upsert, which
   await assert.rejects(() => requestGraduation(failing, 'u1', 'n1'));
 });
 
+test('an automatic request never turns an existing (READY) row back into PENDING', async () => {
+  let updated = false;
+  const client = { from: () => ({
+    insert: async () => ({ error: { code: '23505' } }),
+    update: () => { updated = true; return { eq() { return Promise.resolve({ error: null }); } }; },
+  }) };
+  assert.equal(await requestGraduation(client, 'u1', 'n1', { ifAbsent: true }), false);   // 다른 탭이 먼저 만든 행은 그대로 둔다
+  assert.equal(updated, false);
+  const fresh = { from: () => ({ insert: async () => ({ error: null }) }) };
+  assert.equal(await requestGraduation(fresh, 'u1', 'n1', { ifAbsent: true }), true);
+});
+
 import { visibleTracks, threePAnswer, threePFields, shortReason, reasonOf } from '../src/graduation-assessment.ts';
 const SW_PROGRAMS = [{ college: '소프트웨어융합대학', department: '소프트웨어학과' }];
 const flags = (over = {}) => ({ programs: SW_PROGRAMS, deptInternshipDone: null, university3pInternshipDone: null, university3pInternshipSelected: null, ...over });
