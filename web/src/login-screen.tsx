@@ -21,7 +21,7 @@ export function LoginStatus({ text = '불러오고 있어요' }: { text?: string
   return <div className="flex min-h-dvh items-center justify-center bg-bg px-[24px]"><div role="status" className={`text-center ${shown ? '' : 'invisible'}`}><p className="m-0 text-[15px] leading-[22px] text-ink-2">{text}</p></div></div>;
 }
 
-export function LoginScreen({ app, missing = false }: { app: AppController; missing?: boolean }) {
+export function LoginScreen({ app }: { app: AppController }) {
   const busy = app.authBusy;
   // 가운데 알림 예시는 실제 알림(src/skku_notice/push_collection.py)과 같은 모양이다: 제목은 공지 제목, 본문 첫 줄은 AI 판정 문구, 둘째 줄은 관심 키워드와 마감(키워드가 없으면 마감만), 마지막 줄은 게시판. 알림은 AI 판정이 끝난 뒤에 간다.
   // 토스 첫 화면 구성(TDS Top: 위 그림, 28px 제목, 17px 설명, 아래 고정 단추 하나)을 따른다. 가운데에는 이 앱이 하는 일을 알림 예시 하나로 보여 준다.
@@ -41,7 +41,6 @@ export function LoginScreen({ app, missing = false }: { app: AppController; miss
           {busy ? null : <GoogleG />}
           <span>{busy ? 'Google로 이동하고 있어요' : 'Google로 계속하기'}</span>
         </button>
-        {missing ? <p className="m-0 mb-[12px] text-center text-[14px] leading-[20px] text-ink-2 break-keep">공유받은 공지를 찾지 못했어요. 지워졌거나 기한이 지났을 수 있어요</p> : null}
         <div aria-live="polite" className="mt-[12px] empty:hidden">
           {app.authError ? <p className="m-0 text-[14px] leading-[20px] text-center text-danger" role="alert">{app.authError}</p> : null}
         </div>

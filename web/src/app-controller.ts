@@ -78,6 +78,7 @@ const isTab = (value: string | null): value is Tab => TABS.some((t) => t.id === 
 const normalizeTab = (value: string | null) => value === 'mine' || value === 'deadline' ? 'all' : value;
 const INTERACTIVE = 'a, button, input, textarea, select, [contenteditable]';
 const wide = matchMedia('(min-width: 1080px)');
+const shareWide = matchMedia('(min-width: 720px)');
 const browserTab = matchMedia('(display-mode: browser)');
 
 /** Google 로그인이 주는 프로필 사진 주소만 쓴다(그 밖의 주소는 사진으로 불러오지 않는다). */
@@ -231,6 +232,7 @@ export class AppController extends Reactive {
     devices: { state: true }, thisDeviceId: { state: true }, devicesBusy: { state: true }, devicesError: { state: true }, devicesLoadFailed: { state: true }, summaryTime: { state: true },
     calendarAuto: { state: true },
     accountBusy: { state: true }, accountError: { state: true },
+    sharedDetail: { state: true }, shareWide: { state: true },
     aiHintTick: { state: true }, deepId: { state: true }, preview: { state: true }, deepNotice: { state: true },
     summarizing: { state: true }, summaryError: { state: true }, summaryErrorId: { state: true },
     profile: { state: true }, profileStatus: { state: true }, profileMessage: { state: true }, profileError: { state: true }, settingsSection: { state: true },
@@ -374,10 +376,15 @@ export class AppController extends Reactive {
   private keywordWrite: Promise<void> = Promise.resolve();
   /** 주소의 ?notice=<id>. 한 번 열면 비운다(미리보기와 로그인 사용자의 상세 열기가 이 값을 쓴다). 형식이 틀리면 처음부터 null. */
   deepId: string | null = noticeIdFromSearch(location.search);
-  /** 비로그인 미리보기 상태. 없는 공지(missing)면 평소 로그인 화면으로 돌아간다. */
+  /** 비로그인 공유 화면의 단건 조회 상태. */
   preview: { status: 'idle' | 'loading' | 'ready' | 'missing' | 'error'; data?: PublicNotice } = { status: 'idle' };
   /** 딥링크로 열었는데 목록에 없는 공지 한 건. 목록·캐시에는 섞지 않는다. */
   deepNotice: PublicNotice | null = null;
+  sharedDetail: string | null = null;
+  private subscribedShareId: string | null = null;
+  shareWide = shareWide.matches;
+  get usesDetailPane(): boolean { return this.isWide || (this.shareWide && this.sharedDetail !== null); }
+  get sharedFailure(): boolean { return this.sharedDetail === 'missing' || this.sharedDetail === 'error'; }
   private deepLookup: { id: string; result?: PublicNotice | null; failed?: boolean; feedWaitEnded?: boolean } | null = null;
   private previewRequest = 0;
   authReady = !authClient;
@@ -591,7 +598,7 @@ export class AppController extends Reactive {
           this.opportunityWrites = new Map();
           this.saveCounts = new Map(); ++this.saveCountRevision;
           this.notices = []; this.sources = []; this.generatedAt = null; this.abortBodies(); this.bodies.clear();
-          this.deepNotice = null; this.deepLookup = null; ++this.previewRequest;
+          this.deepNotice = null; this.sharedDetail = null; this.subscribedShareId = null; this.deepLookup = null; ++this.previewRequest;
           this.preview = { status: 'idle' };
           const kept = savedSelection(); this.selectionReady = false;   // 아래에서 계정을 바꾸는 동안 저장된 선택을 덮어쓰지 않는다
           this.authUserId = userId;
@@ -678,6 +685,7 @@ export class AppController extends Reactive {
       }).data.subscription;
     } else { void this.refresh(); }
     wide.addEventListener('change', () => { this.isWide = wide.matches; });
+    shareWide.addEventListener('change', () => { this.shareWide = shareWide.matches; });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { this.refresh(); void this.refreshInbox(); } });
     listenInboxChanged(() => { void this.refreshInbox(); });   // 다른 탭에서 읽음·삭제한 것
     try { navigator.serviceWorker?.addEventListener('message', this.onWorkerMessage); } catch { /* 서비스 워커가 없으면 창이 다시 보일 때만 읽는다 */ }
@@ -730,7 +738,7 @@ export class AppController extends Reactive {
   get gated() { return !!authClient && this.authReady && !this.authUserId; }
 
   async refresh(initial = false) {
-    if (this.gated) return;
+    if (this.authReady === false || this.gated) return;
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     this.loading = true;
     try {
@@ -753,6 +761,10 @@ export class AppController extends Reactive {
       if (userId) void this.refreshSaveCounts(userId, epoch);
       this.liveFeedReady = true;
       if (userId) this.saveCurrentListCache(userId, epoch);
+      if (this.sharedDetail && !this.sharedFailure) {
+        const shared = this.deepShown(this.sharedDetail);
+        if (shared) this.selectSharedTab(shared);
+      }
       remember('has-coop', this.hasCoop() ? '1' : '0');
       if (userId && !initial) {
         void this.refreshMyDeadlines(userId, epoch);
@@ -781,7 +793,7 @@ export class AppController extends Reactive {
       if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.loading = false;
     }
     // 현장실습이 모두 마감돼 메뉴에서 사라졌는데 그 보기에 있으면 성대 공지로 옮긴다.
-    if (!this.failed && this.tab() === 'coop' && !this.hasCoop() && !this.openedId && !(this.detailOpen && this.selectedId)) {
+    if (!this.failed && this.tab() === 'coop' && !this.hasCoop() && !this.sharedDetail && !this.openedId && !(this.detailOpen && this.selectedId)) {
       if (this.view === 'settings') this.listTab = 'all'; else this.setView('all');
     }
   }
@@ -832,22 +844,58 @@ export class AppController extends Reactive {
     const found = this.deepLookup?.id === id ? this.deepLookup.result : undefined;
     const notice = cached ?? found?.notice;
     if (!notice && ((this.loading && !this.liveFeedReady && !this.deepLookup?.feedWaitEnded) || (authClient && found === undefined))) return;
-    const failed = this.deepLookup?.failed || this.failed;
+    const failed = this.deepLookup?.failed ?? (!authClient && this.failed);
     const pendingLookup = notice && found === undefined ? this.deepLookup : null;
     this.clearDeepLink();
     this.deepLookup = pendingLookup;
-    if (!notice) {
-      this.showToast(failed ? '공지를 열지 못했어요. 잠시 뒤 다시 시도해 주세요' : '공지를 찾지 못했어요. 지워졌거나 기한이 지났을 수 있어요');
-      return;
-    }
     if (found) this.deepNotice = found;
-    this.markRead(notice);
-    if (this.isWide) { this.selectedId = id; this.detailOpen = true; return; }
-    this.openedId = id;
-    if (history.state?.notice) history.replaceState({ notice: id }, '');
-    else history.pushState({ notice: id }, '');
-    window.scrollTo({ top: 0 });
+    if (notice) {
+      this.selectSharedTab(notice);
+      this.markRead(notice);
+    }
+    this.subscribedShareId = null;
+    this.sharedDetail = notice ? id : failed ? 'error' : 'missing';
+    this.selectedId = notice ? id : null;
+    this.detailOpen = true;
+    this.openedId = !this.usesDetailPane && notice ? id : null;
+    if (!this.usesDetailPane || history.state?.notice) {
+      const state = { notice: notice ? id : null, sharedDetail: this.sharedDetail };
+      if (history.state?.notice || history.state?.sharedDetail) history.replaceState(state, '');
+      else history.pushState(state, '');
+      window.scrollTo({ top: 0 });
+    }
   }
+
+  private selectSharedTab(notice: Notice): void {
+    const kind = this.kindOf(notice);
+    const tab = kind === 'coop' && !this.hasCoop() ? (this.tab() === 'coop' ? 'all' : this.tab()) : kind;
+    if (this.view === 'settings' || this.view === tab) return;
+    this.view = this.listTab = tab;
+    this.selecting = false; this.selectedReads = [];
+    this.replaceShareTab(tab);
+    remember('tab', tab);
+  }
+
+  private replaceShareTab(tab: Tab): void {
+    const url = new URL(location.href);
+    if (url.searchParams.has('sort') || url.searchParams.get('tab') === 'deadline') url.searchParams.set('sort', this.sortFor(tab));
+    url.searchParams.set('tab', tab);
+    history.replaceState(history.state, '', url);
+  }
+
+  closeSharedDetail = () => {
+    if (history.state?.sharedDetail) { history.back(); return; }
+    this.sharedDetail = null;
+    this.openedId = null;
+    this.listChanged();
+  };
+
+  leavePreview = () => {
+    this.clearDeepLink();
+    ++this.previewRequest;
+    this.preview = { status: 'idle' };
+    this.authError = '';
+  };
 
   private clearDeepLink() {
     if (!this.deepId) return;
@@ -922,6 +970,10 @@ export class AppController extends Reactive {
     if (!this.liveListFields.has('translations')) this.myTranslations = cached.translations;
     if (!this.liveListFields.has('graduation')) this.graduationStatuses = cached.graduation;
     this.cacheReady = true;
+    if (this.sharedDetail && !this.sharedFailure) {
+      const shared = this.deepShown(this.sharedDetail);
+      if (shared) this.selectSharedTab(shared);
+    }
     this.requestUpdate();
   }
 
@@ -1405,7 +1457,14 @@ export class AppController extends Reactive {
   }
 
   // 현장실습은 신청 기간마다 수백 건이 한꺼번에 들어와 판정이 하루쯤 걸리므로 기다리는 동안에도 목록에 둔다(줄에 "AI가 확인하고 있어요").
-  private isWaiting(n: Notice): boolean { return n.id !== this.selectedId && n.id !== this.openedId && this.kindOf(n) !== 'coop' && this.judgePending(n); }
+  private keepReading(id: string): boolean {
+    return id !== this.sharedDetail && (id === this.selectedId || id === this.openedId);
+  }
+
+  private isWaiting(n: Notice): boolean {
+    const justSubscribed = this.sharedDetail === n.id && this.subscribedShareId === n.id;
+    return !justSubscribed && !this.keepReading(n.id) && this.kindOf(n) !== 'coop' && this.judgePending(n);
+  }
 
 
   /** 내 판정과 관심 키워드를 다시 읽는다. 로그인할 때와 공지를 새로 불러올 때 부른다. */
@@ -2602,23 +2661,49 @@ export class AppController extends Reactive {
     }
   }
 
-  async toggleSubscription(sourceId: string, enabled: boolean): Promise<void> {
+  async toggleSubscription(sourceId: string, enabled: boolean): Promise<boolean> {
     const userId = this.authUserId;
     const epoch = this.subscriptionsEpoch;
-    if (!authClient || !userId || this.subscriptionsLoading) return;
+    if (!authClient || !userId || this.subscriptionsLoading) return false;
     this.subscriptionsLoading = true;
     this.subscriptionsError = '';
     try {
       await setSubscription(authClient, userId, sourceId, enabled);
-      if (epoch === this.subscriptionsEpoch) {
-        this.subscriptions = enabled ? [...this.subscriptions, sourceId] : this.subscriptions.filter((id) => id !== sourceId);
-        this.recordSetting(userId, epoch, 'subscriptions', this.subscriptions);
-      }
+      if (!this.isCurrentAccount(userId, epoch)) return false;
+      this.subscriptions = enabled ? [...new Set([...this.subscriptions, sourceId])] : this.subscriptions.filter((id) => id !== sourceId);
+      this.recordSetting(userId, epoch, 'subscriptions', this.subscriptions);
+      return true;
     } catch {
-      if (epoch === this.subscriptionsEpoch) this.subscriptionsError = '구독을 저장하지 못했어요. 다시 시도해 주세요.';
+      if (this.isCurrentAccount(userId, epoch)) this.subscriptionsError = '구독을 저장하지 못했어요. 다시 시도해 주세요.';
+      return false;
     } finally {
-      if (epoch === this.subscriptionsEpoch) this.subscriptionsLoading = false;
+      if (this.isCurrentAccount(userId, epoch)) this.subscriptionsLoading = false;
     }
+  }
+
+  showsShareSubscription(notice: Notice): boolean {
+    return !!this.authUserId && this.sharedDetail === notice.id && this.kindOf(notice) === 'all'
+      && this.hasKnownSubscriptions() && !this.subscriptions.includes(notice.source_id);
+  }
+
+  async subscribeFromShare(notice: Notice): Promise<void> {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.subscriptionsLoading || !this.showsShareSubscription(notice)) return;
+    const current = () => this.isCurrentAccount(userId, epoch);
+    const saved = await this.toggleSubscription(notice.source_id, true);
+    if (!current()) return;
+    if (!saved) {
+      this.showToast(this.subscriptionsError);
+      return;
+    }
+
+    if (this.sharedDetail === notice.id) this.subscribedShareId = notice.id;
+    await this.refresh();
+    if (!current() || !this.subscriptions.includes(notice.source_id) || this.notices.some((item) => item.id === notice.id)) return;
+    const rows = await loadSavedNoticeDetails(authClient, [notice.id], current).catch(() => []);
+    if (!current() || !this.subscriptions.includes(notice.source_id) || this.notices.some((item) => item.id === notice.id)) return;
+    const row = rows.find((item) => item.id === notice.id && !isExpired(item, this.sources.find((source) => source.id === item.source_id)));
+    if (row) this.notices = [...this.notices, row];
   }
 
   /**
@@ -2674,7 +2759,7 @@ export class AppController extends Reactive {
   /** 공지가 속한 보기: 성대 공지(all), 인턴 공고(intern), 현장실습(coop). */
   kindOf(notice: Notice): 'all' | 'intern' | 'coop' {
     return noticeKind(this.sources.find((s) => s.id === notice.source_id)
-      ?? (this.deepNotice?.notice.id === notice.id ? { external: this.deepNotice.external, coop: notice.source_id === 'skku-coop' } : undefined));
+      ?? (this.deepNotice?.notice.source_id === notice.source_id ? { external: this.deepNotice.external, coop: this.deepNotice.coop } : undefined));
   }
 
   byTab(list: Notice[], tab: Tab, allKinds = false): Notice[] {
@@ -2699,13 +2784,13 @@ export class AppController extends Reactive {
       .filter((n) => this.kindOf(n) === tab)
       .filter((n) => allKinds || tab !== 'coop' || this.activeCoopKind() === 'all' || coopKindOf(n) === this.activeCoopKind())
       .filter(() => external || !this.noBoards())
-      .filter((n) => external || this.inChosenBoards(n) || n.id === this.selectedId || n.id === this.openedId);
+      .filter((n) => external || this.inChosenBoards(n) || this.keepReading(n.id));
     // 같은 공지가 여러 게시판에 올라오면 가장 먼저 감지된 글만 보여 준다. 읽고 있는 글은 남긴다.
     const firstSeen = new Set(dropDuplicates(scoped).map((n) => n.id));
-    const unique = scoped.filter((n) => firstSeen.has(n.id) || n.id === this.selectedId || n.id === this.openedId);
+    const unique = scoped.filter((n) => firstSeen.has(n.id) || this.keepReading(n.id));
     const shown = unique
-      .filter((n) => !this.unreadOnly || !this.isRead(n) || n.id === this.selectedId || n.id === this.openedId)
-      .filter((n) => !this.graduationOnly || !this.gradEnabled() || this.gradPartsFor(n, this.judgement(n)?.ai?.verdict).some((part) => part.met) || n.id === this.selectedId || n.id === this.openedId);
+      .filter((n) => !this.unreadOnly || !this.isRead(n) || this.keepReading(n.id))
+      .filter((n) => !this.graduationOnly || !this.gradEnabled() || this.gradPartsFor(n, this.judgement(n)?.ai?.verdict).some((part) => part.met) || this.keepReading(n.id));
     return orderNotices(shown, this.sortFor(tab) as Sort);
   }
 
@@ -2735,7 +2820,7 @@ export class AppController extends Reactive {
       // 같은 공지의 사본을 따로 저장해 두었어도 한 번만 보여 준다(저장한 목록 안에서만 거르므로 하나만 저장한 공지는 그대로다)
       const saved = this.filtered(decorate(this.savedNotices()));
       const firstSeen = new Set(dropDuplicates(saved).map((n) => n.id));
-      const unique = saved.filter((n) => firstSeen.has(n.id) || n.id === this.selectedId || n.id === this.openedId);
+      const unique = saved.filter((n) => firstSeen.has(n.id) || this.keepReading(n.id));
       return this.opportunityFilter === 'all' || this.opportunitiesStatus !== 'ready' ? unique : unique.filter((n) => this.statusOf(n) === this.opportunityFilter);
     }
     return this.byTab(this.filtered(decorate(this.notices)), this.tab());
@@ -2745,6 +2830,7 @@ export class AppController extends Reactive {
     this.closeInbox();
     const entering = view === 'settings' && this.view !== 'settings';
     this.selecting = false; this.selectedReads = [];
+    this.sharedDetail = null;
     this.view = view;
     if (entering || view !== 'settings') this.settingsSection = null;
     if (view !== 'settings') this.listTab = view;
@@ -2955,6 +3041,13 @@ export class AppController extends Reactive {
       // 설정 버튼으로 돌아온 첫 기록이 바로가기 하위 쪽이면 홈으로 바꾼다.
       if (this.settingsDepth() === 1 && this.settingsSection) this.replaceWithSettingsHome();
     }
+    const shared = typeof history.state?.sharedDetail === 'string' ? history.state.sharedDetail : null;
+    if (this.sharedDetail && !shared) {
+      this.replaceShareTab(this.tab());
+      this.detailOpen = false;
+      this.selectedId = null;
+    }
+    this.sharedDetail = shared;
     const params = new URLSearchParams(location.search);
     if (this.gated) {
       const id = noticeIdFromSearch(location.search);
@@ -2990,12 +3083,14 @@ export class AppController extends Reactive {
       // 설정에서 나오거나 탭이 바뀌어 돌아올 때도 상세 칸은 닫힌 채로 연다(setView와 같다). 열어 둔 설정은 그대로 두고 이번만 닫는다.
       if (view !== 'settings') this.detailOpen = false;
     }
+    if (shared) { this.detailOpen = true; this.selectedId = isNoticeId(shared) ? shared : null; }
     this.handoffInboxOpen();
   };
 
   /** 목록 조건(보기, 게시판, 키워드, 필터, 정렬)이 바뀌면 상세 칸은 닫힌 채로 새 목록을 보여 준다.
    *  첫 공지가 저절로 열려 읽은 글로 오해되지 않게 하며, 사용자가 정해 둔 열림 설정(remember)은 건드리지 않고 이번만 닫는다. */
   listChanged() {
+    this.sharedDetail = null;
     this.selectedId = null;
     this.detailOpen = false;
   }
@@ -3084,7 +3179,7 @@ export class AppController extends Reactive {
   }
 
   onKey(event: KeyboardEvent) {
-    if (this.inboxOpen) return;
+    if (!this.authReady || this.gated || this.inboxOpen) return;
     const target = event.target as Element | null;
     // 첫 로그인 설정 창이 떠 있으면 Esc는 그 창이 처리한다(뒤쪽 화면이 같이 닫히지 않게).
     if (this.needsOnboarding()) return;
@@ -3115,6 +3210,7 @@ export class AppController extends Reactive {
     if (event.key === '?') { event.preventDefault(); this.shortcutsOpen = true; return; }
     if (this.view === 'settings' && event.key === 'Escape' && !this.shortcutsOpen) { event.preventDefault(); this.leaveSettings(); return; }
     if (this.view === 'settings' || this.shortcutsOpen) return;
+    if (event.key === 'Escape' && this.sharedDetail) { this.closeSharedDetail(); return; }
     if (event.key === 'Escape' && this.isWide && this.detailOpen && this.shownId) { this.setDetail(false); return; }
     // 단추나 링크에 포커스가 있으면 Enter는 그 요소의 기본 동작에 맡긴다.
     if (event.key === 'Enter' && target?.closest(INTERACTIVE)) return;
@@ -3124,6 +3220,7 @@ export class AppController extends Reactive {
       const next = list[Math.max(0, Math.min(list.length - 1, index + step))];
       if (!next) return;
       this.clearDeepLink();
+      this.sharedDetail = null;
       this.selectedId = next.id;
       if (this.isWide) { this.setDetail(true); this.markRead(next); }
       this.updateComplete.then(() => qsel(`[data-id="${CSS.escape(next.id)}"]`)?.scrollIntoView({ block: 'nearest' }));
@@ -3151,6 +3248,8 @@ export class AppController extends Reactive {
     if (event.ctrlKey || event.metaKey || event.shiftKey) return;
     event.preventDefault();
     this.clearDeepLink();
+    if (this.sharedDetail && this.shownId === notice.id) { this.closeSharedDetail(); return; }
+    this.sharedDetail = null;
     if (this.isWide) {
       if (this.detailOpen && this.shownId === notice.id) { this.setDetail(false); return; }
       this.selectedId = notice.id; this.setDetail(true); return;
@@ -3309,6 +3408,7 @@ export class AppController extends Reactive {
   }
 
   private detailIsOpen(id: string): boolean {
+    if (this.sharedDetail === id) return this.view !== 'settings';
     return this.view !== 'settings' && (this.isWide ? this.detailOpen && this.shownId === id : this.openedId === id);
   }
 

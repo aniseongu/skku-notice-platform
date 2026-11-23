@@ -12,9 +12,12 @@ const sources = [
   { id: school, name: '성대 공지' },
   { id: shared, name: '미구독 게시판' },
   { id: 'external-intern', name: '외부 인턴', external: true },
+  { id: 'linkareer', name: '링커리어', external: true },
+  { id: 'jasoseol', name: '자소설닷컴', external: true },
+  { id: 'skku-career-intern', name: '학생인재개발팀 인턴 게시판' },
   { id: 'skku-coop', name: '현장실습', external: true, coop: true },
 ];
-const plainNotice = (id, source_id, title) => ({
+export const plainNotice = (id, source_id, title) => ({
   id, source_id, article_no: id.split('/')[1], title, url, posted_on: new Date().toISOString().slice(0, 10), pinned: false,
   deadline: null, first_seen: null,
 });
@@ -43,6 +46,7 @@ export async function fastEntryFixture(page, options = {}) {
   const requests = [];
   const opportunities = new Map();
   const saved = options.saved ?? new Map();
+  const subscriptions = new Map();
   const summaries = new Map();
   const settings = { ...options };
   await page.addInitScript(({ session, key, onboarded }) => {
@@ -89,7 +93,11 @@ export async function fastEntryFixture(page, options = {}) {
           result = [plainNotice(sharedId, shared, sharedTitle)];
           break;
         }
-        if (!id) { result = [first, extra]; break; }
+        if (!id) {
+          if (settings.feedGate) await settings.feedGate;
+          result = [first, extra, ...(settings.additionalNotices ?? [])];
+          break;
+        }
         const body = id === first.id ? '목록 공지 본문이에요.' : sharedBody;
         result = [{ id, body, body_html: `<p>${body}</p>`, attachments: [], images: [], fetched_at: new Date().toISOString() }];
         break;
@@ -97,11 +105,11 @@ export async function fastEntryFixture(page, options = {}) {
       case 'get_public_notice': {
         const [board] = arguments_.p_id.split('/');
         const source = sources.find((entry) => entry.id === board);
-        if (!source) break;
+        if (!source || settings.missingIds?.includes(arguments_.p_id)) break;
         const title = settings.english ? 'Scholarship Program Application Details' : board === shared ? sharedTitle : `${source.name} 공고`;
         const body = settings.english ? 'Applications are open for the scholarship program.' : sharedBody;
-        result = [{ ...plainNotice(arguments_.p_id, board, title), source_name: source.name, external: source.external === true,
-          body, body_html: `<p>${body}</p>` }];
+        result = [{ ...plainNotice(arguments_.p_id, board, title), source_name: source.name, external: source.external === true, coop: source.coop === true,
+          deadline: settings.publicDeadline ?? null, body, body_html: `<p>${body}</p>`, attachments: settings.attachments ?? [] }];
         break;
       }
       case 'user_profiles': result = onboarded ? [{
@@ -109,7 +117,20 @@ export async function fastEntryFixture(page, options = {}) {
         military_service: '해당 없음', onboarded_at: '2026-01-01', university_3p_internship_selected: !!settings.graduation,
         university_3p_internship_done: false,
       }] : []; break;
-      case 'user_source_subscriptions': result = [{ source_id: school }]; break;
+      case 'user_source_subscriptions': {
+        const account = arguments_?.user_id ?? owner;
+        const current = subscriptions.get(account) ?? new Set([school]);
+        subscriptions.set(account, current);
+        if (method === 'POST') {
+          if (settings.subscriptionGate) await settings.subscriptionGate;
+          if (settings.subscriptionError) return route.fulfill({ status: 400, headers, json: { message: 'fixture subscription failed' } });
+          current.add(arguments_.source_id);
+          break;
+        }
+        if (method === 'DELETE') { current.delete(requestUrl.searchParams.get('source_id')?.slice(3)); break; }
+        result = [...current].map((source_id) => ({ source_id }));
+        break;
+      }
       case 'user_byok_keys': result = hasKey ? [{ key_hint: 'demo', model: 'fixture', used_today: 0 }] : []; break;
       case 'user_ai_preferences': result = [{ ai_enabled: true }]; break;
       case 'user_notice_summaries': {
@@ -123,7 +144,9 @@ export async function fastEntryFixture(page, options = {}) {
       case 'user_notice_judgments': {
         if (id && settings.infoGate) await settings.infoGate(owner);
         if (!id && columns === 'notice_id,deadline,deadline_kind' && settings.deadlinesGate) await settings.deadlinesGate;
-        result = id && settings.judgmentOnly ? [{ verdict: 'maybe', reason: '판정 이유예요.', model: 'fixture' }] : [];
+        if (settings.unrelatedId && columns.includes('verdict') && (!id || id === settings.unrelatedId)) {
+          result = [{ notice_id: settings.unrelatedId, verdict: 'not_relevant', reason: '내 조건에 맞지 않아요.', model: 'fixture' }];
+        } else result = id && settings.judgmentOnly ? [{ verdict: 'maybe', reason: '판정 이유예요.', model: 'fixture' }] : [];
         break;
       }
       case 'user_notice_translations': {
@@ -169,5 +192,5 @@ export async function fastEntryFixture(page, options = {}) {
     if (Array.isArray(result) && request.headers().accept?.includes('vnd.pgrst.object')) result = result[0] ?? null;
     return route.fulfill({ headers, json: result });
   });
-  return { requests, settings, opportunities };
+  return { requests, settings, opportunities, subscriptions };
 }

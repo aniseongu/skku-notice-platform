@@ -1,65 +1,118 @@
-// 비로그인 공유 미리보기: ?notice=<id>로 들어온 사람이 그 공지 한 건만 본다. 목록·검색·다른 공지로 가는 길은 없다.
-// 로그인 유도는 아래에서 올라오는 시트(설치·알림 패널과 같은 방식). 규칙은 스킬 share-deeplink-preview.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { AppController } from './app-controller';
+import { TABS, type AppController } from './app-controller';
 import { APP_NAME } from './brand';
-import { safeUrl, todayKst } from './data';
+import { todayKst } from './data';
+import { isInternshipNotice } from './graduation-assessment';
+import { isInAppBrowser } from './install-hint';
 import { LoginStatus } from './login-screen';
-import { BOTTOM_SHEET_CARD, BOTTOM_SHEET_MOTION, BOTTOM_SHEET_PADDING, HEADER_ICON_BUTTON, SHEET_GHOST_BUTTON, SHEET_SOLID_BUTTON, SOLID_BUTTON, SETTINGS_ACTION } from './cls';
+import { NoticeExample } from './notice-example';
+import { BOTTOM_SHEET, BOTTOM_SHEET_MOTION, BOTTOM_SHEET_PADDING, HEADER_ICON_BUTTON, NOTE_TEXT, SETTINGS_ACTION, SHEET_GHOST_BUTTON, SHEET_SOLID_BUTTON } from './cls';
+import { Brand, DESKTOP_GRID, DesktopDetail, Icon, NoticeSidebar, ReadingHeader, SaveButton, ShareButton, SharedNoticeEmpty, SHARED_COLUMNS, THREE_COLUMNS, TOPBAR } from './notice-layout';
 
-const Glyph = ({ name }: { name: string }) => <svg className="size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href={`icons/sprite.svg#${name}`} /></svg>;
+const dismissKey = 'platform:shared-login-dismissed';
+const benefits = '마감 3일 전과 하루 전에 알려 드리고, 관심 게시판의 새 공지도 바로 알려 드려요';
+const reasons = {
+  all: '로그인하면 내 게시판 공지를 모아 볼 수 있어요',
+  intern: '로그인하면 인턴 공고를 한곳에서 볼 수 있어요',
+  coop: '로그인하면 모집 중인 현장실습을 볼 수 있어요',
+  saved: '로그인하면 저장한 공지를 모아 볼 수 있어요',
+};
+
+function signInDismissed(): boolean {
+  try { return sessionStorage.getItem(dismissKey) === '1'; }
+  catch { return false; }
+}
+
+function SignInAction({ app, focusTarget }: { app: AppController; focusTarget: React.RefObject<HTMLElement | null> }) {
+  const [help, setHelp] = useState(false);
+  const ua = navigator.userAgent;
+  const inApp = isInAppBrowser(ua);
+  const kakaoAndroid = inApp && /Android/i.test(ua) && /KAKAOTALK/i.test(ua);
+  const actionClass = `${SHEET_SOLID_BUTTON} disabled:opacity-60`;
+  if (kakaoAndroid) return <a ref={(node) => { focusTarget.current = node; }} className={`${actionClass} no-underline`}
+    href={`kakaotalk://web/openExternal?url=${encodeURIComponent(location.href)}`}>브라우저에서 열기</a>;
+  return <>
+    <button ref={(node) => { focusTarget.current = node; }} type="button" className={actionClass} disabled={app.authBusy}
+      aria-expanded={inApp ? help : undefined} aria-busy={app.authBusy}
+      onClick={() => { if (inApp) setHelp((open) => !open); else void app.signIn(); }}>
+      {inApp ? '브라우저에서 열기' : app.authBusy ? 'Google로 이동하고 있어요' : 'Google로 계속하기'}
+    </button>
+    {inApp && help ? <p className={`${NOTE_TEXT} mt-[8px]`} role="status">앱 메뉴에서 ‘다른 브라우저로 열기’를 눌러 주세요.</p> : null}
+    {app.authError ? <p className="m-0 mt-[8px] text-[14px] text-danger" role="alert">{app.authError}</p> : null}
+  </>;
+}
 
 export function NoticePreview({ app }: { app: AppController }) {
-  const [sheet, setSheet] = useState(true);
-  const primary = useRef<HTMLButtonElement>(null);
+  const [sheet, setSheet] = useState(() => !signInDismissed());
+  const [pickedTab, setPickedTab] = useState<(typeof TABS)[number]['id'] | null>(null);
+  const primary = useRef<HTMLElement>(null);
   const reopen = useRef<HTMLButtonElement>(null);
   const moveFocus = useRef(false);
-  const changeSheet = (open: boolean) => { moveFocus.current = true; setSheet(open); };
+  const desktop = app.shareWide;
+  const close = () => {
+    moveFocus.current = true;
+    try { sessionStorage.setItem(dismissKey, '1'); } catch { /* 저장할 수 없어도 이번 화면은 닫는다. */ }
+    setSheet(false);
+  };
+  const askSignIn = () => {
+    if (desktop || sheet) { primary.current?.focus({ preventScroll: false }); return; }
+    moveFocus.current = true;
+    setSheet(true);
+  };
   useLayoutEffect(() => {
-    if (!moveFocus.current) return;
+    if (!moveFocus.current || desktop) return;
     moveFocus.current = false;
     (sheet ? primary : reopen).current?.focus({ preventScroll: true });
-  }, [sheet]);
+  }, [sheet, desktop]);
   useEffect(() => {
-    if (!sheet || app.preview.status !== 'ready') return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') changeSheet(false); };
+    if (desktop || !sheet) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') close(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sheet, app.preview.status]);
+  }, [desktop, sheet]);
+
   const state = app.preview;
   if (state.status === 'idle' || state.status === 'loading') return <LoginStatus />;
-  if (state.status === 'error' || !state.data) return <div className="flex min-h-dvh flex-col items-center justify-center gap-[16px] bg-bg px-[24px] text-center">
-    <p className="m-0 text-[15px] leading-[22px] text-ink-2" role="alert">공지를 불러오지 못했어요</p>
-    <button type="button" className={SOLID_BUTTON} onClick={() => { void app.loadPreview(); }}>다시 불러오기</button>
-  </div>;
-  const { notice, source, body } = state.data;
-  return <div className="notice-preview min-h-dvh bg-bg">
-    <header className="glass sticky top-0 z-[2] flex items-center gap-[8px] border-b border-line pt-[calc(10px_+_env(safe-area-inset-top))] pr-[var(--gutter)] pb-[10px] pl-[var(--gutter)] min-[720px]:px-[24px]">
-      <svg className="size-[32px] flex-none" aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg>
-      <span className="min-w-0 flex-1 truncate text-[17px] font-bold tracking-[-0.02em] text-ink">{APP_NAME}</span>
-      <button type="button" className={HEADER_ICON_BUTTON} aria-label="저장하기" title="저장하기" onClick={() => { if (sheet) primary.current?.focus({ preventScroll: true }); else changeSheet(true); }}><Glyph name="bookmark" /></button>
-      <button type="button" className={HEADER_ICON_BUTTON} aria-label="공유하기" title="공유하기" onClick={() => { void app.share(notice); }}><Glyph name={app.linkCopied ? 'check' : 'share'} /></button>
-    </header>
-    <main className={`mx-auto w-full max-w-[680px] px-[var(--gutter)] pt-[16px] min-[720px]:pt-[24px] ${sheet ? 'pb-[calc(240px+env(safe-area-inset-bottom))]' : 'pb-[calc(72px+env(safe-area-inset-bottom))]'}`}>
-      <notice-detail-screen model={{ notice, source, today: todayKst(), body, interests: [], ai: null, rule: null, notified: false, retry: () => { void app.loadPreview(); } }} />
-      <a className="mt-[12px] inline-flex min-h-[44px] items-center rounded-md px-0 text-[15px] font-medium text-ink-2 underline underline-offset-4 active:bg-hover [@media(hover:hover)]:hover:bg-hover min-[1080px]:ml-[32px]" href={safeUrl(notice.url)} target="_blank" rel="noopener noreferrer">원문 열기</a>
+  const data = state.data;
+  const tab = pickedTab ?? (data?.coop ? 'coop' : data?.external ? 'intern' : 'all');
+  const actions = data ? <><SaveButton app={app} notice={data.notice} onSave={askSignIn} /><ShareButton app={app} notice={data.notice} /></> : null;
+  const detail = data ? <notice-detail-screen model={{
+    notice: data.notice, source: data.source, body: data.body, today: todayKst(), interests: [], ai: null, rule: null, notified: false, coop: data.coop,
+    retry: () => { void app.loadPreview(); },
+    guest: { onSignIn: askSignIn, graduation: isInternshipNotice(data.notice, data.external || data.coop) },
+  }} /> : <SharedNoticeEmpty guest failed={state.status === 'error'} onAction={state.status === 'error' ? () => { void app.loadPreview(); } : app.leavePreview} />;
+
+  if (desktop) return <div className={`app notice-preview ${DESKTOP_GRID} ${THREE_COLUMNS} ${SHARED_COLUMNS}`}>
+    <NoticeSidebar tabs={TABS} active={tab} onPick={setPickedTab} />
+    <main className="list-pane min-h-0 overflow-y-auto border-r border-line bg-surface">
+      <header className={TOPBAR}><h1 className="text-[21px] leading-[28px]">{TABS.find((item) => item.id === tab)?.label}</h1></header>
+      <section aria-label="로그인 안내" className="mx-auto w-full max-w-[440px] p-[24px] min-[1080px]:pt-[40px]">
+        <NoticeExample idPrefix="shared-login" />
+        <p className="m-0 mt-[20px] text-[16px] leading-[24px] font-medium text-ink break-keep" aria-live="polite">{pickedTab ? reasons[tab] : benefits}</p>
+        <SignInAction app={app} focusTarget={primary} />
+      </section>
     </main>
-    {sheet ? <section className={`login-sheet ${BOTTOM_SHEET_CARD} ${BOTTOM_SHEET_PADDING} ${BOTTOM_SHEET_MOTION} min-[720px]:pb-[20px]`} aria-label="로그인 안내">
+    <DesktopDetail shown shared header={<>
+      <button className={HEADER_ICON_BUTTON} type="button" aria-label="상세 칸 닫기" onClick={app.leavePreview}><Icon name="close" /></button>
+      <div className="detail-actions flex gap-[8px]">{actions}</div>
+    </>}>{detail}</DesktopDetail>
+  </div>;
+
+  return <div className="notice-preview min-h-dvh bg-bg">
+    <ReadingHeader onBack={app.leavePreview} backLabel="뒤로 가기" actions={actions ?? <Brand className="size-[28px] text-accent" />} />
+    <main className={`reading px-[var(--gutter)] pt-[16px] ${sheet ? 'pb-[calc(310px+env(safe-area-inset-bottom))]' : 'pb-[calc(68px+env(safe-area-inset-bottom))]'}`}>{detail}</main>
+    {sheet ? <section className={`login-sheet z-[4] ${BOTTOM_SHEET} ${BOTTOM_SHEET_PADDING} ${BOTTOM_SHEET_MOTION}`} aria-label="로그인 안내">
       <div className="flex items-start gap-[12px]">
         <img src="icon-192.png" alt="" className="size-[48px] flex-none rounded-md border border-line" />
         <div className="min-w-0 flex-1 pt-[2px]">
-          <p className="m-0 text-[18px] leading-[25px] font-bold text-ink">로그인하고 공지를 저장해요</p>
-          <p className="m-0 mt-[4px] text-[15px] leading-[22px] text-ink-2 break-keep">저장한 공지의 마감 알림도 받을 수 있어요</p>
-          {app.authError ? <p className="m-0 mt-[8px] text-[14px] leading-[21px] text-danger" role="alert">{app.authError}</p> : null}
+          <p className="m-0 text-[18px] leading-[25px] font-bold text-ink">{data ? '로그인하고 이 공지를 저장해요' : '로그인하고 다른 공지를 봐요'}</p>
+          <p className="m-0 mt-[4px] text-[15px] leading-[22px] text-ink-2 break-keep">{benefits}</p>
         </div>
       </div>
-      <button ref={primary} type="button" className={`${SHEET_SOLID_BUTTON} disabled:opacity-60`} disabled={app.authBusy} aria-busy={app.authBusy} onClick={() => { void app.signIn(); }}>
-        {app.authBusy ? 'Google로 이동하고 있어요' : 'Google로 로그인'}
-      </button>
-      <button type="button" className={SHEET_GHOST_BUTTON} onClick={() => changeSheet(false)}>다음에 할게요</button>
-    </section> : <div className={`login-bar ${BOTTOM_SHEET_CARD} flex items-center justify-between gap-[12px] px-[20px] pt-[4px] pb-[calc(4px+env(safe-area-inset-bottom))] min-[720px]:pb-[4px]`}>
-      <p className="m-0 text-[14px] font-medium text-ink">저장한 공지의 마감 알림도 받아요</p>
-      <button ref={reopen} type="button" className={`${SETTINGS_ACTION} flex-none underline underline-offset-4`} onClick={() => changeSheet(true)}>로그인</button>
+      <SignInAction app={app} focusTarget={primary} />
+      <button type="button" className={SHEET_GHOST_BUTTON} onClick={close}>다음에 할게요</button>
+    </section> : <div className={`login-bar z-[4] ${BOTTOM_SHEET} flex items-center justify-end px-[20px] pb-[env(safe-area-inset-bottom)]`}>
+      <button ref={reopen} type="button" className={`${SETTINGS_ACTION} underline underline-offset-4`} onClick={askSignIn}>로그인</button>
     </div>}
   </div>;
 }

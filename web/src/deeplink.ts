@@ -28,21 +28,26 @@ export function withoutNotice(href: string): string {
   return url.href;
 }
 
-export interface PublicNotice { notice: Notice; source: string; external: boolean; body: NoticeBody }
+export interface PublicNotice { notice: Notice; source: string; external: boolean; coop: boolean; body: NoticeBody }
 
 interface PublicRow {
   id: string; source_id: string; source_name: string; external: boolean | null; title: string; category: string | null;
   url: string; posted_on: string; deadline: string | null; body: string | null; body_html: string | null;
+  attachments?: unknown; coop?: boolean;
 }
 
 export function publicRowToNotice(row: PublicRow): PublicNotice {
   const article = row.id.slice(row.id.indexOf('/') + 1);
   return {
     source: row.source_name, external: row.external === true,
+    coop: row.coop ?? row.source_id === 'skku-coop',
     notice: { id: row.id, source_id: row.source_id, article_no: article, title: row.title, category: row.category, url: row.url,
       posted_on: row.posted_on, pinned: false, deadline: row.deadline, first_seen: null },
     body: { version: 1, id: row.id, summary: null, body: row.body, body_html: row.body_html, body_status: 'ready',
-      attachments: [], images: [], body_from_image: false, fetched_at: new Date().toISOString() },
+      attachments: Array.isArray(row.attachments) ? row.attachments.flatMap((file) =>
+        file && typeof file.name === 'string' && typeof file.url === 'string' && /^https?:\/\//i.test(file.url)
+          ? [{ name: file.name, url: file.url, type: typeof file.type === 'string' ? file.type : undefined, size: typeof file.size === 'string' ? file.size : null }] : []) : [],
+      images: [], body_from_image: false, fetched_at: new Date().toISOString() },
   };
 }
 

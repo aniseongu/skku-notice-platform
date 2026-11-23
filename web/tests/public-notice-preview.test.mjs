@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 
-const ALLOWED = ['id', 'source_id', 'source_name', 'external', 'title', 'category', 'url', 'posted_on', 'deadline', 'body', 'body_html'].sort();
+const ALLOWED = ['id', 'source_id', 'source_name', 'external', 'title', 'category', 'url', 'posted_on', 'deadline', 'body', 'body_html', 'attachments', 'coop'].sort();
 
 test('public notice preview reads one notice by id without opening the tables', async () => {
   const db = new PGlite();
@@ -26,10 +26,15 @@ test('public notice preview reads one notice by id without opening the tables', 
     await db.exec(await readFile(new URL('../../supabase/migrations/20261118110000_public_notice_preview.sql', import.meta.url), 'utf8'));
     // 두 번 적용해도 된다(멱등)
     await db.exec(await readFile(new URL('../../supabase/migrations/20261118110000_public_notice_preview.sql', import.meta.url), 'utf8'));
+    const shareSql = await readFile(new URL('../../supabase/migrations/20261123130000_public_notice_share_fields.sql', import.meta.url), 'utf8');
+    await db.exec(shareSql);
+    await db.exec(shareSql);
     await db.exec(`insert into platform_sources(id,name,url) values ('school','학교','https://www.skku.edu/notice');
       insert into platform_notices(id,source_id,article_no,title,url,posted_on,first_seen,body,body_html,deadline)
       values ('school/1','school','1','공지','https://www.skku.edu/n?1','2026-11-01',now(),'본문','<p>본문</p>','2026-12-01'),
              ('school/2','school','2','만료','https://www.skku.edu/n?2','2026-11-01',now(),'x','x',null);
+      update platform_notices set attachments = '[{"name":"안내.pdf","url":"https://www.skku.edu/file","internal":"discard"},{"name":"위험","url":"javascript:alert(1)"}]'
+       where id='school/1';
       update platform_notices set expires_at = now() - interval '1 day' where id='school/2';
       insert into platform_sources(id,name,url,external,coop) values ('skku-coop','현장실습','https://tollgate.skku.edu/x',true,true);
       insert into platform_notices(id,source_id,article_no,title,url,posted_on,first_seen,body,body_html)
@@ -42,6 +47,8 @@ test('public notice preview reads one notice by id without opening the tables', 
     assert.equal(r.rows[0].title, '공지');
     assert.equal(r.rows[0].source_name, '학교');
     assert.equal(r.rows[0].external, false);
+    assert.equal(r.rows[0].coop, false);
+    assert.deepEqual(r.rows[0].attachments, [{ name: '안내.pdf', url: 'https://www.skku.edu/file' }]);
     // 표는 직접 못 읽는다
     await assert.rejects(db.exec('select * from platform_notices'), /permission denied/);
     await assert.rejects(db.exec('select * from platform_sources'), /permission denied/);
@@ -49,7 +56,7 @@ test('public notice preview reads one notice by id without opening the tables', 
     assert.equal((await db.query(`select * from public.get_public_notice('school/999')`)).rows.length, 0);
     assert.equal((await db.query(`select * from public.get_public_notice('school/2')`)).rows.length, 0);
     // 현장실습(coop)도 미리보기에 포함한다(사용자 결정)
-    assert.equal((await db.query(`select * from public.get_public_notice('skku-coop/7')`)).rows.length, 1);
+    assert.equal((await db.query(`select coop from public.get_public_notice('skku-coop/7')`)).rows[0].coop, true);
     // 잘못된 입력은 거절
     for (const bad of ['', 'school', 'school/1 or 1=1', "school/1'--", 'School/1', 'school/a', `s/${'1'.repeat(200)}`, '../etc/1']) {
       await assert.rejects(db.query('select * from public.get_public_notice($1)', [bad]), /invalid notice id/, bad);

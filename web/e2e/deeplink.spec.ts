@@ -38,7 +38,7 @@ async function mockAuth(page: Page, user: string | null, long = false, fresh = f
 }
 const open = (page: Page, search: string) => page.goto(`/?api=sample/api/v1${search}`);
 const login = (page: Page) => page.getByRole('button', { name: 'Google로 계속하기' });
-const signIn = (page: Page) => page.getByRole('button', { name: 'Google로 로그인' });
+const signIn = login;
 
 test('without ?notice= a signed-out visitor sees the login screen and the preview code never runs', async ({ page }) => {
   await mockAuth(page, null);
@@ -48,39 +48,22 @@ test('without ?notice= a signed-out visitor sees the login screen and the previe
   expect(await page.evaluate(() => (window as unknown as { __rpc: unknown[] }).__rpc)).toEqual([]);
 });
 
-test('with ?notice= a signed-out visitor sees only that notice and the login sheet, with no way to the list', async ({ page }) => {
+test('the shared body is public and OAuth returns to that same notice', async ({ page }) => {
   await mockAuth(page, null);
   await open(page, '&notice=skku-notice01%2F777');
-  const sheet = page.getByRole('region', { name: '로그인 안내' });
+  const panel = page.getByRole('region', { name: '로그인 안내' });
   await expect(page.getByRole('heading', { name: '공유받은 장학 안내' })).toBeVisible();
   await expect(page.getByText('공유 본문입니다')).toBeVisible();
-  await expect(sheet).toBeVisible();
-  await expect(sheet).toContainText('저장한 공지의 마감 알림도 받을 수 있어요');
+  await expect(panel).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __rpc: unknown[] }).__rpc)).toEqual([['get_public_notice', { p_id: 'skku-notice01/777' }]]);
   expect(await page.evaluate(() => (window as unknown as { __byokChecks: number }).__byokChecks)).toBe(0);
-  // 목록·탭·설정으로 가는 길이 없다
   await expect(page.locator('notice-rows-screen')).toHaveCount(0);
-  await expect(page.getByRole('navigation')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /설정/ })).toHaveCount(0);
-  // 시트를 닫아도 그 공지만 보인다. 낮은 로그인 줄이 남고, 저장을 누르면 다시 올라온다.
-  await sheet.getByRole('button', { name: '다음에 할게요' }).click();
-  await expect(sheet).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: '공유받은 장학 안내' })).toBeVisible();
-  const bar = page.locator('.login-bar').getByRole('button', { name: '로그인', exact: true });
-  await expect(bar).toBeFocused();
-  await bar.click();
-  await expect(signIn(page)).toBeFocused();
-  await page.keyboard.press('Escape');
-  await expect(bar).toBeFocused();
-  await page.getByRole('button', { name: '저장하기' }).click();
-  await expect(sheet).toBeVisible();
-  // 큰 단추 하나로 로그인하고, 복귀 주소에 notice가 남는다
-  await expect(signIn(page)).toHaveCount(1);
   await signIn(page).click();
   const oauth = await page.evaluate(() => (window as unknown as { __oauth: { options: { redirectTo: string } }[] }).__oauth);
   expect(new URL(oauth[0].options.redirectTo).searchParams.get('notice')).toBe('skku-notice01/777');
   await page.evaluate(() => (window as unknown as { __completeOAuth(): void }).__completeOAuth());
-  await expect(sheet).toHaveCount(0);
+  await expect(panel).toHaveCount(0);
   await expect(page.getByRole('heading', { name: '공유받은 장학 안내' })).toBeVisible();
   await expect(page.getByRole('button', { name: '저장하기' })).toBeVisible();
   expect(new URL(page.url()).searchParams.has('notice')).toBe(false);
@@ -94,11 +77,14 @@ test('a malformed id falls back to the plain login screen without any request', 
   expect(await page.evaluate(() => (window as unknown as { __rpc: unknown[] }).__rpc)).toEqual([]);
 });
 
-test('a well-formed id that does not exist shows the login screen with a one-line note', async ({ page }) => {
+test('a missing signed-out notice opens Empty and returns to the normal login screen', async ({ page }) => {
   await mockAuth(page, null);
   await open(page, '&notice=skku-notice01%2F999');
+  await expect(page.getByRole('heading', { name: '공지를 찾을 수 없어요' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '로그인 안내' })).toBeVisible();
+  await page.getByRole('button', { name: '로그인하고 다른 공지 보기' }).click();
   await expect(login(page)).toBeVisible();
-  await expect(page.getByText('공유받은 공지를 찾지 못했어요')).toBeVisible();
+  await expect(page.locator('.notice-preview')).toHaveCount(0);
 });
 
 test('a signed-in user opens the shared notice directly: in the list, and when it is not in the list', async ({ page }, testInfo) => {
@@ -121,8 +107,9 @@ test('a signed-in user opens the shared notice directly: in the list, and when i
 test('a signed-in user sees a note, not a crash, when the shared notice is gone', async ({ page }) => {
   await mockAuth(page, 'a');
   await open(page, '&notice=skku-notice01%2F999');
+  await expect(page.getByRole('heading', { name: '공지를 찾을 수 없어요' })).toBeVisible();
+  await page.getByRole('button', { name: '목록으로 돌아가기' }).click();
   await expect(page.locator('notice-rows-screen a.row').first()).toBeVisible();
-  await expect(page.locator('.toast')).toContainText('공지를 찾지 못했어요');
 });
 
 test('a push link opens the notice while the full feed is still blocked', async ({ page }) => {
@@ -156,7 +143,7 @@ test('a missing push notice reports the result even when the feed never returns'
   });
   try {
     await open(page, '&notice=skku-notice01%2F999&push=1');
-    await expect(page.locator('.toast')).toContainText('공지를 찾지 못했어요');
+    await expect(page.getByRole('heading', { name: '공지를 찾을 수 없어요' })).toBeVisible();
     expect(new URL(page.url()).searchParams.has('notice')).toBe(false);
   } finally { release(); }
 });
@@ -192,21 +179,22 @@ test('the service worker hands an open tab the notice without reloading the page
   }
 });
 
-test('the sheet leaves room for the final line and uses a bottom-right card on desktop', async ({ page }) => {
+test('the final public body line can scroll into view without the signup area covering it', async ({ page }) => {
   await mockAuth(page, null, true);
   await open(page, '&notice=skku-notice01%2F777');
-  const sheet = page.getByRole('region', { name: '로그인 안내' });
-  await expect(sheet).toBeVisible();
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  const last = await page.getByText('마지막 줄이에요').boundingBox();
-  const card = await sheet.boundingBox();
-  expect(last!.y + last!.height).toBeLessThanOrEqual(card!.y);
-  if (page.viewportSize()!.width >= 1080) {
-    const text = await page.getByText('긴 본문 0번째 줄이에요').boundingBox();
-    const open = await page.getByRole('link', { name: '원문 열기' }).boundingBox();
-    expect(Math.abs(open!.x - text!.x)).toBeLessThanOrEqual(1);
-    expect(card!.width).toBeCloseTo(400);
-    expect(page.viewportSize()!.width - card!.x - card!.width).toBeCloseTo(24);
+  const panel = page.getByRole('region', { name: '로그인 안내' });
+  await expect(panel).toBeVisible();
+  const last = page.getByText('마지막 줄이에요');
+  await last.scrollIntoViewIfNeeded();
+  const body = (await last.boundingBox())!;
+  const signup = (await panel.boundingBox())!;
+  if (page.viewportSize()!.width >= 720) {
+    expect(body.x).toBeGreaterThanOrEqual(signup.x + signup.width);
+    await expect(page.locator('.login-sheet')).toHaveCount(0);
+  } else {
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    const final = (await last.boundingBox())!;
+    expect(final.y + final.height).toBeLessThanOrEqual(signup.y);
   }
 });
 

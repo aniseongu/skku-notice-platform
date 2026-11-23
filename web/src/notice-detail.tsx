@@ -8,7 +8,7 @@ import { summaryLines } from './summary-lines';
 import type { GradPart } from './graduation-assessment';
 import { GraduationNotes, GraduationSection, type GraduationModel } from './graduation-assessment-view';
 import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, NOTE_MAX, type OpportunityStatus } from './opportunities';
-import { DETAIL_SECTION, IMAGE_MISSING_CLASS, NOTE_TEXT, SECTION_TITLE, SETTINGS_INPUT, SKELETON_BAR, TEXT_BUTTON, TEXT_BUTTON_BODY } from './cls';
+import { DETAIL_SECTION, IMAGE_MISSING_CLASS, NOTE_TEXT, SECTION_TITLE, SETTINGS_INPUT, SKELETON_BAR, SOLID_BUTTON, TEXT_BUTTON, TEXT_BUTTON_BODY } from './cls';
 import { MoreMenu } from './more-menu';
 import { TeamSection, type TeamModel } from './team-section';
 import { QuestionsSection, type QuestionsModel } from './questions-section';
@@ -18,6 +18,8 @@ export interface NoticeDetailModel {
   notice: Notice;
   source: string;
   saveCount?: number;
+  subscription?: { pending: boolean; onSubscribe: () => void };
+  guest?: { onSignIn: () => void; graduation: boolean };
   today: string;
   body: NoticeBody | null | 'loading';
   /** 내 Gemini 키로 만든 요약(없으면 null) */
@@ -180,8 +182,19 @@ function AiConnectHint({ hint }: { hint: { connect: () => void; dismiss: () => v
   </section>;
 }
 
+function LockedDetailLine({ onClick, children }: { onClick: () => void; children: string }) {
+  return <div className="mt-[8px] border-t border-line pt-[4px]">
+    <button type="button" className={`${TEXT_BUTTON} ${NOTE_TEXT} flex w-full text-[13px]! items-center gap-[8px] text-left underline decoration-ink-3 underline-offset-4`} onClick={onClick}>
+      <svg className="size-[16px] flex-none fill-none stroke-current [stroke-width:1.75]" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" />
+      </svg>
+      {children}
+    </button>
+  </div>;
+}
+
 function NoticeDetail({ model }: { model: NoticeDetailModel }) {
-  const { notice, body, ai, interests } = model;
+  const { notice, body, ai, interests, guest, subscription } = model;
   const loaded = body === 'loading' ? null : body;
   const summary = model.mySummary || loaded?.summary || null;
   const title = cleanTitle(notice.title_ko || notice.title);
@@ -189,29 +202,38 @@ function NoticeDetail({ model }: { model: NoticeDetailModel }) {
   const urgent = !!notice.deadline && !passed && daysLeft(notice.deadline, model.today) <= 3;
   // 인턴십 충족 표시는 아래 "인턴십 요건 확인" 한 곳에서만 말한다(제목 아래와 구역에서 같은 말을 두 번 하지 않는다). 목록 줄에는 구역이 없어 그대로 둔다.
   const hasReason = interests.length > 0 || !!ai || !!model.rule || !!model.pending;
-  return <div className="detail min-[1080px]:px-[32px] min-[1080px]:py-[24px]">
-    <p className="meta flex min-w-0 flex-wrap gap-[6px] mb-[6px] [&>span+span]:before:mr-[6px] [&>span+span]:before:content-['·'] text-[13px] leading-[18px] font-medium text-ink-3"><span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{model.source}</span>{notice.category ? <span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{notice.category}</span> : null}{model.saveCount ? <span>{model.saveCount}명이 저장했어요</span> : null}</p>
+  return <div className="detail min-[720px]:max-[1079px]:px-[16px] min-[720px]:max-[1079px]:py-[16px] min-[1080px]:px-[32px] min-[1080px]:py-[24px]">
+    {subscription ? <div className="share-subscription mb-[6px] flex items-center justify-between gap-[4px] rounded-md bg-sunken px-[8px]">
+      <p className={NOTE_TEXT}>구독하지 않은 게시판이에요</p>
+      <button type="button" className={`${TEXT_BUTTON} shrink-0 font-semibold text-accent! underline underline-offset-4`} disabled={subscription.pending} onClick={subscription.onSubscribe}>이 게시판도 받기</button>
+    </div> : null}
+    <p className="meta flex min-w-0 flex-wrap gap-[6px] mb-[6px] [&>span+span]:before:mr-[6px] [&>span+span]:before:content-['·'] text-[13px] leading-[18px] font-medium text-ink-3"><span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{model.source}</span>{guest ? <span><time dateTime={notice.posted_on}>{koreanDate(notice.posted_on)}</time></span> : null}{notice.category ? <span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{notice.category}</span> : null}{model.saveCount ? <span>{model.saveCount}명이 저장했어요</span> : null}</p>
     <h2 className="detail-title text-[20px] leading-[28px] font-bold tracking-[-0.02em]" title={title}>{title}</h2>
     {notice.title_ko ? <p className="detail-original mt-[4px] text-[13px] leading-[19px] text-ink-3" lang="en">{cleanTitle(notice.title)}</p> : null}
     {hasReason ? <p className="detail-reason mt-[10px] text-[14px] leading-[21px] text-ink-2"><Reason interests={interests} ai={ai} rule={model.rule} pending={model.pending} /></p> : null}
     {notice.deadline ? <p className="detail-deadline mt-[6px] text-[14px] leading-[21px] font-semibold tabular-nums">{notice.deadline_kind ?? '마감'} {deadlineDetail(notice.deadline)} <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''} ml-[6px] text-[14px] leading-[18px] tabular-nums ${passed ? 'font-medium' : 'font-bold'} ${urgent ? 'text-danger' : passed ? 'text-ink-3' : ''}`}>{deadlineText(notice.deadline, model.today)}</span></p> : null}
     {notice.changed_at ? <p className="detail-change mt-[4px] text-[13px] leading-[19px] text-ink-2">{koreanDate(notice.changed_at.slice(0, 10))}에 원문 {notice.change_kind === '제목' ? '제목이' : '본문이'} 바뀌었어요</p> : null}
-    {summary ? <section key={`summary-${notice.id}`} className={`${DETAIL_SECTION} summary`} aria-labelledby="sec-summary"><h3 id="sec-summary" className={SECTION_TITLE}>요약</h3>{summaryLines(summary).map((line, index) => <p className={SUMMARY_P} key={index}>{line}</p>)}</section>
+    {guest ? <LockedDetailLine onClick={guest.onSignIn}>로그인하면 이 공지의 세 줄 요약을 볼 수 있어요</LockedDetailLine>
+      : summary ? <section key={`summary-${notice.id}`} className={`${DETAIL_SECTION} summary`} aria-labelledby="sec-summary"><h3 id="sec-summary" className={SECTION_TITLE}>요약</h3>{summaryLines(summary).map((line, index) => <p className={SUMMARY_P} key={index}>{line}</p>)}</section>
       : model.summarizing ? <SummaryLoading key={`summary-${notice.id}`} />
       : model.aiHint ? <AiConnectHint key={`aihint-${notice.id}`} hint={model.aiHint} />
       : null}
+    {guest?.graduation ? <LockedDetailLine onClick={guest.onSignIn}>로그인하고 인턴십 요건 확인하기</LockedDetailLine> : null}
     {model.graduation ? <GraduationSection key={`grad-${notice.id}`} title={title} model={model.graduation} /> : null}
+    {guest ? <LockedDetailLine onClick={guest.onSignIn}>로그인하고 내 진행 상태 기록하기</LockedDetailLine> : null}
     {model.opportunity ? <OpportunitySection key={`opportunity-${notice.id}`} model={model.opportunity} /> : null}
     {model.team ? <TeamSection key={`team-${notice.id}`} model={model.team} /> : null}
     {body === 'loading' ? <BodyLoading key={`body-${notice.id}`} /> : !loaded ? <><p className={NOTE} role="status">본문을 불러오지 못했어요. 다시 불러오거나 원문을 확인해 주세요</p><button type="button" className="text-button [@media(hover:hover)]:hover:text-ink active:text-ink self-start px-0 py-[10px] border-0 bg-transparent text-ink-2 text-[14px] font-semibold underline underline-offset-[3px]" onClick={model.retry}>본문 다시 불러오기</button></>
       : loaded.translation?.body ? <><section className={`${DETAIL_SECTION} body-text`} aria-label="한국어로 옮긴 본문"><h3 className={SECTION_TITLE}>본문 (한국어로 옮긴 글)</h3><p className={NOTE_BODY}>Gemini 번역이에요. 정확한 내용은 아래 영어 원문을 확인해 주세요</p>{loaded.translation.body.split(/\n+/).filter(Boolean).map((para, index) => <p className={BODY_P} key={index}>{para}</p>)}</section><div className="original-body" lang="en"><Body body={loaded} heading="영어 원문" /></div></> : <Body body={loaded} />}
     {model.coop ? <p className={NOTE}>신청은 톨게이트에 학교 계정으로 로그인한 뒤 할 수 있어요</p> : null}
     {/* 그림에서 읽은 글은 판정에만 쓰고 화면에는 보이지 않는다(틀린 글자가 섞여 있고 그림이 더 정확하다). */}
+    {guest ? <LockedDetailLine onClick={guest.onSignIn}>로그인하고 질문·후기 보기</LockedDetailLine> : null}
     {model.questions ? <QuestionsSection key={model.questions.key} model={model.questions} /> : null}
     {loaded?.attachments?.length ? <section className={DETAIL_SECTION} aria-labelledby="sec-files"><h3 id="sec-files" className={SECTION_TITLE}>첨부 {loaded.attachments.length}개</h3><ul className="attachments m-0 p-0 list-none [&>li+li]:border-t [&>li+li]:border-line">{loaded.attachments.map((file, index) => <li key={index}><a className="file flex items-center gap-[10px] min-h-[48px] text-[14px] text-ink no-underline" href={safeUrl(file.url)} target="_blank" rel="noopener"><span className="file-type flex-none min-w-[40px] px-0 py-[2px] border border-line rounded-[4px] text-[11px] font-semibold text-center text-ink-2">{fileType(file.name, file.type)}</span><span className="file-name flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{file.name}</span>{file.size ? <span className="file-size flex-none text-[12px] text-ink-3 tabular-nums">{file.size}</span> : null}</a></li>)}</ul><p className={NOTE_FIRST}>누르면 학교 공지 사이트의 원본 파일을 받아요</p></section> : null}
-    <dl className="facts m-0 mt-[24px] border-t border-line pt-[4px]" aria-label="글 정보"><div className={FACT}><dt className={FACT_DT}>게시일</dt><dd className="m-0">{koreanDate(notice.posted_on)}</dd></div>
+    {guest ? <a className={`${SOLID_BUTTON} mt-[16px]`} href={safeUrl(notice.url)} target="_blank" rel="noopener noreferrer">원문 보기</a>
+      : <dl className="facts m-0 mt-[24px] border-t border-line pt-[4px]" aria-label="글 정보"><div className={FACT}><dt className={FACT_DT}>게시일</dt><dd className="m-0">{koreanDate(notice.posted_on)}</dd></div>
       {notice.previous_title ? <div className={FACT}><dt className={FACT_DT}>이전 제목</dt><dd className="m-0">{cleanTitle(notice.previous_title)}</dd></div> : null}
-      {model.notified ? <div className={FACT}><dt className={FACT_DT}>알림</dt><dd className="m-0">알림을 보냈어요</dd></div> : null}</dl>
+      {model.notified ? <div className={FACT}><dt className={FACT_DT}>알림</dt><dd className="m-0">알림을 보냈어요</dd></div> : null}</dl>}
     {model.graduation ? <GraduationNotes model={model.graduation} /> : null}
   </div>;
 }

@@ -28,6 +28,7 @@ import { PushSheet, pushSheetShown } from './push-sheet';
 import { subscribeUpdate, updateAvailable } from './app-update';
 import { LoginScreen, LoginStatus } from './login-screen';
 import { NoticePreview } from './notice-preview';
+import { Brand, DESKTOP_GRID, DesktopDetail, Icon, NoticeSidebar, ReadingHeader, SaveButton, ShareButton, SharedNoticeEmpty, SHARED_COLUMNS, SIDE_ITEM, SIDE_ITEM_IDLE, SideItem, THREE_COLUMNS, TOPBAR } from './notice-layout';
 import type { CanvasMode } from './devices';
 import { bodyInterests, withMyDeadline } from './notice-view';
 import './platform-settings';
@@ -51,7 +52,6 @@ const KBD_ON_SOLID = 'border-[color-mix(in_oklch,var(--on-accent)_40%,transparen
 const Kbd = ({ keys, className = '', onSolid = false }: { keys: string[]; className?: string; onSolid?: boolean }) =>
   <span className={`kbd-group inline-flex gap-[4px] ${className}`} aria-hidden="true">{keys.map((key) => <kbd className={`${KBD} ${onSolid ? KBD_ON_SOLID : KBD_IDLE}`} key={key}>{key}</kbd>)}</span>;
 
-const Icon = ({ name }: { name: IconName }) => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href={`icons/sprite.svg#${name}`} /></svg>;
 const BellIcon = () => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>;
 /** 알림함 열기. 로그인한 계정에만 보이고, 안 읽은 알림이 있으면 점 하나만 더한다. */
 function InboxButton({ app, trigger }: { app: AppController; trigger: RefObject<HTMLButtonElement | null> }) {
@@ -73,8 +73,6 @@ function ExploreButton({ app }: { app: AppController }) {
 }
 const GearIcon = () => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" />
   <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>;
-
-const Brand = ({ className = 'brand-mark' }: { className?: string }) => <svg className={className} aria-hidden="true"><use href="icons/sprite.svg#brand" /></svg>;
 
 // 커스텀 엘리먼트 경계의 model은 속성으로 전달한다(React 19는 요소에 있는 속성은 property로 넣는다).
 type ModelElement = { model?: unknown };
@@ -98,7 +96,7 @@ export function NoticeShell({ app }: { app: AppController }) {
   });
 
   if (!app.authReady) return <LoginStatus />;
-  if (app.gated) return app.deepId && app.preview.status !== 'missing' ? <NoticePreview app={app} /> : <LoginScreen app={app} missing={!!app.deepId} />;
+  if (app.gated) return app.deepId ? <NoticePreview app={app} /> : <LoginScreen app={app} />;
   if (app.awaitingProfile() && app.view !== 'settings') return <LoginStatus />;
   // 첫 목록이 준비되기 전의 개수는 계정 정보가 오면 바뀌므로(판정 대기 공지가 빠진다) 보이지 않는다.
   const ready = app.userDataReady();
@@ -114,26 +112,26 @@ export function NoticeShell({ app }: { app: AppController }) {
   const keywordTotals = keywordCounts(keywordScope.filter((notice) => board === 'all' || notice.source_id === board),
     app.keywords, (notice) => app.interests(notice));
   const title = settings ? settingsTitle() : app.keyword ? app.keyword : TABS.find((t) => t.id === app.view)!.label;
-  const selected = settings ? undefined : list.find((n) => n.id === app.selectedId) ?? (app.selectedId ? app.deepShown(app.selectedId) : undefined) ?? (app.isWide ? list[0] : undefined);
+  const shared = app.sharedDetail !== null;
+  const usesDetailPane = app.usesDetailPane;
+  const selected = settings || app.sharedFailure || !usesDetailPane ? undefined : list.find((n) => n.id === app.selectedId) ?? (app.selectedId ? app.deepShown(app.selectedId) : undefined) ?? (usesDetailPane ? list[0] : undefined);
   app.shownId = selected?.id ?? null;
-  const reading = !app.isWide && !settings
-    ? app.notices.find((n) => n.id === app.openedId) ?? list.find((n) => n.id === app.openedId) ?? app.deepShown(app.openedId) : undefined;
+  const readingId = app.sharedDetail ?? app.openedId;
+  const reading = !usesDetailPane && !settings
+    ? list.find((n) => n.id === readingId) ?? app.deepShown(readingId) : undefined;
+  const missing = !settings && app.sharedFailure ? <SharedNoticeEmpty failed={app.sharedDetail === 'error'} onAction={app.closeSharedDetail} /> : null;
+  const mobileReading = !usesDetailPane && (reading || missing);
   // 첫 로그인 설정 창이 떠 있는 동안 뒤쪽 화면은 비활성으로 두어 Tab 키 포커스와 화면 낭독기가 새지 않게 한다.
   const onboarding = app.needsOnboarding();
-  const noDetail = app.isWide && (!app.detailOpen || !selected);
-  const classes = [settings ? 'is-settings' : '', noDetail ? 'no-detail' : '', reading ? 'is-reading' : ''].join(' ');
+  const noDetail = usesDetailPane && (!app.detailOpen || (!selected && !missing));
+  const classes = [settings ? 'is-settings' : '', noDetail ? 'no-detail' : '', mobileReading ? 'is-reading' : ''].join(' ');
   // 1080px 이상에서는 목록·상세 두 칸, 설정이거나 상세를 닫았으면 한 칸이다.
   const oneColumn = settings || noDetail;
 
   return <>
     <div className="wco-bar" aria-hidden="true"><Brand />{APP_NAME}</div>
-    <div className={`app min-[720px]:grid min-[720px]:h-[calc(100dvh-var(--wco-h))] min-[720px]:grid-cols-[248px_minmax(0,1fr)] ${oneColumn ? 'min-[1080px]:grid-cols-[248px_minmax(0,1fr)]' : 'min-[1080px]:grid-cols-[248px_minmax(0,680px)_minmax(400px,1fr)]'} ${classes}`} inert={onboarding}>
-      <aside className="sidebar hidden border-r border-line bg-mica px-[12px] pt-0 pb-[12px] min-[720px]:flex min-[720px]:min-h-0 min-[720px]:flex-col min-[720px]:overflow-y-auto" aria-label="탐색">
-        <div className="pane-head brand min-[720px]:-mx-[12px] min-[720px]:mt-0 min-[720px]:mb-[12px] min-[720px]:flex min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:items-center min-[720px]:gap-[8px] min-[720px]:border-b min-[720px]:border-line min-[720px]:px-[24px] min-[720px]:text-[17px] min-[720px]:font-bold min-[720px]:tracking-[-0.02em] min-[720px]:[&_.brand-mark]:text-accent min-[720px]:[&_.brand-mark]:size-[32px]"><Brand />{APP_NAME}</div>
-        <nav className="side-group flex flex-col gap-[1px]" aria-label="보기">
-          {app.shownTabs().map((t) => <SideItem key={t.id} label={t.label} count={counts[t.id]} active={sidebarTab === t.id}
-            onClick={() => app.openTab(t.id)} shortcut={String(TABS.indexOf(t) + 1)} icon={t.icon} />)}
-        </nav>
+    <div className={`app ${DESKTOP_GRID} ${oneColumn ? '' : THREE_COLUMNS} ${shared && usesDetailPane ? SHARED_COLUMNS : ''} ${classes}`} inert={onboarding}>
+      <NoticeSidebar tabs={app.shownTabs()} counts={counts} active={sidebarTab} onPick={(tab) => app.openTab(tab)} shortcuts>
         {/* 키워드·게시판 묶음은 계정 정보(키워드, 구독)가 온 뒤 한 번에 그린다. 먼저 그리면 늦게 온 항목만큼 길어지며 아래가 밀린다. */}
         {ready ? <>
         <SideGroup app={app} id="keywords" title="관심 키워드" count={keywordTotals.total}>
@@ -152,10 +150,12 @@ export function NoticeShell({ app }: { app: AppController }) {
         <div className="side-foot mt-auto flex flex-col gap-[1px] pt-[12px]">
           <SideItem label="설정" count={null} active={settings && settingsSection !== 'explore' && settingsSection !== 'inbox'} onClick={app.openSettingsHome} />
         </div>
-      </aside>
+      </NoticeSidebar>
 
-      <main className={`list-pane min-[720px]:min-h-0 min-[720px]:overflow-y-auto min-[720px]:bg-surface min-[720px]:pb-[32px] ${app.selecting ? 'max-[719px]:pb-[calc(88px+env(safe-area-inset-bottom))]' : 'max-[719px]:pb-[calc(var(--tabbar-h)+24px+env(safe-area-inset-bottom))] max-[719px]:[notice-app:has(.install-banner)_&]:pb-[calc(380px+env(safe-area-inset-bottom))] max-[719px]:[notice-app:has(.push-sheet)_&]:pb-[calc(300px+env(safe-area-inset-bottom))]'} ${noDetail ? '' : 'min-[1080px]:border-r min-[1080px]:border-line'}`}>
-        {reading ? <ReadingView app={app} notice={reading} /> : <>
+      <main className={`list-pane min-[720px]:min-h-0 min-[720px]:overflow-y-auto min-[720px]:bg-surface min-[720px]:pb-[32px] ${app.selecting ? 'max-[719px]:pb-[calc(88px+env(safe-area-inset-bottom))]' : 'max-[719px]:pb-[calc(var(--tabbar-h)+24px+env(safe-area-inset-bottom))] max-[719px]:[notice-app:has(.install-banner)_&]:pb-[calc(380px+env(safe-area-inset-bottom))] max-[719px]:[notice-app:has(.push-sheet)_&]:pb-[calc(300px+env(safe-area-inset-bottom))]'} ${noDetail ? '' : shared ? 'min-[720px]:border-r min-[720px]:border-line' : 'min-[1080px]:border-r min-[1080px]:border-line'}`}>
+        {reading ? <ReadingView app={app} notice={reading} /> : null}
+        {!usesDetailPane && missing ? <><ReadingHeader onBack={app.closeSharedDetail} />{missing}</> : null}
+        {(!mobileReading || shared) ? <div className={mobileReading ? 'hidden' : 'contents'}>
           <div className="navigation-head contents">
             <header className={`${TOPBAR} ${settings ? TOPBAR_SETTINGS : TOPBAR_FEED}`}>
               {settings ? <button type="button" className={`${HEADER_ICON_BUTTON} narrow-only back -ml-[12px] min-[720px]:hidden!`} aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} onClick={app.backSettings}><Icon name="back" /></button> : null}
@@ -201,33 +201,34 @@ export function NoticeShell({ app }: { app: AppController }) {
             <ViewFilters app={app} />
             <div className="list" aria-live="polite" aria-busy={app.loading}><ListBody app={app} list={list} /></div>
           </>}
-        </>}
+        </div> : null}
       </main>
 
-      <aside className={`detail-pane hidden min-[720px]:min-h-0 min-[720px]:overflow-y-auto min-[1080px]:bg-bg ${oneColumn ? '' : 'min-[1080px]:block'}`} aria-label="공지 상세">
-        <div className="pane-head detail-head min-[720px]:flex min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:items-center min-[720px]:gap-[8px] min-[720px]:border-b min-[720px]:border-line min-[1080px]:justify-between min-[1080px]:pr-[32px] min-[1080px]:pl-[20px] min-[1080px]:[&_:is(.save-button,.share-button)]:size-[36px] [@media(pointer:coarse)]:min-[1080px]:[&_:is(.save-button,.share-button)]:size-[44px] min-[1080px]:[&_:is(.save-button,.share-button)]:rounded-md min-[1080px]:[&_.solid-button]:min-h-[36px] min-[1080px]:[&_.solid-button]:px-[14px] min-[1080px]:[&_.solid-button]:text-[14px] min-[1080px]:[&_.ghost-button]:min-h-[36px] min-[1080px]:[&_.ghost-button]:px-[14px] min-[1080px]:[&_.ghost-button]:text-[14px]">
-          {selected ? <button type="button" className={HEADER_ICON_BUTTON} aria-label="상세 칸 닫기" title="상세 칸 닫기 (Esc)" aria-keyshortcuts="Escape"
-            onClick={() => app.setDetail(false)}><Icon name="close" /></button> : null}
-          {selected ? <div className="detail-actions min-[1080px]:flex min-[1080px]:gap-[8px]">
-            <SaveButton app={app} notice={selected} />
-            <ShareButton app={app} notice={selected} />
-            <a className={SOLID_BUTTON} href={safeUrl(selected.url)} target="_blank" rel="noopener" aria-keyshortcuts="Enter">{openLabel(app, selected)}<Kbd keys={['Enter']} className="ml-[8px]" onSolid /></a></div> : null}
+      <DesktopDetail shown={usesDetailPane && !oneColumn} shared={shared} header={selected && !missing ? <>
+        <button type="button" className={HEADER_ICON_BUTTON} aria-label="상세 칸 닫기" title="상세 칸 닫기 (Esc)" aria-keyshortcuts="Escape"
+          onClick={shared ? app.closeSharedDetail : () => app.setDetail(false)}><Icon name="close" /></button>
+        <div className="detail-actions flex min-w-0 gap-[8px]">
+          <SaveButton app={app} notice={selected} />
+          <ShareButton app={app} notice={selected} />
+          <a className={SOLID_BUTTON} href={safeUrl(selected.url)} target="_blank" rel="noopener" aria-keyshortcuts="Enter">{openLabel(app, selected)}<Kbd keys={['Enter']} className="ml-[8px] max-[1079px]:hidden" onSolid /></a>
         </div>
-        {selected ? <Detail app={app} notice={selected} /> : <p className="detail-note detail-empty m-0 grid min-h-[60%] place-items-center px-[32px] py-[24px] text-[14px] leading-[19px] text-ink-3">공지를 고르면 여기에 보여요</p>}
-      </aside>
+      </> : null}>
+        {usesDetailPane ? missing : null}
+        {selected ? <Detail app={app} notice={selected} /> : null}
+      </DesktopDetail>
     </div>
 
-    <nav className="tabbar glass fixed inset-x-0 bottom-0 z-[3] flex h-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] select-none border-t border-line pb-[env(safe-area-inset-bottom)] [-webkit-user-select:none] min-[720px]:hidden!" aria-label="보기" hidden={settings || Boolean(reading) || app.selecting} inert={onboarding}>
+    <nav className="tabbar glass fixed inset-x-0 bottom-0 z-[3] flex h-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] select-none border-t border-line pb-[env(safe-area-inset-bottom)] [-webkit-user-select:none] min-[720px]:hidden!" aria-label="보기" hidden={settings || Boolean(mobileReading) || app.selecting} inert={onboarding}>
       {app.shownTabs().map((t) => <button type="button" key={t.id} className="flex min-h-[44px] min-w-[44px] flex-1 flex-col items-center justify-center gap-[2px] border-0 bg-transparent text-[13px] leading-[18px] font-semibold text-ink-2 aria-[current=page]:font-bold aria-[current=page]:text-accent" aria-current={app.view === t.id ? 'page' : 'false'}
         onClick={() => app.openTab(t.id)}><Icon name={t.icon} /><span>{t.label}</span></button>)}
     </nav>
     <UpdateBar />
-    {app.authUserId && !onboarding && !settings && !reading && !app.selecting ? <BottomSheets app={app} /> : null}
+    {app.authUserId && !onboarding && !settings && !mobileReading && !app.selecting ? <BottomSheets app={app} /> : null}
     {/* 토스트는 모든 화면 폭에서 아래 가운데(TDS Toast의 아래 위치: 동작 단추를 둘 수 있다). 휴대폰은 탭 바 위, 넓은 화면은 바닥에서 24px. */}
     <div className="toast fixed bottom-[calc(var(--tabbar-h)+16px+env(safe-area-inset-bottom))] left-1/2 min-[720px]:bottom-[24px] z-[4] w-max max-w-[calc(100%-32px)] [transform:translateX(-50%)] rounded-lg border border-line bg-toast px-[20px] py-[14px] text-[15px] leading-[22px] font-medium text-on-toast [box-shadow:var(--shadow-pop)]" role="status" hidden={!app.toast}>{app.toast}{app.toastLink ? <div className="toast-actions flex items-center justify-between gap-[12px]">
       <a className={`${TOAST_ACTION} underline`} href={app.toastLink} target={app.toastLink.startsWith('?') ? '_self' : '_blank'} rel="noopener noreferrer">{app.toastLinkLabel}</a>
       <button type="button" className={`${TOAST_ACTION} min-w-[44px] justify-center border-0 bg-transparent px-[4px] py-0`} onClick={() => { app.toast = ''; app.toastLink = null; }}>닫기</button></div> : null}</div>
-    {app.inboxOpen && !settings && !reading && !onboarding ? <OverlaySheet title="알림함" trigger={inboxTrigger} onClose={app.closeInbox}>
+    {app.inboxOpen && !settings && !mobileReading && !onboarding ? <OverlaySheet title="알림함" trigger={inboxTrigger} onClose={app.closeInbox}>
       <InboxPage overlay model={inboxModel(app, () => app.openSettings('notifications'))} />
     </OverlaySheet> : null}
     {app.shortcutsOpen ? <ShortcutsDialog app={app} /> : null}
@@ -332,26 +333,12 @@ function inboxModel(app: AppController, goNotifications: () => void): InboxModel
 }
 
 // 상단 바. 휴대폰은 위에 붙는 한 줄(홈 목록은 바탕과 같은 면에 선 없음), 720px부터는 64px 머리 줄이다.
-const TOPBAR = 'pane-head topbar glass sticky top-[var(--wco-h)] z-[2] flex items-center gap-[4px] border-b border-line pt-[calc(10px_+_env(safe-area-inset-top))] pr-[4px] pb-[10px] pl-[var(--gutter)] select-none [-webkit-user-select:none] min-[720px]:top-0 min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:gap-[8px] min-[720px]:px-[24px] min-[720px]:py-0';
 const TOPBAR_FEED = 'feed-topbar max-[719px]:relative max-[719px]:top-auto max-[719px]:gap-0 max-[719px]:border-b-0 max-[719px]:bg-bg max-[719px]:pt-[calc(8px_+_env(safe-area-inset-top))] max-[719px]:pr-[4px] max-[719px]:pb-[8px] max-[719px]:pl-[var(--gutter)] max-[719px]:[-webkit-backdrop-filter:none] max-[719px]:[backdrop-filter:none]';
 // 설정은 전체 폭을 쓰므로 닫기 단추는 머리 줄의 오른쪽 끝(내용 오른쪽 끝선)에 둔다.
 const TOPBAR_SETTINGS = '';
 const TOPBAR_TEXT = 'topbar-text min-w-0 flex-1 min-[720px]:min-w-[88px]';
 const TOPBAR_H1 = 'min-[720px]:text-[21px] min-[720px]:leading-[28px]';
 const UPDATED = 'updated text-[13px] leading-[18px] tabular-nums min-[720px]:text-[12px] min-[720px]:leading-[16px]';
-
-// 사이드바(PC 전용) 항목. 현재 항목은 aria-current=page로 표시한다.
-const SIDE_ITEM = 'flex items-center justify-between gap-[8px] min-h-[40px] px-[12px] py-0 border-0 rounded-sm text-[15px] font-medium text-left select-none [-webkit-user-select:none] [@media(pointer:coarse)]:min-h-[44px]';
-const SIDE_ITEM_IDLE = 'bg-transparent [@media(hover:hover)]:hover:bg-hover active:bg-hover';
-const SIDE_ITEM_CURRENT = 'bg-sunken text-ink font-semibold [&_.i]:text-accent';
-
-function SideItem({ label, count, active, onClick, shortcut, ariaLabel, icon }: {
-  label: string; count: number | null; active: boolean; onClick: () => void; shortcut?: string; ariaLabel?: string; icon?: IconName;
-}) {
-  return <button type="button" className={`side-item ${SIDE_ITEM} ${active ? SIDE_ITEM_CURRENT : `text-ink-2 ${SIDE_ITEM_IDLE}`}`} aria-current={active ? 'page' : 'false'} onClick={onClick}
-    aria-label={ariaLabel} aria-keyshortcuts={shortcut} title={shortcut ? `${label} (${shortcut})` : undefined}>
-    <span className="side-label flex min-w-0 items-center gap-[10px] [&_.i]:h-[20px] [&_.i]:w-[20px]">{icon ? <Icon name={icon} /> : null}<span className="overflow-hidden text-ellipsis whitespace-nowrap">{label}</span></span>{count === null ? null : <span className="count text-[14px] text-ink-3 tabular-nums">{count}</span>}</button>;
-}
 
 // 사이드바 묶음은 머리를 눌러 접고 편다. 접은 묶음은 기억한다(사용자 요청 2026-11-03).
 function SideGroup({ app, id, title, count, children }: { app: AppController; id: string; title: string; count?: number; children: ReactNode }) {
@@ -441,7 +428,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
         // 현장실습 탭에서는 모든 줄의 출처가 탭 이름과 같아 알려 주는 게 없으므로 보이지 않는다(저장 탭에서는 보인다).
         const source = app.tab() === 'coop' ? '' : app.sourceName(notice);
         return { notice: rowNotice, source,
-          read: app.isRead(notice), saved: app.isSaved(notice), current: app.isWide && app.detailOpen && app.shownId === notice.id,
+          read: app.isRead(notice), saved: app.isSaved(notice), current: app.sharedDetail === notice.id || (app.isWide && app.detailOpen && app.shownId === notice.id),
           selected: app.selectedReads.includes(notice.id), dim: ai?.verdict === 'not_relevant' && !interests.length,
           status: app.view === 'saved' ? app.statusOf(notice) : undefined,
           interests, ai, rule: app.judgement(notice)?.rule_name ?? null, grad, pending: !ai && !interests.length && !grad.length && app.judgePending(notice) };
@@ -633,19 +620,6 @@ function BoardSelect({ app, toolbar = false }: { app: AppController; toolbar?: b
   </div>;
 }
 
-/** 공유 단추: 휴대폰은 기기의 공유 창(카카오톡·메시지 등), 공유 창이 없는 PC 브라우저는 링크 복사 */
-function ShareButton({ app, notice }: { app: AppController; notice: Notice }) {
-  return <button type="button" className="icon-button share-button grid place-items-center flex-none size-[44px] rounded-md border border-line bg-surface text-ink active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover"
-    aria-label="공유하기" title="공유하기" onClick={() => { void app.share(notice); }}><Icon name={app.linkCopied ? 'check' : 'share'} /></button>;
-}
-
-function SaveButton({ app, notice }: { app: AppController; notice: Notice }) {
-  const saved = app.isSaved(notice);
-  return <button type="button" className="icon-button save-button grid place-items-center flex-none size-[44px] rounded-md border border-line bg-surface text-ink active:bg-sunken aria-pressed:bg-transparent aria-pressed:text-accent disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover" aria-pressed={saved}
-    aria-label={saved ? '저장 지우기' : '저장하기'} title={saved ? '저장 지우기 (S)' : '저장하기 (S)'} aria-keyshortcuts="s"
-    onClick={() => app.toggleSave(notice)}><Icon name={saved ? 'bookmark-on' : 'bookmark'} /></button>;
-}
-
 function Detail({ app, notice }: { app: AppController; notice: Notice }) {
   const judgement = app.judgement(notice);
   app.autoSummary(notice);
@@ -662,6 +636,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
     // 같은 공지 묶음은 글마다 따로 저장되므로, 겹쳐 세지 않게 가장 큰 수를 보인다.
     saveCount: Math.max(...[notice, ...app.mates(notice.id)].map((member) => app.saveCounts.get(member.id) ?? 0)) || undefined,
     notice: shown, source: app.sourceName(notice),
+    subscription: app.showsShareSubscription(notice) ? { pending: app.subscriptionsLoading, onSubscribe: () => { void app.subscribeFromShare(notice); } } : undefined,
     today: todayKst(), body: shownBody, mySummary: mine?.summary ?? null,
     aiHint: app.aiHintShown() ? { connect: () => app.openSettings('keys'), dismiss: () => app.dismissAiHint() } : undefined, summarizing: app.summarizing === notice.id, interests,
     ai: judgement?.ai ?? mine?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
@@ -686,10 +661,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
 /** 휴대폰 앱 안 상세 화면: 뒤로 가기, 상세, 바닥의 원문 열기 */
 function ReadingView({ app, notice }: { app: AppController; notice: Notice }) {
   return <Fragment>
-    <header className={TOPBAR}>
-      <button type="button" className={`${HEADER_ICON_BUTTON} back -ml-[12px]`} aria-label="목록으로" onClick={() => history.back()}><Icon name="back" /></button>
-      <div className={TOPBAR_TEXT}><h1 className={TOPBAR_H1}>공지</h1></div>
-    </header>
+    <ReadingHeader onBack={app.sharedDetail ? app.closeSharedDetail : () => history.back()} />
     <div className="reading px-[var(--gutter)] pt-[16px] pb-[calc(96px+env(safe-area-inset-bottom))]"><Detail app={app} notice={notice} /></div>
     <div className="read-actions glass fixed inset-x-0 bottom-0 z-[3] flex gap-[8px] border-t border-line px-[var(--gutter)] pt-[12px] pb-[calc(12px+env(safe-area-inset-bottom))] [&>*]:flex-1 [&>:is(.save-button,.share-button)]:flex-none">
       <SaveButton app={app} notice={notice} />

@@ -33,12 +33,14 @@ export const MANUAL_INSTALL_HINT: Record<ManualInstallMode, { lead: string; acti
 // 앱 속 브라우저(웹뷰) 표지. 카카오톡, 네이버 앱, 다음 앱, 인스타그램, 페이스북, 라인, 밴드, 링크드인, 트위터.
 const IN_APP = /KAKAOTALK|NAVER\(inapp|DaumApps|Instagram|FBAN|FBAV|FB_IAB|Line\/|BAND\/|LinkedInApp|Twitter/i;
 
+export const isInAppBrowser = (userAgent: string): boolean => IN_APP.test(userAgent) && !/Whale/i.test(userAgent);
+
 export function installMode(userAgent: string, standalone: boolean, hasPrompt: boolean): InstallMode {
   // 설치한 앱으로 열었을 때만 설치 문구를 없앤다(브라우저로 열면 보인다. 이미 설치한 크롬은 설치 창 신호 자체를 주지 않는다).
   if (standalone) return 'none';
   if (hasPrompt) return 'prompt';
   // 앱 속 브라우저는 어떤 OS에서든 설치가 안 되므로 먼저 거른다. 네이버 웨일(WhaleBrowser)은 앱 속 브라우저가 아니다.
-  if (IN_APP.test(userAgent) && !/Whale/i.test(userAgent)) return 'in-app';
+  if (isInAppBrowser(userAgent)) return 'in-app';
   // iPadOS는 데스크톱 Safari처럼 위장하므로 터치 지원 Mac은 따로 확인하지 않고 iPhone·iPad·iPod 표기만 본다.
   if (/iPhone|iPad|iPod/.test(userAgent)) {
     if (/CriOS|EdgiOS/.test(userAgent)) return 'ios-browser';
