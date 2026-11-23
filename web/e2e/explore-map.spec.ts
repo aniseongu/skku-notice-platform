@@ -21,6 +21,20 @@ const entry = (page: Page) => page.getByRole('button', { name: /^탐험 지도/ 
 const recordedAreas = (page: Page) => page.getByRole('list', { name: '영역별 기록' }).getByRole('listitem');
 const emptyAreas = (page: Page) => page.getByRole('region', { name: '아직 기록이 없는 영역' }).getByRole('listitem');
 
+test('settings opens at home after visiting the explore map', async ({ page }, info) => {
+  await setup(page, [{ id: 'x1', title: '하계 인턴 채용', status: 'interested' }]);
+  await entry(page).click();
+  await expect(page).toHaveURL(/section=explore$/);
+  // 모바일 설정 화면에는 톱니가 없으므로 저장 목록의 머리 줄로 돌아간다.
+  if (info.project.name === 'mobile') await page.getByRole('button', { name: '설정 닫기' }).click();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await expect(page).toHaveURL(/\?view=settings$/);
+  await expect(page.getByRole('heading', { name: '내 설정' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '계정' })).toBeVisible();
+  await page.getByRole('button', { name: '설정 닫기' }).click();
+  await expect(page).toHaveURL(/\?tab=saved$/);
+});
+
 test('saved screen shows the header button, one tap opens the map with counts, back returns to the saved screen', async ({ page }, info) => {
   await setup(page, [
     { id: 'x1', title: '하계 인턴 채용', status: 'interested' }, { id: 'x2', title: '신입 채용 공고', status: 'applied' },

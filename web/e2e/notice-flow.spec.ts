@@ -917,17 +917,88 @@ test('settings home puts the daily settings first and groups AI, iCampus and Goo
   await expect(page).toHaveURL(/section=canvas/);
 });
 
-test('settings opened straight from the side menu shortcut closes with one X instead of showing the settings home', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name === 'mobile', '왼쪽 메뉴는 넓은 화면에만 있다');
+test('settings opens at home after leaving the inbox for the notice list', async ({ page }, testInfo) => {
+  const mobile = testInfo.project.name === 'mobile';
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await page.waitForLoadState('networkidle');
+  await withApp(page, { authUserId: 'account-a', onboardingDismissed: true, settingsCapped: true });
+  const settings = page.getByRole('button', { name: '설정', exact: true });
+  const screen = page.locator('platform-settings-screen');
+  await settings.click();
+  await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
+  // 알림함의 종은 목록 머리 줄에 있다.
+  await page.getByRole('button', { name: '설정 닫기' }).click();
+  await page.getByRole('button', { name: /^알림함/ }).click();
+  await expect(page).toHaveURL(/section=inbox$/);
+  // 모바일에서는 설정이 열려 있는 동안 하단 탭이 숨겨진다.
+  if (mobile) await page.getByRole('button', { name: '설정 닫기' }).click();
+  await page.getByRole('navigation', { name: '보기' }).getByRole('button', { name: /성대 공지/ }).click();
+  await expect(page).toHaveURL(/\?tab=all$/);
+  await settings.click();
+  await expect(page).toHaveURL(/\?view=settings$/);
+  await expect(screen.getByRole('heading', { name: '내 설정' })).toBeVisible();
+  await expect(screen.getByRole('heading', { name: '계정' })).toBeVisible();
+});
+
+test('sidebar settings returns home after opening one settings shortcut from another', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '하위 쪽에서 다른 바로가기와 설정을 누를 수 있는 사이드바는 넓은 화면에만 있다');
+  await page.goto('/?api=sample/api/v1');
+  await page.locator('notice-rows-screen a.row').first().waitFor();
+  await withApp(page, { keywords: ['장학금'] });
+  await page.getByRole('button', { name: '키워드 관리하기' }).click();
+  await expect(page).toHaveURL(/section=keywords$/);
+  await page.getByRole('button', { name: '게시판 더 고르기' }).click();
+  await expect(page).toHaveURL(/section=notifications$/);
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await expect(page).toHaveURL(/\?view=settings$/);
+  await expect(page.getByRole('heading', { name: '내 설정' })).toBeVisible();
+  await page.getByRole('button', { name: '설정 닫기' }).click();
+  await expect(page.locator('notice-rows-screen a.row').first()).toBeVisible();
+});
+
+test('direct keyword settings returns to the list after one close, Escape, or browser Back', async ({ page }) => {
   const list = page.locator('notice-rows-screen a.row').first();
   await page.goto('/?api=sample/api/v1');
   await list.waitFor();
-  await page.locator('.side-item.add').first().click();          // 키워드 관리하기(키워드가 없으면 추가하기)
-  await expect(page).toHaveURL(/section=keywords/);
-  await page.getByRole('button', { name: '설정 닫기' }).first().click();
-  await expect(page).not.toHaveURL(/view=settings/);
-  await expect(list).toBeVisible();
-  await expect(page.locator('platform-settings-screen')).toHaveCount(0);
+  for (const close of [
+    () => page.getByRole('button', { name: '설정 닫기' }).click(),
+    () => page.keyboard.press('Escape'),
+    () => page.goBack(),
+  ]) {
+    await page.getByRole('button', { name: '키워드 추가하기', exact: true }).click();
+    await expect(page).toHaveURL(/section=keywords$/);
+    await close();
+    await expect(page).not.toHaveURL(/view=settings/);
+    await expect(list).toBeVisible();
+    await expect(page.locator('platform-settings-screen')).toHaveCount(0);
+  }
+});
+
+test('settings opened from a direct URL can return home and close to the notice list', async ({ page }, testInfo) => {
+  await page.goto('/?view=settings&section=keywords&api=sample/api/v1');
+  if (testInfo.project.name === 'mobile') {
+    await page.getByRole('button', { name: '설정으로 돌아가기' }).click();
+  } else {
+    await page.getByRole('button', { name: '설정', exact: true }).click();
+  }
+  await expect(page).toHaveURL(/\?view=settings$/);
+  await expect(page.getByRole('heading', { name: '내 설정' })).toBeVisible();
+  await page.getByRole('button', { name: '설정 닫기' }).click();
+  await expect(page).toHaveURL(/\?tab=all$/);
+  await expect(page.locator('notice-rows-screen a.row').first()).toBeVisible();
+});
+
+test('settings home closes to the notice list after following a shortcut from a direct URL', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '게시판 바로가기는 PC 사이드바에 있다');
+  await page.goto('/?view=settings&section=keywords&api=sample/api/v1');
+  await page.getByRole('button', { name: '게시판 더 고르기' }).click();
+  await expect(page).toHaveURL(/section=notifications/);
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '내 설정' })).toBeVisible();
+  await page.getByRole('button', { name: '설정 닫기' }).click();
+  await expect(page.locator('notice-rows-screen a.row').first()).toBeVisible();
+  await expect(page).toHaveURL(/\?tab=all$/);
 });
 
 for (const width of [800, 1366]) test(`opening settings from the side menu highlights only settings at ${width}px (tablet and PC), and a view tab click returns to the list`, async ({ page }, testInfo) => {

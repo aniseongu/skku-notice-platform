@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 type App = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-// 서버 없이 컨트롤러와 화면의 실제 연결을 본다. 저장 호출만 기록용으로 바꾼다.
+// 서버 없이 컨트롤러와 화면의 실제 연결을 본다. 기록 변경은 메모리에서 처리한다.
 async function setup(page: Page, patch: Record<string, unknown> = {}) {
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
@@ -18,13 +18,19 @@ async function setup(page: Page, patch: Record<string, unknown> = {}) {
       w.saves.push({ id: notice.id, source, ...p });
       const old = app.opportunities.get(notice.id);
       app.opportunities = new Map(app.opportunities).set(notice.id, { notice_id: notice.id, title: 't', url: null, board: null, deadline: null, status: 'interested', note: null, created_at: '', updated_at: '', ...old, ...p });
+      return true;
+    };
+    app.removeOpportunityFor = async (notice: { id: string }) => {
+      const next = new Map(app.opportunities);
+      next.delete(notice.id);
+      app.opportunities = next;
     };
     for (const [key, value] of Object.entries(values)) app[key] = value;
   }, patch);
 }
 const saves = (page: Page) => page.evaluate(() => (window as unknown as { saves: Record<string, unknown>[] }).saves);
 
-test('saved notice: one tap sets the status, keys move it, the memo saves on blur', async ({ page }) => {
+test('saved notice: one tap sets the status, the memo can be edited, and the menu clears the record', async ({ page }) => {
   await setup(page);
   const section = page.getByRole('region', { name: '내 진행 상태' });
   await expect(section).toHaveCount(0);                                    // 저장하기 전에는 없다
@@ -33,29 +39,99 @@ test('saved notice: one tap sets the status, keys move it, the memo saves on blu
   expect(await saves(page)).toEqual([expect.objectContaining({ status: 'interested' })]);   // 저장하면 입력 없이 관심으로 기록된다
   await expect(section.getByRole('radio', { name: '관심 있음' })).toHaveAttribute('aria-checked', 'true');
   await expect(section.getByRole('textbox', { name: '메모' })).toHaveCount(0);   // 메모는 접혀 있다
+  await expect(section.getByText('저장을 해제해도 상태와 메모는 남아요')).toHaveCount(0);
   const prepare = section.getByRole('radio', { name: '준비 중' });
   const box = await prepare.boundingBox();
   expect(box!.height).toBeGreaterThanOrEqual(44);
   await prepare.click();                                                    // 저장한 공지에서 상태 바꾸기: 1탭
   await expect(prepare).toHaveAttribute('aria-checked', 'true');
   expect((await saves(page)).map((s) => s.status)).toEqual(['interested', 'preparing']);
-  await prepare.press('ArrowRight');
-  expect((await saves(page)).length).toBe(2);                                // 방향키는 포커스만 옮긴다
-  await page.keyboard.press('Space');
-  await expect(section.getByRole('radio', { name: '지원함' })).toHaveAttribute('aria-checked', 'true');
-  await section.getByRole('button', { name: '메모 추가' }).click();
+  const addMemo = section.getByRole('button', { name: '메모 남기기' });
+  expect((await addMemo.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await addMemo.click();
   const memo = section.getByRole('textbox', { name: '메모' });
   await expect(memo).toBeFocused();
-  await memo.fill('서류 준비');
+  await memo.fill('서류 준비\n마감 확인');
   await memo.press('Enter');
-  expect((await saves(page)).at(-1)).toMatchObject({ note: '서류 준비' });
+  const memoText = section.getByRole('button', { name: '메모 고치기: 서류 준비 마감 확인' });
+  await expect(memoText).toBeVisible();
+  await expect(memoText).toBeFocused();
+  await expect(memoText).toHaveCSS('font-size', '15px');
+  await expect(memoText).toHaveCSS('white-space', 'pre-wrap');
+  await expect(memo).toHaveCount(0);
+  await memoText.click();
+  await expect(memo).toBeFocused();
+  await expect(memo).toHaveValue('서류 준비\n마감 확인');
+  await memo.fill('제출 준비');
+
+  const menu = section.getByRole('button', { name: '더 보기 메뉴' });
+  expect(await menu.boundingBox()).toMatchObject({ width: 44, height: 44 });
+  await menu.click();                                                       // 편집칸을 벗어나면 저장한다
+  await expect(section.getByRole('button', { name: '메모 고치기: 제출 준비' })).toBeVisible();
+  expect((await saves(page)).at(-1)).toMatchObject({ note: '제출 준비' });
+  const remove = section.getByRole('button', { name: '기록 지우기' });
+  await expect(remove).toBeFocused();
+  await remove.press('Escape');
+  await expect(menu).toBeFocused();
+  await expect(remove).toHaveCount(0);
+  await menu.click();
+  await prepare.focus();
+  await expect(remove).toHaveCount(0);
+  await menu.click();
+  await remove.click();
+  await expect(section.getByText('진행 상태와 메모를 지울까요?')).toBeVisible();
+  await section.getByRole('button', { name: '취소' }).click();
+  await expect(menu).toBeFocused();
+  await expect(prepare).toHaveAttribute('aria-checked', 'true');
+  await menu.click();
+  await remove.click();
+  await section.getByRole('button', { name: '지우기', exact: true }).click();
+  await expect(section.getByRole('radio', { name: '관심 있음' })).toHaveAttribute('aria-checked', 'true');
+  await expect(menu).toHaveCount(0);
+  await expect(addMemo).toBeVisible();
+  await addMemo.click();
+  await memo.press('Enter');                                               // 빈 메모는 접히고 저장되지 않는다
+  await expect(addMemo).toBeFocused();
+  expect((await saves(page)).map((save) => save.note)).toEqual([undefined, undefined, '서류 준비\n마감 확인', '제출 준비']);
   await expect(section).not.toContainText('합격');
   await expect(section).not.toContainText('인증');
+});
+
+test('a slow or failed memo save keeps the draft available for retry', async ({ page }) => {
+  await setup(page);
+  await page.getByRole('button', { name: '저장하기' }).click();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as App;
+    const save = app.saveOpportunityFor;
+    app.saveOpportunityFor = (...args: unknown[]) => new Promise<boolean>((resolve) => {
+      app.finishMemoSave = () => { app.saveOpportunityFor = save; resolve(false); };
+    });
+  });
+  await page.getByRole('button', { name: '메모 남기기' }).click();
+  const memo = page.getByRole('textbox', { name: '메모' });
+  await memo.fill('저장할 메모');
+  await memo.press('Enter');
+  await expect(memo).toHaveValue('저장할 메모');
+  await expect(memo).not.toBeEditable();
+  await page.evaluate(() => (document.querySelector('notice-app') as unknown as App).finishMemoSave());
+  await expect(memo).toBeEditable();
+  await expect(memo).toHaveValue('저장할 메모');
+  await memo.press('Enter');
+  await expect(page.getByRole('button', { name: '메모 고치기: 저장할 메모' })).toBeFocused();
+});
+
+test('saved notice: keyboard navigation saves only on selection, and unsaving keeps the record', async ({ page }) => {
+  await setup(page);
+  await page.getByRole('button', { name: '저장하기' }).click();
+  const section = page.getByRole('region', { name: '내 진행 상태' });
+  await section.getByRole('radio', { name: '관심 있음' }).press('ArrowRight');
+  expect(await saves(page)).toHaveLength(1);
+  await page.keyboard.press('Space');
+  await expect(section.getByRole('radio', { name: '준비 중' })).toHaveAttribute('aria-checked', 'true');
   // 저장을 지워도 기록은 남고 구역도 남는다.
   await page.getByRole('button', { name: '저장 지우기' }).click();
-  await expect(section).toBeVisible();
-  await section.getByRole('button', { name: '상태와 메모 지우기' }).click();
-  await expect(section.getByText('상태와 메모를 지울까요?')).toBeVisible();
+  await expect(section.getByRole('radio', { name: '준비 중' })).toHaveAttribute('aria-checked', 'true');
+  await expect(section.getByRole('button', { name: '더 보기 메뉴' })).toBeVisible();
 });
 
 test('the four status segments fit on one line at 360px with any status selected', async ({ page }) => {
@@ -65,6 +141,7 @@ test('the four status segments fit on one line at 360px with any status selected
   const group = page.getByRole('radiogroup', { name: '내 진행 상태' });
   const labels = ['관심 있음', '준비 중', '지원함', '결과 나옴'];
   await expect(group.getByRole('radio')).toHaveText(labels);
+  await expect(group.locator('svg')).toHaveCount(0);
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
 
   for (const label of labels) {
@@ -82,9 +159,8 @@ test('the four status segments fit on one line at 360px with any status selected
           const range = document.createRange();
           range.selectNode(button.lastChild!);
           const text = range.getBoundingClientRect();
-          const check = button.querySelector('svg')?.getBoundingClientRect();
           return { top, width, height, lines: range.getClientRects().length,
-            fits: text.left >= left && text.right <= right && (!check || (check.left >= left && check.right <= text.left)) };
+            fits: text.left >= left && text.right <= right };
         }),
       };
     });
@@ -138,12 +214,12 @@ async function saveSome(page: Page, count: number, records: Record<number, strin
 }
 const rowStatuses = (page: Page) => page.locator('notice-rows-screen a.row .status-meta').allInnerTexts();
 
-test('a saved notice without a record shows the default status "관심 있음"; the filter menu appears only with two kinds and hides empty ones', async ({ page }) => {
+test('default statuses stay off saved rows but count in the filter menu', async ({ page }) => {
   await setup(page);
-  await saveSome(page, 3);
-  expect(await rowStatuses(page)).toEqual(['관심 있음', '관심 있음', '관심 있음']);          // 기록이 없어도 모두 같은 모양
-  const dots = await page.locator('notice-rows-screen a.row .status-meta > span').evaluateAll((els) => els.map((el) => getComputedStyle(el).backgroundColor));
-  expect(new Set(dots).size).toBe(1);                                                           // 점 색은 하나다
+  await saveSome(page, 3, { 1: 'interested' });
+  const rows = page.locator('notice-rows-screen a.row');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.locator('.status-meta')).toHaveCount(0);                               // 기본값은 기록 유무와 관계없이 숨긴다
   await expect(page.locator('.status-trigger')).toHaveCount(0);                              // 거를 것이 한 종류뿐이면 거르기가 없다
   await expect(page.getByRole('group', { name: '진행 상태로 거르기' })).toHaveCount(0);        // 칩 줄은 없다
   await saveSome(page, 3, { 0: 'applied' });
@@ -152,6 +228,10 @@ test('a saved notice without a record shows the default status "관심 있음"; 
   await trigger.click();
   const menu = page.getByRole('group', { name: '진행 상태 선택' });
   await expect(menu.getByRole('button')).toHaveText(['전체3', '관심 있음2', '지원함1']);     // 0건인 준비 중·결과 나옴은 없다
+  await menu.getByRole('button', { name: /관심 있음/ }).click();
+  await expect(rows).toHaveCount(2);
+  await expect(rows.locator('.status-meta')).toHaveCount(0);
+  await page.getByRole('button', { name: '진행 상태: 관심 있음' }).click();
   await menu.getByRole('button', { name: /지원함/ }).click();
   await expect(page.locator('notice-rows-screen a.row')).toHaveCount(1);
   await expect(page.getByRole('button', { name: '진행 상태: 지원함' })).toHaveClass(/text-accent/);   // 거르는 중에는 글자만 강조색
@@ -169,10 +249,10 @@ test('a saved notice without a record shows the default status "관심 있음"; 
   await expect(page.getByRole('region', { name: '내 진행 상태' })).toHaveCount(0);
 });
 
-test('saved toolbar triggers are at least 44px tall and the row does not overflow at 360px', async ({ page }) => {
+test('saved and reorder row metadata fits on one line at 360px', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 780 });
   await setup(page);
-  await saveSome(page, 3, { 0: 'applied' });
+  await saveSome(page, 5, { 1: 'interested', 2: 'preparing', 3: 'applied', 4: 'result' });
   const bar = page.locator('.saved-options');
   await expect(bar).toBeVisible();
   for (const selector of ['.select-trigger', '.status-trigger', '.sort-trigger']) {
@@ -182,15 +262,43 @@ test('saved toolbar triggers are at least 44px tall and the row does not overflo
   }
   const fits = await bar.evaluate((el) => ({ row: el.scrollWidth <= el.clientWidth + 1, page: document.documentElement.scrollWidth <= window.innerWidth }));
   expect(fits).toEqual({ row: true, page: true });
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  const listMeta = 'notice-rows-screen a.row .meta';
+  const labels = ['결과 나옴', '준비 중', '지원함'];
+  const expectSingleLine = async (selector: string) => {
+    const meta = page.locator(selector);
+    await expect(meta).toHaveCount(5);
+    await expect(meta.locator('.status-meta')).toHaveCount(3);
+    expect((await meta.locator('.status-meta').allInnerTexts()).sort()).toEqual(labels);
+    for (const line of await meta.all()) {
+      const layout = await line.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const status = element.querySelector('.status-meta')?.getBoundingClientRect();
+        return {
+          height: box.height,
+          statusAtStart: !status || (status.left === box.left && status.right <= box.right),
+          pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
+        };
+      });
+      expect(layout).toEqual({ height: 18, statusAtStart: true, pageOverflow: 0 });
+    }
+    const dots = await meta.locator('.status-meta > span').evaluateAll((elements) =>
+      elements.map((dot) => getComputedStyle(dot).backgroundColor));
+    expect(new Set(dots).size).toBe(1);
+  };
+  await expectSingleLine(listMeta);
+  await page.getByRole('button', { name: /^정렬:/ }).click();
+  await page.getByRole('button', { name: '순서 바꾸기' }).click();
+  await expectSingleLine('.saved-reorder li > span > span:first-child');
 });
 
-test('the detail shows the same default status as the list for a saved notice without a record', async ({ page }) => {
+test('the detail shows the default status for a saved notice without a record', async ({ page }) => {
   await setup(page);
   await saveSome(page, 2);
   await page.locator('notice-rows-screen a.row').first().click();
   const section = page.getByRole('region', { name: '내 진행 상태' });
   await expect(section.getByRole('radio', { name: '관심 있음' })).toHaveAttribute('aria-checked', 'true');
-  await expect(section.getByRole('button', { name: '상태와 메모 지우기' })).toHaveCount(0);   // 기록 행이 없으니 지울 것도 없다
+  await expect(section.getByRole('button', { name: '더 보기 메뉴' })).toHaveCount(0);          // 기록 행이 없으니 지울 것도 없다
   expect(await saves(page)).toEqual([]);                                                     // 보기만 해서는 서버에 쓰지 않는다
 });
 

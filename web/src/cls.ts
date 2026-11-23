@@ -50,17 +50,18 @@ export const DANGER_BUTTON = 'ghost-button danger-button [@media(hover:hover)]:h
 export const DEVICE_ACTION = 'ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex min-h-[36px] items-center justify-center self-start rounded-md border border-line bg-surface px-[12px] py-0 text-[14px] font-medium text-ink-2 whitespace-nowrap select-none [@media(pointer:coarse)]:min-h-[44px] disabled:opacity-60';
 
 /** 글자 단추 1종(눌림 44px). 구역 안의 보조 동작(지우기·취소·더 보기)에 쓴다. 위험한 동작은 TEXT_BUTTON_DANGER. */
-export const TEXT_BUTTON = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[14px] font-medium text-ink-2 disabled:text-ink-3';
-export const TEXT_BUTTON_DANGER = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] py-0 text-[14px] font-semibold text-danger disabled:text-ink-3';
+const TEXT_BUTTON_BASE = 'rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover min-h-[44px] cursor-pointer border-0 bg-transparent px-[8px] disabled:text-ink-3';
+export const TEXT_BUTTON = `${TEXT_BUTTON_BASE} py-0 text-[14px] font-medium text-ink-2`;
+export const TEXT_BUTTON_DANGER = `${TEXT_BUTTON_BASE} py-0 text-[14px] font-semibold text-danger`;
+/** 눌러서 수정하는 본문 글. */
+export const TEXT_BUTTON_BODY = `${TEXT_BUTTON_BASE} py-[8px] text-left text-[15px] font-normal text-ink whitespace-pre-wrap [overflow-wrap:anywhere]`;
 /** 구역·카드 안의 안내 한 줄(13px). 구역 제목(13px ink-3)보다 진하되 크지 않다. */
 export const NOTE_TEXT = 'm-0 text-[13px] leading-[19px] text-ink-2';
 /** 고르는 칩(상태·인원 등 하나를 고르는 것). 고른 것은 채움이 아니라 중립 면+굵기+체크다. aria-checked로 정한다. */
 export const OPTION_CHIP = 'inline-flex min-h-[44px] items-center justify-center gap-[4px] rounded-pill border border-line bg-surface px-[14px] py-0 text-[14px] font-medium text-ink-2 [@media(hover:hover)]:[&:hover:not([aria-checked=true])]:bg-hover active:[&:not([aria-checked=true])]:bg-hover aria-checked:border-ink-3 aria-checked:bg-sunken aria-checked:font-semibold aria-checked:text-ink';
-/** 선택 칩 안의 체크 표시(14px) */
-export const OPTION_CHECK = 'size-[14px] flex-none fill-none stroke-current [stroke-width:2.25] [stroke-linecap:round] [stroke-linejoin:round]';
 /** 접히는 구역의 머리 한 줄(제목 ··· 현재 값 ⌄). h3 안에 넣는 단추다. */
 export const COLLAPSE_HEAD = '[@media(hover:hover)]:hover:bg-hover active:bg-hover -mx-[8px] flex min-h-[44px] w-[calc(100%+16px)] items-center justify-between gap-[8px] rounded-sm border-0 bg-transparent px-[8px] py-0 text-left text-[13px] font-semibold text-ink-3';
-/** 저장 목록 줄의 상태 표시(메타 줄의 글자 한 요소). 기본 상태는 연하게, 직접 고른 상태는 굵게 한다. */
+/** 저장 목록 메타 줄에서 직접 고른 진행 상태를 한 줄로 표시한다. */
 export const STATUS_META = 'status-meta inline-flex flex-none items-center gap-[5px] whitespace-nowrap';
 /** 상태 점 색은 하나다(색으로 상태를 가르지 않는다). 직접 고른 상태는 글자 굵기로 구분한다. */
 export const STATUS_DOT = 'bg-[light-dark(var(--text-3),oklch(0.85_0.01_var(--h)))]';

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { BADGE, COLLAPSE_HEAD, DETAIL_SECTION, GHOST_BUTTON, NOTE_TEXT, OPTION_CHIP, SECTION_TITLE, SETTINGS_INPUT, SOLID_BUTTON, TEXT_BUTTON, TEXT_BUTTON_DANGER } from './cls';
+import { BADGE, COLLAPSE_HEAD, DETAIL_SECTION, GHOST_BUTTON, NOTE_TEXT, OPTION_CHIP, SECTION_TITLE, SETTINGS_INPUT, SOLID_BUTTON, TEXT_BUTTON } from './cls';
+import { MoreMenu } from './more-menu';
 import { BODY_MAX, formatAverage, validateExperience, validateQuestionBody, type Experience, type ExperienceInput, type Experiences, type Question, type Stars } from './questions';
 
 export interface ReviewDraft { satisfaction: Stars | null; learning: Stars | null; difficulty: Stars | null; participated: boolean; body: string }
@@ -112,46 +113,15 @@ function QuestionForm({ model, parentId, onDone, label, post }: { model: Questio
 }
 
 function Actions({ model, mine, postId, noun, onEdit, hidden = false }: { model: QuestionsModel; mine: boolean; postId: string; noun: '후기' | '질문' | '답'; onEdit?: () => void; hidden?: boolean }) {
-  const [stage, setStage] = useState<'menu' | 'remove' | 'report' | 'block' | null>(null);
-  const container = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const open = stage !== null;
-  useEffect(() => {
-    if (!open) return;
-    const closeOutside = (event: PointerEvent) => {
-      if (!container.current?.contains(event.target as Node)) setStage(null);
-    };
-    document.addEventListener('pointerdown', closeOutside);
-    return () => document.removeEventListener('pointerdown', closeOutside);
-  }, [open]);
-  const close = () => { trigger.current?.focus(); setStage(null); };
   const target = noun === '후기' ? '후기를' : `${noun}을`;
-  const actions = {
-    remove: { label: '지우기', question: `이 ${target} 지울까요?`, run: model.remove },
-    report: { label: '신고하기', question: `이 ${target} 신고할까요?`, run: model.report },
-    block: { label: '차단하기', question: '이 작성자를 차단할까요?', run: model.block },
-  };
-  const action = stage && stage !== 'menu' ? actions[stage] : null;
-  const choices = mine ? ['remove'] as const : ['report', 'block'] as const;
-  return <div ref={container} className="relative -my-[8px] -mr-[8px] ml-auto shrink-0 self-start"
-    onBlur={(event) => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setStage(null); }}
-    onKeyDown={(event) => { if (open && event.key === 'Escape') { event.stopPropagation(); close(); } }}>
-    <button type="button" ref={trigger} className={`${TEXT_BUTTON} grid size-[44px] place-items-center`} aria-label="더 보기 메뉴" aria-expanded={open}
-      onClick={() => open ? close() : setStage('menu')}>
-      <span className="text-[20px] leading-none" aria-hidden="true">⋯</span>
-    </button>
-    {open ? <div className="absolute top-full right-0 z-10 grid min-w-[112px] gap-[2px] rounded-md border border-line bg-surface p-[4px] shadow-lg">
-      {action ? <div key={stage} role="group" aria-label={action.label} className="grid w-[184px] gap-[2px]">
-        <p className="m-0 px-[8px] pt-[6px] text-[13px] text-ink-2">{action.question}</p>
-        <div className="flex flex-wrap">
-          <button type="button" className={TEXT_BUTTON_DANGER} disabled={model.busy} onClick={() => { close(); void action.run(postId); }}>{action.label}</button>
-          <button type="button" className={TEXT_BUTTON} autoFocus onClick={close}>취소</button>
-        </div>
-      </div> : <>{mine && !hidden && onEdit ? <button type="button" className={`${TEXT_BUTTON} text-left`} autoFocus disabled={model.busy} onClick={() => { setStage(null); onEdit(); }}>수정하기</button> : null}
-        {choices.map((choice, index) => <button type="button" key={choice} className={`${TEXT_BUTTON} text-left`}
-        autoFocus={(!mine || hidden || !onEdit) && index === 0} disabled={model.busy} onClick={() => setStage(choice)}>{actions[choice].label}</button>)}</>}
-    </div> : null}
-  </div>;
+  const actions = mine ? [
+    ...(!hidden && onEdit ? [{ label: '수정하기', run: onEdit }] : []),
+    { label: '지우기', confirm: { question: `이 ${target} 지울까요?`, label: '지우기' }, run: () => model.remove(postId) },
+  ] : [
+    { label: '신고하기', confirm: { question: `이 ${target} 신고할까요?`, label: '신고하기' }, run: () => model.report(postId) },
+    { label: '차단하기', confirm: { question: '이 작성자를 차단할까요?', label: '차단하기' }, run: () => model.block(postId) },
+  ];
+  return <MoreMenu className="-my-[8px] -mr-[8px] self-start" actions={actions} busy={model.busy} />;
 }
 
 function ReviewBody({ text }: { text: string }) {

@@ -7,19 +7,20 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import type { AppController } from './app-controller';
 import { boardName, cleanTitle, type Notice } from './data';
-import { STATUS_DOT, STATUS_META } from './cls';
-import { OPPORTUNITY_LABELS } from './opportunities';
+import { REORDER_META, REORDER_META_SPAN, SavedRowStatus } from './notice-rows';
+import type { OpportunityStatus } from './opportunities';
 
-export interface ReorderItem { id: string; title: string; source: string; tags: string; read: boolean; status?: keyof typeof OPPORTUNITY_LABELS }
+export interface ReorderItem { id: string; title: string; source: string; tags: string; read: boolean; status?: OpportunityStatus }
 
 function Row({ item, keyboardIndex, onKeyboard, onKeyboardBlur }: { item: ReorderItem; keyboardIndex?: number; onKeyboard: (id: string, event: React.KeyboardEvent<HTMLButtonElement>) => void; onKeyboardBlur: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   return <li ref={setNodeRef} data-notice-id={item.id} style={{ transform: CSS.Transform.toString(transform), transition, order: keyboardIndex }}
     className={`flex min-h-[56px] items-center gap-[12px] rounded-md border bg-surface py-[14px] pr-[6px] pl-[16px] ${isDragging ? 'relative z-10 border-accent shadow-pop' : 'border-line'}`}>
     <span className="min-w-0 flex-1">
-      <span className={`mb-[2px] flex min-w-0 flex-wrap gap-x-[6px] text-[13px] leading-[18px]`}>
-        {item.status ? <span className={`${STATUS_META} ${item.status === 'interested' ? 'font-normal' : 'font-semibold text-ink-2'}`}><span className={`size-[6px] rounded-full ${STATUS_DOT}`} aria-hidden="true"></span>{OPPORTUNITY_LABELS[item.status]}</span> : null}
-        {item.source ? <span className="min-w-0 [overflow-wrap:anywhere]">{item.source}</span> : null}{item.tags ? <span className="min-w-0 [overflow-wrap:anywhere]">{item.tags}</span> : null}
+      <span className={REORDER_META}>
+        <SavedRowStatus status={item.status} />
+        {item.source ? <span className={REORDER_META_SPAN}>{item.source}</span> : null}
+        {item.tags ? <span className={REORDER_META_SPAN}>{item.tags}</span> : null}
       </span>
       <span className={`reorder-title line-clamp-2 text-[16px] leading-[23px] ${item.read ? 'font-normal text-ink-2' : 'font-semibold'} min-[720px]:text-[15px] min-[720px]:leading-[22px]`}>{item.title}</span>
     </span>

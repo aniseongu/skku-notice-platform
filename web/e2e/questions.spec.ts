@@ -98,6 +98,7 @@ test('blocked authors can be listed and unblocked from settings', async ({ page 
   }
   await unblock.click();
   await expect(pageBody.getByText('차단한 작성자가 없어요')).toBeVisible();
+  await expect(pageBody.getByText('차단을 해제하면 이 작성자의 글이 다시 보여요')).toHaveCount(0);
 });
 
 test('reopening settings waits for an in-flight unblock', async ({ page }) => {

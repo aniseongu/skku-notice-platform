@@ -1,13 +1,14 @@
 import { Reason } from './reason';
 import { createRoot, type Root } from 'react-dom/client';
 import { cleanTitle, deadlineDetail, deadlinePassed, deadlineText, daysLeft, koreanDate, safeUrl, type Notice, type NoticeBody, type Verdict } from './data';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useDelayed } from './ui';
 import { summaryLines } from './summary-lines';
 import type { GradPart } from './graduation-assessment';
 import { GraduationNotes, GraduationSection, type GraduationModel } from './graduation-assessment-view';
 import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, NOTE_MAX, type OpportunityStatus } from './opportunities';
-import { DETAIL_SECTION, IMAGE_MISSING_CLASS, NOTE_TEXT, OPTION_CHECK, SECTION_TITLE, SEGMENTED_GRID, SETTINGS_INPUT, SKELETON_BAR, TEXT_BUTTON, TEXT_BUTTON_DANGER } from './cls';
+import { DETAIL_SECTION, IMAGE_MISSING_CLASS, NOTE_TEXT, SECTION_TITLE, SEGMENTED_GRID, SETTINGS_INPUT, SKELETON_BAR, TEXT_BUTTON, TEXT_BUTTON_BODY } from './cls';
+import { MoreMenu } from './more-menu';
 import { TeamSection, type TeamModel } from './team-section';
 import { QuestionsSection, type QuestionsModel } from './questions-section';
 import { cleanHtml, fileType, IMAGE_MISSING, replaceBrokenImage } from './rich';
@@ -47,15 +48,25 @@ export interface OpportunityModel {
   note: string;
   hasRecord: boolean;
   onStatus: (status: OpportunityStatus) => void;
-  onNote: (note: string) => void;
+  onNote: (note: string) => Promise<boolean>;
   onRemove: () => void;
 }
 
 
-/** 내 진행 상태는 한 번에 바꾸고 메모는 한 줄로 적는다. */
 function OpportunitySection({ model }: { model: OpportunityModel }) {
-  const [confirming, setConfirming] = useState(false);
-  const [memoOpen, setMemoOpen] = useState(false);   // 메모는 선택이라 접어 둔다. 이미 쓴 메모가 있으면 펼쳐 보인다.
+  const [editingMemo, setEditingMemo] = useState(false);
+  const [savingMemo, setSavingMemo] = useState(false);
+  const returnToMemo = useRef(false);
+  const saveMemo = async (input: HTMLTextAreaElement, fromKeyboard = false) => {
+    if (savingMemo) return;
+    returnToMemo.current = fromKeyboard;
+    const value = input.value.trim();
+    if (value === model.note) { setEditingMemo(false); return; }
+    setSavingMemo(true);
+    const saved = await model.onNote(value);
+    setSavingMemo(false);
+    if (saved) setEditingMemo(false);
+  };
   // 방향키는 포커스만 옮기고, Space·Enter로 고른다(이동마다 저장 요청이 나가지 않게).
   const [cursor, setCursor] = useState<OpportunityStatus | null>(null);
   const focusable = cursor ?? model.status ?? OPPORTUNITY_STATUSES[0];
@@ -70,27 +81,37 @@ function OpportunitySection({ model }: { model: OpportunityModel }) {
     setCursor(OPPORTUNITY_STATUSES[next]);
     buttons[next]?.focus();
   };
-  const memo = !!model.note || memoOpen;
-  const remove = !model.hasRecord ? null : confirming
-    ? <div className="flex flex-wrap items-center gap-[4px]"><span className="mr-[4px] text-[13px] text-ink-2">상태와 메모를 지울까요? 되돌릴 수 없어요</span>
-      <button type="button" className={TEXT_BUTTON_DANGER} onClick={() => { setConfirming(false); model.onRemove(); }}>지우기</button>
-      <button type="button" className={TEXT_BUTTON} onClick={() => setConfirming(false)}>취소</button></div>
-    : <button type="button" className={`${TEXT_BUTTON_DANGER} flex-none`} onClick={() => setConfirming(true)}>상태와 메모 지우기</button>;
   return <section className={`${DETAIL_SECTION} opportunity`} aria-labelledby="sec-opportunity">
-    <h3 id="sec-opportunity" className={`${SECTION_TITLE} !mb-[2px]`}>내 진행 상태</h3>
-    <p className="m-0 mb-[8px] text-[14px] leading-[20px] text-ink-2">저장을 해제해도 상태와 메모는 남아요</p>
-    <div role="radiogroup" aria-labelledby="sec-opportunity" className={`${SEGMENTED_GRID} grid-cols-4`} onKeyDown={move}>
-      {OPPORTUNITY_STATUSES.map((status) => <button type="button" role="radio" key={status} className="inline-flex min-h-[44px]! items-center justify-center gap-[2px] whitespace-nowrap [@media(hover:hover)]:[&:hover:not([aria-checked=true])]:bg-line active:[&:not([aria-checked=true])]:bg-line" aria-checked={model.status === status}
-        tabIndex={status === focusable ? 0 : -1} onClick={() => model.onStatus(status)}>{model.status === status ? <svg className={OPTION_CHECK} aria-hidden="true"><use href="icons/sprite.svg#check" /></svg> : null}{OPPORTUNITY_LABELS[status]}</button>)}
+    <div className="flex min-h-[44px] items-center">
+      <h3 id="sec-opportunity" className={`${SECTION_TITLE} !mb-0`}>내 진행 상태</h3>
+      {model.hasRecord ? <MoreMenu actions={[{
+        label: '기록 지우기',
+        confirm: { question: '진행 상태와 메모를 지울까요?', label: '지우기' },
+        run: model.onRemove,
+      }]} /> : null}
     </div>
-    <div className="mt-[6px] flex flex-wrap items-center gap-x-[8px] gap-y-[4px]">
-    {memo
-      ? <input type="text" autoFocus={!model.note} className={`${SETTINGS_INPUT} min-w-0 flex-1 basis-[160px]`} aria-label="메모" placeholder="메모를 남겨요" maxLength={NOTE_MAX} defaultValue={model.note}
-        onBlur={(event) => { const value = event.currentTarget.value; if (value.trim() !== model.note) model.onNote(value); if (!value.trim()) setMemoOpen(false); }}
-        onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
-      : <button type="button" className="flex min-h-[44px] min-w-0 flex-1 basis-[160px] items-center gap-[8px] rounded-md border border-line bg-surface px-[12px] py-0 text-left text-[15px] font-normal text-ink-3 [@media(hover:hover)]:hover:bg-hover active:bg-hover" onClick={() => setMemoOpen(true)}>
-        <svg className="size-[16px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round]" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>메모 추가</button>}
-    {remove}
+    <div role="radiogroup" aria-labelledby="sec-opportunity" className={`${SEGMENTED_GRID} grid-cols-4`} onKeyDown={move}>
+      {OPPORTUNITY_STATUSES.map((status) => <button type="button" role="radio" key={status} className="min-h-[44px]! whitespace-nowrap text-ink! shadow-none! [@media(hover:hover)]:[&:hover:not([aria-checked=true])]:bg-hover active:[&:not([aria-checked=true])]:bg-hover" aria-checked={model.status === status}
+        tabIndex={status === focusable ? 0 : -1} onClick={() => model.onStatus(status)}>{OPPORTUNITY_LABELS[status]}</button>)}
+    </div>
+    <div className="mt-[6px]">
+      {editingMemo
+        ? <textarea autoFocus rows={Math.max(2, Math.min(4, model.note.split('\n').length))} className={`${SETTINGS_INPUT} block w-full resize-y leading-[22px]`} aria-label="메모" placeholder="메모를 남겨요" maxLength={NOTE_MAX} defaultValue={model.note}
+          readOnly={savingMemo} aria-busy={savingMemo}
+          onBlur={(event) => { void saveMemo(event.currentTarget); }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            void saveMemo(event.currentTarget, true);
+          }} />
+        : <button type="button" ref={(button) => {
+          if (!button || !returnToMemo.current) return;
+          returnToMemo.current = false;
+          button.focus();
+        }} className={model.note ? `${TEXT_BUTTON_BODY} w-full` : `${TEXT_BUTTON} flex items-center gap-[8px] text-left`}
+          aria-label={model.note ? `메모 고치기: ${model.note}` : undefined} onClick={() => setEditingMemo(true)}>
+          {model.note || <><svg className="size-[16px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round]" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>메모 남기기</>}
+        </button>}
     </div>
   </section>;
 }

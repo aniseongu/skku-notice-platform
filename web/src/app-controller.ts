@@ -328,6 +328,8 @@ export class AppController extends Reactive {
   profileError = '';
   // 설정 화면의 하위 쪽(원본과 같은 ?view=settings&section=... 주소). keys=1은 연결 키 쪽이다.
   settingsSection: string | null = settingsSectionFromUrl();
+  private returningToSettingsHome = false;
+  private closingSettings = false;
   onboardingOpen = false;
   onboardingDismissed = false;
   onboardingBusy = false;
@@ -341,7 +343,7 @@ export class AppController extends Reactive {
   // 내 기회함(상태·메모). 계정이 바뀌면 비운다. 표가 없거나 못 불러오면 'unavailable'로 두고 화면에서 숨긴다.
   opportunities = new Map<string, Opportunity>();
   opportunitiesStatus: 'idle' | 'ready' | 'unavailable' | 'failed' = 'idle';   // unavailable: 표 없음, failed: 일시적 오류(다음 새로고침에 다시 시도)
-  private opportunityQueue = new Map<string, Promise<void>>();
+  private opportunityQueue = new Map<string, Promise<unknown>>();
   private opportunitiesLoading = false;
   private exploreSavedStatus: 'idle' | 'ready' | 'failed' = 'idle';
   opportunityFilter: 'all' | OpportunityStatus = 'all';
@@ -1189,7 +1191,7 @@ export class AppController extends Reactive {
   }
 
   /** 같은 공지의 저장·삭제는 줄을 세워 앞 요청이 끝난 뒤 보낸다(늦게 커밋돼 상태가 어긋나거나 삭제한 행이 되살아나지 않게). */
-  private enqueueOpportunity(id: string, work: () => Promise<void>): Promise<void> {
+  private enqueueOpportunity<T>(id: string, work: () => Promise<T>): Promise<T> {
     const next = (this.opportunityQueue.get(id) ?? Promise.resolve()).then(work, work);
     this.opportunityQueue.set(id, next);
     void next.then(() => { if (this.opportunityQueue.get(id) === next) this.opportunityQueue.delete(id); });
@@ -1221,8 +1223,8 @@ export class AppController extends Reactive {
 
   /** 상태·메모를 저장한다. 처음이면 제목·링크·게시판·마감 사본과 함께 만든다. 응답을 받은 뒤에 화면에 반영한다.
    *  ifAbsent: 서버에 이미 행이 있으면 덮지 않는다(저장할 때 자동으로 남기는 '관심'용). */
-  saveOpportunityFor(notice: Notice, source: string, patch: { status?: OpportunityStatus; note?: string | null }, announce = false, ifAbsent = false): Promise<void> {
-    if (!authClient || !this.authUserId) return Promise.resolve();
+  saveOpportunityFor(notice: Notice, source: string, patch: { status?: OpportunityStatus; note?: string | null }, announce = false, ifAbsent = false): Promise<boolean> {
+    if (!authClient || !this.authUserId) return Promise.resolve(false);
     const client = authClient, userId = this.authUserId, epoch = this.subscriptionsEpoch;
     const seq = (this.opportunitySeq.get(notice.id) ?? 0) + 1;
     this.opportunitySeq.set(notice.id, seq);
@@ -1234,14 +1236,16 @@ export class AppController extends Reactive {
           notice_id: notice.id, title: cleanTitle(notice.title_ko || notice.title).slice(0, TITLE_MAX), url,
           board: source ? source.slice(0, 100) : null, deadline: deadlineIso(notice.deadline), ...patch,
         }, same, { ifAbsent });
-        if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
+        if (!this.isCurrentAccount(userId, epoch)) return false;
         // 더 새로운 요청이 줄에 있으면 그 결과가 화면을 정한다.
         if (this.opportunitySeq.get(notice.id) === seq) this.opportunities = new Map(this.opportunities).set(notice.id, saved);
         if (announce && patch.status) this.showToast(`${OPPORTUNITY_LABELS[patch.status]}으로 기록했어요`);
+        return true;
       } catch (error) {
-        if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
+        if (!this.isCurrentAccount(userId, epoch)) return false;
         this.showToast(isLimitReached(error) ? '기록이 너무 많아요. 안 쓰는 기록을 지워 주세요' : '기록을 저장하지 못했어요. 다시 눌러 주세요');
         this.requestUpdate();
+        return false;
       }
     });
   }
@@ -2622,6 +2626,7 @@ export class AppController extends Reactive {
     const entering = view === 'settings' && this.view !== 'settings';
     this.selecting = false; this.selectedReads = [];
     this.view = view;
+    if (entering || view !== 'settings') this.settingsSection = null;
     if (view !== 'settings') this.listTab = view;
     this.openedId = null;
     this.boardMenuOpen = false;
@@ -2630,7 +2635,7 @@ export class AppController extends Reactive {
     this.reordering = false;
     if (view !== 'settings') remember('tab', view);
     // 주소도 보기와 맞춘다. 설정은 기록에 쌓아 뒤로 가기로 닫히고, 탭은 바꿔 써서 새로고침해도 같은 보기가 열린다.
-    if (entering) history.pushState({ view: 'settings', depth: 1 }, '', `${location.pathname}?view=settings`);
+    if (entering) history.pushState({ view: 'settings', depth: 1 }, '', this.settingsUrl(null));
     else if (view !== 'settings') history.replaceState(null, '', `${location.pathname}?tab=${view}`);
     this.selectedId = null;
     // 탭을 옮기면 상세 칸은 닫고 목록만 보여 준다(첫 공지가 저절로 열려 읽은 글로 오해되지 않게). 사용자가 정해 둔 열림 설정은 그대로 두고 이번만 닫는다.
@@ -2675,13 +2680,24 @@ export class AppController extends Reactive {
   /** 사이드바의 "설정": 다른 화면이면 설정 첫 쪽을 열고, 설정의 하위 쪽이면 첫 쪽으로 돌아온다. 첫 쪽이면 그대로 둔다. */
   openSettingsHome = () => {
     if (this.view !== 'settings') { this.setView('settings'); return; }
-    if (!this.settingsSection) return;
+    if (!this.settingsSection || this.returningToSettingsHome) return;
     const depth = this.settingsDepth();
-    if (depth > 1) { history.go(-(depth - 1)); return; }
-    history.replaceState({ view: 'settings', depth: 1 }, '', this.settingsUrl(null));
+    if (depth > 1) {
+      this.returningToSettingsHome = true;
+      history.go(1 - depth);
+      return;
+    }
+    this.replaceWithSettingsHome();
+  };
+
+  private replaceWithSettingsHome() {
+    // 주소로 바로 들어온 경우 X는 이전 브라우저 기록 대신 공지 목록을 연다.
+    const state = this.settingsDepth() > 0 ? { view: 'settings', depth: 1 } : null;
+    history.replaceState(state, '', this.settingsUrl(null));
     this.settingsSection = null;
     window.scrollTo({ top: 0 });
-  };
+    qsel('.list-pane')?.scrollTo({ top: 0 });
+  }
 
   /** 어느 화면에서든 설정의 해당 쪽으로 바로 간다(키워드 관리하기, 게시판 고르기 같은 단축). */
   openSettings(section: string | null) {
@@ -2721,9 +2737,7 @@ export class AppController extends Reactive {
     if (!this.settingsSection) { this.closeSettings(); return; }
     if (history.state?.direct) { this.closeSettings(); return; }
     if (this.settingsDepth() > 1) { history.back(); return; }
-    history.replaceState({ view: 'settings', depth: 1 }, '', this.settingsUrl(null));
-    this.settingsSection = null;
-    window.scrollTo({ top: 0 });
+    this.replaceWithSettingsHome();
   };
 
   // 알림함. 소유자를 적고(남의 항목은 같은 트랜잭션에서 지운다) 읽는다. 로그아웃이면 이전 계정의 보관분만 지운다.
@@ -2782,9 +2796,8 @@ export class AppController extends Reactive {
   /** 설정을 한 번에 닫고 들어오기 전에 보던 보기로 돌아간다. 첫 쪽의 X와 Esc가 쓴다. */
   closeSettings = () => {
     const depth = this.settingsDepth();
-    if (depth > 0) { history.go(-depth); return; }   // 이동이 끝나면 onPopState가 이어서 알림함의 공지를 연다
+    if (depth > 0) { this.closingSettings = true; history.go(-depth); return; }   // 이동이 끝나면 onPopState가 이어서 알림함의 공지를 연다
     const last = normalizeTab(remember('tab'));
-    this.settingsSection = null;
     this.setView(isTab(last) ? last : 'all');
   };
 
@@ -2797,7 +2810,20 @@ export class AppController extends Reactive {
     this.sortMenuOpen = false;
     this.statusMenuOpen = false;
     this.settingsSection = settingsSectionFromUrl();
+    if (this.returningToSettingsHome) {
+      this.returningToSettingsHome = false;
+      // 설정 버튼으로 돌아온 첫 기록이 바로가기 하위 쪽이면 홈으로 바꾼다.
+      if (this.settingsDepth() === 1 && this.settingsSection) this.replaceWithSettingsHome();
+    }
     const params = new URLSearchParams(location.search);
+    if (this.closingSettings) {
+      this.closingSettings = false;
+      if (params.get('view') === 'settings' && this.settingsDepth() === 0) {
+        this.closeSettings();
+        this.handoffInboxOpen();
+        return;
+      }
+    }
     const view: View = params.get('view') === 'settings' ? 'settings'
       : [normalizeTab(params.get('tab')), normalizeTab(remember('tab'))].find(isTab) ?? 'all';
     const requested = params.get('sort');

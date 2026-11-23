@@ -81,7 +81,7 @@ declare module 'react' {
   namespace JSX {
     interface IntrinsicElements {
       'notice-rows-screen': ModelElement & React.HTMLAttributes<HTMLElement>;
-      'notice-detail-screen': ModelElement & React.HTMLAttributes<HTMLElement>;
+      'notice-detail-screen': ModelElement & React.HTMLAttributes<HTMLElement> & React.Attributes;
       'platform-settings-screen': ModelElement & React.HTMLAttributes<HTMLElement>;
     }
   }
@@ -645,7 +645,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
   const hasGrad = gradDetail.length > 0;
   const interests = [...new Set([...app.shownInterests(notice, hasGrad), ...bodyInterests(app.keywords, body, keywordMatches).filter((word) => app.shownInterests(notice, hasGrad).includes(word) || !app.isExternal(notice) || !/^(인턴|인턴십|인턴쉽|intern|internship)$/i.test(word))])];
   const shown = withMyDeadline(notice, mine);
-  return <notice-detail-screen model={{
+  return <notice-detail-screen key={app.authUserId} model={{
     // 같은 공지 묶음은 글마다 따로 저장되므로, 겹쳐 세지 않게 가장 큰 수를 보인다.
     saveCount: Math.max(...[notice, ...app.mates(notice.id)].map((member) => app.saveCounts.get(member.id) ?? 0)) || undefined,
     notice: shown, source: boardName(app.sources.find((source) => source.id === notice.source_id), notice.source_id),
@@ -660,7 +660,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
       const current = app.statusOf(notice) ?? null;
       return { status: current, note: record?.note ?? '', hasRecord: !!record,
         onStatus: (status: OpportunityStatus) => { if (status !== current) void app.saveOpportunityFor(notice, source, { status }, true); },
-        onNote: (note: string) => { void app.saveOpportunityFor(notice, source, { note: note.trim() || null }); },
+        onNote: (note: string) => app.saveOpportunityFor(notice, source, { note: note || null }),
         onRemove: () => { void app.removeOpportunityFor(notice); } };
     })() : undefined,
     grad: gradDetail,
