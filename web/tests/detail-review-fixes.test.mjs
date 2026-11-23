@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
+import test from 'node:test';
+import { setImmediate } from 'node:timers/promises';
+import vm from 'node:vm';
+
+// 반대 리뷰(fe45876..f7d742e) 지적의 컨트롤러 경로 재현. 컨트롤러에서 해당 메서드만 잘라 낸다.
+const source = readFileSync(new URL('../src/app-controller.ts', import.meta.url), 'utf8');
+const method = (start) => source.slice(source.indexOf(start), source.indexOf('\n  }', source.indexOf(start)) + 4);
+const build = (names, globals) => new vm.Script(stripTypeScriptTypes(`(class { ${names.map(method).join('\n')} })`)).runInNewContext(globals);
+
+test('a translation server read that fails before the cache restore does not hide the later cached translation', async () => {
+  const cachedTranslation = { title: '번역 제목', body: '번역 본문' };
+  let resolveRestore;
+  const Controller = build(['  detailTranslation(', '  private refreshDetailTranslation('], {
+    authClient: {}, loadMyTranslation: () => Promise.reject(new Error('offline')),
+  });
+  const app = Object.assign(new Controller(), {
+    authUserId: 'u', subscriptionsEpoch: 1, detailTranslations: new Map(), myTranslations: new Map([['n', {}]]),
+    isCurrentAccount: () => true, requestUpdate() {}, cacheDetail() {},
+    restoreDetail: () => new Promise((resolve) => { resolveRestore = resolve; }),
+  });
+  const notice = { id: 'n', title: 'Intern', title_ko: '인턴' };
+  assert.equal(app.detailTranslation(notice, null), null);
+  await setImmediate();            // 서버 읽기가 먼저 실패한다
+  resolveRestore({ translation: cachedTranslation });
+  await setImmediate();
+  assert.deepEqual(app.detailTranslation(notice, null), cachedTranslation);
+});

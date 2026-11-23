@@ -537,7 +537,8 @@ export class AppController extends Reactive {
   private deadlineRequest = 0;
   private summaryDeadlineWrites = new Map<string, { request: number; deadline: Pick<MyNoticeInfo, 'deadline' | 'deadlineKind'> }>();
   myTranslations = new Map<string, MyTranslationTitle>();
-  private detailTranslations = new Map<string, MyTranslation | null | 'loading'>();
+  /** 'failed'는 서버 조회 실패(늦게 오는 기기 캐시가 채울 수 있다), null은 서버가 확인한 '번역 없음'이다. */
+  private detailTranslations = new Map<string, MyTranslation | null | 'loading' | 'failed'>();
   private translationRequest = 0;
   toastTimer = 0;
   /** 링크를 복사한 직후 잠깐 true: 공유 단추가 체크로 바뀌어 누른 자리에서 결과를 보여 준다 */
@@ -3500,7 +3501,7 @@ export class AppController extends Reactive {
     const userId = this.authUserId;
     if (!authClient || !userId) return null;
     const cached = this.detailTranslations.get(notice.id);
-    if (cached !== undefined) return cached === 'loading' ? null : cached;
+    if (cached !== undefined) return cached === 'loading' || cached === 'failed' ? null : cached;
     const epoch = this.subscriptionsEpoch;
     const original = `${notice.title}
 ${body && body !== 'loading' ? body.body?.slice(0, 2000) ?? '' : ''}`;
@@ -3510,7 +3511,7 @@ ${body && body !== 'loading' ? body.body?.slice(0, 2000) ?? '' : ''}`;
     void this.restoreDetail(notice.id, userId, epoch).then(({ translation }) => {
       if (!this.isCurrentAccount(userId, epoch)) return;
       const value = this.detailTranslations.get(notice.id);
-      if (translation && (value === undefined || value === 'loading')) {
+      if (translation && (value === undefined || value === 'loading' || value === 'failed')) {
         this.detailTranslations.set(notice.id, translation);
         this.requestUpdate();
         if (!known && value === undefined) this.refreshDetailTranslation(notice.id, userId, epoch);
@@ -3529,7 +3530,7 @@ ${body && body !== 'loading' ? body.body?.slice(0, 2000) ?? '' : ''}`;
       this.cacheDetail(id, 'translation', translation);
       this.requestUpdate();
     }, () => {
-      if (this.isCurrentAccount(userId, epoch) && this.detailTranslations.get(id) === 'loading') this.detailTranslations.set(id, null);
+      if (this.isCurrentAccount(userId, epoch) && this.detailTranslations.get(id) === 'loading') this.detailTranslations.set(id, 'failed');
     });
   }
 
