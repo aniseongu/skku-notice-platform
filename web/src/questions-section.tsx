@@ -106,6 +106,7 @@ function QuestionForm({ model, parentId, onDone, label, post }: { model: Questio
       {post ? <p className="m-0 text-[14px] font-semibold text-ink">{label}</p> : null}
       <textarea autoFocus className={AREA} aria-label={label} maxLength={BODY_MAX} value={body} placeholder={parentId ? '아는 만큼 답해 주세요' : '궁금한 점을 적어 주세요'} onChange={(event) => setBody(event.target.value)} />
       {problem ? <p className="m-0 text-[13px] text-danger" role="status">{problem}</p> : null}
+      {post ? null : <p className={NOTE_TEXT}>이름은 보이지 않아요. 학교의 공식 답변은 아니에요</p>}
       <div className="flex gap-[6px]"><button type="submit" className={post ? SOLID_BUTTON : GHOST_BUTTON} disabled={model.busy || !ok}>{post ? '수정 완료' : parentId ? '답 남기기' : '질문하기'}</button>
         <button type="button" className={GHOST_BUTTON} onClick={onDone}>{post ? '취소' : '닫기'}</button></div>
     </fieldset>
@@ -179,7 +180,7 @@ function QuestionItem({ model, question, replies, canReply }: { model: Questions
   </li>;
 }
 
-/** 공고 상세 맨 아래(첨부 위)의 "질문·경험" 구역. 접어 두고 개수만 보인다. 내 글이 있으면 처음부터 펼친다. */
+/** 공고 상세 맨 아래(첨부 위)의 "질문·후기" 구역. 접어 두고 개수만 보인다. 내 글이 있으면 처음부터 펼친다. */
 export function QuestionsSection({ model }: { model: QuestionsModel }) {
   const [open, setOpen] = useState(false);
   const [reviewing, setReviewing] = useState(false);
@@ -202,16 +203,16 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
   return <section className={`${DETAIL_SECTION} qe [&:has([data-qe-editing])_.qe-create]:hidden`} aria-labelledby="sec-qe">
     <h3 id="sec-qe" className={`${SECTION_TITLE} !mb-0`}>
       <button type="button" className={COLLAPSE_HEAD} aria-expanded={open} aria-controls="qe-body" onClick={() => setOpen(!open)}>
-        <span>질문·경험</span><span className="flex items-center gap-[8px] font-medium">{open ? null : summary}
+        <span>질문·후기</span><span className="flex items-center gap-[8px] font-medium">{open ? null : summary}
           <Chevron open={open} /></span></button></h3>
     {/* 접어도 마운트를 유지해 수정 중인 입력이 사라지지 않게 한다. */}
     <div id="qe-body" hidden={!open} className={`mt-[6px] gap-[12px] ${open ? 'grid' : 'hidden'}`}>
       {model.status === 'loading' ? <p className={NOTE_TEXT} role="status">불러오고 있어요</p> : null}
       {model.status === 'failed' ? <><p className={NOTE_TEXT} role="status">질문과 후기를 불러오지 못했어요</p><div><button type="button" className={GHOST_BUTTON} onClick={model.load}>다시 불러오기</button></div></> : null}
       {model.status === 'ready' ? <>
-        {!hasContent && !reviewing && !asking ? <div className="grid gap-[8px]"><p className="m-0 text-[14px] leading-[21px] text-ink-2">아직 남은 글이 없어요. 먼저 궁금한 점을 묻거나 경험을 남겨 봐요</p>
-          <div className="flex flex-wrap gap-[6px]"><button type="button" className={SOLID_BUTTON} onClick={() => setReviewing(true)}>후기 남기기</button>
-            <button type="button" className={`qe-create ${GHOST_BUTTON}`} onClick={() => setAsking(true)}>질문하기</button></div></div> : null}
+        {!hasContent && !reviewing && !asking ? <div className="grid gap-[8px]"><p className="m-0 text-[14px] leading-[21px] text-ink-2">아직 글이 없어요</p>
+          <div className="flex flex-wrap gap-[6px]"><button type="button" className={`qe-create ${GHOST_BUTTON}`} onClick={() => setAsking(true)}>질문하기</button>
+            <button type="button" className={`qe-create ${GHOST_BUTTON}`} onClick={() => setReviewing(true)}>후기 남기기</button></div></div> : null}
 
         {experiences.count || experiences.posts.length || reviewing ? <div className="grid gap-[8px]">
           <h4 className={SUBTITLE}>후기</h4>
@@ -232,7 +233,7 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
             : <div><button type="button" className={`qe-create ${GHOST_BUTTON}`} onClick={() => setAsking(true)}>질문하기</button></div>}
         </div> : null}
         {hasContent && !experiences.count && !experiences.posts.length && !reviewing ? <div><button type="button" className={`qe-create ${GHOST_BUTTON}`} onClick={() => setReviewing(true)}>후기 남기기</button></div> : null}
-        <p className={NOTE_TEXT}>{reviewing && !reviewed ? '' : '이름은 보이지 않아요. '}학교의 공식 답변은 아니에요</p>
+        {hasContent ? <p className={NOTE_TEXT}>학교의 공식 답변은 아니에요</p> : null}
       </> : null}
     </div>
   </section>;

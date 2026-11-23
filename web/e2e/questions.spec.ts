@@ -33,8 +33,8 @@ async function setup(page: Page, otherQuestion = false) {
 
 test('authors can edit their review, question and answer in place', async ({ page }) => {
   await setup(page);
-  const section = page.getByRole('region', { name: /질문·경험/ });
-  await section.getByRole('button', { name: /^질문·경험/ }).click();
+  const section = page.getByRole('region', { name: /질문·후기/ });
+  await section.getByRole('button', { name: /^질문·후기/ }).click();
   await section.getByRole('button', { name: '후기 남기기' }).first().click();
   const reviewForm = section.getByRole('form', { name: '후기 남기기' });
   await reviewForm.getByRole('radio', { name: '업무 만족 4점' }).click();
@@ -125,8 +125,8 @@ test('reopening settings waits for an in-flight unblock', async ({ page }) => {
 
 test('a failed edit preserves the input and can be retried', async ({ page }) => {
   await setup(page);
-  const section = page.getByRole('region', { name: /질문·경험/ });
-  await section.getByRole('button', { name: /^질문·경험/ }).click();
+  const section = page.getByRole('region', { name: /질문·후기/ });
+  await section.getByRole('button', { name: /^질문·후기/ }).click();
   await section.getByRole('button', { name: '질문하기' }).click();
   await section.getByRole('textbox', { name: '질문하기' }).fill('원래 질문');
   await section.getByRole('form', { name: '질문하기' }).getByRole('button', { name: '질문하기' }).click();
@@ -188,13 +188,23 @@ test('a late block list from the previous account is discarded', async ({ page }
 test('empty state, leave a star-only review, ask a question and answer it', async ({ page }) => {
   await setup(page);
   await expect(page.locator('section.qe')).toHaveCount(1);   // 상세에는 구역이 하나만 그려진다
-  const section = page.getByRole('region', { name: /질문·경험/ });
-  const head = section.getByRole('button', { name: /^질문·경험/ });
+  const section = page.getByRole('region', { name: /질문·후기/ });
+  const head = section.getByRole('button', { name: /^질문·후기/ });
   await expect(head).toHaveAttribute('aria-expanded', 'false');   // 기본은 접힌 한 줄
-  await expect(head).toHaveText('질문·경험');
+  await expect(head).toHaveText('질문·후기');
   expect((await head.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await head.click();
-  await expect(section.getByText(/아직 남은 글이 없어요/)).toBeVisible();   // 빈 방처럼 보이지 않게 안내
+  await expect(section.getByText('아직 글이 없어요')).toBeVisible();   // 빈 방처럼 보이지 않게 안내
+  await expect(section.getByText(/이름은 보이지 않아요/)).toHaveCount(0);   // 안내는 글 쓰는 칸 아래에만
+  const buttons = section.getByRole('button', { name: /^(질문하기|후기 남기기)$/ });
+  await expect(buttons).toHaveText(['질문하기', '후기 남기기']);
+  expect((await buttons.nth(0).boundingBox())!.height).toBe((await buttons.nth(1).boundingBox())!.height);
+  await buttons.nth(0).click();   // 1번으로 폼이 열린다
+  const askForm = section.getByRole('form', { name: '질문하기' });
+  await expect(askForm.getByText(/이름은 보이지 않아요/)).toBeVisible();
+  await askForm.getByRole('button', { name: '닫기' }).click();
+  await expect(askForm).toHaveCount(0);
+  await expect(section.getByText('아직 글이 없어요')).toBeVisible();
   await section.getByRole('button', { name: '후기 남기기' }).first().click();
   const form = section.getByRole('form', { name: '후기 남기기' });
   await expect(section.getByText(/이름은 보이지 않아요/)).toHaveCount(1);
@@ -208,7 +218,7 @@ test('empty state, leave a star-only review, ask a question and answer it', asyn
   const review = section.getByRole('listitem').filter({ hasText: '내 후기' });
   expect((await review.boundingBox())!.height).toBeLessThan(70);
   await head.click();
-  await expect(head).toHaveAccessibleName('질문·경험 후기 1');
+  await expect(head).toHaveAccessibleName('질문·후기 후기 1');
   await head.click();
   await expect(section.getByRole('button', { name: '후기 남기기' })).toHaveCount(0);   // 이미 남겼다
 
@@ -221,7 +231,7 @@ test('empty state, leave a star-only review, ask a question and answer it', asyn
   await section.getByRole('button', { name: '답 남기기' }).last().click();
   await expect(section.getByText('금요일까지예요')).toBeVisible();
   await head.click();
-  await expect(head).toHaveAccessibleName('질문·경험 후기 1 · 질문 1');
+  await expect(head).toHaveAccessibleName('질문·후기 후기 1 · 질문 1');
   await head.click();
   await review.getByRole('button', { name: '더 보기 메뉴' }).click();
   await review.getByRole('button', { name: '지우기' }).click();
@@ -232,7 +242,7 @@ test('empty state, leave a star-only review, ask a question and answer it', asyn
 
 test('click budget: report takes three clicks from the card menu through confirmation', async ({ page }) => {
   await setup(page, true);
-  const head = page.getByRole('button', { name: '질문·경험 질문 1' });
+  const head = page.getByRole('button', { name: '질문·후기 질문 1' });
   await head.click();
   const card = page.getByRole('listitem').filter({ hasText: '면접은 언제인가요?' });
   const more = card.getByRole('button', { name: '더 보기 메뉴' });
@@ -255,8 +265,8 @@ test('click budget: report takes three clicks from the card menu through confirm
 
 test('draft survives closing the review form', async ({ page }) => {
   await setup(page);
-  const section = page.getByRole('region', { name: /질문·경험/ });
-  await section.getByRole('button', { name: /^질문·경험/ }).click();
+  const section = page.getByRole('region', { name: /질문·후기/ });
+  await section.getByRole('button', { name: /^질문·후기/ }).click();
   await section.getByRole('button', { name: '후기 남기기' }).first().click();
   const form = section.getByRole('form', { name: '후기 남기기' });
   await form.getByRole('radio', { name: '업무 만족 5점' }).click();
@@ -267,8 +277,8 @@ test('draft survives closing the review form', async ({ page }) => {
 
 test('"더 보기" only appears on long review bodies; star-only review has one submit button', async ({ page }) => {
   await setup(page);
-  const section = page.getByRole('region', { name: /질문·경험/ });
-  await section.getByRole('button', { name: /^질문·경험/ }).click();
+  const section = page.getByRole('region', { name: /질문·후기/ });
+  await section.getByRole('button', { name: /^질문·후기/ }).click();
   await section.getByRole('button', { name: '후기 남기기' }).first().click();
   const form = section.getByRole('form', { name: '후기 남기기' });
   await expect(form.getByText('필수')).toBeVisible();
@@ -291,8 +301,8 @@ test('"더 보기" only appears on long review bodies; star-only review has one 
 
 test('a long review body is clamped and "더 보기" expands it', async ({ page }) => {
   await setup(page);
-  const section = page.getByRole('region', { name: /질문·경험/ });
-  await section.getByRole('button', { name: /^질문·경험/ }).click();
+  const section = page.getByRole('region', { name: /질문·후기/ });
+  await section.getByRole('button', { name: /^질문·후기/ }).click();
   await section.getByRole('button', { name: '후기 남기기' }).first().click();
   const form = section.getByRole('form', { name: '후기 남기기' });
   await form.getByRole('radio', { name: '업무 만족 4점' }).click();
@@ -307,10 +317,10 @@ test('a long review body is clamped and "더 보기" expands it', async ({ page 
 
 test('click budget: review is 4 clicks with no typing, question is 3 clicks plus typing', async ({ page }) => {
   await setup(page);
-  const section = page.getByRole('region', { name: /질문·경험/ });
+  const section = page.getByRole('region', { name: /질문·후기/ });
   let clicks = 0;
   const click = async (locator: ReturnType<typeof section.locator>) => { await locator.click(); clicks += 1; };
-  await click(section.getByRole('button', { name: /^질문·경험/ }));                                  // 1 펼치기
+  await click(section.getByRole('button', { name: /^질문·후기/ }));                                  // 1 펼치기
   await click(section.getByRole('button', { name: '후기 남기기' }).first());                          // 2
   const form = section.getByRole('form', { name: '후기 남기기' });
   await click(form.getByRole('radio', { name: '업무 만족 4점' }));                                    // 3 별점
@@ -328,8 +338,8 @@ test('click budget: review is 4 clicks with no typing, question is 3 clicks plus
 
 test('stale question models cannot mutate after an account or epoch change, and the form remounts', async ({ page }) => {
   await setup(page);
-  const section = page.getByRole('region', { name: /질문·경험/ });
-  await section.getByRole('button', { name: /^질문·경험/ }).click();
+  const section = page.getByRole('region', { name: /질문·후기/ });
+  await section.getByRole('button', { name: /^질문·후기/ }).click();
   await section.getByRole('button', { name: '질문하기' }).click();
   await section.getByRole('textbox', { name: '질문하기' }).fill('계정 A의 글');
   const result = await page.evaluate(async () => {
@@ -349,7 +359,7 @@ test('stale question models cannot mutate after an account or epoch change, and 
     return { calls, changedEpoch, changedUser };
   });
   expect(result).toEqual({ calls: 0, changedEpoch: Array(8).fill(false), changedUser: Array(8).fill(false) });
-  await expect(section.getByRole('button', { name: /^질문·경험/ })).toHaveAttribute('aria-expanded', 'false');
+  await expect(section.getByRole('button', { name: /^질문·후기/ })).toHaveAttribute('aria-expanded', 'false');
   await expect(section.getByRole('textbox')).toHaveCount(0);
 });
 
@@ -378,7 +388,7 @@ test('the shared account epoch reset clears an in-flight question write and disc
 
 test('reading an existing review clears only its own draft', async ({ page }) => {
   await setup(page);
-  await page.getByRole('button', { name: /^질문·경험/ }).click();
+  await page.getByRole('button', { name: /^질문·후기/ }).click();
   const keys = await page.evaluate(() => {
     const controller = (document.querySelector('notice-app') as unknown as App).controller;
     const id = controller.openedId ?? controller.selectedId;
@@ -415,14 +425,14 @@ test('schema cache errors leave the feature available to retry on the next notic
 
 test('a detached reply appears below the unavailable-question message and has no reply button', async ({ page }) => {
   await setup(page);
-  await page.getByRole('button', { name: /^질문·경험/ }).click();
+  await page.getByRole('button', { name: /^질문·후기/ }).click();
   await page.evaluate(() => {
     const controller = (document.querySelector('notice-app') as unknown as App).controller;
     const id = controller.openedId ?? controller.selectedId;
     (window as unknown as { qdb: { questions: unknown[] } }).qdb.questions.push({ id: 'detached', body: '남아 있는 답변', detached: true });
     controller.questionsModel({ id }).load();
   });
-  const section = page.getByRole('region', { name: /질문·경험/ });
+  const section = page.getByRole('region', { name: /질문·후기/ });
   const replies = section.getByRole('list', { name: '답변' });
   await expect(replies).toContainText('남아 있는 답변');
   await expect(replies.locator('xpath=preceding-sibling::p')).toHaveText('원래 질문을 볼 수 없어요');
