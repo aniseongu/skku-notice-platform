@@ -40,7 +40,6 @@ import { isRememberedOnboarded, rememberOnboarded } from './onboarded-flag.ts';
 import type { Subscription } from '@supabase/supabase-js';
 import { dropDuplicates, groupMates } from './dup-notices';
 import type { ExploreItem } from './explore-map';
-import { pickCandidates, type CupNotice } from './worldcup';
 import { orderNotices, type Sort } from './notice-order';
 import { Reactive, defineReactive } from './reactive';
 import { loadPublicNotice, noticeIdFromSearch, noticeLink, withoutNotice, type PublicNotice } from './deeplink';
@@ -92,7 +91,7 @@ export function settingsSectionFromUrl(): string | null {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'keys';
   const section = params.get('section');
-  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile', 'feedback', 'inbox', 'explore', 'worldcup', 'blocks'].includes(section) ? section : null;
+  return section && ['notifications', 'canvas', 'keywords', 'calendar', 'profile', 'feedback', 'inbox', 'explore', 'blocks'].includes(section) ? section : null;
 }
 
 /** 설정 머리의 부제. 쪽마다 그 쪽에서 하는 일을 말한다. */
@@ -107,7 +106,6 @@ export function settingsSubtitle(): string {
     case 'feedback': return '궁금한 점이나 바라는 점을 남겨 주세요';
     case 'inbox': return '이 기기가 받은 알림을 다시 봐요';
     case 'explore': return '기록한 활동이 어느 영역에 있는지 봐요';
-    case 'worldcup': return '공지 둘 중 마음에 드는 쪽을 골라 봐요';
     case 'blocks': return '차단한 작성자를 관리해요';
     default: return '알림과 연결을 정해요';
   }
@@ -116,7 +114,7 @@ export function settingsSubtitle(): string {
 export function settingsTitle(): string {
   const params = new URLSearchParams(location.search);
   if (params.get('keys') === '1') return 'AI 연결';
-  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정', feedback: '문의하기', inbox: '알림함', explore: '탐험 지도', worldcup: '공지 월드컵', blocks: '차단 관리' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
+  return ({ notifications: '알림', canvas: '아이캠퍼스', keywords: '관심 키워드', calendar: '구글 캘린더', profile: '프로필 설정', feedback: '문의하기', inbox: '알림함', explore: '탐험 지도', blocks: '차단 관리' } as Record<string, string>)[params.get('section') ?? ''] ?? '설정';
 }
 
 export interface InstallPrompt extends Event { prompt(): Promise<void> }
@@ -1022,7 +1020,7 @@ export class AppController extends Reactive {
     };
   }
 
-  private async qeRun<T>(noticeId: string, work: (api: QuestionsApi, guard: QuestionsSessionGuard) => Promise<T>, done: string | null, reloadOnError = true): Promise<{ ok: true; value: T } | { ok: false }> {
+  private async qeRun<T>(noticeId: string, work: (api: QuestionsApi, guard: QuestionsSessionGuard) => Promise<T>, done: string | null, reloadOnError = true, followCurrent = false): Promise<{ ok: true; value: T } | { ok: false }> {
     const api = this.qeApi(), userId = this.authUserId, epoch = this.subscriptionsEpoch;
     if (!api || !userId) return { ok: false };
     const guard = this.qeSessionGuard(userId, epoch);
@@ -1032,7 +1030,15 @@ export class AppController extends Reactive {
       if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return { ok: false };
       if (done) this.showToast(done);
       // 다시 불러오기가 끝날 때까지 busy를 유지한다(옛 값으로 수정 폼이 다시 열리지 않게).
-      if (this.qeState.noticeId === noticeId) await this.loadQuestions(noticeId);
+      const target = followCurrent ? this.qeState.noticeId : noticeId;   // 해제처럼 오래 걸리는 일은 끝난 시점에 보는 공지를 다시 불러온다
+      if (target && this.qeState.noticeId === target) {
+        // 다시 불러오기가 멈춰도 busy가 영구히 남지 않게 시간을 둔다. 넘으면 질문 구역을 다시 불러오기 단추 상태로 둔다.
+        await withTimeout(this.loadQuestions(target), 15_000).catch(() => {
+          if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
+          ++this.qeSeq;
+          if (this.qeState.noticeId === target) this.qeState = { noticeId: target, status: 'failed', questions: [], experiences: EMPTY_EXPERIENCES };
+        });
+      }
       return { ok: true, value };
     } catch (error) {
       if (error instanceof AccountChanged || epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return { ok: false };
@@ -1095,7 +1101,7 @@ export class AppController extends Reactive {
       },
       unblock: async (blockId: string) => {
         if (!current() || this.qeUnblockPending) return false;
-        const pending = this.qeRun(this.qeState.noticeId ?? '', (api, guard) => api.unblock(blockId, guard), '차단을 해제했어요').then(({ ok }) => ok);
+        const pending = this.qeRun(this.qeState.noticeId ?? '', (api, guard) => api.unblock(blockId, guard), '차단을 해제했어요', true, true).then(({ ok }) => ok);
         this.qeUnblockPending = pending;
         try {
           return await pending;
@@ -2581,30 +2587,6 @@ export class AppController extends Reactive {
 
   openExploreMap = () => { this.openSettings('explore'); };
 
-  /** 공지 월드컵 후보. 저장한 공지를 먼저, 모자라면 받는 게시판의 최근 공지. 로그인하지 않았거나 공지를 아직 못 받았으면 비어 있다. */
-  worldcupCandidates(): CupNotice[] {
-    if (!this.authUserId || this.loading || !this.notices.length) return [];
-    const sources = new Map(this.sources.map((source) => [source.id, source]));
-    const live = (notice: Notice) => !isExpired(notice, sources.get(notice.source_id));
-    const toCup = (notice: Notice, saved: boolean): CupNotice => ({ id: notice.id, title: cleanTitle(notice.title_ko || notice.title), board: boardName(sources.get(notice.source_id), notice.source_id), deadline: notice.deadline, saved });
-    const saved = dropDuplicates(this.decorated(this.savedNotices())).map((notice) => toCup(notice, true));
-    const savedIds = new Set(saved.map((item) => item.id));
-    const recent = dropDuplicates(this.decorated(this.notices.filter((notice) => live(notice) && this.inChosenBoards(notice) && !this.isSaved(notice))))
-      .sort((a, b) => (b.posted_on > a.posted_on ? 1 : b.posted_on < a.posted_on ? -1 : 0))
-      .filter((notice) => !savedIds.has(notice.id)).map((notice) => toCup(notice, false));
-    return pickCandidates(saved, recent);
-  }
-  openWorldcup = () => { this.openSettings('worldcup'); };
-  /** 우승 공지를 앱 안의 공지로 연다(알림함과 같은 경로). */
-  openWorldcupNotice(id: string) { this.inboxOpenId = id; this.closeSettings(); this.handoffInboxOpen(); }
-  saveWorldcupNotice(id: string) {
-    const notice = this.notices.find((item) => item.id === id);
-    if (notice && !this.isSaved(notice)) this.toggleSave(notice);
-  }
-  shareWorldcupNotice(id: string) {
-    const notice = this.notices.find((item) => item.id === id);
-    if (notice) void this.share(notice);
-  }
   openInbox = () => { this.openSettings('inbox'); };
 
   async changeInbox(change: InboxChange): Promise<void> {
@@ -2992,8 +2974,9 @@ export class AppController extends Reactive {
     withTimeout(fetchBody(notice, controller.signal), 20_000, () => controller.abort()).catch(() => null).then((body) => {
       if (this.bodyAborts.get(notice.id) !== controller) return;
       this.bodyAborts.delete(notice.id);
-      if (bodies !== this.bodies || epoch !== this.subscriptionsEpoch || bodies.get(notice.id) !== 'loading') return;
-      if (generation !== this.generatedAt) bodies.delete(notice.id);
+      if (bodies !== this.bodies || bodies.get(notice.id) !== 'loading') return;
+      // 계정이 바뀌었거나(epoch) 목록 세대가 바뀌었으면 결과를 버리고 'loading'을 지워 다음 그림에서 다시 요청한다.
+      if (epoch !== this.subscriptionsEpoch || generation !== this.generatedAt) bodies.delete(notice.id);
       else bodies.set(notice.id, body);
       this.requestUpdate();
     });

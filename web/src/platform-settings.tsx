@@ -24,8 +24,6 @@ import { aiKeysLead, connectedAiKeys } from './ai-keys';
 import { BoardRequest, BOARD_TRAILING_ROW } from './board-request';
 import { InboxPage, type InboxModel } from './inbox-view';
 import { ExploreMapPage, type ExploreModel } from './explore-map-view';
-import { WorldcupPage, type WorldcupModel } from './worldcup-view';
-import { CUP_MIN } from './worldcup';
 import type { BoardRequestResult, BoardRequestState } from './shared-board-requests';
 
 export interface SettingsModel {
@@ -104,7 +102,6 @@ export interface SettingsModel {
   };
   inbox?: InboxModel;
   explore?: ExploreModel;
-  worldcup?: WorldcupModel;
   calendar?: {
     auto: { active: boolean; error: string | null; lastRunAt: string | null };
     id: string | null;
@@ -228,7 +225,6 @@ function Overview({ model }: { model: SettingsModel }) {
     <Section id="s-preferences" title="내 설정">
       <SettingsLink model={model} label="알림" help="받을 게시판과 이 기기 알림" section="notifications" />
       <SettingsLink model={model} label="관심 키워드" help={model.keywords.length ? `${model.keywords.length}개 키워드를 쓰고 있어요` : '관심 있는 공지를 골라 봐요'} section="keywords" />
-      {model.userId && model.worldcup && model.worldcup.candidates.length >= CUP_MIN ? <SettingsLink model={model} label="공지 월드컵" help="공지 둘 중 마음에 드는 쪽을 골라 봐요" section="worldcup" /> : null}
     </Section>
     <Section id="s-account" title="계정">
       {model.userId ? <>
@@ -1058,7 +1054,6 @@ export function PlatformSettings({ model }: { model: SettingsModel }) {
     case 'feedback': return <Feedback model={model} />;
     case 'inbox': return model.inbox ? <InboxPage model={model.inbox} /> : <Overview model={model} />;
     case 'explore': return model.explore ? <ExploreMapPage model={model.explore} /> : <Overview model={model} />;
-    case 'worldcup': return model.worldcup && model.worldcup.candidates.length >= CUP_MIN ? <WorldcupPage model={model.worldcup} /> : <Overview model={model} />;
     case 'blocks': return model.questionBlocks ? <BlockedAuthors key={model.questionBlocks.key} model={model.questionBlocks} /> : <Overview model={model} />;
     default: return <Overview model={model} />;
   }

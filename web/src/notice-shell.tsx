@@ -111,7 +111,7 @@ export function NoticeShell({ app }: { app: AppController }) {
   const keywordTotals = keywordCounts(keywordScope.filter((notice) => board === 'all' || notice.source_id === board),
     app.keywords, (notice) => app.interests(notice));
   const title = settings ? settingsTitle() : app.keyword ? app.keyword : TABS.find((t) => t.id === app.view)!.label;
-  const selected = settings ? undefined : list.find((n) => n.id === app.selectedId) ?? (app.selectedId && app.selectedId === app.deepNotice?.notice.id ? app.deepShown(app.selectedId) : undefined) ?? (app.isWide ? list[0] : undefined);
+  const selected = settings ? undefined : list.find((n) => n.id === app.selectedId) ?? (app.selectedId ? app.deepShown(app.selectedId) : undefined) ?? (app.isWide ? list[0] : undefined);
   app.shownId = selected?.id ?? null;
   const reading = !app.isWide && !settings
     ? app.notices.find((n) => n.id === app.openedId) ?? list.find((n) => n.id === app.openedId) ?? app.deepShown(app.openedId) : undefined;
@@ -289,8 +289,6 @@ function settingsModel(app: AppController) {
       refresh: () => { void app.refreshDevices(); }, setMode: (mode: string) => { void app.setCanvasMode(mode as CanvasMode); }, setAlertAll: (enabled: boolean) => { void app.setDeviceAlertAll(enabled); }, remove: (id: string) => { void app.removeDevice(id); }, rename: (id: string, name: string) => app.renameDevice(id, name),
       setSummaryTime: (period: 'am' | 'pm', hour: number, minute: number) => { void app.setSummaryTime(period, hour, minute); } },
     explore: app.settingsSection === 'explore' ? exploreModel(app) : undefined,
-    worldcup: { candidates: app.worldcupCandidates(), isSaved: (id: string) => { const notice = app.notices.find((item) => item.id === id); return !!notice && app.isSaved(notice); },
-      save: (id: string) => app.saveWorldcupNotice(id), open: (id: string) => app.openWorldcupNotice(id), share: (id: string) => app.shareWorldcupNotice(id) },
     inbox: { items: app.inboxItems, pushOn: app.pushStatus === 'on', open: (item: InboxItem) => app.openInboxItem(item), remove: (id: string) => { void app.changeInbox({ kind: 'remove', ids: [id] }); },
       readAll: () => { void app.changeInbox({ kind: 'read-all' }); }, clear: () => { void app.changeInbox({ kind: 'clear' }); }, goNotifications: () => app.openSettingsSection('notifications') },
     calendar: { auto: app.calendarAuto, id: app.calendarId, syncedAt: app.calendarSyncedAt, busy: app.calendarBusy, message: app.calendarMessage, error: app.calendarError, savedCount: app.saved.length,

@@ -3049,3 +3049,17 @@ test('the AI connect line stays hidden while the key state is unknown (loading, 
   await withApp(page, { byokOn: true, aiPrefs: { aiEnabled: false } });
   await expect(page.getByRole('region', { name: 'AI 연결 안내' })).toHaveCount(0);   // 요약을 꺼 둔 사용자에게는 안내하지 않는다
 });
+
+test('settings home draws a divider between 차단 관리 (link row) and 로그아웃 (setting row)', async ({ page }) => {
+  await settingsAt(page);
+  await withApp(page, { authUserId: 'account-a', profileStatus: 'unavailable', onboardingDismissed: true });
+  const screen = page.locator('platform-settings-screen');
+  await expect(screen.getByRole('link', { name: /차단 관리/ })).toBeVisible();
+  const logout = screen.locator('.setting', { hasText: '로그아웃' }).first();
+  await expect(logout).toHaveCSS('border-top-width', '1px');
+  const adjacent = await page.evaluate(() => {
+    const link = [...document.querySelectorAll('a.settings-link')].find((el) => el.textContent?.includes('차단 관리'));
+    return link?.nextElementSibling?.textContent?.includes('로그아웃') ?? false;
+  });
+  expect(adjacent).toBe(true);
+});
