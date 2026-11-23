@@ -1098,6 +1098,7 @@ export class AppController extends Reactive {
     this.opportunitiesLoading = true;
     const same = () => this.isCurrentAccount(userId, epoch);
     const writes = new Map(this.opportunityWrites);
+    const fetchedAt = Date.now();   // 이 조회가 시작된 시각: 서버 값이 없다는 관측은 이 시점 기준이다
     try {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
@@ -1112,7 +1113,8 @@ export class AppController extends Reactive {
           }
           this.opportunities = refreshed;
           this.opportunitiesStatus = 'ready';
-          for (const id of this.detailRestores.keys()) this.cacheDetail(id, 'opportunity', refreshed.get(id) ?? null);
+          for (const id of this.detailRestores.keys()) this.cacheDetail(id, 'opportunity', refreshed.get(id) ?? null, this.opportunityVersion(refreshed.get(id), fetchedAt));
+          this.opportunitiesFetchedAt = fetchedAt;
           return;
         } catch (error) {
           if (!same()) return;
@@ -1392,7 +1394,7 @@ export class AppController extends Reactive {
         if (!this.isCurrentAccount(userId, epoch)) return false;
         this.opportunityWrites.set(notice.id, (this.opportunityWrites.get(notice.id) ?? 0) + 1);
         this.opportunities = new Map(this.opportunities).set(notice.id, saved);
-        this.cacheDetail(notice.id, 'opportunity', saved);
+        this.cacheDetail(notice.id, 'opportunity', saved, Date.now());   // 내 쓰기는 쓴 시각으로 남겨 앞선 삭제 표시를 이긴다
         if (announce && patch.status) this.showToast(`${OPPORTUNITY_LABELS[patch.status]}으로 기록했어요`);
         return true;
       } catch (error) {
@@ -1414,7 +1416,7 @@ export class AppController extends Reactive {
         if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
         this.opportunityWrites.set(notice.id, (this.opportunityWrites.get(notice.id) ?? 0) + 1);
         const next = new Map(this.opportunities); next.delete(notice.id); this.opportunities = next;
-        this.cacheDetail(notice.id, 'opportunity', null);
+        this.cacheDetail(notice.id, 'opportunity', null, Date.now());   // 삭제 표시를 남겨 다른 탭의 늦은 옛 조회가 되살리지 못하게 한다
         this.showToast('기록을 지웠어요');
       } catch {
         if (epoch === this.subscriptionsEpoch && this.authUserId === userId) this.showToast('기록을 지우지 못했어요. 다시 눌러 주세요');
@@ -3390,6 +3392,11 @@ export class AppController extends Reactive {
   }
 
   private detailRestores = new Map<string, ReturnType<typeof loadDetailCache>>();
+  private opportunitiesFetchedAt = 0;
+  /** 상세 캐시에 적을 기록의 버전: 값이 있으면 서버의 갱신 시각, 없다는 관측이면 조회를 시작한 시각. */
+  private opportunityVersion(row: Opportunity | undefined, fetchedAt: number): number {
+    return (row ? Date.parse(row.updated_at) : NaN) || fetchedAt;
+  }
   private missingSummaries = new Set<string>();
 
   private restoreDetail(id: string, userId: string, epoch: number) {
@@ -3404,15 +3411,15 @@ export class AppController extends Reactive {
       return entry;
     });
     this.detailRestores.set(id, restore);
-    if (this.opportunitiesStatus === 'ready') this.cacheDetail(id, 'opportunity', this.opportunities.get(id) ?? null);
+    if (this.opportunitiesStatus === 'ready') { const row = this.opportunities.get(id); this.cacheDetail(id, 'opportunity', row ?? null, this.opportunityVersion(row, this.opportunitiesFetchedAt)); }
     return restore;
   }
 
   private cacheDetail<K extends keyof DetailFields>(
-    id: string, field: K, value: DetailFields[K] | null,
+    id: string, field: K, value: DetailFields[K] | null, version?: number,
   ): void {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
-    if (userId) void saveDetailField(userId, id, field, value, () => this.isCurrentAccount(userId, epoch));
+    if (userId) void saveDetailField(userId, id, field, value, () => this.isCurrentAccount(userId, epoch), version);
   }
 
   private detailIsOpen(id: string): boolean {

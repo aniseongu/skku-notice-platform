@@ -9,7 +9,8 @@ export type DetailFields = {
   graduation: GraduationAssessment;
   opportunity: Opportunity;
 };
-type Entry = { [K in keyof DetailFields]?: { at: number; value: DetailFields[K] } };
+// version은 서버가 그 값을 만든 시각(ms)이다. 삭제는 value가 null인 자리표시(tombstone)로 남겨 다른 탭의 늦은 옛 조회가 되살리지 못하게 한다.
+type Entry = { [K in keyof DetailFields]?: { at: number; value: DetailFields[K] | null; version?: number } };
 const key = (userId: string) => `detail-cache:v1:${userId}`;
 const maxAge = 30 * 24 * 60 * 60 * 1000;
 const maxEntries = 300;
@@ -26,26 +27,29 @@ export async function loadDetailCache(userId: string, noticeId: string): Promise
   try {
     const entries = await get<Map<string, Entry>>(key(userId));
     const entry = prune(entries?.get(noticeId) ?? {}, Date.now() - maxAge);
-    return Object.fromEntries(fields.flatMap((field) => entry[field] ? [[field, entry[field].value]] : []));
+    return Object.fromEntries(fields.flatMap((field) => entry[field]?.value != null ? [[field, entry[field].value]] : []));
   } catch { return {}; }
 }
 
 export async function saveDetailField<K extends keyof DetailFields>(
-  userId: string, noticeId: string, field: K, value: DetailFields[K] | null, current: () => boolean,
+  userId: string, noticeId: string, field: K, value: DetailFields[K] | null, current: () => boolean, version?: number,
 ): Promise<void> {
   if (!current()) return;
   try {
-    await update<Map<string, Entry>>(key(userId), (stored) => {
+    await update<Map<string, Entry>>(key(userId), (previous) => {
       if (!current()) throw new Error('Account changed');
       const at = Date.now();
       const entries = new Map<string, Entry>();
-      for (const [id, entry] of stored ?? []) {
+      for (const [id, entry] of previous ?? []) {
         const fresh = prune(entry, at - maxAge);
         if (Object.keys(fresh).length) entries.set(id, fresh);
       }
       const entry = entries.get(noticeId) ?? {};
-      if (value === null) delete entry[field];
-      else Object.assign(entry, { [field]: { at, value } });
+      const known = entry[field];
+      // 다른 탭이 이미 더 새 값(또는 삭제)을 남겼으면 늦게 도착한 옛 값으로 덮지 않는다.
+      if (version !== undefined && known?.version !== undefined && known.version > version) return previous ?? new Map();
+      if (value === null && version === undefined) delete entry[field];
+      else Object.assign(entry, { [field]: { at, value, ...(version === undefined ? {} : { version }) } });
       entries.delete(noticeId);
       if (Object.keys(entry).length) entries.set(noticeId, entry);
       return new Map([...entries].slice(-maxEntries));
