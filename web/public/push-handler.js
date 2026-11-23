@@ -16,6 +16,7 @@ const INBOX_MAX_ITEMS = 200;
 const INBOX_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const INBOX_TIMEOUT_MS = 3000;
 const GENERIC_TAG = 'skku-notice';
+const DIGEST_MAX_ITEMS = 20;
 
 function openKeyval() {
   return new Promise((resolve, reject) => {
@@ -31,8 +32,8 @@ function pruneInbox(items, now) {
   return items.filter((item) => now - item.at <= INBOX_MAX_AGE_MS).sort((a, b) => b.at - a.at).slice(0, INBOX_MAX_ITEMS);
 }
 
-async function saveInbox(entry, now) {
-  if (typeof indexedDB === 'undefined' || typeof entry.to !== 'string' || !/^[0-9a-f]{16}$/.test(entry.to)) return false;
+async function saveInbox(entries, to, now) {
+  if (!entries.length || typeof indexedDB === 'undefined' || typeof to !== 'string' || !/^[0-9a-f]{16}$/.test(to)) return false;
   const subscription = await self.registration.pushManager.getSubscription();
   const endpoint = subscription && subscription.endpoint;
   if (typeof endpoint !== 'string' || !endpoint) return false;   // 구독이 없으면(해제·전환 중) 저장하지 않는다
@@ -47,11 +48,13 @@ async function saveInbox(entry, now) {
         const old = request.result;
         const owner = old && old.version === 1 ? old.owner : null;
         if (!owner || typeof owner.userId !== 'string' || !owner.userId
-          || owner.endpoint !== endpoint || owner.recipientHash !== entry.to) return;
+          || owner.endpoint !== endpoint || owner.recipientHash !== to) return;
         let items = Array.isArray(old.items) ? old.items : [];
-        if (entry.tag !== GENERIC_TAG) items = items.filter((item) => !(item.owner === owner.userId && item.tag === entry.tag));
-        const id = now.toString(36) + Math.random().toString(36).slice(2, 8);
-        items.push({ id, owner: owner.userId, tag: entry.tag, title: entry.title, body: entry.body, noticeId: entry.noticeId, url: entry.url, at: now, read: false });
+        for (const entry of entries) {
+          if (entry.tag !== GENERIC_TAG) items = items.filter((item) => !(item.owner === owner.userId && item.tag === entry.tag));
+          const id = now.toString(36) + Math.random().toString(36).slice(2, 8);
+          items.push({ id, owner: owner.userId, ...entry, at: now, read: false });
+        }
         store.put({ version: 1, owner, items: pruneInbox(items, now) }, INBOX_KEY);
         saved = true;
       };
@@ -62,11 +65,11 @@ async function saveInbox(entry, now) {
   } finally { db.close(); }
 }
 
-async function rememberInbox(entry) {
+async function rememberInbox(entries, to) {
   let timer;
   try {
     const limit = new Promise((resolve) => { timer = setTimeout(resolve, INBOX_TIMEOUT_MS); });
-    const write = saveInbox(entry, Date.now()).then(async (saved) => {
+    const write = saveInbox(entries, to, Date.now()).then(async (saved) => {
       if (saved && self.clients?.matchAll) {
         for (const client of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) client.postMessage({ type: 'inbox-changed' });
       }
@@ -90,6 +93,16 @@ function checkedTarget(value) {
   return self.registration.scope;
 }
 
+function digestEntries(items) {
+  const entries = [];
+  for (const item of items.slice(0, DIGEST_MAX_ITEMS)) {
+    const noticeId = noticeIdOf(item?.tag);
+    if (!noticeId || noticeId !== item.id || typeof item.title !== 'string' || !item.title) continue;
+    entries.push({ tag: item.tag, title: item.title, body: '', noticeId, url: checkedTarget(item.url) });
+  }
+  return entries;
+}
+
 self.addEventListener('push', (event) => {
   let payload = {};
   try {
@@ -100,6 +113,7 @@ self.addEventListener('push', (event) => {
   const body = typeof payload.body === 'string' ? payload.body : '새 공지가 도착했어요';
   const target = checkedTarget(payload.url);
   const tag = typeof payload.tag === 'string' ? payload.tag : GENERIC_TAG;
+  const noticeId = noticeIdOf(tag);
   // 알림 표시를 먼저 시작하고 알림함 저장은 따로 시작한다. 저장이 느리거나 실패해도 알림은 뜬다.
   const shown = self.registration.showNotification(title, {
     body,
@@ -107,9 +121,12 @@ self.addEventListener('push', (event) => {
     badge: new URL('icon-monochrome-512.png', self.registration.scope).href,
     tag,
     silent: payload.silent === true,
-    data: { url: target, notice: noticeIdOf(payload.tag) },
+    data: { url: target, notice: noticeId },
   });
-  const kept = rememberInbox({ to: payload.to, tag, title, body, noticeId: noticeIdOf(payload.tag), url: target });
+  const entries = tag.startsWith('digest:') && Array.isArray(payload.items)
+    ? digestEntries(payload.items)
+    : [{ tag, title, body, noticeId, url: target }];
+  const kept = rememberInbox(entries, payload.to);
   event.waitUntil(Promise.all([shown, kept]));
 });
 

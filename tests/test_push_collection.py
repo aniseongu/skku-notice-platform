@@ -1,6 +1,9 @@
+import hashlib
+import json
 from datetime import UTC, datetime
 
 import pytest
+import requests
 
 from skku_notice import push_collection as worker
 
@@ -402,6 +405,7 @@ def test_main_reports_required_batch_error_as_failure_but_finishes_other_batches
     calls = []
     monkeypatch.setattr(worker, "PushStore", Store)
     monkeypatch.setattr(worker.Vapid, "from_string", lambda key: None)
+    monkeypatch.setattr(worker, "run_deferred_batch", lambda *a: {"sent": 0, "expired": 0, "retry": 0})
     monkeypatch.setattr(worker, "run_batch", lambda *a: {"sent": 0, "expired": 0, "retry": 0, "skipped": 0})
     monkeypatch.setattr(worker, "run_canvas_batch", lambda *a: {"canvas_sent": 0, "canvas_failed": 0})
 
@@ -420,6 +424,156 @@ def test_main_reports_required_batch_error_as_failure_but_finishes_other_batches
     assert calls == ["feedback"]
     assert "Required reminder batch error: RuntimeError" in out and "fcm.example" not in out
     assert "required_failed=-1" in out
+
+
+class DeferredStore(MemoryStore):
+    def __init__(self, groups):
+        super().__init__([])
+        self.groups = list(groups)
+        self.deferred_at = []
+        self.in_flight = {}
+
+    def defer_quiet_pushes(self, now):
+        self.deferred_at.append(now)
+
+    def claim_deferred_pushes(self, now):
+        if not self.groups:
+            return []
+        group = self.groups.pop(0)
+        self.in_flight[group["claim_token"]] = group["candidates"]
+        return [group]
+
+    def mark_deferred_pushes(self, token, status):
+        self.marks.append((token, status, len(self.in_flight.pop(token))))
+
+
+@pytest.fixture
+def digest_messages(monkeypatch):
+    messages = []
+
+    def capture(**kwargs):
+        messages.append(kwargs["data"].encode())
+        response = requests.Response()
+        response.status_code = 201
+        return response
+
+    monkeypatch.setattr(worker.platform_push, "valid_subscription", lambda _subscription: True)
+    monkeypatch.setattr(worker.platform_push, "webpush", capture)
+    return messages
+
+
+@pytest.mark.parametrize(("utc", "date"), [
+    ("2026-11-22T14:59:59+00:00", "2026-11-22"),
+    ("2026-11-22T15:00:00+00:00", "2026-11-23"),
+    ("2026-11-22T23:00:00+00:00", "2026-11-23"),
+])
+@pytest.mark.parametrize("silent", [True, False])
+def test_deferred_digest_sends_first_three_titles(digest_messages, utc, date, silent):
+    now = datetime.fromisoformat(utc)
+    items = [
+        {**candidate(), "notice_id": f"school/{i}", "title": f"안내 {i}", "silent": i < 4 or silent}
+        for i in range(1, 5)
+    ]
+    store = DeferredStore([
+        {"claim_token": "12345678-first", "candidates": items},
+        {"claim_token": "87654321-second", "candidates": items},
+    ])
+
+    assert worker.run_deferred_batch(store, "key", "subject", now)["sent"] == 2
+    first, second = map(json.loads, digest_messages)
+    assert first == {
+        "to": hashlib.sha256(b"skku-inbox:user").hexdigest()[:16],
+        "title": "밤사이 알림 4건", "body": "안내 1\n안내 2\n안내 3",
+        "url": worker.APP_URL + "?view=settings&section=inbox",
+        "tag": f"digest:{date}:12345678",
+        "silent": silent,
+        "items": [
+            {
+                "id": item["notice_id"], "title": item["title"],
+                "url": item["url"], "tag": f"notice:{item['notice_id']}",
+            }
+            for item in items
+        ],
+    }
+    assert second == {**first, "tag": f"digest:{date}:87654321"}
+    assert store.marks == [("12345678-first", "sent", 4), ("87654321-second", "sent", 4)]
+    assert worker.run_deferred_batch(store, "key", "subject", now)["sent"] == 0
+    assert len(digest_messages) == 2
+
+
+def test_deferred_digest_keeps_twenty_items_within_the_utf8_budget(digest_messages):
+    title = '학😀"\\\n' * 60
+    items = [
+        {**candidate(url=f"https://www.skku.edu/notice/{i}"), "notice_id": f"school/{i}", "title": title}
+        for i in range(1, 25)
+    ]
+    store = DeferredStore([{"claim_token": "12345678", "candidates": items}])
+
+    assert worker.run_deferred_batch(store, "key", "subject", NOW)["sent"] == 1
+    [encoded] = digest_messages
+    assert 3700 < len(encoded) <= worker.DIGEST_MAX_BYTES
+    payload = json.loads(encoded)
+    assert payload["title"] == "밤사이 알림 24건"
+    assert [item["id"] for item in payload["items"]] == [f"school/{i}" for i in range(1, 21)]
+    for item in payload["items"]:
+        assert 0 < len(item["title"]) < len(title)
+        assert title.startswith(item["title"])
+
+
+def test_deferred_digest_skips_urls_that_are_untrusted_or_cannot_fit(digest_messages):
+    items = [
+        {**candidate(url="https://evil.example/notice"), "notice_id": "school/2"},
+        {**candidate(url="https://www.skku.edu/" + "a" * 4000), "notice_id": "school/3"},
+        candidate(),
+    ]
+    store = DeferredStore([{"claim_token": "12345678", "candidates": items}])
+    assert worker.run_deferred_batch(store, "key", "subject", NOW)["sent"] == 1
+    payload = json.loads(digest_messages[0])
+    assert payload["title"] == "밤사이 알림 3건"
+    assert payload["items"] == [{
+        "id": "school/1", "title": "공지", "url": items[2]["url"], "tag": "notice:school/1",
+    }]
+
+
+def test_one_deferred_reminder_keeps_its_individual_notification(monkeypatch):
+    notice = {**candidate("phone"), "days_before": 1, "days_remaining": 0, "silent": True}
+    store = DeferredStore([{"claim_token": "phone", "candidates": [notice]}])
+    messages = []
+    monkeypatch.setattr(worker, "send_one", lambda *a, **kw: messages.append(kw) or "sent")
+
+    after_noon = datetime.fromisoformat("2026-11-23T04:00:00+00:00")
+    assert worker.run_deferred_batch(store, "key", "subject", after_noon)["sent"] == 1
+    assert messages == [{
+        "user_id": "user", "title": "공지", "body": "오늘 마감이에요\nschool",
+        "url": notice["url"], "tag": "notice:school/1", "silent": True,
+    }]
+    assert store.marks == [("phone", "sent", 1)]
+
+
+def test_no_deferred_items_keeps_ordinary_send_unchanged(monkeypatch):
+    store = DeferredStore([])
+    store.items = [candidate()]
+    messages = []
+    monkeypatch.setattr(worker, "send_one", lambda *a, **kw: messages.append(kw) or "sent")
+
+    assert worker.run_deferred_batch(store, "key", "subject", NOW)["sent"] == 0
+    assert messages == []
+    assert worker.run_batch(store, "key", "subject", NOW)["sent"] == 1
+    assert messages[0]["tag"] == "notice:school/1"
+    assert store.marks == [(1, "sent", NOW)]
+
+
+def test_deferred_push_failure_and_expiration_are_handled_per_device(monkeypatch):
+    store = DeferredStore([
+        {"claim_token": "failed", "candidates": [candidate("phone")]},
+        {"claim_token": "gone", "candidates": [candidate("laptop")]},
+    ])
+    outcomes = iter(["retry", "expired"])
+    monkeypatch.setattr(worker, "send_one", lambda *a, **kw: next(outcomes))
+
+    assert worker.run_deferred_batch(store, "key", "subject", NOW) == {"sent": 0, "expired": 1, "retry": 1}
+    assert store.marks == [("failed", "failed", 1)]
+    assert store.removed == [("laptop", "user")]
 
 
 @pytest.mark.parametrize(("now", "lists_candidates"), [

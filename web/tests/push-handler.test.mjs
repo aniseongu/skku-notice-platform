@@ -258,6 +258,52 @@ test('the same notice tag replaces its earlier entry and comes back unread; the 
   assert.deepEqual(inboxOf(data).map((item) => item.title).sort(), ['a', 'b', '장학 (수정됨)']);
 });
 
+test('each digest shows once, opens the inbox and stores its notices as individual unread entries', async () => {
+  const data = recordOf(inboxOwner('user-a', EP_A));
+  const w = registered(data, EP_A);
+  const to = recipient('user-a');
+  const url = w.scope + '?view=settings&section=inbox';
+  const notice = { id: APP_ID, title: '수정 공지', url: 'https://cse.skku.edu/a', tag: `notice:${APP_ID}` };
+  const second = { id: 'school/2', title: '새 공지', url: 'javascript:alert(1)', tag: 'notice:school/2' };
+  const tags = ['digest:2026-11-23:12345678', 'digest:2026-11-23:abcdef01'];
+  await w.push({ to, title: '이전 공지', tag: notice.tag });
+  await w.push({ to, title: '밤사이 알림 2건', url, tag: tags[0], items: [notice, second] });
+  await w.push({ to, title: '밤사이 알림 1건', url, tag: tags[1], items: [
+    { id: 'school/3', title: '다음 공지', tag: 'notice:school/3' },
+  ] });
+
+  assert.deepEqual(w.notifications.slice(1).map(({ tag }) => tag), tags);
+  await w.click(w.notifications[1]);
+  assert.deepEqual(w.opened, [url]);
+  const items = inboxOf(data).sort((a, b) => a.title.localeCompare(b.title));
+  assert.equal(new Set(items.map(({ id }) => id)).size, 3);
+  assert.deepEqual(items.map(({ id, at, ...item }) => item), [
+    { owner: 'user-a', tag: 'notice:school/3', title: '다음 공지', body: '', noticeId: 'school/3', url: w.scope, read: false },
+    { owner: 'user-a', tag: second.tag, title: second.title, body: '', noticeId: second.id, url: w.scope, read: false },
+    { owner: 'user-a', tag: notice.tag, title: notice.title, body: '', noticeId: notice.id, url: notice.url, read: false },
+  ]);
+});
+
+test('digest items require the same recipient and endpoint and reject mismatched notice tags', async () => {
+  const data = recordOf(inboxOwner('user-a', EP_A));
+  const digest = { tag: 'digest:2026-11-23:12345678', items: [
+    { id: 'school/1', tag: 'notice:school/1', title: '공지' },
+  ] };
+  await registered(data, EP_B).push({ ...digest, to: recipient('user-a') });
+  await registered(data, EP_A).push({ ...digest, to: recipient('user-b') });
+  const w = registered(data, EP_A);
+  await w.push({ ...digest, to: recipient('user-a'), items: [null, { ...digest.items[0], id: 'school/2' }] });
+  await w.push({ ...digest, to: recipient('user-a'), items: [] });
+  assert.equal(w.notifications.length, 2);
+  assert.deepEqual(inboxOf(data), []);
+
+  await w.push({ ...digest, to: recipient('user-a'), items: Array.from({ length: 21 }, (_, i) => ({
+    id: `school/${i}`, tag: `notice:school/${i}`, title: `공지 ${i}`,
+  })) });
+  assert.equal(inboxOf(data).length, 20);
+  assert.ok(inboxOf(data).every(({ noticeId }) => noticeId !== 'school/20'));
+});
+
 test('old entries (30 days) are dropped and at most 200 are kept; other owners are not merged away', async () => {
   const now = Date.now();
   const make = (i, at, owner = 'user-a') => ({ id: `i${i}`, owner, tag: `t${i}`, title: `제목${i}`, body: '', noticeId: null, url: 'https://x', at, read: true });

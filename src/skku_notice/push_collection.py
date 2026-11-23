@@ -1,14 +1,16 @@
 """Deliver a bounded batch of eligible personal notifications."""
 
+import hashlib
+import json
 import os
 import re
 from datetime import UTC, datetime
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import requests
 from py_vapid import Vapid
 
-from skku_notice import aibootcamp
+from skku_notice import aibootcamp, platform_push
 from skku_notice.deadline import KST
 from skku_notice.platform_push import send_one
 from skku_notice.scheduled_collection import NoticeStore
@@ -35,8 +37,22 @@ class PushStore(NoticeStore):
             params={
                 "id": f"eq.{claim_id}",
                 "status": "eq.pending",
+                "deferred_at": "is.null",
             },
             json={"status": status, "updated_at": now.isoformat()},
+        )
+
+    def defer_quiet_pushes(self, now: datetime) -> None:
+        self._request("POST", "rpc/defer_quiet_pushes", json={"p_now": now.isoformat()})
+
+    def claim_deferred_pushes(self, now: datetime) -> list[dict]:
+        return self._request(
+            "POST", "rpc/claim_deferred_pushes", json={"p_now": now.isoformat(), "p_limit": 20},
+        ).json()
+
+    def mark_deferred_pushes(self, claim_token: str, status: str) -> None:
+        self._request(
+            "POST", "rpc/mark_deferred_pushes", json={"p_claim_token": claim_token, "p_status": status},
         )
 
     def canvas_alerts(self) -> list[dict]:
@@ -185,7 +201,9 @@ def compose_message(candidate: dict) -> tuple[str, str]:
     """
     board = candidate.get("source_name") or candidate["notice_id"].split("/")[0]
     if "days_before" in candidate:
-        return candidate["title"], f"마감까지 {candidate['days_before']}일 남았어요\n{board}"
+        remaining = candidate.get("days_remaining", candidate["days_before"])
+        reminder = f"마감까지 {remaining}일 남았어요" if remaining else "오늘 마감이에요"
+        return candidate["title"], f"{reminder}\n{board}"
     school = board.endswith(" 공지")
     title = f"[{board.removesuffix(' 공지')}] {candidate['title']}" if school else candidate["title"]
     deadline = _deadline_label(candidate.get("deadline"), candidate.get("deadline_kind"))
@@ -219,16 +237,19 @@ def normalize_subject(subject: str) -> str:
     return value
 
 
-def _send_notice(candidate: dict, private_key: str, subject: str) -> str:
-    if not safe_notice_url(candidate["url"]):
-        return "retry"
-    subscription = {
+def _subscription(candidate: dict) -> dict:
+    return {
         "endpoint": candidate["endpoint"],
         "keys": {"p256dh": candidate["p256dh"], "auth": candidate["auth_secret"]},
     }
+
+
+def _send_notice(candidate: dict, private_key: str, subject: str) -> str:
+    if not safe_notice_url(candidate["url"]):
+        return "retry"
     title, body = compose_message(candidate)
     return send_one(
-        subscription, private_key, subject, user_id=candidate["user_id"], title=title, body=body,
+        _subscription(candidate), private_key, subject, user_id=candidate["user_id"], title=title, body=body,
         url=candidate["url"], tag=f"notice:{candidate['notice_id']}",
         silent=bool(candidate.get("silent", False)),
     )
@@ -314,6 +335,110 @@ def run_canvas_batch(store: PushStore, private_key: str, subject: str, now: date
 
 
 APP_URL = "https://skku-notice-platform.pages.dev/"
+# RFC 8291 reserves 103 bytes of the 4096-byte encrypted Web Push body; keep extra headroom for push services.
+DIGEST_MAX_BYTES = 3800
+DIGEST_MAX_ITEMS = 20
+
+
+def _digest_payload(candidates: list[dict], tag: str, inbox_url: str) -> bytes | None:
+    payload = {
+        "title": f"밤사이 알림 {len(candidates)}건",
+        "url": inbox_url,
+        "tag": tag,
+        "silent": all(candidate.get("silent", False) for candidate in candidates),
+        "to": hashlib.sha256(f"skku-inbox:{candidates[0]['user_id']}".encode()).hexdigest()[:16],
+    }
+    items = []
+    seen = set()
+
+    def encode(title_limit: int) -> bytes:
+        return json.dumps(
+            {
+                **payload,
+                "body": "\n".join(candidate["title"][:title_limit] for candidate in candidates[:3]),
+                "items": [{**item, "title": item["title"][:title_limit]} for item in items],
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode()
+
+    encoded = encode(1)
+    if len(encoded) > DIGEST_MAX_BYTES:
+        return None
+    for candidate in candidates:
+        notice_id, url = candidate["notice_id"], candidate["url"]
+        if notice_id in seen or not safe_notice_url(url):
+            continue
+        seen.add(notice_id)
+        title, _ = compose_message(candidate)
+        items.append({"id": notice_id, "title": title, "url": url, "tag": f"notice:{notice_id}"})
+        if len(encode(1)) > DIGEST_MAX_BYTES:
+            # A long URL can consume the budget even with a truncated title.
+            items.pop()
+        if len(items) == DIGEST_MAX_ITEMS:
+            break
+
+    low, high = 1, 180
+    while low <= high:
+        length = (low + high) // 2
+        trial = encode(length)
+        if len(trial) <= DIGEST_MAX_BYTES:
+            encoded = trial
+            low = length + 1
+        else:
+            high = length - 1
+    return encoded
+
+
+def _send_digest(candidates: list[dict], tag: str, inbox_url: str, private_key: str, subject: str) -> str:
+    subscription = _subscription(candidates[0])
+    payload = _digest_payload(candidates, tag, inbox_url)
+    if payload is None or not platform_push.valid_subscription(subscription):
+        return "retry"
+    try:
+        with platform_push.NoRedirectSession() as session:
+            response = platform_push.webpush(
+                subscription_info=subscription,
+                data=payload.decode(),
+                vapid_private_key=private_key,
+                vapid_claims={"sub": subject},
+                ttl=86400,
+                timeout=10,
+                requests_session=session,
+            )
+    except platform_push.WebPushException as exc:
+        response = exc.response
+    except Exception:
+        return "retry"
+    if not isinstance(response, requests.Response):
+        return "retry"
+    if 200 <= response.status_code < 300:
+        return "sent"
+    return "expired" if response.status_code in (404, 410) else "retry"
+
+
+def run_deferred_batch(
+    store: PushStore, private_key: str, subject: str, now: datetime, app_url: str = APP_URL,
+) -> dict[str, int]:
+    counts = {"sent": 0, "expired": 0, "retry": 0}
+    store.defer_quiet_pushes(now)
+    inbox_url = urljoin(app_url, "?view=settings&section=inbox")
+    date = now.astimezone(KST).date()
+    while groups := store.claim_deferred_pushes(now):
+        for group in groups:
+            candidates = group["candidates"]
+            first = candidates[0]
+            if len(candidates) == 1:
+                outcome = _send_notice(first, private_key, subject)
+            else:
+                tag = f"digest:{date}:{group['claim_token'][:8]}"
+                outcome = _send_digest(candidates, tag, inbox_url, private_key, subject)
+            if outcome == "expired":
+                store.remove_expired(first["subscription_id"], first["user_id"])
+            else:
+                store.mark_deferred_pushes(group["claim_token"], "sent" if outcome == "sent" else "failed")
+            counts[outcome] += 1
+    return counts
 
 
 def required_message(missing: list[str]) -> tuple[str, str]:
@@ -421,9 +546,14 @@ def main() -> int:
         store = PushStore(os.environ.get("SUPABASE_URL", ""), os.environ.get("SUPABASE_SECRET_KEY", ""))
         try:
             now = datetime.now(UTC)
+            app_url = os.environ.get("APP_URL") or APP_URL
+            try:
+                deferred = run_deferred_batch(store, private_key, subject, now, app_url)
+            except Exception as error:
+                print(f"Deferred push batch error: {type(error).__name__}", flush=True)
+                deferred = {"sent": 0, "expired": 0, "retry": -1}
             counts = run_batch(store, private_key, subject, now)
             canvas = run_canvas_batch(store, private_key, subject, now)
-            app_url = os.environ.get("APP_URL") or APP_URL
             try:
                 required = run_required_batch(store, private_key, subject, now, app_url)
             except Exception as error:
@@ -449,6 +579,8 @@ def main() -> int:
         return 1
     print(
         f"Push worker: sent={counts['sent']} expired={counts['expired']} retry={counts['retry']} "
+        f"deferred_sent={deferred['sent']} deferred_expired={deferred['expired']} "
+        f"deferred_retry={deferred['retry']} "
         f"canvas_sent={canvas['canvas_sent']} canvas_failed={canvas['canvas_failed']} "
         f"required_sent={required['required_sent']} required_failed={required['required_failed']} "
         f"saved_deadline_sent={saved['sent']} saved_deadline_expired={saved['expired']} "
@@ -458,7 +590,12 @@ def main() -> int:
         flush=True,
     )
     # 공지 알림 재시도나 리마인더 실패가 있으면 journal에 서비스 실패를 남긴다.
-    return int(counts["retry"] > 0 or required["required_failed"] != 0 or saved["retry"] != 0)
+    return int(
+        counts["retry"] > 0
+        or deferred["retry"] != 0
+        or required["required_failed"] != 0
+        or saved["retry"] != 0
+    )
 
 
 if __name__ == "__main__":
