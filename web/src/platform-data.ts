@@ -33,12 +33,15 @@ export async function loadPublicFeed(client: SupabaseClient): Promise<NoticesFil
     notices: noticeResult.data as unknown as NoticesFile['notices'] };
 }
 
-export async function loadPublicBody(client: SupabaseClient, sourceId: string, articleNo: string): Promise<NoticeBody | null> {
+export async function loadPublicBody(client: SupabaseClient, sourceId: string, articleNo: string, signal?: AbortSignal): Promise<NoticeBody | null> {
   const id = `${sourceId}/${articleNo}`;
+  // 신호가 있으면 쿼리 빌더에 달아 시간 초과나 계정 전환 때 요청 자체를 끊는다.
+  const limited = <Q,>(query: Q): Q => (signal && typeof (query as { abortSignal?: unknown }).abortSignal === 'function'
+    ? (query as unknown as { abortSignal(s: AbortSignal): Q }).abortSignal(signal) : query);
   const [bodyResult, ocrResult] = await Promise.all([
-    client.from('platform_notices').select('id,body,body_html,attachments,images,fetched_at').eq('id', id).maybeSingle(),
-    Promise.resolve(client.from('platform_notice_images').select('image_url,platform_ocr_cache(extracted_text)')
-      .eq('notice_id', id).eq('status', 'ready').limit(3)).catch(() => null),
+    limited(client.from('platform_notices').select('id,body,body_html,attachments,images,fetched_at').eq('id', id)).maybeSingle(),
+    Promise.resolve(limited(client.from('platform_notice_images').select('image_url,platform_ocr_cache(extracted_text)')
+      .eq('notice_id', id).eq('status', 'ready')).limit(3)).catch(() => null),
   ]);
   const { data, error } = bodyResult;
   if (error || !data || !data.fetched_at) return null;

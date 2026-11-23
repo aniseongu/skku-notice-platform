@@ -169,6 +169,21 @@ test('a saved notice without a record shows the default status "관심 있음"; 
   await expect(page.getByRole('region', { name: '내 진행 상태' })).toHaveCount(0);
 });
 
+test('saved toolbar triggers are at least 44px tall and the row does not overflow at 360px', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  await setup(page);
+  await saveSome(page, 3, { 0: 'applied' });
+  const bar = page.locator('.saved-options');
+  await expect(bar).toBeVisible();
+  for (const selector of ['.select-trigger', '.status-trigger', '.sort-trigger']) {
+    const box = await bar.locator(selector).boundingBox();
+    expect(box, selector).not.toBeNull();
+    expect(box!.height, selector).toBeGreaterThanOrEqual(44);
+  }
+  const fits = await bar.evaluate((el) => ({ row: el.scrollWidth <= el.clientWidth + 1, page: document.documentElement.scrollWidth <= window.innerWidth }));
+  expect(fits).toEqual({ row: true, page: true });
+});
+
 test('the detail shows the same default status as the list for a saved notice without a record', async ({ page }) => {
   await setup(page);
   await saveSome(page, 2);

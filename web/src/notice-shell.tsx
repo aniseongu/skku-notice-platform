@@ -635,7 +635,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
     ai: judgement?.ai ?? mine?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
     coop: app.kindOf(notice) === 'coop',
     pending: !(judgement?.ai ?? mine?.ai) && !interests.length && !hasGrad && app.judgePending(notice),
-    retry: () => { app.bodies.delete(notice.id); app.requestUpdate(); },
+    retry: () => app.retryBody(notice),
     opportunity: app.opportunityShown(notice) ? (() => {
       const record = app.opportunities.get(notice.id), source = boardName(app.sources.find((item) => item.id === notice.source_id), notice.source_id);
       const current = app.statusOf(notice) ?? null;

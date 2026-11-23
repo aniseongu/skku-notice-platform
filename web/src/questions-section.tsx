@@ -234,7 +234,8 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
       <button type="button" className={COLLAPSE_HEAD} aria-expanded={open} aria-controls="qe-body" onClick={() => setOpen(!open)}>
         <span>질문·경험</span><span className="flex items-center gap-[8px] font-medium">{open ? null : summary}
           <Chevron open={open} /></span></button></h3>
-    {open ? <div id="qe-body" className="mt-[6px] grid gap-[12px]">
+    {/* 접어도 마운트를 유지해 수정 중인 입력이 사라지지 않게 한다. */}
+    <div id="qe-body" hidden={!open} className={`mt-[6px] gap-[12px] ${open ? 'grid' : 'hidden'}`}>
       {model.status === 'loading' ? <p className={NOTE_TEXT} role="status">불러오고 있어요</p> : null}
       {model.status === 'failed' ? <><p className={NOTE_TEXT} role="status">질문과 후기를 불러오지 못했어요</p><div><button type="button" className={GHOST_BUTTON} onClick={model.load}>다시 불러오기</button></div></> : null}
       {model.status === 'ready' ? <>
@@ -263,6 +264,6 @@ export function QuestionsSection({ model }: { model: QuestionsModel }) {
         {hasContent && !experiences.count && !experiences.posts.length && !reviewing ? <div><button type="button" className={`qe-create ${GHOST_BUTTON}`} onClick={() => setReviewing(true)}>후기 남기기</button></div> : null}
         <p className={NOTE_TEXT}>{reviewing && !reviewed ? '' : '이름은 보이지 않아요. '}학교의 공식 답변은 아니에요</p>
       </> : null}
-    </div> : null}
+    </div>
   </section>;
 }

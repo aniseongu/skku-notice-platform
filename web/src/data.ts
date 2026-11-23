@@ -68,17 +68,27 @@ export interface NoticeBody {
   fetched_at: string | null;
 }
 
-export async function fetchBody(notice: Notice): Promise<NoticeBody | null> {
+export async function fetchBody(notice: Notice, signal?: AbortSignal): Promise<NoticeBody | null> {
   // 주소에 들어가는 값은 형식을 확인한 뒤에만 쓴다.
   if (!/^[\w-]+$/.test(notice.source_id) || !/^\d+$/.test(notice.article_no)) return null;
   for (let attempt = 0; attempt < 2; attempt++) {
+    if (signal?.aborted) return null;
     try {
-      const body = await fetchJson<NoticeBody>(`notices/${notice.source_id}/${notice.article_no}.json`, true);
+      const body = await fetchJson<NoticeBody>(`notices/${notice.source_id}/${notice.article_no}.json`, true, signal);
       if (body) return body;
     } catch { /* 일시적인 네트워크 오류는 한 번 더 확인한다. */ }
-    if (attempt === 0) await new Promise((resolve) => window.setTimeout(resolve, 800));
+    if (attempt === 0) await abortableDelay(800, signal);
   }
   return null;
+}
+
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve();
+    const done = () => { window.clearTimeout(timer); signal?.removeEventListener('abort', done); resolve(); };
+    const timer = window.setTimeout(done, ms);
+    signal?.addEventListener('abort', done, { once: true });
+  });
 }
 
 export interface NoticesFile { version: number; generated_at: string; sources: Source[]; notices: Notice[] }
@@ -109,17 +119,17 @@ export function safeUrl(url: string): string {
 
 export { noticeKind, isExpired, type NoticeKind } from './notice-scope';
 
-export async function fetchJson<T>(name: string, optional = false): Promise<T | null> {
+export async function fetchJson<T>(name: string, optional = false, signal?: AbortSignal): Promise<T | null> {
   // 로그인 설정이 있으면 공지는 로그인한 사용자의 DB에서만 읽는다. 공개 스냅샷으로 대신하지 않는다.
   if (authClient && !(import.meta.env.DEV && requested)) {
     const match = /^notices\/([\w-]+)\/(\d+)\.json$/.exec(name);
     const live = name === 'notices.json' ? await loadPublicFeed(authClient)
-      : match ? await loadPublicBody(authClient, match[1], match[2]) : null;
+      : match ? await loadPublicBody(authClient, match[1], match[2], signal) : null;
     if (live) return live as T;
     if (optional) return null;
     throw new Error(`${name}: 읽지 못했어요`);
   }
-  const response = await fetch(`${API}/${name}`, { cache: 'no-cache' });
+  const response = await fetch(`${API}/${name}`, { cache: 'no-cache', signal });
   if (optional && response.status === 404) return null;
   if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
   return (await response.json()) as T;

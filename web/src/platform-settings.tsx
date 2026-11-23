@@ -289,7 +289,9 @@ function BlockedAuthors({ model }: { model: NonNullable<SettingsModel['questionB
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const alive = useRef(true);
-  const load = () => { setFailed(false); setItems(null); void model.load().then((rows) => { if (alive.current) setItems(rows); }, () => { if (alive.current) setFailed(true); }); };
+  const loadSeq = useRef(0);
+  // 늦게 온 옛 응답이 최신 응답을 덮지 않게 호출 번호를 둔다.
+  const load = () => { const seq = ++loadSeq.current; setFailed(false); setItems(null); void model.load().then((rows) => { if (alive.current && seq === loadSeq.current) setItems(rows); }, () => { if (alive.current && seq === loadSeq.current) setFailed(true); }); };
   useEffect(() => { alive.current = true; load(); return () => { alive.current = false; }; }, []); // account key remounts the page
   return <div className="settings px-[var(--gutter)] pb-[calc(var(--tabbar-h)+32px)] min-[720px]:px-[24px] min-[720px]:pb-[48px]">
     <Section id="blocked-authors" label="차단한 작성자">
@@ -298,7 +300,7 @@ function BlockedAuthors({ model }: { model: NonNullable<SettingsModel['questionB
       {!failed && !items ? <p role="status" className={NOTE_TEXT}>불러오고 있어요</p> : null}
       {items?.length === 0 ? <p className={NOTE_TEXT}>차단한 작성자가 없어요</p> : null}
       {items?.map((item, index) => <Setting key={item.id} name={`차단한 작성자 ${index + 1}`} help={Number.isNaN(Date.parse(item.createdAt)) ? '날짜를 알 수 없어요' : `차단한 날 · ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long', timeZone: 'Asia/Seoul' }).format(new Date(item.createdAt))}`}>
-        <button type="button" className={GHOST_BUTTON} disabled={busy !== null} aria-label={`차단 해제: 차단한 작성자 ${index + 1}`} onClick={() => { setBusy(item.id); void model.unblock(item.id).then((ok) => { if (alive.current && ok) setItems((old) => old?.filter((row) => row.id !== item.id) ?? null); }, () => { if (alive.current) setFailed(true); }).finally(() => { if (alive.current) setBusy(null); }); }}>차단 해제</button>
+        <button type="button" className={GHOST_BUTTON} disabled={busy !== null} aria-label={`차단 해제: 차단한 작성자 ${index + 1}`} onClick={() => { setBusy(item.id); void model.unblock(item.id).then((ok) => { if (alive.current && ok) setItems((old) => old?.filter((row) => row.id !== item.id) ?? null); }, () => { /* 실패는 토스트로 알리고 목록은 그대로 둔다 */ }).finally(() => { if (alive.current) setBusy(null); }); }}>차단 해제</button>
       </Setting>)}
     </Section>
   </div>;
@@ -358,7 +360,7 @@ function BoardGroups({ model }: { model: SettingsModel }) {
       {needle
         ? found.length
           ? <div className="choice-list grid overflow-hidden rounded-lg bg-surface" role="group" aria-label="검색 결과">{found.map(row)}</div>
-          : <p className="field-note text-[14px] leading-[20px] text-ink-2" role="status">'{query}'에 맞는 게시판이 없어요. 다른 단어로 찾아보세요.</p>
+          : <p className="field-note text-[14px] leading-[20px] text-ink-2" role="status">'{query}'에 맞는 게시판이 없어요</p>
         : current
           ? <>
             <BackToGroups current={current} noun={collegeOrder.includes(current) ? '단과대' : '묶음'} onBack={() => setGroup(null)} />

@@ -450,6 +450,8 @@ export class AppController extends Reactive {
   sortMenuOpen = false;
   // 글별 본문(D-013). 'loading'이면 받는 중, null이면 아직 서버가 받지 않은 글.
   bodies = new Map<string, NoticeBody | null | 'loading'>();
+  /** 본문 요청마다 하나. 시간 초과·다시 불러오기·계정 전환·새로고침 때 끊는다. */
+  private bodyAborts = new Map<string, AbortController>();
   /** 내 Gemini 요약. 공유 본문 캐시와 따로 두어 계정이 바뀌면 비운다. */
   summaries = new Map<string, MyNoticeInfo | null | 'loading'>();
   myDeadlines = new Map<string, Pick<MyNoticeInfo, 'deadline' | 'deadlineKind'>>();
@@ -497,7 +499,7 @@ export class AppController extends Reactive {
           if (previousUserId && !userId) void clearListCache(previousUserId);
           this.cacheReady = false; this.liveFeedReady = false; this.liveAccountReady = false;
           this.saveCounts = new Map(); ++this.saveCountRevision;
-          this.notices = []; this.sources = []; this.generatedAt = null; this.bodies.clear();
+          this.notices = []; this.sources = []; this.generatedAt = null; this.abortBodies(); this.bodies.clear();
           const kept = savedSelection(); this.selectionReady = false;   // 아래에서 계정을 바꾸는 동안 저장된 선택을 덮어쓰지 않는다
           this.authUserId = userId;
           const epoch = this.advanceAccountEpoch();
@@ -617,6 +619,7 @@ export class AppController extends Reactive {
       // 뒤늦게 채운 본문도 새 수집 결과와 함께 다시 받는다.
       if (this.generatedAt !== notices!.generated_at) {
         this.generatedAt = notices!.generated_at;
+        this.abortBodies();
         this.bodies = new Map();
       }
       // 기한이 지난 공지는 어느 목록에도 두지 않는다(저장·검색 포함). 서버가 나중에 지운다. 숨기는 곳은 여기 한 곳이다.
@@ -986,9 +989,9 @@ export class AppController extends Reactive {
     return epoch;
   }
 
-  loadQuestions(noticeId: string): void {
+  loadQuestions(noticeId: string): Promise<void> {
     const api = this.qeApi(), userId = this.authUserId;
-    if (!api || !userId) return;
+    if (!api || !userId) return Promise.resolve();
     const seq = ++this.qeSeq, epoch = this.subscriptionsEpoch;
     if (this.qeState.noticeId !== noticeId) this.qeState = { noticeId, status: 'loading', questions: [], experiences: EMPTY_EXPERIENCES };
     else if (this.qeState.status === 'failed') this.qeState = { ...this.qeState, status: 'loading' };
@@ -997,7 +1000,7 @@ export class AppController extends Reactive {
       if (guard() && experiences.posts.some((post) => post.mine)) this.writeQeDraft(this.qeDraftKey(noticeId), null);
       return experiences;
     });
-    void Promise.all([api.listQuestions(noticeId, guard), reviews]).then(([questions, experiences]) => {
+    return Promise.all([api.listQuestions(noticeId, guard), reviews]).then(([questions, experiences]) => {
       if (guard()) this.qeState = { noticeId, status: 'ready', questions, experiences };
     }, (error: unknown) => {
       if (error instanceof AccountChanged || !guard()) return;
@@ -1026,7 +1029,8 @@ export class AppController extends Reactive {
       const value = await work(api, guard);
       if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return { ok: false };
       if (done) this.showToast(done);
-      if (this.qeState.noticeId === noticeId) this.loadQuestions(noticeId);
+      // 다시 불러오기가 끝날 때까지 busy를 유지한다(옛 값으로 수정 폼이 다시 열리지 않게).
+      if (this.qeState.noticeId === noticeId) await this.loadQuestions(noticeId);
       return { ok: true, value };
     } catch (error) {
       if (error instanceof AccountChanged || epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return { ok: false };
@@ -1060,8 +1064,8 @@ export class AppController extends Reactive {
       load: () => { if (current()) this.loadQuestions(id); },
       ask: (body: string, parentId?: string) => run((api, guard) => api.createQuestion(id, body, parentId, guard), parentId ? '답을 남겼어요' : '질문을 남겼어요'),
       review: (input: ExperienceInput) => run(async (api, guard) => { await api.createExperience(id, input, guard); }, '후기를 남겼어요'),
-      editQuestion: (postId, body) => run((api, guard) => api.editQuestion(postId, body, guard), '수정했어요', false),
-      editReview: (postId, input) => run((api, guard) => api.editExperience(postId, input, guard), '수정했어요', false),
+      editQuestion: (postId, body) => this.qeBusyCount > 0 ? Promise.resolve(false) : run((api, guard) => api.editQuestion(postId, body, guard), '수정했어요', false),
+      editReview: (postId, input) => this.qeBusyCount > 0 ? Promise.resolve(false) : run((api, guard) => api.editExperience(postId, input, guard), '수정했어요', false),
       remove: (postId) => run((api, guard) => api.deletePost(postId, guard), '지웠어요'),
       report: (postId) => run((api, guard) => api.report(postId, guard), '신고했어요. 확인할게요'),
       block: (postId) => run(async (api, guard) => { await api.blockAuthor(postId, guard); }, '이 작성자를 차단했어요'),
@@ -1089,7 +1093,7 @@ export class AppController extends Reactive {
       },
       unblock: async (blockId: string) => {
         if (!current() || this.qeUnblockPending) return false;
-        const pending = this.qeRun('', (api, guard) => api.unblock(blockId, guard), '차단을 해제했어요').then(({ ok }) => ok);
+        const pending = this.qeRun(this.qeState.noticeId ?? '', (api, guard) => api.unblock(blockId, guard), '차단을 해제했어요').then(({ ok }) => ok);
         this.qeUnblockPending = pending;
         try {
           return await pending;
@@ -1273,8 +1277,8 @@ export class AppController extends Reactive {
   /** allBoards가 true이면 고른 게시판과 키워드는 무시하고 검색어만 적용한다(왼쪽 메뉴의 탭 숫자용). */
   filtered(notices = this.notices, allBoards = false): Notice[] {
     const query = this.query.trim().toLowerCase();
+    const board = this.activeBoard();
     return notices.filter((n) => {
-      const board = this.activeBoard();
       if (!allBoards && board !== 'all' && n.source_id !== board) return false;
       if (!allBoards && this.keyword && !this.interests(n).includes(this.keyword)) return false;
       if (!query) return true;
@@ -2956,7 +2960,11 @@ export class AppController extends Reactive {
     const cached = bodies.get(notice.id);
     if (cached !== undefined) return cached;
     bodies.set(notice.id, 'loading');
-    withTimeout(fetchBody(notice), 20_000).catch(() => null).then((body) => {
+    const controller = new AbortController();
+    this.bodyAborts.set(notice.id, controller);
+    withTimeout(fetchBody(notice, controller.signal), 20_000, () => controller.abort()).catch(() => null).then((body) => {
+      if (this.bodyAborts.get(notice.id) !== controller) return;
+      this.bodyAborts.delete(notice.id);
       if (bodies !== this.bodies || epoch !== this.subscriptionsEpoch || bodies.get(notice.id) !== 'loading') return;
       if (generation !== this.generatedAt) bodies.delete(notice.id);
       else bodies.set(notice.id, body);
@@ -2964,15 +2972,29 @@ export class AppController extends Reactive {
     });
     return 'loading';
   }
+
+  /** 진행 중인 본문 요청을 모두 끊는다(계정 전환·새 수집 결과). */
+  abortBodies(): void {
+    for (const controller of this.bodyAborts.values()) controller.abort();
+    this.bodyAborts.clear();
+  }
+
+  /** '본문 다시 불러오기': 멈춘 옛 요청을 끊고 새로 한 번만 요청한다. */
+  retryBody(notice: Notice): void {
+    this.bodyAborts.get(notice.id)?.abort();
+    this.bodyAborts.delete(notice.id);
+    this.bodies.delete(notice.id);
+    this.requestUpdate();
+  }
 }
 
 defineReactive(AppController, Object.keys(AppController.properties));
 
 /** 알림 상태 확인 단계 하나가 이 시간 안에 끝나지 않으면 실패로 본다. */
 const PUSH_CHECK_MS = 10_000;
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout?: () => void): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    const timer = setTimeout(() => { onTimeout?.(); reject(new Error('timeout')); }, ms);
     promise.then((value) => { clearTimeout(timer); resolve(value); }, (error: unknown) => { clearTimeout(timer); reject(error); });
   });
 }
