@@ -618,7 +618,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
   const body = app.body(notice);
   const translation = app.detailTranslation(notice, body);
   const shownBody = body && body !== 'loading' && translation ? { ...body, translation } : body;
-  const gradDetail = app.gradPartsFor(notice, (judgement?.ai ?? mine?.ai)?.verdict);
+  const gradDetail = app.gradPartsFor(notice, app.detailAi(notice)?.verdict);
   const hasGrad = gradDetail.length > 0;
   const interests = [...new Set([...app.shownInterests(notice, hasGrad), ...bodyInterests(app.keywords, body, keywordMatches).filter((word) => app.shownInterests(notice, hasGrad).includes(word) || !app.isExternal(notice) || !/^(인턴|인턴십|인턴쉽|intern|internship)$/i.test(word))])];
   const translatedTitle = translation?.title ?? app.myTranslations.get(notice.id)?.title;
@@ -630,9 +630,9 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
     subscription: app.showsShareSubscription(notice) ? { pending: app.subscriptionsLoading, onSubscribe: () => { void app.subscribeFromShare(notice); } } : undefined,
     today: todayKst(), body: shownBody, mySummary: mine?.summary ?? null,
     aiHint: app.aiHintShown() ? { connect: () => app.openSettings('keys'), dismiss: () => app.dismissAiHint() } : undefined, summarizing: app.summarizing === notice.id, interests,
-    ai: judgement?.ai ?? mine?.ai ?? null, rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
+    ai: app.detailAi(notice), rule: judgement?.rule_name ?? null, notified: !!judgement?.notified,
     coop: app.kindOf(notice) === 'coop',
-    pending: !(judgement?.ai ?? mine?.ai) && !interests.length && !hasGrad && app.judgePending(notice),
+    pending: !app.detailAi(notice) && !interests.length && !hasGrad && app.judgePending(notice),
     retry: () => app.retryBody(notice),
     opportunity: app.opportunityShown(notice) ? (() => {
       const record = app.opportunities.get(notice.id), source = app.sourceName(notice);

@@ -28,3 +28,17 @@ test('a translation server read that fails before the cache restore does not hid
   await setImmediate();
   assert.deepEqual(app.detailTranslation(notice, null), cachedTranslation);
 });
+
+test('a successful detail read wins over a stale cached list judgement, including an empty result', () => {
+  const Controller = build(['  detailAi('], {});
+  const stale = { verdict: 'relevant', reason: '옛 이유' }, fresh = { verdict: 'not_relevant', reason: '새 이유' };
+  const app = Object.assign(new Controller(), {
+    summaries: new Map(), liveInfo: new Set(), judgement: () => ({ ai: stale }), myInfo: () => null,
+  });
+  const notice = { id: 'n' };
+  assert.equal(app.detailAi(notice), stale);                         // 상세 조회 전에는 목록 판정
+  app.summaries.set('n', { ai: fresh }); app.liveInfo.add('n');
+  assert.equal(app.detailAi(notice), fresh);                         // 조회가 성공하면 그 결과
+  app.summaries.set('n', null);
+  assert.equal(app.detailAi(notice), null);                          // 빈 결과도 우선
+});

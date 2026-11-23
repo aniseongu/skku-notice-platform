@@ -607,7 +607,7 @@ export class AppController extends Reactive {
           this.syncInboxOwner(userId, previousUserId);
           this.myDeadlines = new Map(); this.summaryDeadlineWrites.clear(); ++this.deadlineRequest; this.myTranslations = new Map(); this.detailTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
-          this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.devicesLoaded = false; this.thisDeviceId = null; this.devicesBusy = false; this.devicesError = ''; this.devicesLoadFailed = false; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
+          this.resetGraduations(); this.summaries = new Map(); this.liveInfo = new Set(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.devicesLoaded = false; this.thisDeviceId = null; this.devicesBusy = false; this.devicesError = ''; this.devicesLoadFailed = false; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
           this.opportunities = new Map(); this.opportunitiesStatus = 'idle'; this.opportunityFilter = 'all'; this.statusMenuOpen = false; this.reordering = false; this.opportunityQueue = new Map();
           this.teamState = { noticeId: null, status: 'loading', posts: [] }; this.teamBusy = false; this.teamBusyCount = 0; this.teamUnavailable = false; ++this.teamSeq;
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
@@ -3399,6 +3399,8 @@ export class AppController extends Reactive {
     return (row ? Date.parse(row.updated_at) : NaN) || fetchedAt;
   }
   private missingSummaries = new Set<string>();
+  /** 서버에서 이 계정의 상세 조회가 성공한 공지. 이때는 늦게 도착한 기기 목록 캐시의 옛 판정보다 이 결과(빈 결과 포함)를 쓴다. */
+  private liveInfo = new Set<string>();
 
   private restoreDetail(id: string, userId: string, epoch: number) {
     const pending = this.detailRestores.get(id);
@@ -3441,12 +3443,20 @@ export class AppController extends Reactive {
     void loadMyNoticeInfo(authClient, userId, id).then((info) => {
       if (!this.isCurrentAccount(userId, epoch)) return;
       if (!info?.summary) this.missingSummaries.add(id);
+      this.liveInfo.add(id);
       this.summaries.set(id, info);
       this.cacheDetail(id, 'info', info);
       this.requestUpdate();
     }, () => {
       // 서버 읽기가 실패하면 캐시는 그대로 둔다. 행이 없다고 확인하기 전에는 요약을 생성하지 않는다.
     });
+  }
+
+  /** 상세에 보일 AI 판정: 상세 조회가 성공했으면 그 결과(없으면 없음)를, 아니면 목록의 판정을 쓰고 없으면 기기 캐시의 상세 값을 쓴다. */
+  detailAi(notice: Notice): Judgement['ai'] | null {
+    const info = this.summaries.get(notice.id);
+    if (this.liveInfo.has(notice.id) && info !== 'loading') return (info ? info.ai : null) ?? null;
+    return this.judgement(notice)?.ai ?? this.myInfo(notice)?.ai ?? null;
   }
 
   myInfo(notice: Notice): MyNoticeInfo | null {
