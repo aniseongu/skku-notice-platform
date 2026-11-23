@@ -40,7 +40,9 @@ test('saved notice: one tap sets the status, the memo can be edited, and the men
   await page.emulateMedia({ colorScheme: 'dark' });
   const interested = section.getByRole('radio', { name: '관심 있음' });
   await expect(interested).toHaveAttribute('aria-checked', 'true');
-  await expect(interested).toHaveCSS('box-shadow', /inset/);
+  await expect(interested).toHaveCSS('font-weight', '600');   // 선택 칸은 굵은 글자 + 트랙보다 밝은 면, 밝은 테두리는 없다
+  expect(await interested.evaluate((el) => getComputedStyle(el).boxShadow)).not.toMatch(/inset/);
+  expect(await interested.evaluate((el) => getComputedStyle(el).backgroundColor !== getComputedStyle(el.parentElement!).backgroundColor)).toBe(true);
   await expect(section.getByRole('textbox', { name: '메모' })).toHaveCount(0);   // 메모는 접혀 있다
   await expect(section.getByText('저장을 해제해도 상태와 메모는 남아요')).toHaveCount(0);
   const prepare = section.getByRole('radio', { name: '준비 중' });

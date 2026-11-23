@@ -3149,8 +3149,9 @@ test('theme segments use one tab stop and keep the selected border in dark mode'
   await page.keyboard.press('Enter');
   await expect(dark).toBeChecked();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await expect(dark).toHaveCSS('box-shadow', /inset/);
-  await expect(auto).toHaveCSS('box-shadow', 'none');
+  await expect(dark).toHaveCSS('font-weight', '600');
+  expect(await dark.evaluate((el) => getComputedStyle(el).boxShadow)).not.toMatch(/inset/);
+  await expect(auto).toHaveCSS('font-weight', '500');
   await page.keyboard.press('Tab');
   expect(await group.evaluate((element) => element.contains(document.activeElement))).toBe(false);
   await page.keyboard.press('Shift+Tab');
