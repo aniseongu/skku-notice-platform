@@ -45,24 +45,22 @@ const SAVED_META_SPAN = 'max-[719px]:truncate';
 export const REORDER_META = 'mb-[2px] flex min-w-0 items-center gap-x-[6px] text-[13px] leading-[18px] font-normal text-ink-3';
 export const REORDER_META_SPAN = 'min-w-0 truncate';
 
-export function SavedRowStatus({ status }: { status?: OpportunityStatus }) {
+export function SavedRowStatus({ status, className = '' }: { status?: OpportunityStatus; className?: string }) {
   if (!status || status === 'interested') return null;
-  return <span className={`${STATUS_META} font-semibold text-ink-2`}>
+  return <span className={`${STATUS_META} font-semibold text-ink-2 ${className}`}>
     <span className={`size-[6px] rounded-full ${STATUS_DOT}`} aria-hidden="true" />
     {OPPORTUNITY_LABELS[status]}
   </span>;
 }
 
 function NoticeRows({ model }: { model: NoticeRowsModel }) {
-  // 저장 보기만 PC 메타 열을 넓혀 상태·게시판을 한 줄에 둔다(다른 탭의 줄 모양은 그대로).
-  const layout = model.savedView ? ROW_LAYOUT.replace('min-[720px]:grid-cols-[120px_minmax(0,1fr)_48px]', 'min-[720px]:grid-cols-[176px_minmax(0,1fr)_48px]') : ROW_LAYOUT;
-  const layoutSelecting = model.savedView ? ROW_LAYOUT_SELECTING.replace('min-[720px]:grid-cols-[106px_minmax(0,1fr)_48px]', 'min-[720px]:grid-cols-[162px_minmax(0,1fr)_48px]') : ROW_LAYOUT_SELECTING;
   return <ol className="rows m-0 list-none overflow-hidden bg-surface p-0 min-[720px]:rounded-none min-[720px]:bg-transparent">{model.rows.map((row, index) => {
     const n = row.notice;
     const title = cleanTitle(n.title_ko || n.title);
     const tags = [n.category, n.pinned ? '고정' : '', n.changed_at ? '수정됨' : '', !model.savedView && row.saved ? '저장함' : ''].filter(Boolean).join(', ');
     const metaSpan = model.savedView ? `${META_SPAN} ${SAVED_META_SPAN}` : META_SPAN;
     const board = row.source ? <span className={`board ${metaSpan} ${row.read ? '' : 'min-[720px]:text-ink-2 min-[720px]:font-semibold'}`}>{row.source}</span> : null;
+    const category = tags ? <span className={`cat ${metaSpan}`} title={tags}>{tags}</span> : null;
     const passed = n.deadline ? deadlinePassed(n.deadline) : false;
     const urgent = !!n.deadline && !passed && daysLeft(n.deadline, model.today) <= 3;
     const hasReason = row.interests.length > 0 || !!row.ai || !!row.rule || (row.grad?.length ?? 0) > 0 || !!row.pending;
@@ -77,17 +75,19 @@ function NoticeRows({ model }: { model: NoticeRowsModel }) {
     return <li key={n.id} className={model.selecting ? 'batch-row flex items-stretch bg-surface min-[720px]:relative max-[719px]:[&:has(.row:active)_.selection-check]:bg-sunken' : ''}>
       {model.selecting ? <label className={`selection-check box-border grid min-h-[44px] w-[42px] flex-none cursor-pointer [place-items:center_start] pl-[var(--gutter)] min-[720px]:absolute min-[720px]:inset-y-0 min-[720px]:left-0 min-[720px]:z-[1] min-[720px]:w-[48px] min-[720px]:bg-transparent! min-[720px]:pl-[24px] ${checkBg} ${index > 0 ? 'border-t border-line' : ''}`}><input className={CHECKBOX} type="checkbox" aria-label={`${title} 선택`} checked={row.selected}
         onChange={() => model.toggleSelection(n.id)} /></label> : null}
-      <a className={`row ${row.dim ? 'dim' : ''} ${row.read ? 'read' : 'unread'} ${model.selecting ? `${layoutSelecting} min-w-0 flex-1` : layout} ${hasReason ? DESKTOP_AREAS : DESKTOP_AREAS_NO_REASON} ${border} ${bg} ${hover} active:bg-sunken focus-visible:outline-offset-[-2px]`} href={safeUrl(n.url)} target="_blank" rel="noopener"
+      <a className={`row ${row.dim ? 'dim' : ''} ${row.read ? 'read' : 'unread'} ${model.selecting ? `${ROW_LAYOUT_SELECTING} min-w-0 flex-1` : ROW_LAYOUT} ${hasReason ? DESKTOP_AREAS : DESKTOP_AREAS_NO_REASON} ${border} ${bg} ${hover} active:bg-sunken focus-visible:outline-offset-[-2px]`} href={safeUrl(n.url)} target="_blank" rel="noopener"
         data-id={n.id} aria-current={row.current ? 'true' : 'false'} onClick={(event) => model.open(event.nativeEvent, n)}>
         <span className="visually-hidden">{row.read ? '읽은 공지' : '읽지 않은 공지'}</span>
         <span className={`meta ${META} ${model.savedView ? 'max-[719px]:flex-nowrap' : ''}`}>
-          {model.savedView ? <span className="max-[719px]:contents min-[720px]:flex min-[720px]:min-w-0 min-[720px]:flex-nowrap min-[720px]:items-center min-[720px]:gap-[8px]">
-            <SavedRowStatus status={row.status} />
-            {board}
-          </span> : board}
-          {tags ? <span className={`cat ${metaSpan}`} title={tags}>{tags}</span> : null}
+          {board}
+          {model.savedView && row.status && row.status !== 'interested'
+            ? <span className="max-[719px]:contents min-[720px]:flex min-[720px]:min-w-0 min-[720px]:items-center min-[720px]:gap-[6px]">
+              <SavedRowStatus status={row.status} className="max-[719px]:order-first" />
+              {category}
+            </span>
+            : category}
         </span>
-        <span className={`title [grid-area:title] line-clamp-2 text-[16px] leading-[23px] min-[720px]:text-[15px] min-[720px]:leading-[22px] ${row.read ? 'font-normal text-ink-2' : 'font-semibold'} ${n.deadline ? 'mt-[4px] min-[720px]:mt-0' : ''}`}>{title}</span>
+        <span className={`title [grid-area:title] line-clamp-2 text-[16px] leading-[23px] min-[720px]:text-[15px] min-[720px]:leading-[22px] ${row.read ? 'font-normal text-ink-2' : 'font-semibold'}`}>{title}</span>
         <span className="sub [grid-area:reason] mt-[2px] text-[14px] leading-[20px] text-ink-2 empty:hidden min-[720px]:mt-0 min-[720px]:overflow-hidden min-[720px]:text-[13px] min-[720px]:leading-[19px] min-[720px]:text-ellipsis min-[720px]:whitespace-nowrap"><Reason interests={row.interests} ai={row.ai} rule={row.rule} read={row.read} grad={row.grad} pending={row.pending} /></span>
         {n.deadline ? <span className={`dday ${urgent ? 'urgent' : ''} ${passed ? 'ended' : ''} [grid-area:dday] self-center text-[14px] leading-[18px] tabular-nums min-[720px]:self-start min-[720px]:pt-[2px] min-[720px]:text-right ${ddayWeight} ${ddayColor}`}>{deadlineText(n.deadline, model.today)}</span> : null}
       </a>

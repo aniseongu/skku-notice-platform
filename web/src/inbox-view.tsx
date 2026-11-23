@@ -2,6 +2,7 @@
 // 행 모양과 읽음 표시는 공지 목록(notice-rows.tsx)과 같다: 구분선만 있는 전체 폭 줄, 안 읽음은 면(surface)+굵은 제목, 읽음은 읽음 면(read)+보통 제목.
 import { NOTE_TEXT, TEXT_BUTTON } from './cls';
 import { inboxTime, type InboxItem } from './inbox';
+import { Empty } from './empty';
 import { Confirm } from './team-section';
 
 export interface InboxModel {
@@ -16,16 +17,14 @@ export interface InboxModel {
 
 const GUTTER = 'px-[var(--gutter)] min-[720px]:px-[24px]';
 
-export function InboxPage({ model }: { model: InboxModel }) {
+export function InboxPage({ model, overlay }: { model: InboxModel; overlay?: boolean }) {
   const { items } = model;
   const hasUnread = items.some((item) => !item.read);
-  return <div className="inbox pb-[calc(var(--tabbar-h)+32px)] min-[720px]:pb-[48px]">
-    {items.length === 0 ? <section aria-label="알림함" className="empty flex flex-col items-center gap-[4px] px-[24px] pt-[64px] pb-[12px] text-center text-ink-3">
-      <svg className="i mb-[8px] size-[36px] flex-none fill-none stroke-current [stroke-width:1.5] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href="icons/sprite.svg#ginkgo" /></svg>
-      <h2 className="m-0 text-[16px] leading-[23px] font-bold text-ink-2">{model.pushOn ? '받은 알림이 없어요' : '알림이 꺼져 있어요'}</h2>
-      <p className="m-0 mb-[12px] text-[14px] leading-[20px]">{model.pushOn ? '새 공지 알림을 놓쳐도 여기서 다시 볼 수 있어요' : '알림을 켜면 놓친 공지를 여기서 볼 수 있어요'}</p>
-      {model.pushOn ? null : <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex min-h-[44px] items-center justify-center rounded-md border border-line bg-surface px-[16px] py-0 text-[15px] font-semibold text-ink" onClick={model.goNotifications}>알림 켜기</button>}
-    </section> : <section aria-label="받은 알림">
+  return <div className={`inbox ${overlay ? 'pb-[20px]' : 'pb-[calc(var(--tabbar-h)+32px)] min-[720px]:pb-[48px]'}`}>
+    {items.length === 0 ? <Empty sectionLabel="알림함"
+      title={model.pushOn ? '받은 알림이 없어요' : '알림이 꺼져 있어요'}
+      body={model.pushOn ? '새 공지 알림을 놓쳐도 여기서 다시 볼 수 있어요' : '알림을 켜면 놓친 공지를 여기서 볼 수 있어요'}
+      action={model.pushOn ? undefined : '알림 켜기'} onAction={model.goNotifications} /> : <section aria-label="받은 알림">
       <div className={`inbox-actions flex min-h-[48px] flex-wrap items-center justify-between gap-x-[4px] ${GUTTER}`}>
         <button type="button" className={`${TEXT_BUTTON} -ml-[8px]`} disabled={!hasUnread} onClick={model.readAll}>모두 읽음으로 표시</button>
         <div className="-mr-[8px] ml-auto"><Confirm label="모두 지우기" question="모두 지울까요? 되돌릴 수 없어요" onConfirm={model.clear} /></div>

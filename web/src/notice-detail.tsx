@@ -1,3 +1,4 @@
+import { SegmentedChoice } from './segmented-choice';
 import { Reason } from './reason';
 import { createRoot, type Root } from 'react-dom/client';
 import { cleanTitle, deadlineDetail, deadlinePassed, deadlineText, daysLeft, koreanDate, safeUrl, type Notice, type NoticeBody, type Verdict } from './data';
@@ -7,7 +8,7 @@ import { summaryLines } from './summary-lines';
 import type { GradPart } from './graduation-assessment';
 import { GraduationNotes, GraduationSection, type GraduationModel } from './graduation-assessment-view';
 import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, NOTE_MAX, type OpportunityStatus } from './opportunities';
-import { DETAIL_SECTION, IMAGE_MISSING_CLASS, NOTE_TEXT, SECTION_TITLE, SEGMENTED_GRID, SEGMENTED_OPTION, SETTINGS_INPUT, SKELETON_BAR, TEXT_BUTTON, TEXT_BUTTON_BODY } from './cls';
+import { DETAIL_SECTION, IMAGE_MISSING_CLASS, NOTE_TEXT, SECTION_TITLE, SETTINGS_INPUT, SKELETON_BAR, TEXT_BUTTON, TEXT_BUTTON_BODY } from './cls';
 import { MoreMenu } from './more-menu';
 import { TeamSection, type TeamModel } from './team-section';
 import { QuestionsSection, type QuestionsModel } from './questions-section';
@@ -53,6 +54,8 @@ export interface OpportunityModel {
 }
 
 
+const OPPORTUNITY_OPTIONS = OPPORTUNITY_STATUSES.map((status) => [status, OPPORTUNITY_LABELS[status]] as const);
+
 function OpportunitySection({ model }: { model: OpportunityModel }) {
   const [editingMemo, setEditingMemo] = useState(false);
   const [savingMemo, setSavingMemo] = useState(false);
@@ -67,20 +70,6 @@ function OpportunitySection({ model }: { model: OpportunityModel }) {
     setSavingMemo(false);
     if (saved) setEditingMemo(false);
   };
-  // 방향키는 포커스만 옮기고, Space·Enter로 고른다(이동마다 저장 요청이 나가지 않게).
-  const [cursor, setCursor] = useState<OpportunityStatus | null>(null);
-  const focusable = cursor ?? model.status ?? OPPORTUNITY_STATUSES[0];
-  const move = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
-    const at = Math.max(buttons.findIndex((button) => button === document.activeElement), 0);
-    const next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? Math.min(at + 1, buttons.length - 1)
-      : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? Math.max(at - 1, 0)
-        : event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : -1;
-    if (next < 0) return;
-    event.preventDefault();
-    setCursor(OPPORTUNITY_STATUSES[next]);
-    buttons[next]?.focus();
-  };
   return <section className={`${DETAIL_SECTION} opportunity`} aria-labelledby="sec-opportunity">
     <div className="flex min-h-[44px] items-center">
       <h3 id="sec-opportunity" className={`${SECTION_TITLE} !mb-0`}>내 진행 상태</h3>
@@ -90,10 +79,7 @@ function OpportunitySection({ model }: { model: OpportunityModel }) {
         run: model.onRemove,
       }]} /> : null}
     </div>
-    <div role="radiogroup" aria-labelledby="sec-opportunity" className={`${SEGMENTED_GRID} grid-cols-4`} onKeyDown={move}>
-      {OPPORTUNITY_STATUSES.map((status) => <button type="button" role="radio" key={status} className={`${SEGMENTED_OPTION} min-h-[44px]! whitespace-nowrap`} aria-checked={model.status === status}
-        tabIndex={status === focusable ? 0 : -1} onClick={() => model.onStatus(status)}>{OPPORTUNITY_LABELS[status]}</button>)}
-    </div>
+    <SegmentedChoice label="내 진행 상태" options={OPPORTUNITY_OPTIONS} value={model.status} onPick={model.onStatus} grid touchHeight noWrap />
     <div className="mt-[6px]">
       {editingMemo
         ? <textarea autoFocus rows={Math.max(2, Math.min(4, model.note.split('\n').length))} className={`${SETTINGS_INPUT} block w-full resize-y leading-[22px]`} aria-label="메모" placeholder="메모를 남겨요" maxLength={NOTE_MAX} defaultValue={model.note}

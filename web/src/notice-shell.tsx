@@ -3,18 +3,20 @@
 import { UpdateBar } from './update-bar';
 import { aiConnectModel } from './ai-connect';
 import { visibleTracks } from './graduation-assessment';
-import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
 import { applyBoardOrder } from './board-order';
 import { type IconName, type Notice, boardName, keywordMatches, deadlineGroup, deadlinePassed, kstDateOf, postedGroup, safeUrl, todayKst } from './data';
 import { APP_NAME } from './brand';
 import type { FeedbackKind } from './feedback';
 import { installMode, isStandalone } from './install-hint';
-import { CHECKBOX, CHEVRON_RIGHT, CHIP, CHIPS, CHIP_ADD, NOTE_TEXT } from './cls';
+import { CHECKBOX, CHEVRON_RIGHT, CHIP, CHIPS, CHIP_ADD, HEADER_ICON_BUTTON, NOTE_TEXT, SOLID_BUTTON } from './cls';
 import { authClient } from './auth';
 import { OPPORTUNITY_LABELS, OPPORTUNITY_STATUSES, type OpportunityStatus } from './opportunities';
 import { SavedReorderList, reorderItems } from './saved-reorder';
 import { keywordCounts } from './keyword-counts';
-import type { InboxItem } from './inbox';
+import { InboxPage, type InboxModel } from './inbox-view';
+import { OverlaySheet } from './overlay-sheet';
+import { Empty } from './empty';
 import { summarize } from './explore-map';
 import type { ExploreModel } from './explore-map-view';
 import { type AppController, STALE_MS, TABS, remember, settingsTitle } from './app-controller';
@@ -50,13 +52,12 @@ const Kbd = ({ keys, className = '', onSolid = false }: { keys: string[]; classN
   <span className={`kbd-group inline-flex gap-[4px] ${className}`} aria-hidden="true">{keys.map((key) => <kbd className={`${KBD} ${onSolid ? KBD_ON_SOLID : KBD_IDLE}`} key={key}>{key}</kbd>)}</span>;
 
 const Icon = ({ name }: { name: IconName }) => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true"><use href={`icons/sprite.svg#${name}`} /></svg>;
-const HEADER_ICON_BUTTON = 'icon-button relative grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover';
 const BellIcon = () => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>;
 /** 알림함 열기. 로그인한 계정에만 보이고, 안 읽은 알림이 있으면 점 하나만 더한다. */
-function InboxButton({ app }: { app: AppController }) {
+function InboxButton({ app, trigger }: { app: AppController; trigger: RefObject<HTMLButtonElement | null> }) {
   if (!app.authUserId) return null;
   const unread = app.inboxUnread;
-  return <button type="button" className={HEADER_ICON_BUTTON} aria-label={unread ? `알림함, 안 읽은 알림 ${unread}개` : '알림함'} title="알림함" onClick={app.openInbox}>
+  return <button type="button" ref={trigger} className={`${HEADER_ICON_BUTTON} relative`} aria-haspopup="dialog" aria-expanded={app.inboxOpen} aria-label={unread ? `알림함, 안 읽은 알림 ${unread}개` : '알림함'} title="알림함" onClick={app.openInbox}>
     <BellIcon />{unread ? <span className="absolute top-[10px] right-[11px] size-[8px] rounded-full bg-accent min-[720px]:top-[6px] min-[720px]:right-[7px]" aria-hidden="true" /> : null}
   </button>;
 }
@@ -65,7 +66,7 @@ const CompassIcon = () => <svg className="i size-[22px] flex-none fill-none stro
 function ExploreButton({ app }: { app: AppController }) {
   const recorded = app.view === 'saved' && app.authUserId ? app.exploreItems().length : 0;
   if (!recorded) return null;
-  return <button type="button" className={`${HEADER_ICON_BUTTON} group/map`} aria-label={`탐험 지도, 기록한 활동 ${recorded}개`} onClick={app.openExploreMap}>
+  return <button type="button" className={`${HEADER_ICON_BUTTON} relative group/map`} aria-label={`탐험 지도, 기록한 활동 ${recorded}개`} onClick={app.openExploreMap}>
     <CompassIcon />
     <span aria-hidden="true" className="explore-tooltip pointer-events-none invisible absolute top-full left-1/2 z-20 -translate-x-1/2 rounded-sm bg-ink px-[8px] py-[3px] text-[12px] whitespace-nowrap text-bg [@media(hover:hover)]:group-hover/map:visible group-focus-visible/map:visible">탐험 지도</span>
   </button>;
@@ -89,6 +90,7 @@ declare module 'react' {
 
 export function NoticeShell({ app }: { app: AppController }) {
   useSyncExternalStore(app.subscribe, app.getVersion);
+  const inboxTrigger = useRef<HTMLButtonElement>(null);
   // 화면이 반영된 뒤에 포커스 이동 같은 후속 작업이 풀리게 알린다.
   useEffect(() => { app.commit(); app.resumeDeepLink(); });
   useEffect(() => {
@@ -156,7 +158,7 @@ export function NoticeShell({ app }: { app: AppController }) {
         {reading ? <ReadingView app={app} notice={reading} /> : <>
           <div className="navigation-head contents">
             <header className={`${TOPBAR} ${settings ? TOPBAR_SETTINGS : TOPBAR_FEED}`}>
-              {settings ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover narrow-only back -ml-[12px] min-[720px]:hidden!" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} onClick={app.backSettings}><Icon name="back" /></button> : null}
+              {settings ? <button type="button" className={`${HEADER_ICON_BUTTON} narrow-only back -ml-[12px] min-[720px]:hidden!`} aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} onClick={app.backSettings}><Icon name="back" /></button> : null}
               {settings ? null : <Brand className="brand-mark narrow-only min-[720px]:hidden! mr-[8px] h-[36px] w-[36px] flex-none text-accent" />}
               <div className={TOPBAR_TEXT}>
                 <h1 className={`${TOPBAR_H1} ${settings ? '' : 'max-[719px]:text-[24px] max-[719px]:leading-[32px] max-[719px]:font-bold'}`}>{title}</h1>
@@ -169,15 +171,15 @@ export function NoticeShell({ app }: { app: AppController }) {
                   <input type="search" placeholder="공지 찾기" autoComplete="off" aria-label="공지 검색" aria-keyshortcuts="/" value={app.query}
                     onChange={(event) => { app.query = event.currentTarget.value; app.selectedReads = []; app.listChanged(); }} />
                   {app.query ? null : <Kbd keys={['/']} className="ml-auto" />}</label>
-                {app.detailOpen ? null : <button type="button" className={`${!selected ? 'invisible ' : ''}icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover wide-only max-[719px]:hidden min-[720px]:flex`} aria-label="상세 칸 열기" title="상세 칸 열기"
+                {app.detailOpen ? null : <button type="button" className={`${!selected ? 'invisible ' : ''}${HEADER_ICON_BUTTON} wide-only max-[719px]:hidden min-[720px]:flex`} aria-label="상세 칸 열기" title="상세 칸 열기"
                   onClick={() => app.setDetail(true)}><Icon name="panel" /></button>}
-                <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover" aria-label="공지 다시 가져오기" title="공지 다시 가져오기 (R)" aria-keyshortcuts="r"
+                <button type="button" className={HEADER_ICON_BUTTON} aria-label="공지 다시 가져오기" title="공지 다시 가져오기 (R)" aria-keyshortcuts="r"
                   disabled={app.loading} onClick={() => { void app.collectNow(); }}><Icon name="refresh" /></button>
                 <ExploreButton app={app} />
-                <InboxButton app={app} />
+                <InboxButton app={app} trigger={inboxTrigger} />
               </>}
-              {settings ? null : <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover narrow-only min-[720px]:hidden!" aria-label="설정" onClick={app.openSettingsHome}><GearIcon /></button>}
-              {settings ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover wide-only min-[720px]:-mr-[11px] max-[719px]:hidden min-[720px]:flex" aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} title={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 (Esc)' : '설정 닫기 (Esc)'}
+              {settings ? null : <button type="button" className={`${HEADER_ICON_BUTTON} narrow-only min-[720px]:hidden!`} aria-label="설정" onClick={app.openSettingsHome}><GearIcon /></button>}
+              {settings ? <button type="button" className={`${HEADER_ICON_BUTTON} wide-only min-[720px]:-mr-[11px] max-[719px]:hidden min-[720px]:flex`} aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} title={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 (Esc)' : '설정 닫기 (Esc)'}
                 aria-keyshortcuts="Escape" onClick={app.backSettings}><Icon name="close" /></button> : null}
             </header>
           </div>
@@ -204,12 +206,12 @@ export function NoticeShell({ app }: { app: AppController }) {
 
       <aside className={`detail-pane hidden min-[720px]:min-h-0 min-[720px]:overflow-y-auto min-[1080px]:bg-bg ${oneColumn ? '' : 'min-[1080px]:block'}`} aria-label="공지 상세">
         <div className="pane-head detail-head min-[720px]:flex min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:items-center min-[720px]:gap-[8px] min-[720px]:border-b min-[720px]:border-line min-[1080px]:justify-between min-[1080px]:pr-[32px] min-[1080px]:pl-[20px] min-[1080px]:[&_:is(.save-button,.share-button)]:size-[36px] [@media(pointer:coarse)]:min-[1080px]:[&_:is(.save-button,.share-button)]:size-[44px] min-[1080px]:[&_:is(.save-button,.share-button)]:rounded-md min-[1080px]:[&_.solid-button]:min-h-[36px] min-[1080px]:[&_.solid-button]:px-[14px] min-[1080px]:[&_.solid-button]:text-[14px] min-[1080px]:[&_.ghost-button]:min-h-[36px] min-[1080px]:[&_.ghost-button]:px-[14px] min-[1080px]:[&_.ghost-button]:text-[14px]">
-          {selected ? <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover" aria-label="상세 칸 닫기" title="상세 칸 닫기 (Esc)" aria-keyshortcuts="Escape"
+          {selected ? <button type="button" className={HEADER_ICON_BUTTON} aria-label="상세 칸 닫기" title="상세 칸 닫기 (Esc)" aria-keyshortcuts="Escape"
             onClick={() => app.setDetail(false)}><Icon name="close" /></button> : null}
           {selected ? <div className="detail-actions min-[1080px]:flex min-[1080px]:gap-[8px]">
             <SaveButton app={app} notice={selected} />
             <ShareButton app={app} notice={selected} />
-            <a className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" href={safeUrl(selected.url)} target="_blank" rel="noopener" aria-keyshortcuts="Enter">{openLabel(app, selected)}<Kbd keys={['Enter']} className="ml-[8px]" onSolid /></a></div> : null}
+            <a className={SOLID_BUTTON} href={safeUrl(selected.url)} target="_blank" rel="noopener" aria-keyshortcuts="Enter">{openLabel(app, selected)}<Kbd keys={['Enter']} className="ml-[8px]" onSolid /></a></div> : null}
         </div>
         {selected ? <Detail app={app} notice={selected} /> : <p className="detail-note detail-empty m-0 grid min-h-[60%] place-items-center px-[32px] py-[24px] text-[14px] leading-[19px] text-ink-3">공지를 고르면 여기에 보여요</p>}
       </aside>
@@ -225,6 +227,9 @@ export function NoticeShell({ app }: { app: AppController }) {
     <div className="toast fixed bottom-[calc(var(--tabbar-h)+16px+env(safe-area-inset-bottom))] left-1/2 min-[720px]:bottom-[24px] z-[4] w-max max-w-[calc(100%-32px)] [transform:translateX(-50%)] rounded-lg border border-line bg-toast px-[20px] py-[14px] text-[15px] leading-[22px] font-medium text-on-toast [box-shadow:var(--shadow-pop)]" role="status" hidden={!app.toast}>{app.toast}{app.toastLink ? <div className="toast-actions flex items-center justify-between gap-[12px]">
       <a className={`${TOAST_ACTION} underline`} href={app.toastLink} target={app.toastLink.startsWith('?') ? '_self' : '_blank'} rel="noopener noreferrer">{app.toastLinkLabel}</a>
       <button type="button" className={`${TOAST_ACTION} min-w-[44px] justify-center border-0 bg-transparent px-[4px] py-0`} onClick={() => { app.toast = ''; app.toastLink = null; }}>닫기</button></div> : null}</div>
+    {app.inboxOpen && !settings && !reading && !onboarding ? <OverlaySheet title="알림함" trigger={inboxTrigger} onClose={app.closeInbox}>
+      <InboxPage overlay model={inboxModel(app, () => app.openSettings('notifications'))} />
+    </OverlaySheet> : null}
     {app.shortcutsOpen ? <ShortcutsDialog app={app} /> : null}
     {onboarding ? <Onboarding app={app} /> : null}
   </>;
@@ -308,10 +313,21 @@ function settingsModel(app: AppController, pending: boolean) {
       refresh: () => { void app.refreshDevices(); }, setMode: (mode: string) => { void app.setCanvasMode(mode as CanvasMode); }, setAlertAll: (enabled: boolean) => { void app.setDeviceAlertAll(enabled); }, remove: (id: string) => { void app.removeDevice(id); }, rename: (id: string, name: string) => app.renameDevice(id, name),
       setSummaryTime: (period: 'am' | 'pm', hour: number, minute: number) => { void app.setSummaryTime(period, hour, minute); } },
     explore: app.settingsSection === 'explore' ? exploreModel(app) : undefined,
-    inbox: { items: app.inboxItems, pushOn: app.pushStatus === 'on', open: (item: InboxItem) => app.openInboxItem(item), remove: (id: string) => { void app.changeInbox({ kind: 'remove', ids: [id] }); },
-      readAll: () => { void app.changeInbox({ kind: 'read-all' }); }, clear: () => { void app.changeInbox({ kind: 'clear' }); }, goNotifications: () => app.openSettingsSection('notifications') },
+    inbox: inboxModel(app, () => app.openSettingsSection('notifications')),
     calendar: { ...(calendar ?? { auto: app.calendarAuto, connected: !!app.calendarId, syncedAt: app.calendarSyncedAt }), busy: app.calendarBusy, fetching: !!calendar, message: app.calendarMessage, error: app.calendarError, savedCount: app.saved.length,
       connect: () => { void app.connectCalendar(); }, sync: () => { void app.syncCalendarNow(); }, disconnect: () => { void app.disconnectCalendar(); } },
+  };
+}
+
+function inboxModel(app: AppController, goNotifications: () => void): InboxModel {
+  return {
+    items: app.inboxItems,
+    pushOn: app.pushStatus === 'on',
+    open: (item) => app.openInboxItem(item),
+    remove: (id) => { void app.changeInbox({ kind: 'remove', ids: [id] }); },
+    readAll: () => { void app.changeInbox({ kind: 'read-all' }); },
+    clear: () => { void app.changeInbox({ kind: 'clear' }); },
+    goNotifications,
   };
 }
 
@@ -366,10 +382,6 @@ function UpdatedTime({ app, count }: { app: AppController; count?: number }) {
   // "확인 필요"(판정)와 겹치지 않게 수집 지연은 다른 말로 쓴다.
   return <p className={`${UPDATED} ${stale ? 'stale text-ink-2' : 'text-ink-3'}`}>{stale ? `${time} 이후 새 공지를 못 가져왔어요` : `${total}${time} 기준`}</p>;
 }
-
-const Empty = ({ title, body, action, onAction }: { title: string; body: string; action?: string; onAction?: () => void }) =>
-  <div className="empty flex flex-col items-center gap-[4px] px-[24px] py-[64px] text-center text-ink-3 [&_.i]:mb-[8px] [&_.i]:size-[36px] [&_.i]:[stroke-width:1.5]"><Icon name="ginkgo" /><strong className="text-[16px] leading-[23px] text-ink-2">{title}</strong><p className="m-0 mb-[12px] text-[14px]">{body}</p>
-    {action ? <button type="button" className="ghost-button [@media(hover:hover)]:hover:bg-hover active:bg-hover inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border border-line bg-surface text-ink text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60" onClick={onAction}>{action}</button> : null}</div>;
 
 function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
   // 처음 불러오는 동안은 목록 자리를 비워 둔다. 기다린다는 말은 위의 기준 시각 줄 한 곳에만 있다(공지를 불러오고 있어요).
@@ -674,14 +686,14 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
 function ReadingView({ app, notice }: { app: AppController; notice: Notice }) {
   return <Fragment>
     <header className={TOPBAR}>
-      <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover back -ml-[12px]" aria-label="목록으로" onClick={() => history.back()}><Icon name="back" /></button>
+      <button type="button" className={`${HEADER_ICON_BUTTON} back -ml-[12px]`} aria-label="목록으로" onClick={() => history.back()}><Icon name="back" /></button>
       <div className={TOPBAR_TEXT}><h1 className={TOPBAR_H1}>공지</h1></div>
     </header>
     <div className="reading px-[var(--gutter)] pt-[16px] pb-[calc(96px+env(safe-area-inset-bottom))]"><Detail app={app} notice={notice} /></div>
     <div className="read-actions glass fixed inset-x-0 bottom-0 z-[3] flex gap-[8px] border-t border-line px-[var(--gutter)] pt-[12px] pb-[calc(12px+env(safe-area-inset-bottom))] [&>*]:flex-1 [&>:is(.save-button,.share-button)]:flex-none">
       <SaveButton app={app} notice={notice} />
       <ShareButton app={app} notice={notice} />
-      <a className="solid-button [@media(hover:hover)]:hover:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] active:bg-[color-mix(in_oklch,var(--accent)_88%,var(--text))] inline-flex items-center justify-center min-h-[44px] px-[16px] py-0 rounded-md border-0 bg-accent text-on-accent text-[15px] font-semibold no-underline whitespace-nowrap select-none [-webkit-user-select:none] disabled:border disabled:border-line disabled:bg-transparent disabled:text-ink-3 disabled:opacity-60 [.list-pane:has([data-qe-editing])_&]:bg-sunken [.list-pane:has([data-qe-editing])_&]:text-ink [.list-pane:has([data-qe-editing])_&]:active:bg-hover" href={safeUrl(notice.url)} target="_blank" rel="noopener">{openLabel(app, notice)}</a>
+      <a className={`${SOLID_BUTTON} [.list-pane:has([data-qe-editing])_&]:bg-sunken [.list-pane:has([data-qe-editing])_&]:text-ink [.list-pane:has([data-qe-editing])_&]:active:bg-hover`} href={safeUrl(notice.url)} target="_blank" rel="noopener">{openLabel(app, notice)}</a>
     </div>
   </Fragment>;
 }
@@ -694,7 +706,7 @@ function ShortcutsDialog({ app }: { app: AppController }) {
     onClick={(event) => { if (event.target === event.currentTarget) event.currentTarget.close(); }}>
     <div className="dialog-head -mr-[8px] flex h-[56px] items-center justify-between">
       <h2 id="shortcuts-title" className="text-[17px] font-bold">단축키</h2>
-      <button type="button" className="icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover" aria-label="닫기" onClick={(event) => event.currentTarget.closest('dialog')?.close()}><Icon name="close" /></button>
+      <button type="button" className={HEADER_ICON_BUTTON} aria-label="닫기" onClick={(event) => event.currentTarget.closest('dialog')?.close()}><Icon name="close" /></button>
     </div>
     {SHORTCUTS.map((section) => <section className="shortcut-group" key={section.group}>
       <h3 className="mx-0 mt-[12px] mb-[4px] text-[12px] leading-[16px] font-semibold text-ink-3">{section.group}</h3>

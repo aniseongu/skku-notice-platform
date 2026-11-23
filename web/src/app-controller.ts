@@ -213,6 +213,7 @@ export class AppController extends Reactive {
     view: { state: true }, board: { state: true }, keyword: { state: true }, keywords: { state: true }, query: { state: true },
     loading: { state: true }, devicesLoaded: { state: true }, accountDataLoaded: { state: true }, aiStateLoaded: { state: true }, settingsCapped: { state: true }, failed: { state: true }, selectedId: { state: true }, install: { state: true },
     inboxItems: { state: true },
+    inboxDialogOwner: { state: true },
     teamState: { state: true }, teamBusy: { state: true }, teamUnavailable: { state: true },
     qeState: { state: true }, qeBusy: { state: true }, qeUnavailable: { state: true },
     opportunities: { state: true }, opportunitiesStatus: { state: true }, opportunitiesLoading: { state: true }, opportunityFilter: { state: true },
@@ -338,6 +339,7 @@ export class AppController extends Reactive {
   keywordNote = '';
   // 알림함(이 기기가 받은 푸시, 서버에는 없다). 계정이 바뀌면 비우고 새 계정 것만 다시 읽는다.
   inboxItems: InboxItem[] = [];
+  private inboxDialogOwner: string | null = null;
   private inboxOpenId: string | null = null;
   private inboxSeq = 0;
   // 내 기회함(상태·메모). 계정이 바뀌면 비운다. 표가 없거나 못 불러오면 'unavailable'로 두고 화면에서 숨긴다.
@@ -2677,6 +2679,7 @@ export class AppController extends Reactive {
   }
 
   setView(view: View) {
+    this.closeInbox();
     const entering = view === 'settings' && this.view !== 'settings';
     this.selecting = false; this.selectedReads = [];
     this.view = view;
@@ -2798,6 +2801,7 @@ export class AppController extends Reactive {
   // 알림함. 소유자를 적고(남의 항목은 같은 트랜잭션에서 지운다) 읽는다. 로그아웃이면 이전 계정의 보관분만 지운다.
   // 소유자의 푸시 주소(endpoint)는 이 계정으로 기기를 서버에 등록한 직후 platform-browser-push가 따로 적는다. 그 전에는 워커가 저장하지 않는다.
   private syncInboxOwner(userId: string | null, previousUserId: string | null) {
+    this.closeInbox();
     this.inboxItems = []; ++this.inboxSeq;
     const epoch = this.subscriptionsEpoch;
     const isCurrent = () => this.isCurrentAccount(userId, epoch);
@@ -2821,7 +2825,15 @@ export class AppController extends Reactive {
 
   openExploreMap = () => { this.openSettings('explore'); };
 
-  openInbox = () => { this.openSettings('inbox'); };
+  get inboxOpen(): boolean { return !!this.authUserId && this.inboxDialogOwner === this.authUserId; }
+
+  openInbox = () => {
+    if (!this.authUserId) return;
+    this.inboxDialogOwner = this.authUserId;
+    void this.refreshInbox();
+  };
+
+  closeInbox = () => { this.inboxDialogOwner = null; };
 
   async changeInbox(change: InboxChange): Promise<void> {
     const userId = this.authUserId;
@@ -2834,15 +2846,23 @@ export class AppController extends Reactive {
   openInboxItem(item: InboxItem) {
     void this.changeInbox({ kind: 'read', ids: [item.id] });
     const noticeId = noticeIdOfItem(item);
-    if (noticeId) { this.inboxOpenId = noticeId; this.closeSettings(); this.handoffInboxOpen(); return; }
+    if (noticeId) {
+      this.inboxOpenId = noticeId;
+      this.closeInbox();
+      if (this.view === 'settings') this.closeSettings();
+      this.handoffInboxOpen();
+      return;
+    }
     // 받을 때 검사한 주소라도 저장소 값을 그대로 믿지 않고 같은 규칙으로 다시 확인한다.
     const safe = safeInboxUrl(item.url, location.origin);
     if (!safe) { this.showToast('이 알림의 주소를 열 수 없어요'); return; }
-    if (new URL(safe).origin === location.origin) this.closeSettings();
-    else window.open(safe, '_blank', 'noopener');
+    if (new URL(safe).origin === location.origin) {
+      this.closeInbox();
+      if (this.view === 'settings') this.closeSettings();
+    } else window.open(safe, '_blank', 'noopener');
   }
 
-  /** 설정을 나가 목록 화면이 된 뒤에 알림함에서 고른 공지를 딥링크로 연다(설정 화면에서는 열지 않는다). */
+  /** 목록에서 알림함에서 고른 공지를 딥링크로 연다. 설정에서 고르면 먼저 목록으로 돌아온다. */
   private handoffInboxOpen() {
     if (!this.inboxOpenId || this.view === 'settings') return;
     this.deepId = this.inboxOpenId; this.inboxOpenId = null;
@@ -2861,6 +2881,7 @@ export class AppController extends Reactive {
   leaveSettings = this.backSettings;
 
   onPopState = () => {
+    this.closeInbox();
     this.openedId = typeof history.state?.notice === 'string' ? history.state.notice : null;
     this.boardMenuOpen = false;
     this.sortMenuOpen = false;
@@ -3000,6 +3021,7 @@ export class AppController extends Reactive {
   }
 
   onKey(event: KeyboardEvent) {
+    if (this.inboxOpen) return;
     const target = event.target as Element | null;
     // 첫 로그인 설정 창이 떠 있으면 Esc는 그 창이 처리한다(뒤쪽 화면이 같이 닫히지 않게).
     if (this.needsOnboarding()) return;

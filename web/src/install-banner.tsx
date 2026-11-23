@@ -1,3 +1,4 @@
+import { BOTTOM_SHEET, BOTTOM_SHEET_MOTION, BOTTOM_SHEET_PADDING, SHEET_GHOST_BUTTON, SHEET_SOLID_BUTTON } from './cls';
 import { useState, useSyncExternalStore } from 'react';
 import type { AppController } from './app-controller';
 import { remember } from './app-controller';
@@ -14,7 +15,7 @@ export function InstallBanner({ app }: { app: AppController }) {
   if (closed || app.toast || update || mode === 'none' || !installBannerDue(remember(KEY), Date.now())) return null;
   const close = () => { remember(KEY, installBannerDismissed(remember(KEY), Date.now())); setClosed(true); };
   const hint = mode === 'prompt' ? null : MANUAL_INSTALL_HINT[mode];
-  return <section className="install-banner fixed inset-x-0 bottom-0 z-[4] max-h-[75dvh] overflow-y-auto rounded-t-lg border border-line bg-surface px-[20px] pt-[20px] pb-[calc(20px+env(safe-area-inset-bottom))] shadow-lg [animation:install-rise_240ms_ease-out_both] motion-reduce:animate-none min-[720px]:hidden" aria-label="앱 설치">
+  return <section className={`install-banner z-[4] ${BOTTOM_SHEET} ${BOTTOM_SHEET_PADDING} ${BOTTOM_SHEET_MOTION} min-[720px]:hidden`} aria-label="앱 설치">
     <div className="flex items-start gap-[12px]">
       <img src="icon-192.png" alt="" className="size-[48px] flex-none rounded-md border border-line" />
       <div className="min-w-0 flex-1 pt-[2px]">
@@ -23,8 +24,8 @@ export function InstallBanner({ app }: { app: AppController }) {
       </div>
     </div>
     {hint ? <p className="install-hint m-0 mt-[16px] rounded-md bg-sunken px-[16px] py-[14px] text-[15px] leading-[22px] text-ink-2 break-keep">{hint.lead}<b className="font-semibold text-ink">{hint.action}</b>{hint.tail}</p> : null}
-    {hint ? null : <button type="button" className="mt-[16px] inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 bg-accent px-[16px] text-[16px] font-semibold text-on-accent active:opacity-80" onClick={() => { void app.runInstall(); }}>홈 화면에 추가</button>}
+    {hint ? null : <button type="button" className={SHEET_SOLID_BUTTON} onClick={() => { void app.runInstall(); }}>홈 화면에 추가</button>}
     {/* 설치 단추가 있으면 닫기는 보조 행동이라 연한 채움(TDS weak), 안내만 있으면 하나뿐인 행동이라 진한 채움(TDS fill). 테두리 없는 글자 단추는 눌리는 자리가 안 보인다. */}
-    <button type="button" className={`inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 px-[16px] text-[16px] font-semibold ${hint ? 'mt-[16px] bg-accent text-on-accent active:opacity-80' : 'mt-[8px] bg-sunken text-ink [@media(hover:hover)]:hover:bg-line active:bg-line'}`} onClick={close}>{hint ? '확인했어요' : '다음에 할게요'}</button>
+    <button type="button" className={hint ? SHEET_SOLID_BUTTON : SHEET_GHOST_BUTTON} onClick={close}>{hint ? '확인했어요' : '다음에 할게요'}</button>
   </section>;
 }

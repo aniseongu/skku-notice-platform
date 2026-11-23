@@ -397,3 +397,84 @@ test('reorder mode: keyboard pick-move-drop saves once, a mouse drag saves once,
   const top = await page.evaluate(() => { const app = document.querySelector('notice-app') as unknown as App; return app.visible()[0].id === app.saved[0].id; });
   expect(top).toBe(true);
 });
+
+test('status radio navigation stays in the detail and does not move or read the next notice', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'the global shortcut reads the next notice on desktop');
+  await setup(page);
+  await page.getByRole('button', { name: '저장하기' }).click();
+  const section = page.getByRole('region', { name: '내 진행 상태' });
+  const group = section.getByRole('radiogroup');
+  const interested = group.getByRole('radio', { name: '관심 있음' });
+  const preparing = group.getByRole('radio', { name: '준비 중' });
+  const current = page.locator('notice-rows-screen a.row[aria-current="true"]');
+  const id = await current.getAttribute('data-id');
+  const readRows = () => page.locator('notice-rows-screen a.row.read').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-id')));
+  const before = await readRows();
+
+  await section.getByRole('button', { name: '더 보기 메뉴' }).focus();
+  await page.keyboard.press('Tab');
+  await expect(interested).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(preparing).toBeFocused();
+  await expect(current).toHaveAttribute('data-id', id!);
+  expect(await readRows()).toEqual(before);
+  await expect(interested).toBeChecked();
+
+  await page.keyboard.press('Space');
+  await expect(preparing).toBeChecked();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Enter');
+  await expect(group.getByRole('radio', { name: '지원함' })).toBeChecked();
+  await page.keyboard.press('Tab');
+  await expect(section.getByRole('button', { name: '메모 남기기' })).toBeFocused();
+});
+
+test('the saved rows keep the feed title alignment and a uniform mobile meta gap', async ({ page }, info) => {
+  const mobile = info.project.name === 'mobile';
+  if (mobile) await page.setViewportSize({ width: 360, height: 780 });
+  await setup(page);
+  const id = await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as unknown as App;
+    const picked = app.visible().slice(0, 4).map((notice: { id: string }, index: number) => ({
+      ...notice, category: '비교과', deadline: index % 2 ? '2099-12-31' : null,
+    }));
+    app.notices = app.notices.map((notice: { id: string }) => picked.find(({ id }: { id: string }) => id === notice.id) ?? notice);
+    app.saved = picked.map((notice: { id: string }, index: number) => ({
+      ...notice, saved_at: `2026-11-0${index + 1}T00:00:00Z`,
+    }));
+    app.opportunities = new Map([[picked[0].id, { status: 'preparing' }]]);
+    app.openedId = null;
+    app.detailOpen = false;
+    return picked[0].id as string;
+  });
+  const rows = page.locator('notice-rows-screen a.row');
+  const title = page.locator(`notice-rows-screen a.row[data-id="${id}"] .title`);
+  const feedX = (await title.boundingBox())!.x;
+  await page.getByRole('navigation', { name: '보기' }).getByRole('button', { name: /^저장(?:$|\s)/ }).click();
+  await expect(rows).toHaveCount(4);
+  expect((await title.boundingBox())!.x).toBeCloseTo(feedX);
+  await expect(rows.locator('.dday')).toHaveCount(2);
+  const { status, board, category } = await title.locator('..').evaluate((row) => {
+    const rect = (selector: string) => row.querySelector(selector)!.getBoundingClientRect().toJSON() as DOMRect;
+    return { status: rect('.status-meta'), board: rect('.board'), category: rect('.cat') };
+  });
+  if (mobile) {
+    expect(status.right).toBeLessThan(board.left);
+    expect(board.right).toBeLessThan(category.left);
+    expect(status.top).toBe(category.top);
+  } else {
+    expect(status.top).toBeGreaterThanOrEqual(board.bottom);
+    expect(status.top).toBe(category.top);
+  }
+  const checkMobile = async () => {
+    expect(await rows.evaluateAll((elements) => elements.map((row) =>
+      row.querySelector('.title')!.getBoundingClientRect().top - row.querySelector('.meta')!.getBoundingClientRect().bottom,
+    ))).toEqual([2, 2, 2, 2]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
+  };
+  if (mobile) await checkMobile();
+  await page.getByRole('button', { name: '선택', exact: true }).click();
+  await expect(page.locator('.batch-row')).toHaveCount(4);
+  if (mobile) await checkMobile();
+  else expect((await title.boundingBox())!.x).toBeCloseTo(feedX);
+});

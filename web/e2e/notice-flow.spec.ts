@@ -302,10 +302,12 @@ test('profile page edits year and status in place and can reopen the first-run s
   await screen.getByRole('button', { name: '바꾸기' }).click();
   await screen.getByRole('button', { name: '문과대학', exact: true }).click();
   await screen.getByRole('radio', { name: '철학과', exact: true }).click();
+  await screen.getByRole('radiogroup', { name: '학기', exact: true }).getByRole('radio', { name: '2학기', exact: true }).click();
   const recorded = await calls(page);
   expect(recorded[0]).toEqual(['save', { ...profile, year: 4 }]);
   expect(recorded[1]).toEqual(['save', { ...profile, enrollmentStatus: '휴학' }]);
   expect(recorded[2]).toEqual(['save', { ...profile, programs: [{ college: '문과대학', department: '철학과' }, { college: '경영대학', department: '경영학과' }] }]);
+  expect(recorded[3]).toEqual(['save', { ...profile, semester: 2 }]);
 });
 
 test('connection keys page follows the original rows: Gemini key and iCampus token flows, no profile fields', async ({ page }) => {
@@ -917,8 +919,7 @@ test('settings home puts the daily settings first and groups AI, iCampus and Goo
   await expect(page).toHaveURL(/section=canvas/);
 });
 
-test('settings opens at home after leaving the inbox for the notice list', async ({ page }, testInfo) => {
-  const mobile = testInfo.project.name === 'mobile';
+test('settings opens at home after closing the inbox over the notice list', async ({ page }) => {
   await page.goto('/?api=sample/api/v1');
   await page.locator('notice-rows-screen a.row').first().waitFor();
   await page.waitForLoadState('networkidle');
@@ -930,9 +931,9 @@ test('settings opens at home after leaving the inbox for the notice list', async
   // 알림함의 종은 목록 머리 줄에 있다.
   await page.getByRole('button', { name: '설정 닫기' }).click();
   await page.getByRole('button', { name: /^알림함/ }).click();
-  await expect(page).toHaveURL(/section=inbox$/);
-  // 모바일에서는 설정이 열려 있는 동안 하단 탭이 숨겨진다.
-  if (mobile) await page.getByRole('button', { name: '설정 닫기' }).click();
+  const inbox = page.getByRole('dialog', { name: '알림함', exact: true });
+  await inbox.getByRole('button', { name: '닫기', exact: true }).click();
+  await expect(inbox).toHaveCount(0);
   await page.getByRole('navigation', { name: '보기' }).getByRole('button', { name: /성대 공지/ }).click();
   await expect(page).toHaveURL(/\?tab=all$/);
   await settings.click();
@@ -3133,4 +3134,25 @@ test('settings home draws a divider between 차단 관리 (link row) and 로그�
     return link?.nextElementSibling?.textContent?.includes('로그아웃') ?? false;
   });
   expect(adjacent).toBe(true);
+});
+
+test('theme segments use one tab stop and keep the selected border in dark mode', async ({ page }) => {
+  await settingsAt(page);
+  const group = page.getByRole('radiogroup', { name: '화면 모드' });
+  const auto = group.getByRole('radio', { name: '자동' });
+  const dark = group.getByRole('radio', { name: '어둡게' });
+  await expect(group.locator('button[tabindex="0"]')).toHaveCount(1);
+  await auto.focus();
+  await page.keyboard.press('End');
+  await expect(dark).toBeFocused();
+  await expect(auto).toBeChecked();
+  await page.keyboard.press('Enter');
+  await expect(dark).toBeChecked();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(dark).toHaveCSS('box-shadow', /inset/);
+  await expect(auto).toHaveCSS('box-shadow', 'none');
+  await page.keyboard.press('Tab');
+  expect(await group.evaluate((element) => element.contains(document.activeElement))).toBe(false);
+  await page.keyboard.press('Shift+Tab');
+  await expect(dark).toBeFocused();
 });

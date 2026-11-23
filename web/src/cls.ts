@@ -68,3 +68,12 @@ export const COLLAPSE_HEAD = '[@media(hover:hover)]:hover:bg-hover active:bg-hov
 export const STATUS_META = 'status-meta inline-flex flex-none items-center gap-[5px] whitespace-nowrap';
 /** 상태 점 색은 하나다(색으로 상태를 가르지 않는다). 직접 고른 상태는 글자 굵기로 구분한다. */
 export const STATUS_DOT = 'bg-[light-dark(var(--text-3),oklch(0.85_0.01_var(--h)))]';
+
+/** 화면 아래 패널에서 공유하는 배치와 움직임. */
+export const BOTTOM_SHEET = 'fixed inset-x-0 bottom-0 max-h-[75dvh] overflow-y-auto rounded-t-lg border border-line bg-surface shadow-lg';
+export const BOTTOM_SHEET_MOTION = '[animation:install-rise_240ms_ease-out_both] motion-reduce:animate-none';
+export const BOTTOM_SHEET_PADDING = 'px-[20px] pt-[20px] pb-[calc(20px+env(safe-area-inset-bottom))]';
+export const SHEET_SOLID_BUTTON = 'mt-[16px] inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 bg-accent px-[16px] text-[16px] font-semibold text-on-accent active:opacity-80';
+export const SHEET_GHOST_BUTTON = 'mt-[8px] inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 bg-sunken px-[16px] text-[16px] font-semibold text-ink [@media(hover:hover)]:hover:bg-line active:bg-line';
+
+export const HEADER_ICON_BUTTON = 'icon-button grid place-items-center flex-none size-[44px] border-0 rounded-pill bg-transparent text-ink-2 active:bg-hover disabled:text-ink-3 min-[720px]:size-[36px] min-[720px]:rounded-sm [@media(hover:hover)]:[&:hover:not(:disabled)]:bg-hover';

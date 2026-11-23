@@ -1,3 +1,4 @@
+import { BOTTOM_SHEET, BOTTOM_SHEET_MOTION, BOTTOM_SHEET_PADDING, SHEET_GHOST_BUTTON, SHEET_SOLID_BUTTON } from './cls';
 import type { AppController } from './app-controller';
 import { AlertIcon } from './alert-icon';
 import { remember } from './app-controller';
@@ -15,7 +16,7 @@ export function PushSheet({ app, onClose }: { app: AppController; onClose: () =>
   // 켜는 동안(busy)에도 패널을 두어 실패하면 같은 자리에서 이유와 다시 시도를 보인다(busy는 사용자가 누른 뒤에만 생긴다).
   const busy = app.pushStatus === 'busy';
   const close = () => { remember(KEY, pushSheetDismissed(remember(KEY), Date.now())); onClose(); };
-  return <section className="push-sheet fixed inset-x-0 bottom-0 z-[4] max-h-[75dvh] overflow-y-auto rounded-t-lg border border-line bg-surface px-[20px] pt-[20px] pb-[calc(20px+env(safe-area-inset-bottom))] shadow-lg [animation:install-rise_240ms_ease-out_both] motion-reduce:animate-none min-[720px]:inset-x-auto min-[720px]:left-auto min-[720px]:right-[24px] min-[720px]:bottom-[24px] min-[720px]:mx-0 min-[720px]:w-[400px] min-[720px]:rounded-lg min-[720px]:pb-[20px]" aria-label="알림 켜기">
+  return <section className={`push-sheet z-[4] ${BOTTOM_SHEET} ${BOTTOM_SHEET_PADDING} ${BOTTOM_SHEET_MOTION} min-[720px]:inset-x-auto min-[720px]:left-auto min-[720px]:right-[24px] min-[720px]:bottom-[24px] min-[720px]:mx-0 min-[720px]:w-[400px] min-[720px]:rounded-lg min-[720px]:pb-[20px]`} aria-label="알림 켜기">
     <div className="flex items-start gap-[12px]">
       <img src="icon-192.png" alt="" className="size-[48px] flex-none rounded-md border border-line" />
       <div className="min-w-0 flex-1 pt-[2px]">
@@ -24,7 +25,7 @@ export function PushSheet({ app, onClose }: { app: AppController; onClose: () =>
         {app.pushError && !denied ? <p className="error-text m-0 mt-[8px] text-[14px] leading-[21px] font-medium text-danger break-keep text-pretty" role="alert"><AlertIcon />{app.pushError}</p> : null}
       </div>
     </div>
-    <button type="button" className="mt-[16px] inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 bg-accent px-[16px] text-[16px] font-semibold text-on-accent active:opacity-80 disabled:opacity-60" disabled={busy} onClick={() => { void (denied ? app.recheckPush() : app.enablePush()); }}>{busy ? '확인하고 있어요' : denied ? '다시 확인하기' : app.pushRetry ? '다시 시도하기' : '알림 받기'}</button>
-    <button type="button" className="mt-[8px] inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 bg-sunken px-[16px] text-[16px] font-semibold text-ink [@media(hover:hover)]:hover:bg-line active:bg-line" onClick={close}>다음에 할게요</button>
+    <button type="button" className={`${SHEET_SOLID_BUTTON} disabled:opacity-60`} disabled={busy} onClick={() => { void (denied ? app.recheckPush() : app.enablePush()); }}>{busy ? '확인하고 있어요' : denied ? '다시 확인하기' : app.pushRetry ? '다시 시도하기' : '알림 받기'}</button>
+    <button type="button" className={SHEET_GHOST_BUTTON} onClick={close}>다음에 할게요</button>
   </section>;
 }
