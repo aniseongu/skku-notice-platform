@@ -62,6 +62,26 @@ class PushStore(NoticeStore):
     def required_reminders(self) -> list[dict]:
         return self._request("POST", "rpc/list_required_info_reminders", json={"p_limit": 20}).json()
 
+    def saved_deadline_reminders(self) -> list[dict]:
+        return self._request("POST", "rpc/list_saved_deadline_reminders", json={"p_limit": 20}).json()
+
+    def claim_saved_deadline(self, candidate: dict) -> dict | None:
+        payload = {
+            "p_user_id": candidate["user_id"],
+            "p_subscription_id": candidate["subscription_id"],
+            "p_notice_id": candidate["notice_id"],
+            "p_days_before": candidate["days_before"],
+        }
+        return self._request("POST", "rpc/claim_saved_deadline_reminder", json=payload).json()
+
+    def mark_saved_deadline(self, claim: dict, status: str) -> None:
+        payload = {
+            "p_id": claim["claim_id"],
+            "p_attempt_count": claim["attempt_count"],
+            "p_status": status,
+        }
+        self._request("POST", "rpc/mark_saved_deadline_reminder", json=payload)
+
     def mark_required(self, user_id: str, missing_key: str) -> None:
         payload = {"p_user": user_id, "p_missing_key": missing_key}
         self._request("POST", "rpc/mark_required_reminder", json=payload)
@@ -164,6 +184,8 @@ def compose_message(candidate: dict) -> tuple[str, str]:
     the keyword and deadline line.
     """
     board = candidate.get("source_name") or candidate["notice_id"].split("/")[0]
+    if "days_before" in candidate:
+        return candidate["title"], f"마감까지 {candidate['days_before']}일 남았어요\n{board}"
     school = board.endswith(" 공지")
     title = f"[{board.removesuffix(' 공지')}] {candidate['title']}" if school else candidate["title"]
     deadline = _deadline_label(candidate.get("deadline"), candidate.get("deadline_kind"))
@@ -197,6 +219,21 @@ def normalize_subject(subject: str) -> str:
     return value
 
 
+def _send_notice(candidate: dict, private_key: str, subject: str) -> str:
+    if not safe_notice_url(candidate["url"]):
+        return "retry"
+    subscription = {
+        "endpoint": candidate["endpoint"],
+        "keys": {"p256dh": candidate["p256dh"], "auth": candidate["auth_secret"]},
+    }
+    title, body = compose_message(candidate)
+    return send_one(
+        subscription, private_key, subject, user_id=candidate["user_id"], title=title, body=body,
+        url=candidate["url"], tag=f"notice:{candidate['notice_id']}",
+        silent=bool(candidate.get("silent", False)),
+    )
+
+
 def run_batch(store: PushStore, private_key: str, subject: str, now: datetime) -> dict[str, int]:
     counts = {"sent": 0, "expired": 0, "retry": 0, "skipped": 0}
     for candidate in store.candidates()[:20]:
@@ -204,33 +241,31 @@ def run_batch(store: PushStore, private_key: str, subject: str, now: datetime) -
         if claim is None:
             counts["skipped"] += 1
             continue
-        if not safe_notice_url(candidate["url"]):
-            store.mark(claim, "failed", now)
-            counts["retry"] += 1
-            continue
-        subscription = {
-            "endpoint": candidate["endpoint"],
-            "keys": {
-                "p256dh": candidate["p256dh"],
-                "auth": candidate["auth_secret"],
-            },
-        }
-        title, body = compose_message(candidate)
-        outcome = send_one(
-            subscription,
-            private_key,
-            subject,
-            user_id=candidate["user_id"],
-            title=title,
-            body=body,
-            url=candidate["url"],
-            tag=f"notice:{candidate['notice_id']}",
-            silent=bool(candidate.get("silent", False)),
-        )
+        outcome = _send_notice(candidate, private_key, subject)
         if outcome == "expired":
             store.remove_expired(candidate["subscription_id"], candidate["user_id"])
         else:
             store.mark(claim, "sent" if outcome == "sent" else "failed", now)
+        counts[outcome] += 1
+    return counts
+
+
+def run_saved_deadline_batch(
+    store: PushStore, private_key: str, subject: str, now: datetime,
+) -> dict[str, int]:
+    counts = {"sent": 0, "expired": 0, "retry": 0, "skipped": 0}
+    if not 9 <= now.astimezone(KST).hour < 12:
+        return counts
+    for candidate in store.saved_deadline_reminders():
+        claim = store.claim_saved_deadline(candidate)
+        if claim is None:
+            counts["skipped"] += 1
+            continue
+        outcome = _send_notice(claim, private_key, subject)
+        if outcome == "expired":
+            store.remove_expired(claim["subscription_id"], claim["user_id"])
+        else:
+            store.mark_saved_deadline(claim, "sent" if outcome == "sent" else "failed")
         counts[outcome] += 1
     return counts
 
@@ -397,6 +432,11 @@ def main() -> int:
                 # 예외 내용은 키나 기기 주소를 담을 수 있어 종류 이름만 남긴다.
                 print(f"Required reminder batch error: {type(error).__name__}", flush=True)
                 required = {"required_sent": 0, "required_failed": -1}
+            try:
+                saved = run_saved_deadline_batch(store, private_key, subject, datetime.now(UTC))
+            except Exception as error:
+                print(f"Saved deadline reminder batch error: {type(error).__name__}", flush=True)
+                saved = {"sent": 0, "expired": 0, "retry": -1}
             feedback = run_feedback_batch(
                 store, os.environ.get("RESEND_API_KEY", ""), os.environ.get("FEEDBACK_NOTIFY_EMAIL", ""),
                 os.environ.get("FEEDBACK_MAIL_FROM", "성공 <onboarding@resend.dev>"), now,
@@ -411,13 +451,14 @@ def main() -> int:
         f"Push worker: sent={counts['sent']} expired={counts['expired']} retry={counts['retry']} "
         f"canvas_sent={canvas['canvas_sent']} canvas_failed={canvas['canvas_failed']} "
         f"required_sent={required['required_sent']} required_failed={required['required_failed']} "
+        f"saved_deadline_sent={saved['sent']} saved_deadline_expired={saved['expired']} "
+        f"saved_deadline_retry={saved['retry']} "
         f"feedback_sent={feedback['feedback_sent']} feedback_retry={feedback['feedback_retry']} "
         f"feedback_dropped={feedback['feedback_dropped']}",
         flush=True,
     )
-    # 공지 알림 재시도나 필수 정보 알림 실패(-1: 단계 오류, 1 이상: 모든 기기 실패)가 있으면
-    # 서비스 실패로 남겨 journal에서 보이게 한다.
-    return int(counts["retry"] > 0 or required["required_failed"] != 0)
+    # 공지 알림 재시도나 리마인더 실패가 있으면 journal에 서비스 실패를 남긴다.
+    return int(counts["retry"] > 0 or required["required_failed"] != 0 or saved["retry"] != 0)
 
 
 if __name__ == "__main__":

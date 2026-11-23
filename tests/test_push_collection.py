@@ -396,6 +396,9 @@ def test_main_reports_required_batch_error_as_failure_but_finishes_other_batches
         def close(self):
             pass
 
+        def saved_deadline_reminders(self):
+            return []
+
     calls = []
     monkeypatch.setattr(worker, "PushStore", Store)
     monkeypatch.setattr(worker.Vapid, "from_string", lambda key: None)
@@ -417,3 +420,76 @@ def test_main_reports_required_batch_error_as_failure_but_finishes_other_batches
     assert calls == ["feedback"]
     assert "Required reminder batch error: RuntimeError" in out and "fcm.example" not in out
     assert "required_failed=-1" in out
+
+
+@pytest.mark.parametrize(("now", "lists_candidates"), [
+    ("2026-11-22T15:00:00+00:00", False),  # KST midnight
+    ("2026-11-22T23:59:59+00:00", False),
+    ("2026-11-23T00:00:00+00:00", True),
+    ("2026-11-23T02:59:59+00:00", True),
+    ("2026-11-23T03:00:00+00:00", False),
+])
+def test_saved_deadline_worker_only_lists_during_kst_morning(now, lists_candidates):
+    calls = []
+
+    class Store:
+        def saved_deadline_reminders(self):
+            calls.append(True)
+            return []
+
+    assert worker.run_saved_deadline_batch(Store(), "key", "subject", datetime.fromisoformat(now)) == {
+        "sent": 0, "expired": 0, "retry": 0, "skipped": 0,
+    }
+    assert bool(calls) is lists_candidates
+
+
+def test_saved_deadline_batch_uses_claimed_payload_and_existing_push_outcomes(monkeypatch):
+    marked = []
+    removed = []
+    sent = []
+
+    class Store:
+        def saved_deadline_reminders(self):
+            return [
+                {"subscription_id": name, "days_before": days}
+                for name, days in [("already", 3), ("finished", 1), ("sent", 3),
+                                   ("expired", 1), ("retry", 1), ("unsafe", 3)]
+            ]
+
+        def claim_saved_deadline(self, row):
+            name = row["subscription_id"]
+            if name in {"already", "finished"}:
+                return None
+            url = "https://example.com/unapproved" if name == "unsafe" else "https://www.skku.edu/notice"
+            return {
+                **candidate(name, url),
+                "days_before": row["days_before"],
+                "claim_id": name,
+                "attempt_count": 2,
+                "source_name": "학과 공지",
+                "silent": name == "sent",
+                "endpoint": name,
+            }
+
+        def mark_saved_deadline(self, claim, status):
+            marked.append((claim["claim_id"], claim["attempt_count"], status))
+
+        def remove_expired(self, device, user):
+            removed.append((device, user))
+
+    def send(subscription, *_args, **payload):
+        sent.append(payload)
+        return subscription["endpoint"]
+
+    monkeypatch.setattr(worker, "send_one", send)
+    assert worker.run_saved_deadline_batch(Store(), "key", "subject", NOW) == {
+        "sent": 1, "expired": 1, "retry": 2, "skipped": 2,
+    }
+    assert marked == [("sent", 2, "sent"), ("retry", 2, "failed"), ("unsafe", 2, "failed")]
+    assert removed == [("expired", "user")]
+    assert sent[0] == {
+        "title": "공지", "body": "마감까지 3일 남았어요\n학과 공지",
+        "url": "https://www.skku.edu/notice", "tag": "notice:school/1", "user_id": "user", "silent": True,
+    }
+    assert sent[1]["body"] == "마감까지 1일 남았어요\n학과 공지"
+    assert sent[1]["silent"] is False
