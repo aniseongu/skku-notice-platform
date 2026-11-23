@@ -60,22 +60,18 @@ export function ChipGroup({ label, options, selected, onToggle }: { label: strin
  * 이름이나 이메일이 바로 옆에 있어 장식으로 취급한다(alt 비움). 사진 서버에 우리 주소가 새지 않게 referrer를 보내지 않는다.
  */
 export function Avatar({ src, size = 48 }: { src?: string | null; size?: number }) {
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    setLoaded(false);
-    if (!src) return;
-    let alive = true;
-    const image = new Image();
-    image.referrerPolicy = 'no-referrer';
-    image.onload = () => { if (alive) setLoaded(true); };
-    image.onerror = () => { if (alive) setLoaded(false); };
-    image.src = src;
-    return () => { alive = false; };
-  }, [src]);
-  return <span className="avatar inline-grid flex-none place-items-center overflow-hidden rounded-[50%] bg-sunken text-ink-3 [box-shadow:inset_0_0_0_1px_var(--line)] [&_img]:h-full [&_img]:w-full [&_img]:object-cover [&_svg]:h-[72%] [&_svg]:w-[72%] [&_svg]:[align-self:end] [&_svg]:fill-current" style={{ width: size, height: size }} aria-hidden="true" data-loaded={loaded}>
-    {src && loaded
-      ? <img src={src} alt="" referrerPolicy="no-referrer" draggable={false} />
-      : <svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="9" r="4.2" /><path d="M3.5 22c.6-4.9 4.3-8 8.5-8s7.9 3.1 8.5 8z" /></svg>}
+  const [imageState, setImageState] = useState<{ url: string; loaded: boolean } | null>(null);
+  const loaded = !!src && src === imageState?.url && imageState.loaded;
+  const failed = !!src && src === imageState?.url && !imageState.loaded;
+  return <span className="avatar inline-grid flex-none place-items-center overflow-hidden rounded-[50%] bg-sunken text-ink-3 [box-shadow:inset_0_0_0_1px_var(--line)] [&_img]:h-full [&_img]:w-full [&_img]:object-cover [&_svg]:h-[72%] [&_svg]:w-[72%] [&_svg]:[align-self:end] [&_svg]:fill-current" style={{ width: size, height: size, position: 'relative' }} aria-hidden="true" data-loaded={loaded}>
+    {!loaded ? <svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="9" r="4.2" /><path d="M3.5 22c.6-4.9 4.3-8 8.5-8s7.9 3.1 8.5 8z" /></svg> : null}
+    {src && !failed ? <img key={src} src={src} alt="" referrerPolicy="no-referrer" draggable={false}
+      style={{ position: 'absolute', inset: 0, visibility: loaded ? 'visible' : 'hidden' }}
+      onLoad={({ currentTarget }) => {
+        setImageState({ url: src, loaded: true });
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches) currentTarget.animate([{ opacity: 0 }, { opacity: 1 }], 150);
+      }}
+      onError={() => setImageState({ url: src, loaded: false })} /> : null}
   </span>;
 }
 

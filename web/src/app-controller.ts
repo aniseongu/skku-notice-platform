@@ -27,7 +27,7 @@ import { CALENDAR_SCOPE, GoogleError, desiredEvents, ensureCalendar, googleRetur
 import { AI_PROVIDERS, DEFAULT_AI_PREFERENCES, loadAiKeyStatuses, loadAiPreferences, registerAiKey, removeAiKey, saveAiPreferences, type AiKeyStatus, type AiPreferences, type AiProvider } from './ai-providers';
 import { sendFeedback, type FeedbackKind, type FeedbackResult } from './feedback';
 import { listBoardRequests, submitBoardRequest } from './shared-board-requests';
-import { byokAvailable, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, loadMyTranslation, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, type MyTranslationTitle, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
+import { checkByokAvailability, loadByokStatus, loadByokBackfillCount, loadCanvasStatus, deleteMyAccount, linkGoogleCalendar, loadGoogleAutoStatus, type GoogleAutoStatus, loadMyNoticeInfo, loadMyDeadlines, loadMyTranslations, loadMyTranslation, requestNoticeSummary, type MyNoticeInfo, type MyTranslation, type MyTranslationTitle, registerByokKey, registerCanvasToken, removeByokKey, removeCanvasToken, type ByokStatus, type CanvasStatus } from './byok';
 import { withMyDeadline } from './notice-view';
 import { keywordMatchesNotice } from './keyword-match';
 import { loadGraduation, loadGraduationStatuses, badgeOf, gradParts, requestGraduation, isInternshipNotice, type GradPart, type GraduationBadge, type GraduationStatuses, isSoftwareOriginal, visibleTracks, type GraduationAssessment } from './graduation-assessment';
@@ -43,6 +43,7 @@ import type { ExploreItem } from './explore-map';
 import { orderNotices, type Sort } from './notice-order';
 import { Reactive, defineReactive } from './reactive';
 import { loadPublicNotice, noticeIdFromSearch, noticeLink, withoutNotice, type PublicNotice } from './deeplink';
+import { clearSettingsCache, loadSettingsCache, saveSettingsCache, type SettingsData, type SettingsPush } from './settings-cache';
 import { clearListCache, loadListCache, saveListCache } from './list-cache';
 import { changeInbox, clearInbox, listenInboxChanged, loadInbox, noticeIdOfItem, pruneStoredInbox, releaseInbox, safeInboxUrl, setInboxOwner, unreadCount, type InboxChange, type InboxItem } from './inbox';
 
@@ -277,6 +278,7 @@ export class AppController extends Reactive {
   byokOn = false;
   /** 키 기능이 켜졌는지 서버에 한 번이라도 물어봤는지. 모르는 동안은 AI 키 상태를 기다린다. */
   private byokChecked = false;
+  private byokUnavailable = false;
   aiKeys: AiKeyStatus[] = [];
   aiPrefs: AiPreferences = DEFAULT_AI_PREFERENCES;
   aiBusy = false;
@@ -426,6 +428,69 @@ export class AppController extends Reactive {
   aiStateLoaded = true;
   /** 설정 화면이 기다리는 상한(FIRST_LOAD_LIMIT_MS)이 지났다. 응답이 없는 항목이 있어도 그때는 그린다. */
   settingsCapped = true;
+  private storedSettings: Partial<SettingsData> | null = null;
+  private liveSettings = new Set<keyof SettingsData>();
+
+  cachedSetting<K extends keyof SettingsData>(field: K): SettingsData[K] | undefined {
+    return this.liveSettings.has(field) ? undefined : this.storedSettings?.[field];
+  }
+
+  private async restoreSettings(userId: string, epoch: number) {
+    const stored = await loadSettingsCache(userId);
+    if (stored && this.isCurrentAccount(userId, epoch)) {
+      this.storedSettings = stored;
+      this.requestUpdate();
+    }
+  }
+
+  private recordSetting<K extends keyof SettingsData>(userId: string, epoch: number, field: K, value: SettingsData[K]) {
+    if (!this.isCurrentAccount(userId, epoch)) return;
+    const previous = this.storedSettings?.[field];
+    const first = !this.liveSettings.has(field);
+    this.liveSettings.add(field);
+    if (first && previous !== undefined) {
+      this.requestUpdate();
+      if (JSON.stringify(previous) === JSON.stringify(value)) return;
+    }
+    void saveSettingsCache(userId, { [field]: value });
+  }
+
+  private recordAiSettings(userId: string, epoch: number) {
+    const status = this.byokStatus;
+    this.recordSetting(userId, epoch, 'ai', {
+      available: this.byokOn,
+      status: status && { keyHint: status.keyHint, model: status.model, disabled: status.disabled, usedToday: status.usedToday, lastError: null },
+      keys: this.aiKeys.map(({ provider, keyHint, model, disabled, usedToday }) => ({ provider, keyHint, model, disabled, usedToday, lastError: null })),
+      prefs: { aiEnabled: this.aiPrefs.aiEnabled }, backfill: this.byokBackfill,
+    });
+  }
+
+  private recordCanvasSettings(userId: string, epoch: number) {
+    const status = this.canvasStatus;
+    this.recordSetting(userId, epoch, 'canvas', status && {
+      keyHint: status.keyHint, disabled: status.disabled, lastOkAt: status.lastOkAt, lastError: null,
+    });
+  }
+
+  private recordDevices(userId: string, epoch: number) {
+    this.recordSetting(userId, epoch, 'devices', {
+      items: this.devices.map(({ id, name, canvasMode, createdAt, alertAllNew }) => ({ id, name, canvasMode, createdAt, alertAllNew })),
+      thisId: this.thisDeviceId, summaryTime: this.summaryTime,
+    });
+  }
+
+  private recordCalendar(userId: string, epoch: number) {
+    this.recordSetting(userId, epoch, 'calendar', {
+      connected: !!this.calendarId, syncedAt: this.calendarSyncedAt,
+      auto: { active: this.calendarAuto.active, lastRunAt: this.calendarAuto.lastRunAt, error: null },
+    });
+  }
+
+  private setCheckedPush(userId: string, epoch: number, status: SettingsPush) {
+    if (!this.isCurrentAccount(userId, epoch)) return;
+    this.pushStatus = status;
+    this.recordSetting(userId, epoch, 'push', status);
+  }
   /** 첫 목록을 무작정 기다리지 않게 하는 상한. 이 시간이 지나면 받은 것만으로 그린다. */
   static readonly FIRST_LOAD_LIMIT_MS = 5000;
   /** 마지막 refresh가 시작한 내 판정 읽기. 직접 새로고침의 결과를 셀 때 기다린다. */
@@ -468,11 +533,16 @@ export class AppController extends Reactive {
 
   /** 키 연결 기능이 켜져 있는지 서버에 다시 묻는다. 첫 설정의 AI 키 단계에서 "다시 확인하기"도 이걸 쓴다. */
   async recheckByok(): Promise<boolean> {
-    const available = await byokAvailable(import.meta.env.VITE_SUPABASE_URL);
+    const result = await checkByokAvailability(import.meta.env.VITE_SUPABASE_URL);
+    const available = result === true;
     this.byokOn = available;
+    this.byokUnavailable = result === false;
     this.byokChecked = true;
     if (!available) this.aiStateLoaded = true;   // 키 기능이 없으면 기다릴 AI 상태가 없다
-    if (available && this.authUserId) { this.byokLoading = true; void this.refreshByok(this.authUserId, this.subscriptionsEpoch); }
+    if (this.authUserId) {
+      this.byokLoading = available;
+      void this.refreshByok(this.authUserId, this.subscriptionsEpoch);
+    }
     return available;
   }
 
@@ -496,7 +566,12 @@ export class AppController extends Reactive {
         const loggedIn = !!userId && userId !== this.authUserId && this.authReady;
         if (!this.authReady || userId !== this.authUserId) {
           const previousUserId = this.authUserId;
-          if (previousUserId && !userId) void clearListCache(previousUserId);
+          if (previousUserId && !userId) {
+            void clearListCache(previousUserId);
+            void clearSettingsCache(previousUserId);
+          }
+          this.storedSettings = null;
+          this.liveSettings.clear();
           this.cacheReady = false; this.liveFeedReady = false; this.liveAccountReady = false;
           this.saveCounts = new Map(); ++this.saveCountRevision;
           this.notices = []; this.sources = []; this.generatedAt = null; this.abortBodies(); this.bodies.clear();
@@ -523,6 +598,7 @@ export class AppController extends Reactive {
           this.preferencesUnavailable = false;
           this.accountDataLoaded = !userId; this.aiStateLoaded = !userId; this.settingsCapped = !userId;
           if (userId) setTimeout(() => { void (async () => {
+            void this.restoreSettings(userId, epoch);
             const cached = await Promise.race([loadListCache(userId), new Promise<null>((resolve) => setTimeout(() => resolve(null), 150))]);
             if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
             if (cached && !this.liveFeedReady) {
@@ -1246,6 +1322,14 @@ export class AppController extends Reactive {
    * "아직 받는 게시판이 없어요"→목록처럼 문구가 차례로 바뀌며 아래가 밀린다. */
   settingsReady(): boolean {
     if (!this.authUserId) return true;
+    const cached = this.storedSettings;
+    if (cached?.profile && cached.ai && cached.keywords) {
+      if (this.settingsSection === 'notifications') {
+        if (cached.push && cached.devices && cached.subscriptions && cached.boardOrder) return true;
+      } else if (this.settingsSection !== 'canvas' || (cached.push && cached.devices && cached.canvas !== undefined)) {
+        return true;
+      }
+    }
     if (!this.userDataReady()) return false;
     return this.settingsCapped || (this.pushStatus !== 'checking' && this.devicesLoaded && this.profileStatus !== 'idle' && this.profileStatus !== 'loading');
   }
@@ -1304,6 +1388,7 @@ export class AppController extends Reactive {
       if (!available) return;
       if (order.length) { this.boardOrder = order; remember('board-order', JSON.stringify(order)); }
       else if (this.boardOrder.length) void this.saveBoardOrderToAccount(this.boardOrder, false);
+      this.recordSetting(userId, epoch, 'boardOrder', this.boardOrder);
     } catch { /* 계정에 못 읽으면 이 기기의 순서를 그대로 쓴다 */ }
   }
 
@@ -1324,6 +1409,7 @@ export class AppController extends Reactive {
       if (report && this.boardOrder !== order) return;
       try {
         await saveBoardOrderPreference(client, userId, order);
+        this.recordSetting(userId, epoch, 'boardOrder', order);
         if (report && epoch === this.subscriptionsEpoch && this.boardOrder === order) this.boardOrderStatus = 'saved';
       } catch {
         if (report && epoch === this.subscriptionsEpoch && this.boardOrder === order) this.boardOrderStatus = 'failed';
@@ -1467,6 +1553,7 @@ export class AppController extends Reactive {
           this.keywords = keywords;
           remember('keywords', JSON.stringify(keywords));
         }
+        this.recordSetting(userId, epoch, 'keywords', this.keywords);
       }
     } catch {
       if (epoch === this.subscriptionsEpoch) { this.preferencesUnavailable = true; this.preferencesError = '키워드를 불러오지 못했어요. 다시 시도해 주세요.'; }
@@ -1541,6 +1628,7 @@ export class AppController extends Reactive {
       this.profile = row ?? EMPTY_PROFILE;
       rememberOnboarded(userId, !!this.profile.onboardedAt);   // 완료로 기억했는데 서버가 아니라고 하면 지운다
       this.profileStatus = 'ready';
+      this.recordSetting(userId, epoch, 'profile', this.profile);
     } catch {
       // 테이블이 아직 없거나 읽지 못하면 온보딩을 띄우지 않는다(설정에서는 그대로 쓸 수 있다).
       if (epoch === this.subscriptionsEpoch) this.profileStatus = 'unavailable';
@@ -1589,6 +1677,7 @@ export class AppController extends Reactive {
       await storeProfile(client, userId, next);
       if (epoch !== this.subscriptionsEpoch) return false;
       this.profile = next;
+      this.recordSetting(userId, epoch, 'profile', next);
       if (close) this.closeOnboarding();
       return true;
     } catch {
@@ -1613,6 +1702,7 @@ export class AppController extends Reactive {
   /** 저장이 끝나도 남은 단계(AI 키, 알림)를 마칠 때까지 첫 설정 화면을 둔다. 프로필에 완료 시각이 생기면 needsOnboarding이 꺼져 화면이 바로 사라지기 때문이다. */
   applyOnboardingSaved(profile: UserProfile) {
     this.profile = profile;
+    if (this.authUserId) this.recordSetting(this.authUserId, this.subscriptionsEpoch, 'profile', profile);
     this.onboardingOpen = true;
   }
 
@@ -1626,7 +1716,9 @@ export class AppController extends Reactive {
       if (epoch !== this.subscriptionsEpoch || !(await sessionIs(client, userId))) throw new Error('계정이 바뀌었어요');
       await storeProfile(client, userId, next);
       if (epoch !== this.subscriptionsEpoch) return false;
-      this.profile = next; rememberOnboarded(userId, true); this.closeOnboarding();
+      this.profile = next;
+      this.recordSetting(userId, epoch, 'profile', next);
+      rememberOnboarded(userId, true); this.closeOnboarding();
       return true;
     } catch {
       if (epoch === this.subscriptionsEpoch) this.onboardingError = '저장하지 못했어요. 다시 시도해 주세요.';
@@ -1671,8 +1763,10 @@ export class AppController extends Reactive {
     this.onboardingBusy = true; this.onboardingError = '';
     try {
       await current.run();
-      if (epoch !== this.subscriptionsEpoch) return false;
+      if (!this.isCurrentAccount(userId, epoch)) return false;
       this.applyOnboardingSaved(nextProfile); this.subscriptions = boards; this.setKeywords(words);
+      this.recordSetting(userId, epoch, 'subscriptions', boards);
+      this.recordSetting(userId, epoch, 'keywords', words);
       this.onboardingChain = null;
       this.showToast('설정을 저장했어요');
       return true;
@@ -1696,13 +1790,29 @@ export class AppController extends Reactive {
   }
 
   async refreshByok(userId: string, epoch: number): Promise<void> {
-    if (!authClient || !this.byokOn) { if (epoch === this.subscriptionsEpoch) { this.byokLoading = false; if (!authClient || this.byokChecked) this.aiStateLoaded = true; } return; }
+    if (!authClient || !this.byokOn) {
+      if (this.isCurrentAccount(userId, epoch)) {
+        this.byokLoading = false;
+        if (!authClient || this.byokChecked) this.aiStateLoaded = true;
+        if (authClient && this.byokUnavailable) {
+          this.recordSetting(userId, epoch, 'ai', { available: false, status: null, keys: [], prefs: DEFAULT_AI_PREFERENCES, backfill: 0 });
+          this.recordSetting(userId, epoch, 'canvas', null);
+        }
+      }
+      return;
+    }
     try {
-      const [status, canvas, aiKeys, aiPrefs] = await Promise.all([loadByokStatus(authClient, userId), loadCanvasStatus(authClient, userId).catch(() => null), loadAiKeyStatuses(authClient, userId), loadAiPreferences(authClient, userId)]);
+      const [status, canvas, aiKeys, aiPrefs] = await Promise.all([loadByokStatus(authClient, userId), loadCanvasStatus(authClient, userId).catch(() => undefined), loadAiKeyStatuses(authClient, userId, true), loadAiPreferences(authClient, userId, true)]);
       if (epoch !== this.subscriptionsEpoch) return;
-      this.byokStatus = status; this.canvasStatus = canvas; this.byokError = '';
+      this.byokStatus = status; this.byokError = '';
+      if (canvas !== undefined) {
+        this.canvasStatus = canvas;
+        this.recordCanvasSettings(userId, epoch);
+      }
       this.aiKeys = aiKeys; this.aiPrefs = aiPrefs;
       this.aiStateLoaded = true;   // 판정 대기(judgePending)는 키와 AI 설정만 보면 정해진다. 채우기 작업은 기다리지 않는다
+      this.byokLoading = false;
+      this.recordAiSettings(userId, epoch);
       await this.refreshByokBackfill(userId, epoch);
     } catch {
       if (epoch === this.subscriptionsEpoch) this.byokError = '키 정보를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.';
@@ -1718,6 +1828,7 @@ export class AppController extends Reactive {
     const count = await loadByokBackfillCount(authClient);
     if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
     this.byokBackfill = count;
+    this.recordAiSettings(userId, epoch);
     if (count > 0) {
       this.byokPoll = setTimeout(() => {
         this.byokPoll = null;
@@ -1736,7 +1847,10 @@ export class AppController extends Reactive {
     try {
       await registerByokKey(authClient, apiKey);
       const status = await loadByokStatus(authClient, userId);
-      if (epoch === this.subscriptionsEpoch) this.byokStatus = status;
+      if (this.isCurrentAccount(userId, epoch)) {
+        this.byokStatus = status;
+        this.recordAiSettings(userId, epoch);
+      }
       await this.refreshByokBackfill(userId, epoch);
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) this.byokError = error instanceof Error ? error.message : '키를 저장하지 못했어요.';
@@ -1752,7 +1866,10 @@ export class AppController extends Reactive {
     try {
       await registerCanvasToken(authClient, token);
       const status = await loadCanvasStatus(authClient, userId);
-      if (epoch === this.subscriptionsEpoch) this.canvasStatus = status;
+      if (this.isCurrentAccount(userId, epoch)) {
+        this.canvasStatus = status;
+        this.recordCanvasSettings(userId, epoch);
+      }
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) this.canvasError = error instanceof Error ? error.message : '토큰을 저장하지 못했어요.';
     } finally {
@@ -1766,7 +1883,10 @@ export class AppController extends Reactive {
     this.canvasBusy = true; this.canvasError = '';
     try {
       await removeCanvasToken(authClient);
-      if (epoch === this.subscriptionsEpoch) this.canvasStatus = null;
+      if (this.isCurrentAccount(userId, epoch)) {
+        this.canvasStatus = null;
+        this.recordCanvasSettings(userId, epoch);
+      }
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) this.canvasError = error instanceof Error ? error.message : '토큰을 지우지 못했어요.';
     } finally {
@@ -1779,7 +1899,7 @@ export class AppController extends Reactive {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     if (!authClient || !userId) { this.devicesLoaded = true; return; }   // 받을 기기 목록이 없으면 기다리지 않는다
     try {
-      const [devices, time] = await Promise.all([loadDevices(authClient, userId), loadSummaryTime(authClient, userId).catch(() => null)]);
+      const [devices, time] = await Promise.all([loadDevices(authClient, userId), loadSummaryTime(authClient, userId).catch(() => undefined)]);
       let endpoint = '';
       // 서비스 워커나 구독 조회가 답하지 않는 브라우저(삼성 인터넷)에서 기기 목록이 끝없이 기다리지 않게 한다.
       const registration = this.pushRegistration ?? await Promise.race([
@@ -1788,15 +1908,20 @@ export class AppController extends Reactive {
       ]).catch(() => null);
       if (registration) endpoint = await deviceEndpoint(registration);
       if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
-      this.devices = devices; this.summaryTime = time; this.devicesLoadFailed = false;
+      this.devices = devices;
+      if (time !== undefined) this.summaryTime = time;
+      else this.summaryTime ??= this.cachedSetting('devices')?.summaryTime ?? null;
+      this.devicesLoadFailed = false;
       this.thisDeviceId = devices.find((device) => device.endpoint === endpoint)?.id ?? null;
       // 이름이 없는 이 기기는 브라우저가 알려 주는 모델이나 기기 종류로 이름을 자동으로 저장한다(원본과 같다).
       const mine = devices.find((device) => device.id === this.thisDeviceId);
       if (mine && !mine.name) {
         const suggestion = await suggestDeviceName();
+        if (!this.isCurrentAccount(userId, epoch)) return;
         await saveDeviceName(authClient, userId, mine.id, suggestion).catch(() => undefined);
         if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.devices = this.devices.map((device) => (device.id === mine.id ? { ...device, name: suggestion } : device));
       }
+      this.recordDevices(userId, epoch);
     } catch { if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.devicesLoadFailed = true; } finally {
       if (epoch === this.subscriptionsEpoch && userId === this.authUserId) this.devicesLoaded = true;
     }
@@ -1808,7 +1933,10 @@ export class AppController extends Reactive {
     this.devicesBusy = true; this.devicesError = '';
     try {
       await saveCanvasMode(authClient, userId, id, mode);
-      if (epoch === this.subscriptionsEpoch) this.devices = this.devices.map((device) => (device.id === id ? { ...device, canvasMode: mode } : device));
+      if (this.isCurrentAccount(userId, epoch)) {
+        this.devices = this.devices.map((device) => (device.id === id ? { ...device, canvasMode: mode } : device));
+        this.recordDevices(userId, epoch);
+      }
     } catch {
       if (epoch === this.subscriptionsEpoch) this.devicesError = '아이캠퍼스 알림을 바꾸지 못했어요. 잠시 뒤 다시 눌러 주세요';
     } finally {
@@ -1823,7 +1951,10 @@ export class AppController extends Reactive {
     this.devicesBusy = true; this.devicesError = '';
     try {
       await saveDeviceAlertAll(authClient, userId, id, enabled);
-      if (epoch === this.subscriptionsEpoch) this.devices = this.devices.map((device) => (device.id === id ? { ...device, alertAllNew: enabled } : device));
+      if (this.isCurrentAccount(userId, epoch)) {
+        this.devices = this.devices.map((device) => (device.id === id ? { ...device, alertAllNew: enabled } : device));
+        this.recordDevices(userId, epoch);
+      }
     } catch {
       if (epoch === this.subscriptionsEpoch) this.devicesError = '설정을 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요';
     } finally {
@@ -1837,7 +1968,10 @@ export class AppController extends Reactive {
     this.devicesBusy = true; this.devicesError = '';
     try {
       await saveDeviceName(authClient, userId, id, name);
-      if (epoch === this.subscriptionsEpoch) this.devices = this.devices.map((device) => (device.id === id ? { ...device, name: name.trim() } : device));
+      if (this.isCurrentAccount(userId, epoch)) {
+        this.devices = this.devices.map((device) => (device.id === id ? { ...device, name: name.trim() } : device));
+        this.recordDevices(userId, epoch);
+      }
       return true;
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) this.devicesError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '기기 이름을 바꾸지 못했어요. 잠시 뒤 다시 눌러 주세요';
@@ -1853,7 +1987,10 @@ export class AppController extends Reactive {
     this.devicesBusy = true; this.devicesError = '';
     try {
       await deleteDevice(authClient, userId, id);
-      if (epoch === this.subscriptionsEpoch) this.devices = this.devices.filter((device) => device.id !== id);
+      if (this.isCurrentAccount(userId, epoch)) {
+        this.devices = this.devices.filter((device) => device.id !== id);
+        this.recordDevices(userId, epoch);
+      }
     } catch {
       if (epoch === this.subscriptionsEpoch) this.devicesError = '기기를 지우지 못했어요. 잠시 뒤 다시 눌러 주세요';
     } finally {
@@ -1870,7 +2007,10 @@ export class AppController extends Reactive {
     this.devicesBusy = true; this.devicesError = '';
     try {
       await saveSummaryTime(authClient, userId, time);
-      if (epoch === this.subscriptionsEpoch) this.summaryTime = time;
+      if (this.isCurrentAccount(userId, epoch)) {
+        this.summaryTime = time;
+        this.recordDevices(userId, epoch);
+      }
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) this.devicesError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '요약 시간을 바꾸지 못했어요. 잠시 뒤 다시 눌러 주세요';
     } finally {
@@ -1933,7 +2073,10 @@ export class AppController extends Reactive {
       this.calendarId = typeof data?.calendar_id === 'string' ? data.calendar_id : null;
       this.calendarSyncedAt = typeof data?.synced_at === 'string' ? data.synced_at : null;
       const auto = await loadGoogleAutoStatus(authClient, userId).catch(() => null);
-      if (auto && epoch === this.subscriptionsEpoch) this.calendarAuto = auto;
+      if (!this.isCurrentAccount(userId, epoch)) return;
+      if (auto) this.calendarAuto = auto;
+      else this.calendarAuto = this.cachedSetting('calendar')?.auto ?? this.calendarAuto;
+      this.recordCalendar(userId, epoch);
     } catch { /* 표가 아직 없으면 연결 전으로 보인다 */ }
   }
 
@@ -1944,7 +2087,9 @@ export class AppController extends Reactive {
     try {
       await linkGoogleCalendar(authClient, refreshToken);
       const auto = await loadGoogleAutoStatus(authClient, userId).catch(() => null);
-      if (auto && epoch === this.subscriptionsEpoch) this.calendarAuto = auto;
+      if (!this.isCurrentAccount(userId, epoch)) return;
+      if (auto) this.calendarAuto = auto;
+      this.recordCalendar(userId, epoch);
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) this.calendarError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '자동으로 반영하는 설정을 저장하지 못했어요. 잠시 뒤 다시 연결해 주세요.';
     }
@@ -1984,6 +2129,7 @@ export class AppController extends Reactive {
       if (error) throw error;
       if (epoch !== this.subscriptionsEpoch) return;
       this.calendarId = calendar; this.calendarSyncedAt = syncedAt;
+      this.recordCalendar(userId, epoch);
       this.calendarMessage = events.size ? `마감 ${events.size}개를 캘린더에 반영했어요` : '마감이 남은 저장 공지가 없어요';
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) {
@@ -2007,7 +2153,7 @@ export class AppController extends Reactive {
       const { error } = await authClient.from('user_calendar').delete().eq('user_id', userId);
       if (error) throw error;
       this.forgetGoogleToken();
-      if (epoch === this.subscriptionsEpoch) { this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarMessage = '연결을 끊었어요. 구글 캘린더의 "성대 공지"는 직접 지워 주세요'; }
+      if (epoch === this.subscriptionsEpoch) { this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.recordCalendar(userId, epoch); this.calendarMessage = '연결을 끊었어요. 구글 캘린더의 "성대 공지"는 직접 지워 주세요'; }
     } catch {
       if (epoch === this.subscriptionsEpoch) this.calendarError = '연결을 끊지 못했어요. 잠시 뒤 다시 눌러 주세요';
     } finally {
@@ -2044,7 +2190,7 @@ export class AppController extends Reactive {
       if (!this.isCurrentAccount(userId, requestedEpoch)) return;
       const epoch = this.advanceAccountEpoch();
       const isCurrent = () => this.isCurrentAccount(userId, epoch);
-      await clearListCache(userId);
+      await Promise.all([clearListCache(userId), clearSettingsCache(userId)]);
       await releaseInbox(userId, { isCurrent });
       await this.releasePush(userId, isCurrent);
       if (!isCurrent()) return;
@@ -2063,8 +2209,11 @@ export class AppController extends Reactive {
     this.aiBusy = true; this.aiError = '';
     try {
       await registerAiKey(authClient, provider, apiKey, model);
-      const keys = await loadAiKeyStatuses(authClient, userId);
-      if (epoch === this.subscriptionsEpoch) this.aiKeys = keys;
+      const keys = await loadAiKeyStatuses(authClient, userId, true);
+      if (this.isCurrentAccount(userId, epoch)) {
+        this.aiKeys = keys;
+        this.recordAiSettings(userId, epoch);
+      }
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) this.aiError = error instanceof Error ? error.message : '키를 저장하지 못했어요.';
     } finally {
@@ -2078,7 +2227,10 @@ export class AppController extends Reactive {
     this.aiBusy = true; this.aiError = '';
     try {
       await removeAiKey(authClient, provider);
-      if (epoch === this.subscriptionsEpoch) this.aiKeys = this.aiKeys.filter((key) => key.provider !== provider);
+      if (this.isCurrentAccount(userId, epoch)) {
+        this.aiKeys = this.aiKeys.filter((key) => key.provider !== provider);
+        this.recordAiSettings(userId, epoch);
+      }
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) this.aiError = error instanceof Error ? error.message : '키를 지우지 못했어요.';
     } finally {
@@ -2092,7 +2244,10 @@ export class AppController extends Reactive {
     this.aiBusy = true; this.aiError = '';
     try {
       await saveAiPreferences(authClient, userId, next);
-      if (epoch === this.subscriptionsEpoch) this.aiPrefs = next;
+      if (this.isCurrentAccount(userId, epoch)) {
+        this.aiPrefs = next;
+        this.recordAiSettings(userId, epoch);
+      }
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) this.aiError = error instanceof Error ? error.message : 'AI 설정을 저장하지 못했어요.';
     } finally {
@@ -2106,7 +2261,7 @@ export class AppController extends Reactive {
     this.byokBusy = true; this.byokError = '';
     try {
       await removeByokKey(authClient);
-      if (epoch === this.subscriptionsEpoch) { this.byokStatus = null; this.byokBackfill = 0; }
+      if (epoch === this.subscriptionsEpoch) { this.byokStatus = null; this.byokBackfill = 0; this.recordAiSettings(userId, epoch); }
       if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; }
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) this.byokError = error instanceof Error ? error.message : '키를 지우지 못했어요.';
@@ -2121,7 +2276,7 @@ export class AppController extends Reactive {
     this.byokBusy = true; this.byokError = ''; this.profileMessage = ''; this.profileError = '';
     try {
       await storeProfile(authClient, userId, profile);
-      if (epoch === this.subscriptionsEpoch) { this.profile = profile; this.profileMessage = '저장했어요.'; }
+      if (epoch === this.subscriptionsEpoch) { this.profile = profile; this.recordSetting(userId, epoch, 'profile', profile); this.profileMessage = '저장했어요.'; }
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) this.profileError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.';
     } finally {
@@ -2145,7 +2300,7 @@ export class AppController extends Reactive {
     if (!authClient) return;
     const isCurrent = () => this.isCurrentAccount(userId, epoch);
     const supported = isSecureContext && 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
-    if (!supported) { if (isCurrent()) this.pushStatus = 'unsupported'; return; }
+    if (!supported) { this.setCheckedPush(userId, epoch, 'unsupported'); return; }
     try {
       // 서비스 워커가 끝내 준비되지 않으면(바꿔 끼우는 중 등) "확인하고 있어요"에 멈추지 않게 끊는다.
       const ready = new Promise<ServiceWorkerRegistration>((resolve, reject) => {
@@ -2164,7 +2319,7 @@ export class AppController extends Reactive {
       const on = await withTimeout(inspectDevicePush(authClient, userId, registration, localStorage,
         { vapidKey: this.pushVapidKey, permission: Notification.permission }, isCurrent), PUSH_CHECK_MS);
       if (!isCurrent()) return;
-      this.pushStatus = on ? 'on' : Notification.permission === 'denied' ? 'denied' : 'off';
+      this.setCheckedPush(userId, epoch, on ? 'on' : Notification.permission === 'denied' ? 'denied' : 'off');
     } catch (error) {
       if (isCurrent()) {
         this.pushStatus = Notification.permission === 'denied' ? 'denied' : 'off';
@@ -2190,7 +2345,7 @@ export class AppController extends Reactive {
     this.pushStatus = 'busy'; this.pushError = '';
     try {
       await current.chain.run();
-      if (isCurrent()) { this.pushStatus = 'on'; this.pushRetry = false; }
+      if (isCurrent()) { this.setCheckedPush(userId, epoch, 'on'); this.pushRetry = false; }
       if (this.pushChain === current) this.pushChain = null;
     } catch (error) {
       if (isCurrent()) {
@@ -2248,7 +2403,7 @@ export class AppController extends Reactive {
     try {
       const cleaned = await disableDevicePush(authClient, userId, registration, localStorage, () => this.isCurrentAccount(userId, epoch));
       if (epoch === this.subscriptionsEpoch) {
-        this.pushStatus = 'off';
+        this.setCheckedPush(userId, epoch, 'off');
         if (!cleaned) this.pushError = '이 기기의 알림은 껐지만 서버 정리는 끝나지 않았어요. 다시 확인해 주세요.';
       }
     } catch (error) {
@@ -2281,8 +2436,12 @@ export class AppController extends Reactive {
       if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId || !(await sessionIs(client, userId))) return;
       try {
         // 연달아 바꿨다면 가장 최근 목록 하나만 저장한다.
-        await saveKeywordsPreference(client, userId, this.keywords);
-        if (epoch === this.subscriptionsEpoch) this.keywordNote = '계정에 저장했어요';
+        const words = this.keywords;
+        await saveKeywordsPreference(client, userId, words);
+        if (this.isCurrentAccount(userId, epoch)) {
+          this.keywordNote = '계정에 저장했어요';
+          this.recordSetting(userId, epoch, 'keywords', words);
+        }
       } catch {
         if (epoch === this.subscriptionsEpoch) this.keywordNote = '저장하지 못했어요. 다시 바꾸면 또 저장해요';
       }
@@ -2304,6 +2463,7 @@ export class AppController extends Reactive {
         this.keywords = keywords;
         remember('keywords', JSON.stringify(keywords));
         if (this.keyword && !keywords.includes(this.keyword)) this.keyword = null;
+        this.recordSetting(userId, epoch, 'keywords', keywords);
         this.showToast('키워드를 저장했어요');
       }
     } catch {
@@ -2317,7 +2477,10 @@ export class AppController extends Reactive {
     if (!authClient) return;
     try {
       const sources = await loadSubscriptions(authClient, userId);
-      if (epoch === this.subscriptionsEpoch) this.subscriptions = sources;
+      if (this.isCurrentAccount(userId, epoch)) {
+        this.subscriptions = sources;
+        this.recordSetting(userId, epoch, 'subscriptions', sources);
+      }
     } catch {
       if (epoch === this.subscriptionsEpoch) this.subscriptionsError = '구독을 불러오지 못했어요. 다시 시도해 주세요.';
     } finally {
@@ -2335,6 +2498,7 @@ export class AppController extends Reactive {
       await setSubscription(authClient, userId, sourceId, enabled);
       if (epoch === this.subscriptionsEpoch) {
         this.subscriptions = enabled ? [...this.subscriptions, sourceId] : this.subscriptions.filter((id) => id !== sourceId);
+        this.recordSetting(userId, epoch, 'subscriptions', this.subscriptions);
       }
     } catch {
       if (epoch === this.subscriptionsEpoch) this.subscriptionsError = '구독을 저장하지 못했어요. 다시 시도해 주세요.';
@@ -2364,13 +2528,14 @@ export class AppController extends Reactive {
   }
 
   /** 학교 게시판 중 사이드바에 보일 것(순서 적용 전, 서버 목록 순서). */
-  schoolSources(): Source[] {
+  schoolSources(cachedSubscriptions?: string[]): Source[] {
     const all = this.sources.filter((s) => !s.external);
     // 로그인했고 받을 게시판을 하나도 안 골랐으면 게시판 목록은 비어 있다(공지가 있다고 대신 보여 주지 않는다).
-    if (this.noBoards()) return [];
-    const subscribed = this.authUserId && !this.subscriptionsLoading && this.subscriptions.length > 0;
+    if (cachedSubscriptions ? cachedSubscriptions.length === 0 : this.noBoards()) return [];
+    const subscriptions = cachedSubscriptions ?? this.subscriptions;
+    const subscribed = this.authUserId && (cachedSubscriptions || !this.subscriptionsLoading) && subscriptions.length > 0;
     const withNotices = new Set(this.notices.map((n) => n.source_id));
-    const chosen = all.filter((s) => (subscribed ? this.subscriptions.includes(s.id) : withNotices.has(s.id)));
+    const chosen = all.filter((s) => (subscribed ? subscriptions.includes(s.id) : withNotices.has(s.id)));
     // 지금 보고 있는 게시판은 목록에서 사라지지 않게 한다.
     const current = all.filter((s) => s.id === this.board && !chosen.includes(s));
     return [...chosen, ...current];

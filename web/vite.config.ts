@@ -72,6 +72,16 @@ export default defineConfig({
         navigateFallbackDenylist: [/\/api\//],
         runtimeCaching: [
           {
+            urlPattern: /^https:\/\/lh3\.googleusercontent\.com\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-avatars',
+              // 불투명 응답은 브라우저가 큰 용량으로 셈하므로 계정 사진 몇 장만 둔다.
+              expiration: { maxAgeSeconds: 30 * 24 * 60 * 60, maxEntries: 3 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             // Pretendard 글꼴 조각은 파일 이름이 바뀌지 않으므로 캐시 우선.
             urlPattern: ({ url }) => url.pathname.endsWith('.woff2'),
             handler: 'CacheFirst',

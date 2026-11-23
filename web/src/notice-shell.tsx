@@ -97,13 +97,14 @@ export function NoticeShell({ app }: { app: AppController }) {
 
   if (!app.authReady) return <LoginStatus />;
   if (app.gated) return app.deepId && app.preview.status !== 'missing' ? <NoticePreview app={app} /> : <LoginScreen app={app} missing={!!app.deepId} />;
-  if (app.awaitingProfile()) return <LoginStatus />;
+  if (app.awaitingProfile() && app.view !== 'settings') return <LoginStatus />;
   // 첫 목록이 준비되기 전의 개수는 계정 정보가 오면 바뀌므로(판정 대기 공지가 빠진다) 보이지 않는다.
   const ready = app.userDataReady();
   const counts = Object.fromEntries(TABS.map((t) => [t.id, ready ? app.tabCount(t.id) : null]));
   const list = app.visible();
   const settings = app.view === 'settings';
   const settingsSection = settings ? app.settingsSection : null;
+  const settingsPending = settings && settingsSection !== 'explore' && !app.settingsReady();
   const sidebarTab = settingsSection === 'explore' ? 'saved' : settings ? null : app.tab();
   const keywordScope = app.tab() === 'saved' ? app.savedNotices() : app.notices.filter((notice) =>
     app.kindOf(notice) === app.tab() && (!notice.deadline || !deadlinePassed(notice.deadline)));
@@ -181,7 +182,8 @@ export function NoticeShell({ app }: { app: AppController }) {
             </header>
           </div>
 
-          {settings ? (app.settingsReady() || app.settingsSection === 'explore' ? <platform-settings-screen model={settingsModel(app)} /> : null) : <>
+          {settings ? (!settingsPending || (app.authUserId && (!settingsSection || settingsSection === 'profile'))
+            ? <platform-settings-screen model={settingsModel(app, settingsPending)} /> : null) : <>
             <div className="tools narrow-only px-[var(--gutter)] pt-[4px] pb-0 min-[720px]:hidden!">
               <label className="search flex h-[44px] items-center gap-[8px] rounded-md bg-sunken px-[16px] text-ink-3 focus-within:outline-2 focus-within:outline-accent [&_.i]:size-[20px] [&_input]:h-full [&_input]:min-w-0 [&_input]:flex-1 [&_input]:border-0 [&_input]:bg-transparent [&_input]:text-ink [&_input]:[outline:0] [&_input]:placeholder:text-ink-3"><Icon name="search" />
                 <input type="search" placeholder="공지 찾기" autoComplete="off" aria-label="공지 검색" value={app.query}
@@ -255,7 +257,22 @@ function exploreModel(app: AppController): ExploreModel {
   return { status };
 }
 
-function settingsModel(app: AppController) {
+function settingsModel(app: AppController, pending: boolean) {
+  const profile = app.cachedSetting('profile');
+  const ai = app.cachedSetting('ai');
+  const canvas = app.cachedSetting('canvas');
+  const devices = app.cachedSetting('devices');
+  const calendar = app.cachedSetting('calendar');
+  const subscriptions = app.cachedSetting('subscriptions');
+  const keywords = app.cachedSetting('keywords');
+  const push = app.pushStatus === 'checking' ? app.cachedSetting('push') : undefined;
+  const byok = aiConnectModel(app);
+  if (ai) {
+    const checking = !app.aiStateLoaded;
+    Object.assign(byok, { available: ai.available, loading: false, status: ai.status, backfill: ai.backfill, busy: checking || byok.busy });
+    if (byok.ai) Object.assign(byok.ai, { keys: ai.keys, prefs: ai.prefs, gemini: !!ai.status && !ai.status.disabled, busy: checking || byok.ai.busy });
+  }
+  if (canvas !== undefined) byok.canvas = canvas;
   return {
     configured: !!authClient, userId: app.authUserId, email: app.authEmail, name: app.authName, avatar: app.authAvatar,
     authBusy: app.authBusy, authError: app.authError,
@@ -265,33 +282,35 @@ function settingsModel(app: AppController) {
     submitBoardRequest: (userId: string, name: string, url: string) => app.submitBoardRequest(userId, name, url),
     showToast: (message: string) => app.showToast(message),
     questionBlocks: app.questionBlocksModel(),
-    section: app.settingsSection, openSection: (section: string | null) => app.openSettingsSection(section),
+    pending, section: app.settingsSection, openSection: (section: string | null) => app.openSettingsSection(section),
     theme: app.theme, setTheme: (theme: 'auto' | 'light' | 'dark') => app.setTheme(theme),
     canInstall: !!app.install && !isStandalone(), manualInstall: ((mode) => (mode === 'prompt' || mode === 'none' ? null : mode))(installMode(navigator.userAgent, isStandalone(), !!app.install)), install: () => { void app.runInstall(); }, showShortcuts: () => { app.shortcutsOpen = true; },
     sources: app.sources.filter((source) => !source.external).map((source) => ({ id: source.id, label: boardName(source, source.id), shared_board: source.shared_board })),
-    boardOrder: { boards: applyBoardOrder(app.schoolSources(), app.boardOrder).map((source) => ({ id: source.id, label: boardName(source, source.id) })),
+    boardOrder: { boards: applyBoardOrder(app.schoolSources(subscriptions), app.cachedSetting('boardOrder') ?? app.boardOrder).map((source) => ({ id: source.id, label: boardName(source, source.id) })),
       status: app.authUserId && app.boardOrderAccount ? app.boardOrderStatus : '' as const, move: (ids: string[]) => app.setBoardOrder(ids) },
-    subscriptions: app.subscriptions, loading: app.subscriptionsLoading, error: app.subscriptionsError,
+    subscriptions: subscriptions ?? app.subscriptions, loading: app.subscriptionsLoading || (!!subscriptions && !app.subscriptionsError), error: app.subscriptionsError,
     toggle: (id: string, enabled: boolean) => { void app.toggleSubscription(id, enabled); },
     retry: () => {
       if (app.authUserId) { app.subscriptionsLoading = true; app.subscriptionsError = ''; void app.refreshSubscriptions(app.authUserId, app.subscriptionsEpoch); }
     },
-    keywords: app.keywords, keywordNote: app.keywordNote,
+    keywords: keywords ?? app.keywords, keywordsPending: !!keywords && app.preferencesLoading, keywordNote: app.keywordNote,
     addKeyword: (word: string) => app.addKeyword(word), removeKeyword: (word: string) => app.removeKeyword(word),
-    pushStatus: app.pushStatus, pushError: app.pushError, pushRetry: app.pushRetry,
+    pushStatus: push ?? app.pushStatus, pushPending: !!push, pushError: app.pushError, pushRetry: app.pushRetry,
     enablePush: () => { void app.enablePush(); }, disablePush: () => { void app.disablePush(); }, sendPushReport: () => { void app.sendPushReport(); },
     testNotification: () => { void app.testNotification(); },
-    profile: app.profile, profileStatus: app.profileStatus, profileMessage: app.profileMessage, profileError: app.profileError,
+    profile: profile ?? app.profile, profileStatus: app.profileStatus, profileMessage: app.profileMessage, profileError: app.profileError,
     saveProfile: (profile: UserProfile) => { void app.saveProfile(profile); },
-    byok: aiConnectModel(app),
+    byok,
     account: { busy: app.accountBusy, error: app.accountError, remove: () => { void app.deleteAccount(); } },
-    devicesInfo: { devices: app.devices, loaded: app.devicesLoaded, thisId: app.thisDeviceId, summaryTime: app.summaryTime, hasCanvasToken: !!app.canvasStatus, busy: app.devicesBusy, error: app.devicesError, loadFailed: app.devicesLoadFailed,
+    devicesInfo: { devices: devices?.items ?? app.devices, loaded: !!devices || app.devicesLoaded,
+      thisId: devices ? devices.thisId : app.thisDeviceId, summaryTime: devices ? devices.summaryTime : app.summaryTime,
+      hasCanvasToken: !!byok.canvas, busy: !!devices || app.devicesBusy, error: app.devicesError, loadFailed: !devices && app.devicesLoadFailed,
       refresh: () => { void app.refreshDevices(); }, setMode: (mode: string) => { void app.setCanvasMode(mode as CanvasMode); }, setAlertAll: (enabled: boolean) => { void app.setDeviceAlertAll(enabled); }, remove: (id: string) => { void app.removeDevice(id); }, rename: (id: string, name: string) => app.renameDevice(id, name),
       setSummaryTime: (period: 'am' | 'pm', hour: number, minute: number) => { void app.setSummaryTime(period, hour, minute); } },
     explore: app.settingsSection === 'explore' ? exploreModel(app) : undefined,
     inbox: { items: app.inboxItems, pushOn: app.pushStatus === 'on', open: (item: InboxItem) => app.openInboxItem(item), remove: (id: string) => { void app.changeInbox({ kind: 'remove', ids: [id] }); },
       readAll: () => { void app.changeInbox({ kind: 'read-all' }); }, clear: () => { void app.changeInbox({ kind: 'clear' }); }, goNotifications: () => app.openSettingsSection('notifications') },
-    calendar: { auto: app.calendarAuto, id: app.calendarId, syncedAt: app.calendarSyncedAt, busy: app.calendarBusy, message: app.calendarMessage, error: app.calendarError, savedCount: app.saved.length,
+    calendar: { ...(calendar ?? { auto: app.calendarAuto, connected: !!app.calendarId, syncedAt: app.calendarSyncedAt }), busy: app.calendarBusy, fetching: !!calendar, message: app.calendarMessage, error: app.calendarError, savedCount: app.saved.length,
       connect: () => { void app.connectCalendar(); }, sync: () => { void app.syncCalendarNow(); }, disconnect: () => { void app.disconnectCalendar(); } },
   };
 }

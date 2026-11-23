@@ -36,8 +36,11 @@ async function failure(error: unknown, fallback: string): Promise<Error> {
 }
 
 /** 암호문 열은 읽지 않는다. 표가 없는 환경이면 빈 목록이다. */
-export async function loadAiKeyStatuses(client: SupabaseClient, userId: string): Promise<AiKeyStatus[]> {
+const missingTable = (code: string) => code === '42P01' || code === 'PGRST205';
+
+export async function loadAiKeyStatuses(client: SupabaseClient, userId: string, requireFresh = false): Promise<AiKeyStatus[]> {
   const { data, error } = await client.from('user_ai_keys').select('provider,key_hint,model,disabled_at,last_error,used_today').eq('user_id', userId);
+  if (error && requireFresh && !missingTable(error.code)) throw error;
   if (error) return [];
   return (data ?? []).flatMap((row) => (row.provider === 'groq'
     ? [{ provider: row.provider as AiProvider, keyHint: String(row.key_hint), model: String(row.model), disabled: !!row.disabled_at,
@@ -55,8 +58,9 @@ export async function removeAiKey(client: SupabaseClient, provider: AiProvider):
   if (error) throw await failure(error, '키를 지우지 못했어요. 잠시 뒤 다시 시도해 주세요.');
 }
 
-export async function loadAiPreferences(client: SupabaseClient, userId: string): Promise<AiPreferences> {
+export async function loadAiPreferences(client: SupabaseClient, userId: string, requireFresh = false): Promise<AiPreferences> {
   const { data, error } = await client.from('user_ai_preferences').select('ai_enabled').eq('user_id', userId).maybeSingle();
+  if (error && requireFresh && !missingTable(error.code)) throw error;
   if (error || !data) return DEFAULT_AI_PREFERENCES;
   return { aiEnabled: data.ai_enabled !== false };
 }

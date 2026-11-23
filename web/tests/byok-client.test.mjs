@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { byokAvailable, loadByokStatus, looksLikeGeminiKey, registerByokKey, removeByokKey } from '../src/byok.ts';
+import { checkByokAvailability, loadByokStatus, looksLikeGeminiKey, registerByokKey, removeByokKey } from '../src/byok.ts';
 
 const KEY = `AIza${'C'.repeat(35)}`;
 
@@ -30,11 +30,12 @@ test('status query never asks for the ciphertext column', async () => {
   assert.equal(selects[0].includes('ciphertext'), false);
 });
 
-test('availability probe needs a 204 from the function and treats network errors as unavailable', async () => {
-  assert.equal(await byokAvailable('https://x.supabase.co', async () => ({ status: 204 })), true);
-  assert.equal(await byokAvailable('https://x.supabase.co', async () => ({ status: 404 })), false);
-  assert.equal(await byokAvailable('https://x.supabase.co', async () => { throw new TypeError('cors'); }), false);
-  assert.equal(await byokAvailable(undefined), false);
+test('availability probe distinguishes a missing function from a transient error', async () => {
+  assert.equal(await checkByokAvailability('https://x.supabase.co', async () => ({ status: 204 })), true);
+  assert.equal(await checkByokAvailability('https://x.supabase.co', async () => ({ status: 404 })), false);
+  assert.equal(await checkByokAvailability('https://x.supabase.co', async () => { throw new TypeError('cors'); }), null);
+  assert.equal(await checkByokAvailability('https://x.supabase.co', async () => ({ status: 503 })), null);
+  assert.equal(await checkByokAvailability(undefined), false);
 });
 
 test('client accepts the AQ. key format', () => {

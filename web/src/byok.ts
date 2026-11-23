@@ -192,10 +192,11 @@ export async function removeByokKey(client: SupabaseClient): Promise<void> {
 }
 
 /** 키 등록 기능이 이 환경에 배포돼 있는지 확인한다. 없으면 설정 화면에 입력란을 보이지 않는다. */
-export async function byokAvailable(supabaseUrl: string | undefined, fetcher: typeof fetch = fetch): Promise<boolean> {
+export async function checkByokAvailability(supabaseUrl: string | undefined, fetcher: typeof fetch = fetch): Promise<boolean | null> {
   if (!supabaseUrl) return false;
   try {
     const response = await fetcher(new URL('/functions/v1/byok', supabaseUrl), { method: 'OPTIONS', cache: 'no-store' });
-    return response.status === 204;
-  } catch { return false; }
+    if (response.status === 204) return true;
+    return response.status === 404 ? false : null;
+  } catch { return null; }
 }
