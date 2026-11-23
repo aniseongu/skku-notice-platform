@@ -1,7 +1,7 @@
 // 공지 상세의 "졸업요건 확인". 서버가 수집할 때 미리 판정해 두고, 이 화면은 결과를 글로만 보여 준다(버튼 없음).
 // 영역 이름, 판정 키워드(되면 초록·안 되면 빨강), 이유가 한 문단에 이어진다. 색만으로 구분하지 않도록 판정도 글로 쓴다.
 import { useState } from 'react';
-import { DETAIL_SECTION, SECTION_TITLE } from './cls';
+import { COLLAPSE_HEAD, DETAIL_SECTION, SECTION_TITLE } from './cls';
 import { STATUS_TEXT, displayStatus, jobNote, reasonOf, type GraduationAssessment, type Track, type VisibleTracks } from './graduation-assessment';
 
 export interface GraduationModel {
@@ -72,11 +72,12 @@ export function GraduationNotes({ model }: { model: GraduationModel }) {
   const hasP3 = model.tracks.p3 && !!ready.university3p;
   const hasDept = model.tracks.dept && !!ready.department;
   return <div className="mt-[16px] text-[12px] leading-[18px] text-ink-2 [word-break:keep-all]" aria-label="인턴십 요건 안내">
-    <p className="m-0">공고에 적힌 근무 기간과 시간으로 대략 판단해요. 실제 인정 여부는 학교와 학과에 확인해 주세요{hasP3 || hasDept
-      // 글자는 문장 끝에 붙고, 눌리는 영역은 위아래 여백으로 44px를 채운다(줄 높이는 그대로).
-      ? <button type="button" aria-expanded={open} aria-controls="grad-criteria" onClick={() => setOpen((value) => !value)}
-          className="ml-[6px] inline cursor-pointer border-0 bg-transparent p-0 py-[13px] -my-[13px] text-[12px] leading-[18px] font-medium text-ink-3 underline underline-offset-2 [@media(hover:hover)]:hover:text-ink active:text-ink">판정 근거 {open ? '접기' : '보기'}</button>
-      : null}</p>
+    <p className="m-0">공고에 적힌 근무 기간과 시간으로 대략 판단해요. 실제 인정 여부는 학교와 학과에 확인해 주세요</p>
+    {hasP3 || hasDept
+      ? <button type="button" aria-expanded={open} aria-controls="grad-criteria" onClick={() => setOpen((value) => !value)} className={`${COLLAPSE_HEAD} mt-[4px] !text-[12px] !font-medium`}>
+        <span>판정 근거 {open ? '접기' : '보기'}</span>
+        <svg className={`size-[16px] flex-none fill-none stroke-current [stroke-width:2] [stroke-linecap:round] [stroke-linejoin:round] ${open ? 'rotate-180' : ''}`} viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg></button>
+      : null}
     {open ? <div id="grad-criteria" className="mt-[8px]">
       {readFacts(ready.facts) ? <p className="m-0">공고에서 읽은 내용: {readFacts(ready.facts)}</p> : null}
       {ready.facts?.missing.length ? <p className="m-0">공고에 없어 확인하지 못한 내용: {ready.facts.missing.join(', ')}</p> : null}

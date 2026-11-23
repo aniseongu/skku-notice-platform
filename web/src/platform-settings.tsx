@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { MANUAL_INSTALL_HINT, type ManualInstallMode } from './install-hint';
 import { isSoftwareOriginal, threePAnswer, threePFields, type ThreePAnswer } from './graduation-assessment';
-import { AiRows, StepGuide } from './ai-connect';
+import { AiRows } from './ai-connect';
 import type { AiKeyStatus, AiPreferences, AiProvider } from './ai-providers';
 import { type ByokStatus, type CanvasStatus } from './byok';
 import { CANVAS_MODES, composeSummaryTime, displayDeviceName, summaryParts, validDeviceName, type CanvasMode } from './devices';
@@ -13,9 +13,8 @@ import { COLLEGES, MAX_PROGRAMS, programKey, programLabel, type Program } from '
 import { ProgramPicker } from './onboarding';
 import { BOARD_CATALOG, OTHER_BOARDS, boardCollege } from './skku-boards';
 // 마우스·터치 끌기는 dnd-kit(MIT), 키보드 순서 바꾸기는 손잡이에서 처리한다.
-import { DndContext, MeasuringStrategy, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
-import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
+import { ReorderHandle, useReorder, type ReorderState } from './reorder-handle';
 import { CSS } from '@dnd-kit/utilities';
 import { Avatar, BackToGroups, GroupGrid, SwitchRow } from './ui';
 import { SegmentedChoice } from './segmented-choice';
@@ -592,86 +591,29 @@ function chevron(d: string, className?: string) {
 
 /** 게시판 한 줄. 줄마다 테두리가 있는 따로 떨어진 칸이다. 오른쪽 끝에서 받기를 켜고 끄고(평소), 순서를 바꾸는 중에는 같은 자리의 손잡이로 끈다.
  *  손잡이를 스위치와 같은 오른쪽에 둔 이유: 마우스가 단추 근처에 있는 채로 바로 옮길 수 있게 하려는 것이다(.claude/rules/usability.md). */
-function BoardRow({ board, editing, onToggle, busy, keyboardIndex, onKeyboard, onKeyboardBlur }: { board: { id: string; label: string }; editing: boolean; onToggle?: (id: string) => void; busy: boolean; keyboardIndex?: number; onKeyboard: (id: string, event: React.KeyboardEvent<HTMLButtonElement>) => void; onKeyboardBlur: (id: string) => void }) {
+function BoardRow({ board, editing, onToggle, busy, reorder }: { board: { id: string; label: string }; editing: boolean; onToggle?: (id: string) => void; busy: boolean; reorder: ReorderState }) {
+  const keyboardIndex = reorder.keyboardIndexOf(board.id);
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: board.id, disabled: !editing });
   return <li ref={setNodeRef} data-board-id={board.id} style={{ transform: CSS.Transform.toString(transform), transition, order: keyboardIndex }}
     className={`flex min-h-[56px] items-center gap-[12px] rounded-md border bg-surface pr-[6px] pl-[16px] ${isDragging ? 'relative z-10 border-accent shadow-pop' : 'border-line'}`}>
     <span className="order-name min-w-0 flex-1 text-[15px] font-medium [overflow-wrap:anywhere]">{board.label}</span>
-    {editing ? <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} onKeyDown={(event) => onKeyboard(board.id, event)} onBlur={() => onKeyboardBlur(board.id)} aria-label={`${board.label} 순서 옮기기`}
-      className="order-handle grid size-[44px] flex-none cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent text-ink-3 [@media(hover:hover)]:hover:bg-hover active:bg-hover active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-accent">
-      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">{[7, 12, 17].flatMap((y) => [9, 15].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.7" />))}</svg></button> : null}
+    {editing ? <ReorderHandle id={board.id} label={board.label} state={reorder} activatorRef={setActivatorNodeRef} attributes={attributes} listeners={listeners} /> : null}
     {onToggle && !editing ? <button type="button" role="switch" className={SWITCH_ONLY} aria-checked="true" aria-label={`${board.label} 받기`} disabled={busy}
       onClick={() => onToggle(board.id)}><span className={SWITCH} aria-hidden="true" /></button> : null}
   </li>;
 }
 
 function BoardOrderList({ order, editing, onToggle, busy = false }: { order: SettingsModel['boardOrder']; editing: boolean; onToggle?: (id: string) => void; busy?: boolean }) {
-  const latest = useRef(order);
-  latest.current = order;
-  const [picked, setPicked] = useState<{ id: string; ids: string[] } | null>(null);
-  const pickedRef = useRef(picked);
-  const [announcement, setAnnouncement] = useState('');
-  const updatePicked = (value: typeof picked) => { pickedRef.current = value; setPicked(value); };
-  useEffect(() => { if (!editing) updatePicked(null); }, [editing]);
   const ids = order.boards.map((board) => board.id);
-  const labelOf = (id: unknown) => order.boards.find((board) => board.id === id)?.label ?? '';
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
-  );
-  const onDragEnd = ({ active, over }: DragEndEvent) => {
-    if (!over || active.id === over.id) return;
-    const from = ids.indexOf(String(active.id)), to = ids.indexOf(String(over.id));
-    if (from < 0 || to < 0) return;
-    latest.current.move(arrayMove(ids, from, to));
-  };
-  const position = (id: unknown) => `${ids.indexOf(String(id)) + 1}번째`;
-  const onKeyboard = (id: string, event: React.KeyboardEvent<HTMLButtonElement>) => {
-    const current = pickedRef.current;
-    if (event.code === 'Space' || event.code === 'Enter') {
-      event.preventDefault();
-      if (!current) {
-        updatePicked({ id, ids });
-        setAnnouncement(`${labelOf(id)}을 집었어요. 지금 ${position(id)}예요`);
-      } else if (current.id === id) {
-        updatePicked(null);
-        if (current.ids.some((value, index) => value !== ids[index])) latest.current.move(current.ids);
-        setAnnouncement(`${labelOf(id)}을 ${current.ids.indexOf(id) + 1}번째로 옮겼어요`);
-      }
-    } else if (current?.id === id && event.code === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      updatePicked(null);
-      setAnnouncement(`${labelOf(id)} 옮기기를 취소했어요`);
-    } else if (current?.id === id && (event.code === 'ArrowUp' || event.code === 'ArrowDown')) {
-      event.preventDefault();
-      const from = current.ids.indexOf(id);
-      const to = Math.max(0, Math.min(current.ids.length - 1, from + (event.code === 'ArrowDown' ? 1 : -1)));
-      updatePicked({ id, ids: arrayMove(current.ids, from, to) });
-      setAnnouncement(`${labelOf(id)}이 ${to + 1}번째 자리예요`);
-    }
-  };
+  const { state, shell } = useReorder({
+    ids, labelOf: (id) => order.boards.find((board) => board.id === id)?.label ?? '',
+    position: (id, list) => `${list.indexOf(String(id)) + 1}번째`,
+    onCommit: (next) => order.move(next), active: editing,
+  });
   return <div className="order-box py-[4px]">
-    <span className="sr-only" aria-live="assertive" aria-atomic="true">{announcement}</span>
-    <DndContext measuring={{ droppable: { strategy: MeasuringStrategy.Always } }} sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis, restrictToParentElement]}
-      onDragEnd={onDragEnd}
-      accessibility={{
-        screenReaderInstructions: { draggable: '순서를 바꾸려면 Space를 눌러 집고, 위아래 방향키로 옮긴 뒤 Space로 놓으세요. 취소는 Esc예요.' },
-        announcements: {
-          onDragStart: ({ active }) => `${labelOf(active.id)}을 집었어요. 지금 ${position(active.id)}예요`,
-          onDragOver: ({ active, over }) => (over ? `${labelOf(active.id)}이 ${position(over.id)} 자리 위에 있어요` : undefined),
-          onDragEnd: ({ active, over }) => (over ? `${labelOf(active.id)}을 ${position(over.id)}로 옮겼어요` : `${labelOf(active.id)}을 제자리에 놓았어요`),
-          onDragCancel: ({ active }) => `${labelOf(active.id)} 옮기기를 취소했어요`,
-        },
-      }}>
-      <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-        <ul className="order-list m-0 flex list-none flex-col gap-[8px] p-0">
-          {order.boards.map((board) => <BoardRow key={board.id} board={board} editing={editing} onToggle={onToggle} busy={busy}
-            keyboardIndex={picked ? picked.ids.indexOf(board.id) : undefined} onKeyboard={onKeyboard}
-            onKeyboardBlur={(id) => { if (pickedRef.current?.id === id) { updatePicked(null); setAnnouncement(`${labelOf(id)} 옮기기를 취소했어요`); } }} />)}
-        </ul>
-      </SortableContext>
-    </DndContext>
+    {shell(<ul className="order-list m-0 flex list-none flex-col gap-[8px] p-0">
+      {order.boards.map((board) => <BoardRow key={board.id} board={board} editing={editing} onToggle={onToggle} busy={busy} reorder={state} />)}
+    </ul>)}
     {/* 아래에는 문제가 생겼을 때만 적는다. 저장 성공은 따로 알리지 않는다(바로 저장된다고 위에 이미 적었다). */}
     {editing && order.status === 'failed' ? <p className="field-note error text-[14px] leading-[20px] text-danger m-0 mt-[8px]" role="alert">저장하지 못했어요. 다시 옮기면 또 저장해요</p> : null}
   </div>;
@@ -874,7 +816,22 @@ function Profile({ model }: { model: SettingsModel }) {
 }
 
 // bare: 이미 위에 구분선이 있는 묶음 안에서는 자기 윗선과 여백을 없애 선이 두 줄로 겹치지 않게 한다.
-export function Guide({ label, steps, bare = false, open = false, compact = false }: { label: string; steps: ReactNode[]; bare?: boolean; open?: boolean; compact?: boolean }) {
+/** 접는 안내(details). 변형: 기본(설정 연결 방법), compact(작은 글), numbered(번호 원 + 부제·끝 안내, AI 키·아이캠퍼스 토큰 받는 방법). */
+export function Guide({ label, steps, bare = false, open = false, compact = false, numbered = false, sub, note }: { label: string; steps: ReactNode[]; bare?: boolean; open?: boolean; compact?: boolean; numbered?: boolean; sub?: string; note?: string }) {
+  if (numbered) {
+    return <div className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch"><details className="group w-full">
+      <summary className="rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[44px] cursor-pointer list-none items-center justify-between text-[15px] font-semibold text-ink [&::-webkit-details-marker]:hidden"><span className="flex flex-col py-1">{label}{sub ? <span className="text-[13px] font-normal text-ink-3">{sub}</span> : null}</span>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-ink-3 transition-transform group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg></summary>
+      <div className="flex flex-col gap-3 pb-2 pt-1">
+        <ol className="m-0 flex list-none flex-col gap-2 p-0">
+          {steps.map((step, index) => <li key={index} className="flex items-start gap-2 text-[13px] leading-[20px] text-ink-2">
+            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-pill bg-sunken text-[12px] font-semibold text-ink-2">{index + 1}</span>
+            <span>{step}</span></li>)}
+        </ol>
+        {note ? <p className="m-0 text-[13px] text-ink-3">{note}</p> : null}
+      </div>
+    </details></div>;
+  }
   if (compact) {
     return <details open={open} className="group"><summary className="rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[36px] cursor-pointer list-none items-center gap-1 text-[13px] text-ink-3 [&::-webkit-details-marker]:hidden">{label}{chevron('M6 9l6 6 6-6', 'h-4 w-4 text-ink-3 transition-transform group-open:rotate-180')}</summary><ol className="m-0 mb-1 mt-1 flex list-decimal flex-col gap-1 pl-5 text-[13px] text-ink-2">{steps.map((step, index) => <li key={index}>{step}</li>)}</ol></details>;
   }
@@ -968,7 +925,7 @@ function CanvasRow({ model, alignEnd }: { model: SettingsModel; alignEnd: boolea
     labels={{ empty: '연결 안 됨', saved: '연결됨', disabled: ' (사용 중지됨)', broken: '', retry: '', close: '닫기', add: '연결하기', edit: '바꾸기', remove: '연결 끊기', save: '연결하기' }}
     error={byok.canvasError} onRegister={byok.registerCanvas} onRemove={byok.removeCanvas} guide={null}
     valid={(value) => /^[0-9A-Za-z~_-]{16,200}$/.test(value)} />
-    <StepGuide label="토큰은 어디서 받나요?" sub="무료로 만들 수 있어요" note="읽기만 하고 내용은 바꾸지 않아요"
+    <Guide numbered label="토큰은 어디서 받나요?" sub="무료로 만들 수 있어요" note="읽기만 하고 내용은 바꾸지 않아요"
       steps={[<>{ext('https://canvas.skku.edu/profile/settings', '아이캠퍼스 설정')}에서 로그인해요</>, '"새 액세스 토큰"을 눌러요', '이름을 적고 "토큰 생성"을 눌러요', '토큰을 복사해요. 한 번만 보여요', '위 칸에 붙여 넣고 "연결하기"를 눌러요']} /></>;
 }
 

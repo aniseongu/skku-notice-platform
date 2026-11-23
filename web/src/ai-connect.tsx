@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { looksLikeAiKey, PROVIDER_GUIDE, type AiPreferences, type AiProvider } from './ai-providers';
 import type { AppController } from './app-controller';
 import { canRemoveKey, connectedAiKeys } from './ai-keys';
-import { Setting, SecretRow, type SettingsModel } from './platform-settings';
+import { Guide, Setting, SecretRow, type SettingsModel } from './platform-settings';
 
 type Byok = NonNullable<SettingsModel['byok']>;
 type Id = 'groq' | 'gemini';
@@ -28,24 +28,8 @@ const LABELS = { empty: '연결 안 됨', saved: '연결됨', disabled: '', brok
 
 const lnk = (href: string, text: string) => <a key={href} href={href} target="_blank" rel="noopener noreferrer">{text}</a>;
 
-/** 받는 방법 안내. 눌러서 펼치면 순서가 한 번에 다 보인다. 이미 연결했어도 줄 아래에 계속 둔다. */
-export function StepGuide({ label, sub, steps, note }: { label: string; sub: string; steps: ReactNode[]; note: string }) {
-  return <div className="setting stacked flex flex-col gap-[10px] py-[16px] [.setting+&]:border-t [.setting+&]:border-line min-[720px]:items-stretch"><details className="group w-full">
-    <summary className="rounded-sm [@media(hover:hover)]:hover:bg-hover active:bg-hover flex min-h-[44px] cursor-pointer list-none items-center justify-between text-[15px] font-semibold text-ink [&::-webkit-details-marker]:hidden"><span className="flex flex-col py-1">{label}<span className="text-[13px] font-normal text-ink-3">{sub}</span></span>
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-ink-3 transition-transform group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg></summary>
-    <div className="flex flex-col gap-3 pb-2 pt-1">
-      <ol className="m-0 flex list-none flex-col gap-2 p-0">
-        {steps.map((step, index) => <li key={index} className="flex items-start gap-2 text-[13px] leading-[20px] text-ink-2">
-          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-pill bg-sunken text-[12px] font-semibold text-ink-2">{index + 1}</span>
-          <span>{step}</span></li>)}
-      </ol>
-      <p className="m-0 text-[13px] text-ink-3">{note}</p>
-    </div>
-  </details></div>;
-}
-
 function SharedGuide() {
-  return <StepGuide label="키는 어디서 받나요?" sub="두 곳 모두 무료로 만들 수 있어요" note="키는 암호화해서 서버에만 보관해요"
+  return <Guide numbered label="키는 어디서 받나요?" sub="두 곳 모두 무료로 만들 수 있어요" note="키는 암호화해서 서버에만 보관해요"
     steps={[<>{lnk(GUIDE.gemini.url, 'Gemini')}, {lnk(GUIDE.groq.url, 'Groq')} 중 한 곳에서 로그인해요</>,
       '"키 만들기"를 눌러요', '키를 복사해요. 한 번만 보여요', '받은 키를 해당 업체 칸에 붙여 넣고 "연결하기"를 눌러요']} />;
 }
