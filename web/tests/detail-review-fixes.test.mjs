@@ -69,3 +69,32 @@ test('two tabs do not both call the summary API for the same account and notice'
   await summaryApp(free, calls, { summary: '다른 탭이 만든 요약', deadline: null, deadlineKind: null, ai: null }).makeSummary({ id: 'n' });
   assert.deepEqual(calls, ['summarize']);
 });
+
+test('the detail behind the first-setup or inbox window is not "open" for summary and graduation requests', () => {
+  const Controller = build(['  private detailIsOpen('], {});
+  const app = Object.assign(new Controller(), {
+    sharedDetail: null, view: 'all', isWide: true, detailOpen: true, shownId: 'n', openedId: null,
+    needsOnboarding: () => false, inboxOpen: false,
+  });
+  assert.equal(app.detailIsOpen('n'), true);
+  app.needsOnboarding = () => true;                        // 첫 설정 창이 앞에 있다
+  assert.equal(app.detailIsOpen('n'), false);
+  app.needsOnboarding = () => false; app.inboxOpen = true; // 알림함 창이 앞에 있다
+  assert.equal(app.detailIsOpen('n'), false);
+});
+
+test('an OS notification click while the inbox window is open closes it and opens the notice', () => {
+  const start = source.indexOf('  private onWorkerMessage = ');
+  const text = source.slice(start, source.indexOf('\n  };', start) + 5).replace('private onWorkerMessage =', 'onWorkerMessage =');
+  const Controller = new vm.Script(stripTypeScriptTypes(`(class { ${text.replace('onWorkerMessage = (event: MessageEvent) =>', 'onWorkerMessage(event)')} })`)).runInNewContext({
+    isNoticeId: () => true, navigator: { serviceWorker: { controller: 'sw' } }, location: { href: 'https://x/' }, history: { pushState() {} }, noticeLink: () => 'https://x/',
+  });
+  const app = Object.assign(new Controller(), {
+    authReady: true, gated: false, view: 'all', inboxDialogOwner: 'u', deepId: null, deepLookup: null,
+    closeInbox() { this.inboxDialogOwner = null; }, resumeDeepLink() {}, refreshInbox() {},
+  });
+  const port = { postMessage() {}, close() {} };
+  app.onWorkerMessage({ data: { type: 'open-notice', noticeId: 'n' }, source: 'sw', ports: [port] });
+  assert.equal(app.inboxDialogOwner, null);
+  assert.equal(app.deepId, 'n');
+});

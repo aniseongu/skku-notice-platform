@@ -712,6 +712,7 @@ export class AppController extends Reactive {
       || !event.source || event.source !== navigator.serviceWorker.controller || !event.ports[0]) return;
     const id = message.noticeId;
     this.deepLookup = null;
+    this.closeInbox();   // 알림함 창이 떠 있으면 항목을 눌렀을 때와 같이 닫고 그 공지를 연다
     if (this.gated) {
       const url = noticeLink(id, location.href);
       if (url !== location.href) history.pushState(null, '', url);
@@ -3427,6 +3428,8 @@ export class AppController extends Reactive {
   }
 
   private detailIsOpen(id: string): boolean {
+    // 첫 설정이나 알림함 창이 앞에 있으면 뒤쪽 상세는 보이는 상세가 아니다(요약·졸업요건을 요청하지 않는다).
+    if (this.needsOnboarding() || this.inboxOpen) return false;
     if (this.sharedDetail === id) return this.view !== 'settings';
     return this.view !== 'settings' && (this.isWide ? this.detailOpen && this.shownId === id : this.openedId === id);
   }
