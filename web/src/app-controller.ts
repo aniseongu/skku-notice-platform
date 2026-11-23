@@ -45,6 +45,8 @@ import { Reactive, defineReactive } from './reactive';
 import { isNoticeId, loadPublicNotice, noticeIdFromSearch, noticeLink, withoutNotice, type PublicNotice } from './deeplink';
 import { clearSettingsCache, loadSettingsCache, saveSettingsCache, type SettingsData, type SettingsPush } from './settings-cache';
 import { clearListCache, loadListCache, saveListCache } from './list-cache';
+import { clearDetailCache, loadDetailCache, saveDetailField, type DetailFields } from './detail-cache';
+import { loadPublicBody, loadSavedNoticeDetails } from './platform-data';
 import { changeInbox, clearInbox, listenInboxChanged, loadInbox, noticeIdOfItem, pruneStoredInbox, releaseInbox, safeInboxUrl, setInboxOwner, unreadCount, type InboxChange, type InboxItem } from './inbox';
 
 const COOP_KIND_ORDER = ['대기업', '중견기업', '중소기업', '스타트업', '기업', '공공기관', '연구기관', '협회/기타', '기타 기관'];
@@ -265,6 +267,8 @@ export class AppController extends Reactive {
   private cacheReady = false;
   private liveFeedReady = false;
   private liveAccountReady = false;
+  private savedTouched = new Set<string>();
+  private liveListFields = new Set<'deadlines' | 'judgments' | 'interests' | 'translations' | 'graduation'>();
   seenAddedBoardRequests = new Set<string>();
   pushStatus: 'unsupported' | 'checking' | 'off' | 'on' | 'busy' | 'denied' = 'checking';
   pushError = '';
@@ -366,7 +370,7 @@ export class AppController extends Reactive {
   /** 시험에서 서버 대신 쓰는 가짜. 비어 있으면 로그인한 계정의 Supabase를 쓴다. */
   teamApiOverride: TeamApi | null = null;
   private teamSeq = 0;
-  private opportunitySeq = new Map<string, number>();
+  private opportunityWrites = new Map<string, number>();
   private keywordWrite: Promise<void> = Promise.resolve();
   /** 주소의 ?notice=<id>. 한 번 열면 비운다(미리보기와 로그인 사용자의 상세 열기가 이 값을 쓴다). 형식이 틀리면 처음부터 null. */
   deepId: string | null = noticeIdFromSearch(location.search);
@@ -426,9 +430,7 @@ export class AppController extends Reactive {
   }
 
   loading = true;
-  /** 로그인 뒤 처음 목록을 그리기 전에 기다리는 계정 정보(내 판정·졸업요건, 마감, 번역, 구독, 키워드, 게시판 순서)와 AI 키 상태를 받았는지.
-   * 공지만 먼저 그리면 이 정보가 따로 도착할 때마다 판정 문구가 붙고, AI 확인 중인 공지가 빠지고, 줄 높이가 바뀌어 화면이 여러 번 움직인다.
-   * 그래서 처음 한 번은 모두 온 뒤 한꺼번에 그린다(userDataReady). 이후 새로고침은 그 자리에서 바꾼다. */
+  /** 개인 표지와 AI 대기 건수를 처음 계산할 수 있는지. 목록 자체는 피드와 구독 범위가 오면 먼저 그린다. */
   accountDataLoaded = true;
   aiStateLoaded = true;
   /** 설정 화면이 기다리는 상한(FIRST_LOAD_LIMIT_MS)이 지났다. 응답이 없는 항목이 있어도 그때는 그린다. */
@@ -526,6 +528,7 @@ export class AppController extends Reactive {
   summaries = new Map<string, MyNoticeInfo | null | 'loading'>();
   myDeadlines = new Map<string, Pick<MyNoticeInfo, 'deadline' | 'deadlineKind'>>();
   private deadlineRequest = 0;
+  private summaryDeadlineWrites = new Map<string, { request: number; deadline: Pick<MyNoticeInfo, 'deadline' | 'deadlineKind'> }>();
   myTranslations = new Map<string, MyTranslationTitle>();
   private detailTranslations = new Map<string, MyTranslation | null | 'loading'>();
   private translationRequest = 0;
@@ -561,7 +564,6 @@ export class AppController extends Reactive {
     remember('intern-sort', this.internSort);
     remember('coop-sort', this.coopSort);
     applyTheme(this.theme);
-    void this.recheckByok();
     // 구글 화면에서 취소하고 돌아오면 주소에 오류가 붙는다. 조용히 지운다(오류 문구 없음).
     if (authClient && /[?&#](error|error_description)=/.test(location.search + location.hash)) history.replaceState(history.state, '', cleanReturnUrl());
     if (authClient) {
@@ -574,6 +576,8 @@ export class AppController extends Reactive {
           if (previousUserId) {
             this.deepId = noticeIdFromSearch(location.search);
             this.inboxOpenId = null;
+            this.selectedId = null; this.openedId = null;
+            void clearDetailCache(previousUserId);
           }
           if (previousUserId && !userId) {
             void clearListCache(previousUserId);
@@ -582,6 +586,9 @@ export class AppController extends Reactive {
           this.storedSettings = null;
           this.liveSettings.clear();
           this.cacheReady = false; this.liveFeedReady = false; this.liveAccountReady = false;
+          this.liveListFields.clear(); this.savedTouched.clear();
+          this.detailRestores = new Map(); this.missingSummaries = new Set();
+          this.opportunityWrites = new Map();
           this.saveCounts = new Map(); ++this.saveCountRevision;
           this.notices = []; this.sources = []; this.generatedAt = null; this.abortBodies(); this.bodies.clear();
           this.deepNotice = null; this.deepLookup = null; ++this.previewRequest;
@@ -590,10 +597,10 @@ export class AppController extends Reactive {
           this.authUserId = userId;
           const epoch = this.advanceAccountEpoch();
           this.syncInboxOwner(userId, previousUserId);
-          this.myDeadlines = new Map(); ++this.deadlineRequest; this.myTranslations = new Map(); this.detailTranslations = new Map(); ++this.translationRequest;
+          this.myDeadlines = new Map(); this.summaryDeadlineWrites.clear(); ++this.deadlineRequest; this.myTranslations = new Map(); this.detailTranslations = new Map(); ++this.translationRequest;
           this.pushStatus = userId ? 'checking' : 'off'; this.pushError = ''; this.pushRetry = false;
           this.resetGraduations(); this.summaries = new Map(); this.autoSummaries = new Set(); this.myJudgments = new Map(); this.myInterests = new Map(); this.graduationStatuses = new Map(); this.devices = []; this.devicesLoaded = false; this.thisDeviceId = null; this.devicesBusy = false; this.devicesError = ''; this.devicesLoadFailed = false; this.summaryTime = null; this.summarizing = null; this.summaryError = ''; this.summaryErrorId = null; this.byokStatus = null; this.aiKeys = []; this.aiPrefs = DEFAULT_AI_PREFERENCES; this.aiBusy = false; this.aiError = ''; this.byokBackfill = 0; if (this.byokPoll) { clearTimeout(this.byokPoll); this.byokPoll = null; } this.byokError = ''; this.byokBusy = false; this.canvasStatus = null; this.canvasError = ''; this.canvasBusy = false; this.calendarId = null; this.calendarSyncedAt = null; this.calendarAuto = { active: false, error: null, lastRunAt: null }; this.calendarBusy = false; this.calendarMessage = ''; this.calendarError = ''; if (!userId) this.forgetGoogleToken(); this.profile = EMPTY_PROFILE; this.profileMessage = ''; this.profileError = ''; this.keywordNote = '';
-          this.opportunities = new Map(); this.opportunitiesStatus = 'idle'; this.opportunityFilter = 'all'; this.statusMenuOpen = false; this.reordering = false; this.opportunitySeq = new Map(); this.opportunityQueue = new Map();
+          this.opportunities = new Map(); this.opportunitiesStatus = 'idle'; this.opportunityFilter = 'all'; this.statusMenuOpen = false; this.reordering = false; this.opportunityQueue = new Map();
           this.teamState = { noticeId: null, status: 'loading', posts: [] }; this.teamBusy = false; this.teamBusyCount = 0; this.teamUnavailable = false; ++this.teamSeq;
           this.profileStatus = userId ? 'loading' : 'idle'; this.onboardingOpen = false; this.onboardingBusy = false; this.onboardingError = ''; this.onboardingChain = null;
           this.byokLoading = !!userId && this.byokOn;
@@ -608,29 +615,29 @@ export class AppController extends Reactive {
           this.preferencesError = '';
           this.preferencesUnavailable = false;
           this.accountDataLoaded = !userId; this.aiStateLoaded = !userId; this.settingsCapped = !userId;
-          if (userId) setTimeout(() => { void (async () => {
+          if (userId) setTimeout(() => {
+            if (!this.isCurrentAccount(userId, epoch)) return;
+            this.resumeDeepLink();
             void this.restoreSettings(userId, epoch);
-            const cached = await Promise.race([loadListCache(userId), new Promise<null>((resolve) => setTimeout(() => resolve(null), 150))]);
-            if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
-            if (cached && !this.liveFeedReady) {
-              const bySource = new Map(cached.sources.map((source) => [source.id, source]));
-              this.sources = cached.sources; this.notices = cached.notices.filter((notice) => !isExpired(notice, bySource.get(notice.source_id)));
-              this.generatedAt = cached.generatedAt; this.subscriptions = cached.subscriptions; this.subscriptionsLoading = false;
-              this.keywords = cached.keywords; this.boardOrder = cached.boardOrder;
-              this.myDeadlines = cached.deadlines; this.myJudgments = cached.judgments; this.myInterests = cached.interests;
-              this.myTranslations = cached.translations; this.graduationStatuses = cached.graduation;
-              this.cacheReady = true; this.requestUpdate();
-            }
-            // 첫 목록에 필요한 계정 정보를 모두 받으면 한꺼번에 그린다(userDataReady). 너무 늦으면 상한 시간에 그냥 그린다.
-            // 구독·키워드·게시판 순서도 목록과 왼쪽 메뉴의 모양을 바꾸므로 같이 기다린다.
+            const restoring = this.restoreList(userId, epoch);
             const first = [this.refreshMyDeadlines(userId, epoch), this.refreshMyTranslations(userId, epoch), this.refreshMine(userId, epoch),
               this.refreshSubscriptions(userId, epoch), this.refreshPreferences(userId, epoch), this.refreshBoardOrder(userId, epoch)];
-            void Promise.allSettled(first).then(() => { if (epoch === this.subscriptionsEpoch && userId === this.authUserId) { this.accountDataLoaded = true; this.liveAccountReady = true; this.saveCurrentListCache(userId, epoch); } });
-            setTimeout(() => { if (epoch === this.subscriptionsEpoch) { this.accountDataLoaded = true; this.aiStateLoaded = true; this.settingsCapped = true; } }, AppController.FIRST_LOAD_LIMIT_MS);
-            void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshByok(userId, epoch); void this.refreshProfile(userId, epoch);
+            void Promise.allSettled(first).then(() => {
+              if (!this.isCurrentAccount(userId, epoch)) return;
+              this.accountDataLoaded = true;
+              void restoring.then(() => {
+                if (!this.isCurrentAccount(userId, epoch)) return;
+                this.liveAccountReady = true;
+                this.saveCurrentListCache(userId, epoch);
+              });
+            });
+            setTimeout(() => { if (this.isCurrentAccount(userId, epoch)) { this.accountDataLoaded = true; this.aiStateLoaded = true; this.settingsCapped = true; } }, AppController.FIRST_LOAD_LIMIT_MS);
+            if (this.byokChecked) void this.refreshByok(userId, epoch);
+            else void this.recheckByok();
+            void this.refreshPush(userId, epoch); void this.refreshCalendar(userId, epoch); void this.syncStates(); void this.refreshProfile(userId, epoch);
             void this.refreshOpportunities(userId, epoch); void this.refreshSavedOrder(userId, epoch);
-            void this.refreshDevices();   // 알림 설정을 열 때 기기 구역이 뒤늦게 끼어들지 않게 미리 받는다
-          })(); }, 0);
+            void this.refreshDevices();
+          }, 0);
           setLocalOwner(userId);
           this.saved = loadSaved();
           this.keywords = loadKeywords();
@@ -731,6 +738,10 @@ export class AppController extends Reactive {
       if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
       // 뒤늦게 채운 본문도 새 수집 결과와 함께 다시 받는다.
       if (this.generatedAt !== notices!.generated_at) {
+        if (this.liveFeedReady && this.deepNotice) {
+          const { body, ...notice } = this.deepNotice;
+          this.deepNotice = { ...notice, body: { ...body, body: null, body_html: null } };
+        }
         this.generatedAt = notices!.generated_at;
         this.abortBodies();
         this.bodies = new Map();
@@ -793,6 +804,7 @@ export class AppController extends Reactive {
   resumeDeepLink() {
     const id = this.deepId;
     if (!id || !this.authReady || this.gated || this.view === 'settings') return;
+    this.loadDetailInfo(id);
     const cached = this.notices.find((notice) => notice.id === id);
     if (!cached && authClient && this.deepLookup?.id !== id) {
       const userId = this.authUserId, epoch = this.subscriptionsEpoch;
@@ -802,7 +814,13 @@ export class AppController extends Reactive {
         (notice) => { lookup.result = notice; },
         () => { lookup.result = null; lookup.failed = true; },
       ).then(() => {
-        if (this.deepLookup === lookup && this.isCurrentAccount(userId, epoch)) this.resumeDeepLink();
+        if (this.deepLookup !== lookup || !this.isCurrentAccount(userId, epoch)) return;
+        if (this.deepId === id) this.resumeDeepLink();
+        else {
+          this.deepLookup = null;
+          if (lookup.result) this.deepNotice = lookup.result;
+          this.requestUpdate();
+        }
         if (this.deepLookup === lookup && !lookup.result) setTimeout(() => {
           if (this.deepLookup !== lookup) return;
           lookup.feedWaitEnded = true;
@@ -815,7 +833,9 @@ export class AppController extends Reactive {
     const notice = cached ?? found?.notice;
     if (!notice && ((this.loading && !this.liveFeedReady && !this.deepLookup?.feedWaitEnded) || (authClient && found === undefined))) return;
     const failed = this.deepLookup?.failed || this.failed;
+    const pendingLookup = notice && found === undefined ? this.deepLookup : null;
     this.clearDeepLink();
+    this.deepLookup = pendingLookup;
     if (!notice) {
       this.showToast(failed ? '공지를 열지 못했어요. 잠시 뒤 다시 시도해 주세요' : '공지를 찾지 못했어요. 지워졌거나 기한이 지났을 수 있어요');
       return;
@@ -881,6 +901,28 @@ export class AppController extends Reactive {
     } catch {
       this.authError = '로그아웃을 완료하지 못했어요. 다시 확인해 주세요.';
     } finally { this.authBusy = false; }
+  }
+
+  private async restoreList(userId: string, epoch: number): Promise<void> {
+    const keywords = this.keywords, boardOrder = this.boardOrder;
+    const cached = await loadListCache(userId);
+    if (!cached || !this.isCurrentAccount(userId, epoch)) return;
+    if (!this.liveFeedReady) {
+      const bySource = new Map(cached.sources.map((source) => [source.id, source]));
+      this.sources = cached.sources;
+      this.notices = cached.notices.filter((notice) => !isExpired(notice, bySource.get(notice.source_id)));
+      this.generatedAt = cached.generatedAt;
+    }
+    if (!this.liveSettings.has('subscriptions')) this.subscriptions = cached.subscriptions;
+    if (!this.liveSettings.has('keywords') && this.keywords === keywords) this.keywords = cached.keywords;
+    if (!this.liveSettings.has('boardOrder') && this.boardOrder === boardOrder) this.boardOrder = cached.boardOrder;
+    if (!this.liveListFields.has('deadlines')) this.myDeadlines = new Map([...cached.deadlines, ...this.myDeadlines]);
+    if (!this.liveListFields.has('judgments')) this.myJudgments = cached.judgments;
+    if (!this.liveListFields.has('interests')) this.myInterests = cached.interests;
+    if (!this.liveListFields.has('translations')) this.myTranslations = cached.translations;
+    if (!this.liveListFields.has('graduation')) this.graduationStatuses = cached.graduation;
+    this.cacheReady = true;
+    this.requestUpdate();
   }
 
   private saveCurrentListCache(userId: string, epoch: number): void {
@@ -982,6 +1024,7 @@ export class AppController extends Reactive {
     const counts = new Map(this.saveCounts);
     for (const id of added ? [notice.id] : savedMembers.map((member) => member.id)) {
       this.saveCountTouched.add(id);
+      this.savedTouched.add(id);
       if (counts.has(id)) counts.set(id, Math.max(0, counts.get(id)! + (added ? 1 : -1)));
     }
     this.saveCounts = counts;
@@ -991,8 +1034,8 @@ export class AppController extends Reactive {
     // 다시 저장한 공지는 옛 자리가 아니라 맨 위로 온다(순서에서 뺀다).
     if (added && this.savedOrder.includes(notice.id)) this.setSavedOrder(this.savedOrder.filter((id) => id !== notice.id));
     // 저장하면 기회함에 '관심'으로 자동 기록한다(입력 없음). 이미 기록이 있으면 상태를 덮지 않는다.
-    if (added && this.opportunitiesStatus === 'ready') {
-      void this.saveOpportunityFor(notice, boardName(this.sources.find((item) => item.id === notice.source_id), notice.source_id), { status: 'interested' }, false, true);
+    if (added && this.authUserId && this.opportunitiesStatus !== 'unavailable') {
+      void this.saveOpportunityFor(notice, this.sourceName(notice), { status: 'interested' }, false, true);
     }
     const changes = added ? [{ id: notice.id, saved: true }] : savedMembers.map((member) => ({ id: member.id, saved: false }));
     this.uploadStates((guard) => pushSaved(authClient!, changes, guard));
@@ -1001,20 +1044,28 @@ export class AppController extends Reactive {
   async refreshOpportunities(userId: string, epoch: number): Promise<void> {
     if (!authClient || this.opportunitiesLoading) return;
     this.opportunitiesLoading = true;
-    const same = () => epoch === this.subscriptionsEpoch && this.authUserId === userId;
+    const same = () => this.isCurrentAccount(userId, epoch);
+    const writes = new Map(this.opportunityWrites);
     try {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const items = await loadOpportunities(authClient, userId, same);
           if (!same()) return;
-          this.opportunities = new Map(items.map((item) => [item.notice_id, item]));
+          const refreshed = new Map(items.map((item) => [item.notice_id, item]));
+          for (const [id, revision] of this.opportunityWrites) {
+            if (writes.get(id) === revision) continue;
+            const current = this.opportunities.get(id);
+            if (current) refreshed.set(id, current);
+            else refreshed.delete(id);
+          }
+          this.opportunities = refreshed;
           this.opportunitiesStatus = 'ready';
+          for (const id of this.detailRestores.keys()) this.cacheDetail(id, 'opportunity', refreshed.get(id) ?? null);
           return;
         } catch (error) {
           if (!same()) return;
-          this.opportunities = new Map();
-          // 표가 없으면(운영 적용 전) 이 영역만 숨긴다. 일시적 오류는 한 번 다시 시도하고, 그래도 안 되면 다음 새로고침에서 다시 읽는다.
-          if (isMissingTable(error)) { this.opportunitiesStatus = 'unavailable'; return; }
+          // 표가 없으면(운영 적용 전) 이 영역만 숨긴다. 일시적 오류에는 캐시를 유지한다.
+          if (isMissingTable(error)) { this.opportunities = new Map(); this.opportunitiesStatus = 'unavailable'; return; }
           this.opportunitiesStatus = 'failed';
           if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 2000));
           if (!same()) return;
@@ -1269,7 +1320,8 @@ export class AppController extends Reactive {
 
   /** 상세에 "내 진행 상태"를 보일지: 기록을 불러왔고, 저장했거나 이미 기록이 있을 때. */
   opportunityShown(notice: Notice): boolean {
-    return !!this.authUserId && this.opportunitiesStatus === 'ready' && (this.isSaved(notice) || this.opportunities.has(notice.id));
+    if (!this.authUserId || this.opportunitiesStatus === 'unavailable') return false;
+    return this.opportunities.has(notice.id) || (this.opportunitiesStatus === 'ready' && this.isSaved(notice));
   }
 
   /** 상태·메모를 저장한다. 처음이면 제목·링크·게시판·마감 사본과 함께 만든다. 응답을 받은 뒤에 화면에 반영한다.
@@ -1277,8 +1329,6 @@ export class AppController extends Reactive {
   saveOpportunityFor(notice: Notice, source: string, patch: { status?: OpportunityStatus; note?: string | null }, announce = false, ifAbsent = false): Promise<boolean> {
     if (!authClient || !this.authUserId) return Promise.resolve(false);
     const client = authClient, userId = this.authUserId, epoch = this.subscriptionsEpoch;
-    const seq = (this.opportunitySeq.get(notice.id) ?? 0) + 1;
-    this.opportunitySeq.set(notice.id, seq);
     return this.enqueueOpportunity(notice.id, async () => {
       const same = async () => epoch === this.subscriptionsEpoch && this.authUserId === userId && await sessionIs(client, userId);
       try {
@@ -1288,8 +1338,9 @@ export class AppController extends Reactive {
           board: source ? source.slice(0, 100) : null, deadline: deadlineIso(notice.deadline), ...patch,
         }, same, { ifAbsent });
         if (!this.isCurrentAccount(userId, epoch)) return false;
-        // 더 새로운 요청이 줄에 있으면 그 결과가 화면을 정한다.
-        if (this.opportunitySeq.get(notice.id) === seq) this.opportunities = new Map(this.opportunities).set(notice.id, saved);
+        this.opportunityWrites.set(notice.id, (this.opportunityWrites.get(notice.id) ?? 0) + 1);
+        this.opportunities = new Map(this.opportunities).set(notice.id, saved);
+        this.cacheDetail(notice.id, 'opportunity', saved);
         if (announce && patch.status) this.showToast(`${OPPORTUNITY_LABELS[patch.status]}으로 기록했어요`);
         return true;
       } catch (error) {
@@ -1304,13 +1355,14 @@ export class AppController extends Reactive {
   removeOpportunityFor(notice: Notice): Promise<void> {
     if (!authClient || !this.authUserId) return Promise.resolve();
     const client = authClient, userId = this.authUserId, epoch = this.subscriptionsEpoch;
-    this.opportunitySeq.set(notice.id, (this.opportunitySeq.get(notice.id) ?? 0) + 1);
     return this.enqueueOpportunity(notice.id, async () => {
       const same = async () => epoch === this.subscriptionsEpoch && this.authUserId === userId && await sessionIs(client, userId);
       try {
         await removeOpportunity(client, userId, notice.id, same);
         if (epoch !== this.subscriptionsEpoch || this.authUserId !== userId) return;
+        this.opportunityWrites.set(notice.id, (this.opportunityWrites.get(notice.id) ?? 0) + 1);
         const next = new Map(this.opportunities); next.delete(notice.id); this.opportunities = next;
+        this.cacheDetail(notice.id, 'opportunity', null);
         this.showToast('기록을 지웠어요');
       } catch {
         if (epoch === this.subscriptionsEpoch && this.authUserId === userId) this.showToast('기록을 지우지 못했어요. 다시 눌러 주세요');
@@ -1335,7 +1387,7 @@ export class AppController extends Reactive {
    * 이런 공지는 판정이 끝날 때까지 목록(성대 공지·인턴 탭)에서 빼고, 목록 위에 몇 개를 확인하는 중인지 한 줄로 알린다(waitingCount).
    * AI를 꺼 두었거나 키가 없으면, 범위 밖(오래됐거나 마감된 공지)이면 거짓이라 모두 그대로 보인다. */
   judgePending(notice: Notice): boolean {
-    if (!this.aiPrefs.aiEnabled) return false;
+    if (!this.userDataReady() || !this.aiPrefs.aiEnabled) return false;
     if (!this.authUserId || !(this.byokStatus && !this.byokStatus.disabled) && !this.aiKeys.some((key) => !key.disabled)) return false;
     if (this.judgement(notice) || !notice.first_seen) return false;
     const now = Date.now(), day = 24 * 3600 * 1000;
@@ -1362,9 +1414,9 @@ export class AppController extends Reactive {
     if (this.opportunitiesStatus === 'failed') void this.refreshOpportunities(userId, epoch);
     const [judgments, interests, statuses] = await Promise.all([loadMyJudgments(authClient, userId).catch(() => null), loadMyInterests(authClient).catch(() => null), loadGraduationStatuses(authClient, userId).catch(() => null)]);
     if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
-    if (judgments) this.myJudgments = judgments;
-    if (interests) this.myInterests = interests;
-    if (statuses) this.graduationStatuses = statuses;
+    if (judgments) { this.liveListFields.add('judgments'); this.myJudgments = judgments; }
+    if (interests) { this.liveListFields.add('interests'); this.myInterests = interests; }
+    if (statuses) { this.liveListFields.add('graduation'); this.graduationStatuses = statuses; }
   }
 
   /** 내 졸업요건 판정 요약(공지 번호별). 목록 표지와 "인턴십 충족만"에 쓴다. */
@@ -1372,6 +1424,7 @@ export class AppController extends Reactive {
   graduationOnly = remember('view-grad') === '1';
   /** 목록에 졸업요건 표지를 보여 줄 수 있는 사용자인지: 로그인했고 아직 채우지 않은 요건이 있다. */
   /** 첫 목록을 그려도 되는지. 로그인하지 않았으면 기다릴 계정 정보가 없다. */
+  listReady(): boolean { return !this.authUserId || this.hasKnownSubscriptions() || !this.subscriptionsLoading || this.settingsCapped; }
   userDataReady(): boolean { return !this.authUserId || this.cacheReady || (this.accountDataLoaded && this.aiStateLoaded); }
   /** 설정 화면은 이 기기 알림 상태, 기기 목록, 프로필까지 받은 뒤 한 번에 그린다. 먼저 그리면 새로고침 때 "확인하고 있어요"→"켜져 있어요",
    * "아직 받는 게시판이 없어요"→목록처럼 문구가 차례로 바뀌며 아래가 밀린다. */
@@ -1543,8 +1596,8 @@ export class AppController extends Reactive {
 
   /** 저장한 공지의 진행 상태. 기록이 없으면 화면 기본값 '관심 있음'(서버에는 행을 만들지 않는다). 기록 표를 쓸 수 없으면 없다. */
   statusOf(notice: Notice): OpportunityStatus | undefined {
-    if (this.opportunitiesStatus !== 'ready') return undefined;
-    return this.opportunities.get(notice.id)?.status ?? (this.isSaved(notice) ? 'interested' : undefined);
+    return this.opportunities.get(notice.id)?.status
+      ?? (this.opportunitiesStatus === 'ready' && this.isSaved(notice) ? 'interested' : undefined);
   }
 
   exploreStatus(): 'loading' | 'failed' | 'ready' {
@@ -1630,7 +1683,7 @@ export class AppController extends Reactive {
     void run(guard).catch(() => true).then((ok) => { if (!ok && epoch === this.subscriptionsEpoch) this.showToast('이 기기에는 저장했지만 계정에 올리지 못했어요. 다음에 다시 맞출게요'); });
   }
 
-  // 로그인 사용자의 저장·읽음을 서버와 맞춘다. 공지 목록이 있어야 서버에만 있는 저장의 글 정보를 찾을 수 있다.
+  // 로그인 사용자의 저장·읽음을 서버와 맞춘다. 피드에 없는 저장 공지는 글 정보만 별도로 읽는다.
   // 병합 → 저장 업로드 → 읽음 업로드 순서의 체인이며, 업로드가 일부 실패하면 다음 새로고침에서 실패한 단계부터 이어 간다.
   async syncStates(): Promise<void> {
     const userId = this.authUserId, epoch = this.subscriptionsEpoch;
@@ -1651,9 +1704,15 @@ export class AppController extends Reactive {
             if (this.isCurrentAccount(userId, epoch)) this.exploreSavedStatus = 'failed';
             throw error;
           });
-          if (epoch !== this.subscriptionsEpoch) throw new Error('계정이 바뀌었어요');
-          mergedWithNotices = this.notices.length > 0;
-          plan = planStateSync(remote, this.saved, this.readState ?? parseReadState(null), this.notices);
+          if (!this.isCurrentAccount(userId, epoch)) throw new Error('계정이 바뀌었어요');
+          const known = new Set([...this.notices.map((notice) => notice.id), ...this.saved.map((notice) => notice.id)]);
+          const missing = [...remote.savedIds].filter((id) => !known.has(id) && !this.savedTouched.has(id));
+          const outsideFeed = missing.length ? await loadSavedNoticeDetails(client, missing, () => this.isCurrentAccount(userId, epoch)).catch(() => null) : [];
+          if (!this.isCurrentAccount(userId, epoch)) throw new Error('계정이 바뀌었어요');
+          mergedWithNotices = this.notices.length > 0 && outsideFeed !== null;
+          const currentSaved = new Set(this.saved.map((notice) => notice.id));
+          const savedIds = new Set([...remote.savedIds].filter((id) => !this.savedTouched.has(id) || currentSaved.has(id)));
+          plan = planStateSync({ ...remote, savedIds }, this.saved, this.readState ?? parseReadState(null), [...(outsideFeed ?? []), ...this.notices]);
           this.saved = plan.saved; storeSaved(plan.saved);
           this.readState = plan.read; this.read = readIds(plan.read); storeReadState(plan.read);
           this.exploreSavedStatus = 'ready';
@@ -2245,7 +2304,7 @@ export class AppController extends Reactive {
       if (!this.isCurrentAccount(userId, requestedEpoch)) return;
       const epoch = this.advanceAccountEpoch();
       const isCurrent = () => this.isCurrentAccount(userId, epoch);
-      await Promise.all([clearListCache(userId), clearSettingsCache(userId)]);
+      await Promise.all([clearListCache(userId), clearSettingsCache(userId), clearDetailCache(userId)]);
       await releaseInbox(userId, { isCurrent });
       await this.releasePush(userId, isCurrent);
       if (!isCurrent()) return;
@@ -2577,9 +2636,13 @@ export class AppController extends Reactive {
     return applyBoardOrder(this.schoolSources(), this.boardOrder);
   }
 
+  private hasKnownSubscriptions(): boolean {
+    return this.cacheReady || this.liveSettings.has('subscriptions') || (!this.subscriptionsLoading && !this.subscriptionsError);
+  }
+
   /** 로그인했고 받을 게시판을 아직 하나도 고르지 않았는지(불러오는 중이거나 불러오지 못한 때는 아니다). 첫 설정을 건너뛴 사람이 여기에 해당한다. */
   noBoards(): boolean {
-    return !!this.authUserId && !this.subscriptionsLoading && !this.subscriptionsError && this.subscriptions.length === 0;
+    return !!this.authUserId && this.hasKnownSubscriptions() && this.subscriptions.length === 0;
   }
 
   /** 학교 게시판 중 사이드바에 보일 것(순서 적용 전, 서버 목록 순서). */
@@ -2588,7 +2651,7 @@ export class AppController extends Reactive {
     // 로그인했고 받을 게시판을 하나도 안 골랐으면 게시판 목록은 비어 있다(공지가 있다고 대신 보여 주지 않는다).
     if (cachedSubscriptions ? cachedSubscriptions.length === 0 : this.noBoards()) return [];
     const subscriptions = cachedSubscriptions ?? this.subscriptions;
-    const subscribed = this.authUserId && (cachedSubscriptions || !this.subscriptionsLoading) && subscriptions.length > 0;
+    const subscribed = this.authUserId && (cachedSubscriptions || this.hasKnownSubscriptions()) && subscriptions.length > 0;
     const withNotices = new Set(this.notices.map((n) => n.source_id));
     const chosen = all.filter((s) => (subscribed ? subscriptions.includes(s.id) : withNotices.has(s.id)));
     // 지금 보고 있는 게시판은 목록에서 사라지지 않게 한다.
@@ -2601,7 +2664,7 @@ export class AppController extends Reactive {
 
   /** 로그인해 받을 게시판을 고른 사람은 고른 게시판의 학교 공지만 목록에 나온다(전체 보기에서도 고르지 않은 게시판 공지가 섞이지 않게). */
   inChosenBoards(notice: Notice): boolean {
-    if (!this.authUserId || this.subscriptionsLoading || this.subscriptionsError || this.subscriptions.length === 0) return true;
+    if (!this.authUserId || !this.hasKnownSubscriptions() || this.subscriptions.length === 0) return true;
     return this.subscriptions.includes(notice.source_id);
   }
 
@@ -3070,7 +3133,11 @@ export class AppController extends Reactive {
       j: () => move(1), ArrowDown: () => move(1), k: () => move(-1), ArrowUp: () => move(-1),
       Enter: () => { const notice = list[index]; if (notice) { this.markRead(notice); window.open(safeUrl(notice.url), '_blank', 'noopener'); } },
       r: () => this.collectNow(), 1: () => this.openTab('all'), 2: () => this.openTab('intern'), 3: () => { if (this.hasCoop()) this.openTab('coop'); }, 4: () => this.openTab('saved'),
-      s: () => { const notice = list[index]; if (notice) this.toggleSave(notice); },
+      s: () => {
+        const id = this.openedId ?? (this.detailOpen ? this.shownId : null);
+        const notice = this.deepShown(id) ?? list.find((item) => item.id === id) ?? list[index];
+        if (notice) this.toggleSave(notice);
+      },
     };
     const action = actions[event.key];
     if (action) { event.preventDefault(); action(); }
@@ -3106,6 +3173,11 @@ export class AppController extends Reactive {
     try {
       const deadlines = await loadMyDeadlines(authClient, userId);
       if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId || request !== this.deadlineRequest) return;
+      for (const [id, write] of this.summaryDeadlineWrites) {
+        if (write.request === request) deadlines.set(id, write.deadline);
+        else this.summaryDeadlineWrites.delete(id);
+      }
+      this.liveListFields.add('deadlines');
       this.myDeadlines = deadlines;
       this.requestUpdate();
     } catch { /* 날짜 열이 아직 없다면 공용 마감일을 계속 쓴다. */ }
@@ -3117,6 +3189,7 @@ export class AppController extends Reactive {
     try {
       const translations = await loadMyTranslations(authClient, userId);
       if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId || request !== this.translationRequest) return;
+      this.liveListFields.add('translations');
       this.myTranslations = translations;
       this.requestUpdate();
     } catch { /* 번역을 읽지 못하면 원문을 그대로 표시한다. */ }
@@ -3134,34 +3207,56 @@ export class AppController extends Reactive {
   }
   /** 이 공지에 졸업요건 확인을 보여 줄지: 인턴 공고이고 아직 채우지 않은 요건이 있을 때만. */
   showsGraduation(notice: Notice): boolean {
-    const source = this.sources.find((item) => item.id === notice.source_id);
-    const external = !!source?.external || !!source?.coop;
-    return !!authClient && !!this.authUserId && isInternshipNotice(notice, external) && (() => { const v = visibleTracks(this.profile); return v.dept || v.p3; })();
+    return !!authClient && !!this.authUserId && isInternshipNotice(notice, this.isExternal(notice) || this.kindOf(notice) === 'coop') && (() => { const v = visibleTracks(this.profile); return v.dept || v.p3; })();
   }
   private autoGraduations = new Set<string>();
   graduationFor(notice: Notice): GraduationAssessment | null {
     const userId = this.authUserId;
     if (!authClient || !userId || !this.showsGraduation(notice)) return null;
     const cached = this.graduations.get(notice.id);
-    if (cached !== undefined) return cached === 'loading' ? null : cached;
+    if (cached !== undefined) {
+      if (cached === null && this.profileStatus === 'ready' && this.detailIsOpen(notice.id)
+        && !this.autoGraduations.has(notice.id) && !this.graduationBusy) {
+        this.autoGraduations.add(notice.id);
+        const epoch = this.subscriptionsEpoch;
+        setTimeout(() => {
+          if (!this.isCurrentAccount(userId, epoch)) return;
+          if (!this.detailIsOpen(notice.id) || !this.showsGraduation(notice) || this.graduationBusy) {
+            this.autoGraduations.delete(notice.id);
+            return;
+          }
+          void this.requestGraduation(notice);
+        }, 0);
+      }
+      return cached === 'loading' ? null : cached;
+    }
     this.graduations.set(notice.id, 'loading');
-    void this.reloadGraduation(notice.id, userId, this.subscriptionsEpoch, 0);
+    const epoch = this.subscriptionsEpoch, assessments = this.graduations;
+    void this.restoreDetail(notice.id, userId, epoch).then(({ graduation }) => {
+      if (graduation && this.isCurrentAccount(userId, epoch) && this.graduations === assessments && assessments.get(notice.id) === 'loading') {
+        assessments.set(notice.id, graduation);
+        this.requestUpdate();
+      }
+    });
+    void this.reloadGraduation(notice.id, userId, epoch, 0);
     return null;
   }
   private async reloadGraduation(noticeId: string, userId: string, epoch: number, attempt: number): Promise<void> {
-    if (!authClient) return;
-    let row: GraduationAssessment | null = null;
+    if (!authClient || !this.isCurrentAccount(userId, epoch)) return;
+    const assessments = this.graduations;
+    const current = () => this.isCurrentAccount(userId, epoch) && this.graduations === assessments;
+    let row: GraduationAssessment | null;
     try { row = await loadGraduation(authClient, userId, noticeId); }
-    catch { if (epoch === this.subscriptionsEpoch) this.graduationError = '졸업요건 결과를 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.'; }
-    if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
-    this.graduations.set(noticeId, row);
-    this.requestUpdate();
-    // 버튼 없이: 서버가 아직 판정해 두지 않은 공고(오래된 글 등)는 열어 볼 때 한 번 알아서 요청한다.
-    if (!row && !this.graduationError && !this.autoGraduations.has(noticeId)) {
-      this.autoGraduations.add(noticeId);
-      void this.requestGraduation({ id: noticeId } as Notice);
+    catch {
+      if (!current()) return;
+      this.graduationError = '졸업요건 결과를 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.';
+      this.requestUpdate();
+      return;
     }
-    // 워커는 10분마다 돈다. 기다리는 동안 20초마다 확인하고, 약 14분이 지나면 멈춘다.
+    if (!current()) return;
+    assessments.set(noticeId, row);
+    this.cacheDetail(noticeId, 'graduation', row);
+    this.requestUpdate();
     if (row?.state === 'pending' && attempt < 40) {
       this.graduationPolls.set(noticeId, setTimeout(() => { void this.reloadGraduation(noticeId, userId, epoch, attempt + 1); }, 20000));
     }
@@ -3171,10 +3266,13 @@ export class AppController extends Reactive {
     if (!authClient || !userId || this.graduationBusy) return;
     this.graduationBusy = notice.id; this.graduationError = '';
     try {
+      if (!await sessionIs(authClient, userId) || !this.isCurrentAccount(userId, epoch) || !this.detailIsOpen(notice.id)) return;
       await requestGraduation(authClient, userId, notice.id);
-      if (epoch !== this.subscriptionsEpoch) return;
+      if (!this.isCurrentAccount(userId, epoch)) return;
       const before = this.graduations.get(notice.id);
-      this.graduations.set(notice.id, { ...(typeof before === 'object' && before ? before : { aiStatus: null, department: null, university3p: null, facts: null }), state: 'pending' });
+      const pending = { ...(typeof before === 'object' && before ? before : { aiStatus: null, department: null, university3p: null, facts: null }), state: 'pending' as const };
+      this.graduations.set(notice.id, pending);
+      this.cacheDetail(notice.id, 'graduation', pending);
       clearTimeout(this.graduationPolls.get(notice.id));
       this.graduationPolls.set(notice.id, setTimeout(() => { void this.reloadGraduation(notice.id, userId, epoch, 1); }, 20000));
     } catch {
@@ -3184,30 +3282,77 @@ export class AppController extends Reactive {
     }
   }
 
-  myInfo(notice: Notice): MyNoticeInfo | null {
-    const userId = this.authUserId;
-    if (!authClient || !userId) return null;
-    const cached = this.summaries.get(notice.id);
-    if (cached !== undefined) return cached === 'loading' ? null : cached;
-    this.summaries.set(notice.id, 'loading');
-    const epoch = this.subscriptionsEpoch;
-    loadMyNoticeInfo(authClient, userId, notice.id).catch(() => null).then((info) => {
-      if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
-      this.summaries.set(notice.id, info);
-      this.requestUpdate();
+  private detailRestores = new Map<string, ReturnType<typeof loadDetailCache>>();
+  private missingSummaries = new Set<string>();
+
+  private restoreDetail(id: string, userId: string, epoch: number) {
+    const pending = this.detailRestores.get(id);
+    if (pending) return pending;
+    const restore = loadDetailCache(userId, id).then((entry) => {
+      if (!this.isCurrentAccount(userId, epoch)) return {};
+      if (entry.opportunity && this.opportunitiesStatus !== 'ready' && this.opportunitiesStatus !== 'unavailable'
+        && !this.opportunityWrites.has(id) && !this.opportunities.has(id)) {
+        this.opportunities = new Map(this.opportunities).set(id, entry.opportunity);
+      }
+      return entry;
     });
-    return null;
+    this.detailRestores.set(id, restore);
+    if (this.opportunitiesStatus === 'ready') this.cacheDetail(id, 'opportunity', this.opportunities.get(id) ?? null);
+    return restore;
+  }
+
+  private cacheDetail<K extends keyof DetailFields>(
+    id: string, field: K, value: DetailFields[K] | null,
+  ): void {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (userId) void saveDetailField(userId, id, field, value, () => this.isCurrentAccount(userId, epoch));
+  }
+
+  private detailIsOpen(id: string): boolean {
+    return this.view !== 'settings' && (this.isWide ? this.detailOpen && this.shownId === id : this.openedId === id);
+  }
+
+  private loadDetailInfo(id: string) {
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
+    if (!authClient || !userId || this.summaries.has(id)) return;
+    this.summaries.set(id, 'loading');
+    void this.restoreDetail(id, userId, epoch).then(({ info }) => {
+      if (info && this.isCurrentAccount(userId, epoch) && this.summaries.get(id) === 'loading') {
+        this.summaries.set(id, info);
+        this.requestUpdate();
+      }
+    });
+    void loadMyNoticeInfo(authClient, userId, id).then((info) => {
+      if (!this.isCurrentAccount(userId, epoch)) return;
+      if (!info?.summary) this.missingSummaries.add(id);
+      this.summaries.set(id, info);
+      this.cacheDetail(id, 'info', info);
+      this.requestUpdate();
+    }, () => {
+      // 서버 읽기가 실패하면 캐시는 그대로 둔다. 행이 없다고 확인하기 전에는 요약을 생성하지 않는다.
+    });
+  }
+
+  myInfo(notice: Notice): MyNoticeInfo | null {
+    this.loadDetailInfo(notice.id);
+    const info = this.summaries.get(notice.id);
+    return info && info !== 'loading' ? info : null;
   }
 
   /** 열어 본 공지에 요약이 없으면 내 AI 키로 자동으로 만든다. 공지마다 한 번만 시도하고, 실패하면 요약 칸을 보이지 않는다("다시 만들기" 단추는 없앴다, 사용자 지시 2026-11-13). */
   private autoSummaries = new Set<string>();
   autoSummary(notice: Notice): void {
-    if (this.summaries.get(notice.id) !== null || this.autoSummaries.has(notice.id)) return;   // 아직 불러오는 중이거나 이미 있다
+    if (!this.missingSummaries.has(notice.id) || this.autoSummaries.has(notice.id) || !this.detailIsOpen(notice.id)) return;
     // 예전 Gemini 키나 업체별 키(Gemini·Groq) 중 하나라도 켜져 있으면 만든다(Groq 키만 있는 계정도 요약, 2026-11-13).
     const hasKey = (!!this.byokStatus && !this.byokStatus.disabled) || this.aiKeys.some((key) => !key.disabled);
     if (!this.authUserId || !hasKey || this.summarizing) return;
+    const userId = this.authUserId, epoch = this.subscriptionsEpoch;
     this.autoSummaries.add(notice.id);
-    setTimeout(() => { void this.makeSummary(notice); }, 0);
+    setTimeout(() => {
+      if (!this.isCurrentAccount(userId, epoch)) return;
+      if (this.summarizing || !this.detailIsOpen(notice.id)) { this.autoSummaries.delete(notice.id); return; }
+      void this.makeSummary(notice);
+    }, 0);
   }
 
   /** 상세 화면의 "요약 만들기". 내 Gemini 키가 있어야 하고, 만든 요약은 저장돼서 다시 만들지 않는다. */
@@ -3216,11 +3361,19 @@ export class AppController extends Reactive {
     if (!authClient || !userId || this.summarizing) return;
     this.summarizing = notice.id; this.summaryError = ''; this.summaryErrorId = null;
     try {
+      if (!await sessionIs(authClient, userId) || !this.isCurrentAccount(userId, epoch) || !this.detailIsOpen(notice.id)) return;
       const made = await requestNoticeSummary(authClient, notice.id);
-      if (epoch !== this.subscriptionsEpoch) return;
+      if (!this.isCurrentAccount(userId, epoch)) return;
       const before = this.summaries.get(notice.id);
-      this.summaries.set(notice.id, { ai: typeof before === 'object' && before ? before.ai : null, ...made });
-      if (made.deadline) { this.myDeadlines.set(notice.id, made); ++this.deadlineRequest; }
+      const info = { ai: typeof before === 'object' && before ? before.ai : null, ...made };
+      this.summaries.set(notice.id, info);
+      this.missingSummaries.delete(notice.id);
+      this.cacheDetail(notice.id, 'info', info);
+      if (made.deadline) {
+        const deadline = { deadline: made.deadline, deadlineKind: made.deadlineKind };
+        this.myDeadlines = new Map(this.myDeadlines).set(notice.id, deadline);
+        this.summaryDeadlineWrites.set(notice.id, { request: this.deadlineRequest, deadline });
+      }
     } catch (error) {
       if (epoch === this.subscriptionsEpoch) { this.summaryErrorId = notice.id; this.summaryError = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '요약을 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.'; }
     } finally {
@@ -3228,30 +3381,58 @@ export class AppController extends Reactive {
     }
   }
 
-  detailTranslation(notice: Notice): MyTranslation | null {
+  detailTranslation(notice: Notice, body: NoticeBody | null | 'loading'): MyTranslation | null {
     const userId = this.authUserId;
-    if (!authClient || !userId || !this.myTranslations.has(notice.id)) return null;
+    if (!authClient || !userId) return null;
     const cached = this.detailTranslations.get(notice.id);
     if (cached !== undefined) return cached === 'loading' ? null : cached;
-    this.detailTranslations.set(notice.id, 'loading');
     const epoch = this.subscriptionsEpoch;
-    loadMyTranslation(authClient, userId, notice.id).catch(() => null).then((translation) => {
-      if (epoch !== this.subscriptionsEpoch || userId !== this.authUserId) return;
-      this.detailTranslations.set(notice.id, translation);
-      this.requestUpdate();
+    const original = `${notice.title}
+${body && body !== 'loading' ? body.body?.slice(0, 2000) ?? '' : ''}`;
+    const latin = original.match(/[a-z]/gi)?.length ?? 0;
+    const hangul = original.match(/[가-힣]/g)?.length ?? 0;
+    const known = this.myTranslations.has(notice.id) || !!notice.title_ko || (latin >= 20 && hangul < latin * 0.15);
+    void this.restoreDetail(notice.id, userId, epoch).then(({ translation }) => {
+      if (!this.isCurrentAccount(userId, epoch)) return;
+      const value = this.detailTranslations.get(notice.id);
+      if (translation && (value === undefined || value === 'loading')) {
+        this.detailTranslations.set(notice.id, translation);
+        this.requestUpdate();
+        if (!known && value === undefined) this.refreshDetailTranslation(notice.id, userId, epoch);
+      }
     });
+    if (known) this.refreshDetailTranslation(notice.id, userId, epoch);
     return null;
+  }
+
+  private refreshDetailTranslation(id: string, userId: string, epoch: number): void {
+    if (!authClient) return;
+    if (!this.detailTranslations.has(id)) this.detailTranslations.set(id, 'loading');
+    void loadMyTranslation(authClient, userId, id).then((translation) => {
+      if (!this.isCurrentAccount(userId, epoch)) return;
+      this.detailTranslations.set(id, translation);
+      this.cacheDetail(id, 'translation', translation);
+      this.requestUpdate();
+    }, () => {
+      if (this.isCurrentAccount(userId, epoch) && this.detailTranslations.get(id) === 'loading') this.detailTranslations.set(id, null);
+    });
   }
 
   body(notice: Notice): NoticeBody | null | 'loading' {
     const { bodies, generatedAt: generation, subscriptionsEpoch: epoch } = this;
     const cached = bodies.get(notice.id);
     const fallback = this.deepNotice?.notice.id === notice.id ? this.deepNotice.body : null;
-    if (cached !== undefined) return !cached || cached === 'loading' ? fallback ?? cached : cached;
+    if (cached && cached !== 'loading') return cached;
+    const reusable = fallback?.body || fallback?.body_html ? fallback : null;
+    if (cached !== undefined) return reusable ?? cached;
+    if (this.deepLookup?.id === notice.id && this.deepLookup.result === undefined) return 'loading';
     bodies.set(notice.id, 'loading');
     const controller = new AbortController();
     this.bodyAborts.set(notice.id, controller);
-    withTimeout(fetchBody(notice, controller.signal), 20_000, () => controller.abort()).catch(() => null).then((body) => {
+    const reading = reusable && authClient
+      ? loadPublicBody(authClient, notice.source_id, notice.article_no, controller.signal, reusable)
+      : fetchBody(notice, controller.signal);
+    withTimeout(reading, 20_000, () => controller.abort()).catch(() => null).then((body) => {
       if (this.bodyAborts.get(notice.id) !== controller) return;
       this.bodyAborts.delete(notice.id);
       if (bodies !== this.bodies || bodies.get(notice.id) !== 'loading') return;
@@ -3260,7 +3441,7 @@ export class AppController extends Reactive {
       else bodies.set(notice.id, body);
       this.requestUpdate();
     });
-    return fallback ?? 'loading';
+    return reusable ?? 'loading';
   }
 
   /** 진행 중인 본문 요청을 모두 끊는다(계정 전환·새 수집 결과). */

@@ -73,6 +73,7 @@ export const STATUS_DOT = 'bg-[light-dark(var(--text-3),oklch(0.85_0.01_var(--h)
 export const BOTTOM_SHEET = 'fixed inset-x-0 bottom-0 max-h-[75dvh] overflow-y-auto rounded-t-lg border border-line bg-surface shadow-lg';
 export const BOTTOM_SHEET_MOTION = '[animation:install-rise_240ms_ease-out_both] motion-reduce:animate-none';
 export const BOTTOM_SHEET_PADDING = 'px-[20px] pt-[20px] pb-[calc(20px+env(safe-area-inset-bottom))]';
+export const BOTTOM_SHEET_CARD = `${BOTTOM_SHEET} z-[4] min-[720px]:inset-x-auto min-[720px]:right-[24px] min-[720px]:bottom-[24px] min-[720px]:w-[400px] min-[720px]:rounded-lg`;
 export const SHEET_SOLID_BUTTON = 'mt-[16px] inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 bg-accent px-[16px] text-[16px] font-semibold text-on-accent active:opacity-80';
 export const SHEET_GHOST_BUTTON = 'mt-[8px] inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-0 bg-sunken px-[16px] text-[16px] font-semibold text-ink [@media(hover:hover)]:hover:bg-line active:bg-line';
 

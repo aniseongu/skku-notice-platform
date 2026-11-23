@@ -1,7 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { NoticeBody, NoticesFile } from './data';
+import type { Notice, NoticeBody, NoticesFile } from './data';
 
 // 로그인한 사용자만 읽는다(공지 표는 authenticated 전용). 개인 설정과 개인 응답은 오프라인 캐시에 넣지 않는다.
+const NOTICE_COLUMNS = 'id,source_id,article_no,title,category,url,posted_on,pinned,deadline,first_seen,changed_at,change_kind,previous_title,dup_key,dup_text_key';
+
 export async function loadPublicFeed(client: SupabaseClient): Promise<NoticesFile | null> {
   // external, coop 컬럼이 아직 없는 데이터베이스에서도 피드가 깨지지 않게 한 칸씩 줄여 다시 읽는다.
   const readSources = async () => {
@@ -13,7 +15,6 @@ export async function loadPublicFeed(client: SupabaseClient): Promise<NoticesFil
     return read('id,name,url,last_success_at');
   };
   // expires_at 컬럼이 없는 데이터베이스에서는 빼고 다시 읽는다.
-  const NOTICE_COLUMNS = 'id,source_id,article_no,title,category,url,posted_on,pinned,deadline,first_seen,changed_at,change_kind,previous_title,dup_key,dup_text_key';
   const readNotices = async () => {
     // 같은 날짜 안의 순서를 원본(alert)처럼 (게시일, 처음 본 시각, 번호) 내림차순으로 고정한다. 정렬은 게시일만 보므로 이 입력 순서가 그대로 남는다.
     const read = (columns: string) => client.from('platform_notices').select(columns)
@@ -33,18 +34,38 @@ export async function loadPublicFeed(client: SupabaseClient): Promise<NoticesFil
     notices: noticeResult.data as unknown as NoticesFile['notices'] };
 }
 
-export async function loadPublicBody(client: SupabaseClient, sourceId: string, articleNo: string, signal?: AbortSignal): Promise<NoticeBody | null> {
+/** 저장에만 남은 공지의 행을 받는다. 피드 범위와 구독 여부에 의존하지 않는다. */
+export async function loadSavedNoticeDetails(client: SupabaseClient, ids: readonly string[], current: () => boolean): Promise<Notice[]> {
+  const notices: Notice[] = [];
+  for (let offset = 0; offset < ids.length; offset += 50) {
+    if (!current()) throw new Error('계정이 바뀌었어요');
+    const { data, error } = await client.from('platform_notices').select(`${NOTICE_COLUMNS},expires_at`)
+      .in('id', ids.slice(offset, offset + 50));
+    if (error) throw error;
+    notices.push(...(data as Notice[] ?? []));
+  }
+  return notices;
+}
+
+export async function loadPublicBody(client: SupabaseClient, sourceId: string, articleNo: string, signal?: AbortSignal, existing?: NoticeBody): Promise<NoticeBody | null> {
   const id = `${sourceId}/${articleNo}`;
   // 신호가 있으면 쿼리 빌더에 달아 시간 초과나 계정 전환 때 요청 자체를 끊는다.
   const limited = <Q,>(query: Q): Q => (signal && typeof (query as { abortSignal?: unknown }).abortSignal === 'function'
     ? (query as unknown as { abortSignal(s: AbortSignal): Q }).abortSignal(signal) : query);
+  const notices = client.from('platform_notices');
+  // 단건 RPC의 원문은 즉시 표시했다. 첨부·이미지 정보만 읽어 덧붙인다.
+  const query = existing
+    ? notices.select('id,attachments,images,fetched_at')
+    : notices.select('id,body,body_html,attachments,images,fetched_at');
   const [bodyResult, ocrResult] = await Promise.all([
-    limited(client.from('platform_notices').select('id,body,body_html,attachments,images,fetched_at').eq('id', id)).maybeSingle(),
+    limited(query.eq('id', id)).maybeSingle(),
     Promise.resolve(limited(client.from('platform_notice_images').select('image_url,platform_ocr_cache(extracted_text)')
       .eq('notice_id', id).eq('status', 'ready')).limit(3)).catch(() => null),
   ]);
-  const { data, error } = bodyResult;
-  if (error || !data || !data.fetched_at) return null;
+  const { error } = bodyResult;
+  const data = bodyResult.data as Pick<NoticeBody, 'id' | 'attachments' | 'images' | 'fetched_at'>
+    & Partial<Pick<NoticeBody, 'body' | 'body_html'>> | null;
+  if (error || !data || !data.fetched_at) return existing ?? null;
   const rows = (ocrResult?.error ? [] : ocrResult?.data ?? []) as unknown as
     { image_url: string; platform_ocr_cache: { extracted_text?: unknown } | null }[];
   const images: unknown[] = Array.isArray(data.images) ? data.images : [];
@@ -52,7 +73,7 @@ export async function loadPublicBody(client: SupabaseClient, sourceId: string, a
     .map((row) => row.platform_ocr_cache?.extracted_text)
     .filter((text): text is string => typeof text === 'string' && !!text.trim())
     .map((text) => text.slice(0, 100_000)))];
-  return { version: 1, id: data.id, summary: null, body: data.body, body_html: data.body_html,
+  return { version: 1, id: data.id, summary: null, body: existing ? existing.body : data.body ?? null, body_html: existing ? existing.body_html : data.body_html,
     body_status: 'ready', attachments: data.attachments, images: data.images,
     body_from_image: false, ocr_text: ocrText, fetched_at: data.fetched_at };
 }

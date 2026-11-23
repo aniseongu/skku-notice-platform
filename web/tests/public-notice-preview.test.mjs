@@ -56,6 +56,9 @@ test('public notice preview reads one notice by id without opening the tables', 
     }
     await assert.rejects(db.query('select * from public.get_public_notice($1)', [null]), /invalid notice id/);
 
+    // 로그인 사용자도 공유받은 단건과 같은 공개 열을 읽는다.
+    await db.exec('set role authenticated');
+    assert.deepEqual((await db.query(`select * from public.get_public_notice('school/1')`)).rows, r.rows);
     // 권한: anon·authenticated 가능, 다른 내부 함수는 불가 유지
     await db.exec('reset role');
     const has = async (role, fn) => (await db.query(`select has_function_privilege('${role}', '${fn}', 'execute') ok`)).rows[0].ok;

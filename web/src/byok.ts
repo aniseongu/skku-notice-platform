@@ -80,28 +80,31 @@ const kindOf = (value: unknown): '마감' | '일정' | null => (value === '마�
 
 /** 목록에 쓸 본인 날짜를 페이지 단위로 가져온다. 요청한 요약의 날짜가 판정 날짜보다 우선이다. */
 export async function loadMyDeadlines(client: SupabaseClient, userId: string): Promise<Map<string, Pick<MyNoticeInfo, 'deadline' | 'deadlineKind'>>> {
-  const result = new Map<string, Pick<MyNoticeInfo, 'deadline' | 'deadlineKind'>>();
-  for (const table of ['user_notice_summaries', 'user_notice_judgments']) {
+  const read = async (table: string) => {
+    const result = new Map<string, Pick<MyNoticeInfo, 'deadline' | 'deadlineKind'>>();
     for (let offset = 0; ; offset += 500) {
       const { data, error } = await client.from(table).select('notice_id,deadline,deadline_kind')
         .eq('user_id', userId).not('deadline', 'is', null).order('notice_id').range(offset, offset + 499);
       if (error) throw error;
       for (const row of data ?? []) {
         const deadline = clean(row.deadline);
-        if (deadline && typeof row.notice_id === 'string' && !result.has(row.notice_id))
-          result.set(row.notice_id, { deadline, deadlineKind: kindOf(row.deadline_kind) });
+        if (deadline && typeof row.notice_id === 'string') result.set(row.notice_id, { deadline, deadlineKind: kindOf(row.deadline_kind) });
       }
-      if (!data || data.length < 500) break;
+      if (!data || data.length < 500) return result;
     }
-  }
-  return result;
+  };
+  const [summaries, judgments] = await Promise.all([read('user_notice_summaries'), read('user_notice_judgments')]);
+  for (const [id, deadline] of judgments) if (!summaries.has(id)) summaries.set(id, deadline);
+  return summaries;
 }
 
 /** 눌러서(또는 열어서) 만든 요약을 먼저 보고, 없으면 판정할 때 같이 만든 것을 본다. 아무것도 없으면 null. */
 export async function loadMyNoticeInfo(client: SupabaseClient, userId: string, noticeId: string): Promise<MyNoticeInfo | null> {
-  const made = await client.from('user_notice_summaries').select('summary,deadline,deadline_kind').eq('user_id', userId).eq('notice_id', noticeId).maybeSingle();
+  const [made, judged] = await Promise.all([
+    client.from('user_notice_summaries').select('summary,deadline,deadline_kind').eq('user_id', userId).eq('notice_id', noticeId).maybeSingle(),
+    client.from('user_notice_judgments').select('summary,verdict,reason,model,deadline,deadline_kind').eq('user_id', userId).eq('notice_id', noticeId).maybeSingle(),
+  ]);
   if (made.error) throw made.error;
-  const judged = await client.from('user_notice_judgments').select('summary,verdict,reason,model,deadline,deadline_kind').eq('user_id', userId).eq('notice_id', noticeId).maybeSingle();
   if (judged.error) throw judged.error;
   const m = made.data as Record<string, unknown> | null;
   const j = judged.data as Record<string, unknown> | null;

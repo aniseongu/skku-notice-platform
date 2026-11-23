@@ -1,4 +1,4 @@
-import { BOTTOM_SHEET, BOTTOM_SHEET_MOTION, BOTTOM_SHEET_PADDING, SHEET_GHOST_BUTTON, SHEET_SOLID_BUTTON } from './cls';
+import { BOTTOM_SHEET_CARD, BOTTOM_SHEET_MOTION, BOTTOM_SHEET_PADDING, SHEET_GHOST_BUTTON, SHEET_SOLID_BUTTON } from './cls';
 import type { AppController } from './app-controller';
 import { AlertIcon } from './alert-icon';
 import { remember } from './app-controller';
@@ -16,7 +16,7 @@ export function PushSheet({ app, onClose }: { app: AppController; onClose: () =>
   // 켜는 동안(busy)에도 패널을 두어 실패하면 같은 자리에서 이유와 다시 시도를 보인다(busy는 사용자가 누른 뒤에만 생긴다).
   const busy = app.pushStatus === 'busy';
   const close = () => { remember(KEY, pushSheetDismissed(remember(KEY), Date.now())); onClose(); };
-  return <section className={`push-sheet z-[4] ${BOTTOM_SHEET} ${BOTTOM_SHEET_PADDING} ${BOTTOM_SHEET_MOTION} min-[720px]:inset-x-auto min-[720px]:left-auto min-[720px]:right-[24px] min-[720px]:bottom-[24px] min-[720px]:mx-0 min-[720px]:w-[400px] min-[720px]:rounded-lg min-[720px]:pb-[20px]`} aria-label="알림 켜기">
+  return <section className={`push-sheet ${BOTTOM_SHEET_CARD} ${BOTTOM_SHEET_PADDING} ${BOTTOM_SHEET_MOTION} min-[720px]:pb-[20px]`} aria-label="알림 켜기">
     <div className="flex items-start gap-[12px]">
       <img src="icon-192.png" alt="" className="size-[48px] flex-none rounded-md border border-line" />
       <div className="min-w-0 flex-1 pt-[2px]">

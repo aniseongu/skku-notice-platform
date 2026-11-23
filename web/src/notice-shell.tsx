@@ -372,20 +372,20 @@ function UpdatedLine({ app, count }: { app: AppController; count?: number }) {
 }
 
 function UpdatedTime({ app, count }: { app: AppController; count?: number }) {
-  if ((app.loading && !app.generatedAt) || !app.userDataReady()) return <p className={`${UPDATED} text-ink-3`} role="status">공지를 불러오고 있어요</p>;
+  if ((app.loading && !app.generatedAt) || !app.listReady()) return <p className={`${UPDATED} text-ink-3`} role="status">공지를 불러오고 있어요</p>;
   if (!app.generatedAt) return <p className={`${UPDATED} text-ink-3`}>받은 시각을 알 수 없어요</p>;
   const stale = Date.now() - Date.parse(app.generatedAt) > STALE_MS;
   const time = new Intl.DateTimeFormat('ko-KR', {
     timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date(app.generatedAt));
-  const total = count === undefined ? '' : `${count}건, `;
+  const total = count === undefined || !app.userDataReady() ? '' : `${count}건, `;
   // "확인 필요"(판정)와 겹치지 않게 수집 지연은 다른 말로 쓴다.
   return <p className={`${UPDATED} ${stale ? 'stale text-ink-2' : 'text-ink-3'}`}>{stale ? `${time} 이후 새 공지를 못 가져왔어요` : `${total}${time} 기준`}</p>;
 }
 
 function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
   // 처음 불러오는 동안은 목록 자리를 비워 둔다. 기다린다는 말은 위의 기준 시각 줄 한 곳에만 있다(공지를 불러오고 있어요).
-  if ((app.loading && !app.notices.length) || !app.userDataReady()) return null;
+  if ((app.loading && !app.notices.length && !list.length) || !app.listReady()) return null;
   if (app.failed && !app.notices.length) {
     return <Empty title="목록을 불러오지 못했어요" body="공지 데이터를 연결하는 중이에요. 잠시 뒤 다시 확인해 주세요" action="다시 불러오기" onAction={() => { void app.refresh(); }} />;
   }
@@ -439,7 +439,7 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
         const cached = app.summaries.get(notice.id);
         const rowNotice = withMyDeadline(notice, cached && cached !== 'loading' ? cached : null);
         // 현장실습 탭에서는 모든 줄의 출처가 탭 이름과 같아 알려 주는 게 없으므로 보이지 않는다(저장 탭에서는 보인다).
-        const source = app.tab() === 'coop' ? '' : boardName(app.sources.find((item) => item.id === notice.source_id), notice.source_id);
+        const source = app.tab() === 'coop' ? '' : app.sourceName(notice);
         return { notice: rowNotice, source,
           read: app.isRead(notice), saved: app.isSaved(notice), current: app.isWide && app.detailOpen && app.shownId === notice.id,
           selected: app.selectedReads.includes(notice.id), dim: ai?.verdict === 'not_relevant' && !interests.length,
@@ -651,12 +651,13 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
   app.autoSummary(notice);
   const mine = app.myInfo(notice);
   const body = app.body(notice);
-  const translation = app.detailTranslation(notice);
+  const translation = app.detailTranslation(notice, body);
   const shownBody = body && body !== 'loading' && translation ? { ...body, translation } : body;
   const gradDetail = app.gradPartsFor(notice, (judgement?.ai ?? mine?.ai)?.verdict);
   const hasGrad = gradDetail.length > 0;
   const interests = [...new Set([...app.shownInterests(notice, hasGrad), ...bodyInterests(app.keywords, body, keywordMatches).filter((word) => app.shownInterests(notice, hasGrad).includes(word) || !app.isExternal(notice) || !/^(인턴|인턴십|인턴쉽|intern|internship)$/i.test(word))])];
-  const shown = withMyDeadline(notice, mine);
+  const translatedTitle = translation?.title ?? app.myTranslations.get(notice.id)?.title;
+  const shown = withMyDeadline(translatedTitle ? { ...notice, title_ko: translatedTitle } : notice, mine);
   return <notice-detail-screen key={app.authUserId} model={{
     // 같은 공지 묶음은 글마다 따로 저장되므로, 겹쳐 세지 않게 가장 큰 수를 보인다.
     saveCount: Math.max(...[notice, ...app.mates(notice.id)].map((member) => app.saveCounts.get(member.id) ?? 0)) || undefined,
@@ -668,7 +669,7 @@ function Detail({ app, notice }: { app: AppController; notice: Notice }) {
     pending: !(judgement?.ai ?? mine?.ai) && !interests.length && !hasGrad && app.judgePending(notice),
     retry: () => app.retryBody(notice),
     opportunity: app.opportunityShown(notice) ? (() => {
-      const record = app.opportunities.get(notice.id), source = boardName(app.sources.find((item) => item.id === notice.source_id), notice.source_id);
+      const record = app.opportunities.get(notice.id), source = app.sourceName(notice);
       const current = app.statusOf(notice) ?? null;
       return { status: current, note: record?.note ?? '', hasRecord: !!record,
         onStatus: (status: OpportunityStatus) => { if (status !== current) void app.saveOpportunityFor(notice, source, { status }, true); },
