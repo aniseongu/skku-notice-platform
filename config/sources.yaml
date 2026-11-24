@@ -51,11 +51,14 @@ sources:
     url: https://linkareer.com/list/intern
     external: true
 
+  # 2026-11-24 일시 중지(사용자 결정): 2026-11-23 15:00 KST부터 Cloudflare가 자동 접근을 막는다(API·robots.txt 403).
+  # 차단을 우회하지 않는다. paused를 지우면 다시 수집하고 화면에도 보인다(web/src/notice-scope.ts PAUSED_SOURCES도 함께).
   - id: jasoseol-intern
     name: 자소설닷컴
     kind: jasoseol
     url: https://jasoseol.com/recruit
     external: true
+    paused: true
 
 # BEGIN catalog
 # scripts/board_catalog.py가 만든다. 직접 고치지 않는다. 구독자가 있는 게시판만 수집한다(on_demand).

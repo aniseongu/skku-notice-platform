@@ -4,7 +4,7 @@ import { showTestNotification } from './test-notification';
 // 규칙은 docs/DESIGN.md, docs/design/ux-rules.md, docs/design/platforms.md.
 import {
   type IconName, type Judgement, type MatchedFile, type Notice, type NoticeBody, type NoticesFile, type Source,
-  boardName, cleanTitle, deadlineGroup, deadlinePassed, fetchBody, fetchJson, isExpired, keywordMatches, noticeKind, postedGroup, safeUrl, todayKst,
+  boardName, cleanTitle, deadlineGroup, deadlinePassed, fetchBody, fetchJson, isExpired, keywordMatches, PAUSED_SOURCES, noticeKind, postedGroup, safeUrl, todayKst,
 } from './data';
 import { type SavedNotice, type SavedSort, SAVED_ORDER_LIMIT, loadSaved, orderSaved, parseSavedOrder, savedOrderToStore, storeSaved, toggleSaved } from './saved-notices';
 import { initialReadState, isNoticeRead, loadReadState, mergeReadStates, parseReadState, readIds, setReadState, storeReadState } from './read-notices';
@@ -758,7 +758,7 @@ export class AppController extends Reactive {
       }
       // 기한이 지난 공지는 어느 목록에도 두지 않는다(저장·검색 포함). 서버가 나중에 지운다. 숨기는 곳은 여기 한 곳이다.
       const bySource = new Map(notices!.sources.map((source) => [source.id, source]));
-      this.notices = notices!.notices.filter((notice) => !isExpired(notice, bySource.get(notice.source_id)));
+      this.notices = notices!.notices.filter((notice) => !PAUSED_SOURCES.has(notice.source_id) && !isExpired(notice, bySource.get(notice.source_id)));
       this.sources = notices!.sources;
       if (userId) void this.refreshSaveCounts(userId, epoch);
       this.liveFeedReady = true;
@@ -960,7 +960,7 @@ export class AppController extends Reactive {
     if (!this.liveFeedReady) {
       const bySource = new Map(cached.sources.map((source) => [source.id, source]));
       this.sources = cached.sources;
-      this.notices = cached.notices.filter((notice) => !isExpired(notice, bySource.get(notice.source_id)));
+      this.notices = cached.notices.filter((notice) => !PAUSED_SOURCES.has(notice.source_id) && !isExpired(notice, bySource.get(notice.source_id)));
       this.generatedAt = cached.generatedAt;
     }
     if (!this.liveSettings.has('subscriptions')) this.subscriptions = cached.subscriptions;
@@ -2721,7 +2721,7 @@ export class AppController extends Reactive {
       return applyBoardOrder(this.sources.filter((source) => savedSources.has(source.id)), this.boardOrder);
     }
     if (tab === 'coop') return this.sources.filter((s) => s.coop === true);
-    if (tab === 'intern') return this.sources.filter((s) => s.external === true && !s.coop);
+    if (tab === 'intern') return this.sources.filter((s) => s.external === true && !s.coop && !PAUSED_SOURCES.has(s.id));
     return applyBoardOrder(this.schoolSources(), this.boardOrder);
   }
 

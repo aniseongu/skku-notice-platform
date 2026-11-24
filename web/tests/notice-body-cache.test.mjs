@@ -20,6 +20,7 @@ function setup() {
     fetchBody: (_notice, signal) => new Promise((resolve) => requests.push({ generation: app.generatedAt, resolve, signal })),
     fetchJson: async () => ({ generated_at: 'new', notices: [notice], sources: [] }),
     isExpired: () => false,
+    PAUSED_SOURCES: new Set(),
     remember() {},
     console,
     AbortController,

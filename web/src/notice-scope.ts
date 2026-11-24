@@ -2,6 +2,10 @@
 interface ScopeSource { external?: boolean; coop?: boolean }
 interface ScopeNotice { deadline: string | null; expires_at?: string | null }
 
+/** 일시 중지한 게시판(config/sources.yaml의 paused: true와 같게 둔다). 서버는 수집하지 않고 화면은 목록·게시판 고르기·기준 시각에서 뺀다.
+ * 저장해 둔 공지는 저장 탭에 그대로 남는다. 자소설닷컴은 2026-11-23부터 자동 접근을 막아 2026-11-24에 멈췄다(사용자 결정). */
+export const PAUSED_SOURCES: ReadonlySet<string> = new Set(['jasoseol-intern']);
+
 /** 공지가 어느 보기에 속하는지: 현장실습 > 인턴 공고(외부) > 성대 공지. */
 export type NoticeKind = 'all' | 'intern' | 'coop';
 export function noticeKind(source: ScopeSource | undefined): NoticeKind {

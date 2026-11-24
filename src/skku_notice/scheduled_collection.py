@@ -186,6 +186,12 @@ class NoticeStore:
 DETAIL_BUDGET = 60
 
 
+def paused_sources(settings: dict) -> list[str]:
+    """설정에서 일시 중지한(paused: true) 게시판.
+    수집하지 않고 화면에서도 숨긴다(설정은 남겨 다시 켤 수 있다)."""
+    return [s["id"] for s in settings["sources"] if s.get("paused")]
+
+
 def school_sources(settings: dict) -> list[dict]:
     sources = [s for s in settings["sources"]
                if s.get("kind") in {"skku-cms", "gnuboard"} and not s.get("external")]
@@ -436,7 +442,8 @@ def run_external_collection(settings: dict, store: NoticeStore, now: datetime, p
     """
     sources = [
         s for s in settings["sources"]
-        if s.get("external") and (s.get("kind") in COLLECTORS or s.get("kind") == "skku-career-intern")
+        if s.get("external") and not s.get("paused")
+        and (s.get("kind") in COLLECTORS or s.get("kind") == "skku-career-intern")
     ]
     stamp = now.astimezone(KST).isoformat()
     gap = max(1.5, float(settings.get("request_gap_seconds", 1.5)))
@@ -614,7 +621,9 @@ def main() -> int:
             # 구독자 없는 게시판이 기준 시각을 끌어내리지 않게 한다. 실패해도 수집 결과에는 영향이 없다.
             try:
                 catalog = [s["id"] for s in school_sources(settings) if s.get("on_demand")]
-                store.clear_dormant([source_id for source_id in catalog if source_id not in subscribed])
+                # 일시 중지한 외부 게시판(paused)도 수집하지 않으니 같은 방법으로 기준 시각 계산에서 뺀다.
+                dormant = [source_id for source_id in catalog if source_id not in subscribed]
+                store.clear_dormant(dormant + paused_sources(settings))
             except StoreError as exc:
                 print(f"휴면 게시판 정리 건너뜀 ({type(exc).__name__})", flush=True)
             # 보관 기간이 지난 데이터 정리. 실패해도 수집 결과에는 영향이 없다(함수가 아직 없으면 건너뛴다).

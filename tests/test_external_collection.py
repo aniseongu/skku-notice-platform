@@ -135,3 +135,21 @@ def test_school_career_center_is_read_from_its_public_list_with_the_same_limits(
 def test_career_center_parse_failure_is_counted_and_does_not_raise(monkeypatch):
     monkeypatch.setattr(collection, "fetch_list", lambda url, agent, timeout: "<html></html>")
     assert collection.run_external_collection({**SETTINGS, "sources": [CAREER]}, MemoryStore(), NOW) == (0, 1)
+
+
+def test_paused_external_board_is_not_requested_and_is_listed_for_clearing():
+    jasoseol = {"id": "jasoseol-intern", "kind": "jasoseol", "name": "자소설닷컴",
+                "url": "https://jasoseol.com/recruit", "external": True, "paused": True}
+    settings = {**SETTINGS, "sources": [*SETTINGS["sources"], jasoseol]}
+    post = fake_post(count=1)
+    store = MemoryStore()
+    # 자소설닷컴 수집기가 돌았다면 가짜 post가 모르는 요청이라 실패로 셌을 것이다.
+    assert collection.run_external_collection(settings, store, NOW, post) == (1, 0)
+    assert "jasoseol-intern" not in store.sources
+    assert collection.paused_sources(settings) == ["jasoseol-intern"]
+
+
+def test_jasoseol_is_paused_in_the_real_config():
+    import yaml
+    config = yaml.safe_load((Path(__file__).parents[1] / "config" / "sources.yaml").read_text())
+    assert collection.paused_sources(config) == ["jasoseol-intern"]

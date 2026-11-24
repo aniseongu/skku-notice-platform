@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Notice, NoticeBody, NoticesFile } from './data';
+import { PAUSED_SOURCES } from './notice-scope.ts';
 
 // 로그인한 사용자만 읽는다(공지 표는 authenticated 전용). 개인 설정과 개인 응답은 오프라인 캐시에 넣지 않는다.
 const NOTICE_COLUMNS = 'id,source_id,article_no,title,category,url,posted_on,pinned,deadline,first_seen,changed_at,change_kind,previous_title,dup_key,dup_text_key';
@@ -25,7 +26,9 @@ export async function loadPublicFeed(client: SupabaseClient): Promise<NoticesFil
   const [sourceResult, noticeResult] = await Promise.all([readSources(), readNotices()]);
   if (sourceResult.error || noticeResult.error || !sourceResult.data?.length || !noticeResult.data?.length) return null;
   const sourceRows = sourceResult.data as unknown as { id: string; name: string; url: string; last_success_at: string | null; external?: boolean; coop?: boolean; shared_board?: boolean }[];
-  const successes = sourceRows.map((source) => source.last_success_at).filter((v): v is string => Boolean(v));
+  // 일시 중지한 게시판은 더 수집하지 않으니 기준 시각을 끌어내리지 않게 뺀다.
+  const successes = sourceRows.filter((source) => !PAUSED_SOURCES.has(source.id))
+    .map((source) => source.last_success_at).filter((v): v is string => Boolean(v));
   if (!successes.length) return null;
   // The oldest successful source prevents a failing board from looking freshly updated.
   const generatedAt = successes.reduce((a, b) => Date.parse(a) < Date.parse(b) ? a : b);

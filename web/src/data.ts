@@ -117,7 +117,7 @@ export function safeUrl(url: string): string {
   }
 }
 
-export { noticeKind, isExpired, type NoticeKind } from './notice-scope';
+export { noticeKind, isExpired, PAUSED_SOURCES, type NoticeKind } from './notice-scope';
 
 export async function fetchJson<T>(name: string, optional = false, signal?: AbortSignal): Promise<T | null> {
   // 로그인 설정이 있으면 공지는 로그인한 사용자의 DB에서만 읽는다. 공개 스냅샷으로 대신하지 않는다.
