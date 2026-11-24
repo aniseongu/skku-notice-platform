@@ -1009,11 +1009,14 @@ for (const width of [800, 1366]) test(`opening settings from the side menu highl
   await page.goto('/?api=sample/api/v1');
   await list.waitFor();
   const sidebar = page.locator('aside.sidebar');
+  const openMenu = async () => { if (width < 1080) await page.getByRole('button', { name: '메뉴 열기' }).click(); };
   await expect(sidebar.locator('.side-item[aria-current="page"]')).not.toHaveCount(0); // 목록에서는 보기 탭이 강조된다
+  await openMenu();
   await page.locator('.side-foot .side-item').click();
   await expect(page).toHaveURL(/view=settings/);
   await expect(sidebar.locator('.side-item[aria-current="page"]')).toHaveCount(1);
   await expect(sidebar.locator('.side-foot .side-item')).toHaveAttribute('aria-current', 'page');
+  await openMenu();
   const board = sidebar.locator('nav.side-group').first().locator('.side-item').first();
   await board.click();
   await expect(page).not.toHaveURL(/view=settings/);
@@ -3156,4 +3159,24 @@ test('theme segments use one tab stop and keep the selected border in dark mode'
   expect(await group.evaluate((element) => element.contains(document.activeElement))).toBe(false);
   await page.keyboard.press('Shift+Tab');
   await expect(dark).toBeFocused();
+});
+
+test('on a tablet the sidebar stays hidden until the menu button is pressed', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '휴대폰은 하단 탭을 쓴다');
+  const side = page.locator('aside.sidebar');
+  await page.setViewportSize({ width: 820, height: 1100 });
+  await page.goto('/?api=sample/api/v1');
+  await expect(page.locator('notice-rows-screen .row').first()).toBeVisible();
+  await expect(side).toBeHidden();
+  expect((await page.locator('main.list-pane').boundingBox())!.x).toBeLessThan(2);
+  await page.getByRole('button', { name: '메뉴 열기' }).click();
+  await expect(side).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(side).toBeHidden();
+  await page.getByRole('button', { name: '메뉴 열기' }).click();
+  await side.getByRole('button', { name: /^저장/ }).click();
+  await expect(side).toBeHidden();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(side).toBeVisible();
+  await expect(page.getByRole('button', { name: '메뉴 열기' })).toBeHidden();
 });

@@ -28,7 +28,7 @@ import { PushSheet, pushSheetShown } from './push-sheet';
 import { subscribeUpdate, updateAvailable } from './app-update';
 import { LoginScreen, LoginStatus } from './login-screen';
 import { NoticePreview } from './notice-preview';
-import { Brand, DESKTOP_GRID, DesktopDetail, Icon, NoticeSidebar, ReadingHeader, SaveButton, ShareButton, SharedNoticeEmpty, SHARED_COLUMNS, SIDE_ITEM, SIDE_ITEM_IDLE, SideItem, THREE_COLUMNS, TOPBAR } from './notice-layout';
+import { Brand, DESKTOP_GRID, DRAWER_GRID, MenuIcon, setDrawer, useDrawerOpen, DesktopDetail, Icon, NoticeSidebar, ReadingHeader, SaveButton, ShareButton, SharedNoticeEmpty, SHARED_COLUMNS, SIDE_ITEM, SIDE_ITEM_IDLE, SideItem, THREE_COLUMNS, TOPBAR } from './notice-layout';
 import type { CanvasMode } from './devices';
 import { bodyInterests, withMyDeadline } from './notice-view';
 import './platform-settings';
@@ -86,15 +86,35 @@ declare module 'react' {
   }
 }
 
+// 알림을 누른 직후: 서버에서 공지를 가져오는 동안 알림에 있던 제목과 본문 줄을 바로 보여 준다.
+function PushPeek({ title, body, onBack }: { title: string; body: string; onBack: () => void }) {
+  return <div className="min-h-dvh bg-bg">
+    <ReadingHeader onBack={onBack} />
+    <main className="mx-auto max-w-[720px] px-[var(--gutter)] py-[20px]">
+      <h2 className="m-0 text-[22px] leading-[30px] font-bold text-ink">{title}</h2>
+      {body.split('\n').map((line, index) => <p key={index} className="mt-[8px] mb-0 text-[15px] leading-[22px] text-ink-2">{line}</p>)}
+      <p role="status" className="mt-[24px] mb-0 text-[14px] leading-[20px] text-ink-3">자세한 내용을 불러오고 있어요</p>
+    </main>
+  </div>;
+}
+
 export function NoticeShell({ app }: { app: AppController }) {
   useSyncExternalStore(app.subscribe, app.getVersion);
   const inboxTrigger = useRef<HTMLButtonElement>(null);
+  const drawerOpen = useDrawerOpen();
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setDrawer(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawerOpen]);
   // 화면이 반영된 뒤에 포커스 이동 같은 후속 작업이 풀리게 알린다.
   useEffect(() => { app.commit(); app.resumeDeepLink(); });
   useEffect(() => {
     document.title = app.gated ? `로그인 - ${APP_NAME}` : app.authReady && app.view === 'settings' ? `${settingsTitle()} - ${APP_NAME}` : APP_NAME;
   });
 
+  if (app.peekShown() && app.pushPeek) return <PushPeek title={app.pushPeek.title} body={app.pushPeek.body} onBack={app.closePeek} />;
   if (!app.authReady) return <LoginStatus />;
   if (app.gated) return app.deepId ? <NoticePreview app={app} /> : <LoginScreen app={app} />;
   if (app.awaitingProfile() && app.view !== 'settings') return <LoginStatus />;
@@ -127,11 +147,13 @@ export function NoticeShell({ app }: { app: AppController }) {
   const classes = [settings ? 'is-settings' : '', noDetail ? 'no-detail' : '', mobileReading ? 'is-reading' : ''].join(' ');
   // 1080px 이상에서는 목록·상세 두 칸, 설정이거나 상세를 닫았으면 한 칸이다.
   const oneColumn = settings || noDetail;
+  const drawerMode = !(shared && usesDetailPane);
 
   return <>
     <div className="wco-bar" aria-hidden="true"><Brand />{APP_NAME}</div>
-    <div className={`app ${DESKTOP_GRID} ${oneColumn ? '' : THREE_COLUMNS} ${shared && usesDetailPane ? SHARED_COLUMNS : ''} ${classes}`} inert={onboarding}>
-      <NoticeSidebar tabs={app.shownTabs()} counts={counts} active={sidebarTab} onPick={(tab) => app.openTab(tab)} shortcuts>
+    <div className={`app ${DESKTOP_GRID} ${oneColumn ? '' : THREE_COLUMNS} ${shared && usesDetailPane ? SHARED_COLUMNS : drawerMode ? DRAWER_GRID : ''} ${classes}`} inert={onboarding}>
+      {drawerMode && drawerOpen ? <button type="button" className="fixed inset-0 z-[5] hidden border-0 bg-black/30 min-[720px]:max-[1079px]:block" aria-label="메뉴 닫기" onClick={() => setDrawer(false)} /> : null}
+      <NoticeSidebar tabs={app.shownTabs()} counts={counts} active={sidebarTab} onPick={(tab) => app.openTab(tab)} shortcuts drawer={drawerMode}>
         {/* 키워드·게시판 묶음은 계정 정보(키워드, 구독)가 온 뒤 한 번에 그린다. 먼저 그리면 늦게 온 항목만큼 길어지며 아래가 밀린다. */}
         {ready ? <>
         <SideGroup app={app} id="keywords" title="관심 키워드" count={keywordTotals.total}>
@@ -158,6 +180,7 @@ export function NoticeShell({ app }: { app: AppController }) {
         {(!mobileReading || shared) ? <div className={mobileReading ? 'hidden' : 'contents'}>
           <div className="navigation-head contents">
             <header className={`${TOPBAR} ${settings ? TOPBAR_SETTINGS : TOPBAR_FEED}`}>
+              {drawerMode ? <button type="button" className={`${HEADER_ICON_BUTTON} max-[719px]:hidden! min-[1080px]:hidden! -ml-[8px]`} aria-label="메뉴 열기" aria-expanded={drawerOpen} onClick={() => setDrawer(true)}><MenuIcon /></button> : null}
               {settings ? <button type="button" className={`${HEADER_ICON_BUTTON} narrow-only back -ml-[12px] min-[720px]:hidden!`} aria-label={app.settingsSection && !app.settingsLeavesDirectly ? '설정으로 돌아가기' : '설정 닫기'} onClick={app.backSettings}><Icon name="back" /></button> : null}
               {settings ? null : <Brand className="brand-mark narrow-only min-[720px]:hidden! mr-[8px] h-[36px] w-[36px] flex-none text-accent" />}
               <div className={TOPBAR_TEXT}>

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useSyncExternalStore, type ReactNode } from 'react';
 import { TABS, type AppController } from './app-controller';
 import { APP_NAME } from './brand';
 import { HEADER_ICON_BUTTON } from './cls';
@@ -6,6 +6,8 @@ import { Empty } from './empty';
 import type { IconName, Notice } from './data';
 
 export const DESKTOP_GRID = 'min-[720px]:grid min-[720px]:h-[calc(100dvh-var(--wco-h))] min-[720px]:grid-cols-[248px_minmax(0,1fr)]';
+// 720~1079px(태블릿)에서는 사이드바를 접어 두고 메뉴 단추를 눌렀을 때만 위에 띄운다. 공유 미리보기는 기존 3칸을 그대로 쓴다.
+export const DRAWER_GRID = 'min-[720px]:max-[1079px]:grid-cols-1';
 export const THREE_COLUMNS = 'min-[1080px]:grid-cols-[248px_minmax(0,680px)_minmax(400px,1fr)]';
 export const SHARED_COLUMNS = 'min-[720px]:max-[1079px]:grid-cols-[minmax(120px,20%)_minmax(0,1fr)_minmax(0,1.3fr)]';
 
@@ -26,15 +28,26 @@ export function SideItem({ label, count, active, onClick, shortcut, ariaLabel, i
     <span className="side-label flex min-w-0 items-center gap-[10px] [&_.i]:h-[20px] [&_.i]:w-[20px]">{icon ? <Icon name={icon} /> : null}<span className="overflow-hidden text-ellipsis whitespace-nowrap">{label}</span></span>{count === null ? null : <span className="count text-[14px] text-ink-3 tabular-nums">{count}</span>}</button>;
 }
 
-export function NoticeSidebar({ tabs, active, counts = {}, onPick, shortcuts = false, children }: {
+let drawerOpen = false;
+const drawerListeners = new Set<() => void>();
+export function setDrawer(open: boolean): void { if (drawerOpen !== open) { drawerOpen = open; drawerListeners.forEach((fn) => fn()); } }
+export function useDrawerOpen(): boolean {
+  return useSyncExternalStore((fn) => { drawerListeners.add(fn); return () => { drawerListeners.delete(fn); }; }, () => drawerOpen, () => false);
+}
+export const MenuIcon = () => <svg className="i size-[22px] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round]" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>;
+
+export function NoticeSidebar({ tabs, active, counts = {}, onPick, shortcuts = false, drawer = false, children }: {
   tabs: typeof TABS;
   active: (typeof TABS)[number]['id'] | null;
   counts?: Record<string, number | null>;
   onPick: (id: (typeof TABS)[number]['id']) => void;
   shortcuts?: boolean;
+  drawer?: boolean;
   children?: ReactNode;
 }) {
-  return <aside className="sidebar hidden border-r border-line bg-mica px-[12px] pt-0 pb-[12px] min-[720px]:flex min-[720px]:min-h-0 min-[720px]:flex-col min-[720px]:overflow-y-auto" aria-label="탐색">
+  const open = useDrawerOpen();
+  const drawerClass = drawer ? ` max-[1079px]:fixed max-[1079px]:inset-y-0 max-[1079px]:left-0 max-[1079px]:z-[6] max-[1079px]:w-[280px] max-[1079px]:transition-transform max-[1079px]:duration-200 ${open ? 'max-[1079px]:shadow-[var(--shadow-pop)]' : 'max-[1079px]:invisible max-[1079px]:-translate-x-full'}` : '';
+  return <aside onClick={drawer ? (event) => { if ((event.target as Element).closest('button')) setDrawer(false); } : undefined} className={"sidebar hidden border-r border-line bg-mica px-[12px] pt-0 pb-[12px] min-[720px]:flex min-[720px]:min-h-0 min-[720px]:flex-col min-[720px]:overflow-y-auto" + drawerClass} aria-label="탐색">
     <div className="pane-head brand min-[720px]:-mx-[12px] min-[720px]:mt-0 min-[720px]:mb-[12px] min-[720px]:flex min-[720px]:h-[var(--head-h)] min-[720px]:flex-none min-[720px]:items-center min-[720px]:gap-[8px] min-[720px]:border-b min-[720px]:border-line min-[720px]:px-[24px] min-[720px]:text-[17px] min-[720px]:font-bold min-[720px]:tracking-[-0.02em] min-[720px]:[&_.brand-mark]:text-accent min-[720px]:[&_.brand-mark]:size-[32px]"><Brand />{APP_NAME}</div>
     <nav className="side-group flex flex-col gap-[1px]" aria-label="보기">
       {tabs.map((tab) => <SideItem key={tab.id} label={tab.label} count={counts[tab.id] ?? null} active={active === tab.id}

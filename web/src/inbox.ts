@@ -128,6 +128,14 @@ export async function loadInbox(owner: string | null, store: InboxStore = defaul
   } catch { return []; }
 }
 
+/** 알림을 눌러 앱을 막 열었을 때, 서버 응답 전에 먼저 보일 제목과 본문 줄. 10분 안에 이 기기가 받은 그 공지의 알림만 쓴다. */
+export async function peekPushItem(noticeId: string, store: InboxStore = defaultStore, now = Date.now()): Promise<{ title: string; body: string; owner: string } | null> {
+  try {
+    const item = itemsOf(await store.get(INBOX_KEY)).filter((entry) => entry.noticeId === noticeId && now - entry.at <= 10 * 60_000).sort((a, b) => b.at - a.at)[0];
+    return item ? { title: item.title, body: item.body, owner: item.owner } : null;
+  } catch { return null; }
+}
+
 /** 정리한 목록을 되써서 만료된 것을 실제로 비운다(앱을 열거나 다시 보일 때). 소유자는 그대로 둔다. */
 export async function pruneStoredInbox(store: InboxStore = defaultStore, now = Date.now()): Promise<void> {
   try { await store.update(INBOX_KEY, (old) => { const current = parse(old); return { ...current, items: pruneInbox(current.items, now) } satisfies InboxRecord; }); } catch { /* 위와 같다 */ }
