@@ -47,7 +47,8 @@ import { clearSettingsCache, loadSettingsCache, saveSettingsCache, type Settings
 import { clearListCache, loadListCache, saveListCache } from './list-cache';
 import { clearDetailCache, loadDetailCache, saveDetailField, type DetailFields } from './detail-cache';
 import { loadPublicBody, loadSavedNoticeDetails } from './platform-data';
-import { changeInbox, clearInbox, listenInboxChanged, loadInbox, noticeIdOfItem, peekPushItem, pruneStoredInbox, releaseInbox, safeInboxUrl, setInboxOwner, unreadCount, type InboxChange, type InboxItem } from './inbox';
+import { loadPrefetchedNotice } from './notice-prefetch';
+import { changeInbox, clearInbox, listenInboxChanged, loadInbox, noticeIdOfItem, pruneStoredInbox, releaseInbox, safeInboxUrl, setInboxOwner, unreadCount, type InboxChange, type InboxItem } from './inbox';
 
 const COOP_KIND_ORDER = ['대기업', '중견기업', '중소기업', '스타트업', '기업', '공공기관', '연구기관', '협회/기타', '기타 기관'];
 /** 기관 구분이 비어 있는 현장실습은 '기타 기관'으로 묶는다. */
@@ -376,13 +377,6 @@ export class AppController extends Reactive {
   private keywordWrite: Promise<void> = Promise.resolve();
   /** 주소의 ?notice=<id>. 한 번 열면 비운다(미리보기와 로그인 사용자의 상세 열기가 이 값을 쓴다). 형식이 틀리면 처음부터 null. */
   deepId: string | null = noticeIdFromSearch(location.search);
-  /** 알림을 눌러 열 때 상세가 오기 전에 먼저 그리는 제목과 본문 줄(기기에 저장된 그 알림). 상세가 열리면 쓰이지 않는다. */
-  pushPeek: { id: string; title: string; body: string; owner: string } | null = null;
-  private pushPeekLoad = (() => {
-    const id = this.deepId;
-    if (!id || new URLSearchParams(location.search).get('push') !== '1') return;
-    void peekPushItem(id).then((item) => { if (item && this.deepId === id) { this.pushPeek = { id, ...item }; this.requestUpdate(); } });
-  })();
   /** 비로그인 공유 화면의 단건 조회 상태. */
   preview: { status: 'idle' | 'loading' | 'ready' | 'missing' | 'error'; data?: PublicNotice } = { status: 'idle' };
   /** 딥링크로 열었는데 목록에 없는 공지 한 건. 목록·캐시에는 섞지 않는다. */
@@ -831,7 +825,7 @@ export class AppController extends Reactive {
       const userId = this.authUserId, epoch = this.subscriptionsEpoch;
       const lookup: NonNullable<AppController['deepLookup']> = { id };
       this.deepLookup = lookup;
-      void withTimeout(loadPublicNotice(authClient, id), 8_000).then(
+      void withTimeout(loadPrefetchedNotice(id).then((hit) => hit ?? loadPublicNotice(authClient!, id)), 8_000).then(
         (notice) => { lookup.result = notice; },
         () => { lookup.result = null; lookup.failed = true; },
       ).then(() => {
@@ -905,14 +899,6 @@ export class AppController extends Reactive {
     this.preview = { status: 'idle' };
     this.authError = '';
   };
-
-  /** 알림을 누른 직후 상세가 오기 전에 제목을 먼저 보여 줄지. 다른 계정이 로그인했거나 첫 설정·로그인 화면이면 보이지 않는다. */
-  peekShown(): boolean {
-    const peek = this.pushPeek;
-    return Boolean(peek && this.deepId === peek.id && !this.gated && this.view !== 'settings' && !this.needsOnboarding() && (!this.authUserId || this.authUserId === peek.owner));
-  }
-
-  closePeek = () => { this.pushPeek = null; this.clearDeepLink(); this.requestUpdate(); };
 
   private clearDeepLink() {
     if (!this.deepId) return;

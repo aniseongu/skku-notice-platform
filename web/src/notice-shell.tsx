@@ -86,18 +86,6 @@ declare module 'react' {
   }
 }
 
-// 알림을 누른 직후: 서버에서 공지를 가져오는 동안 알림에 있던 제목과 본문 줄을 바로 보여 준다.
-function PushPeek({ title, body, onBack }: { title: string; body: string; onBack: () => void }) {
-  return <div className="min-h-dvh bg-bg">
-    <ReadingHeader onBack={onBack} />
-    <main className="mx-auto max-w-[720px] px-[var(--gutter)] py-[20px]">
-      <h2 className="m-0 text-[22px] leading-[30px] font-bold text-ink">{title}</h2>
-      {body.split('\n').map((line, index) => <p key={index} className="mt-[8px] mb-0 text-[15px] leading-[22px] text-ink-2">{line}</p>)}
-      <p role="status" className="mt-[24px] mb-0 text-[14px] leading-[20px] text-ink-3">자세한 내용을 불러오고 있어요</p>
-    </main>
-  </div>;
-}
-
 export function NoticeShell({ app }: { app: AppController }) {
   useSyncExternalStore(app.subscribe, app.getVersion);
   const inboxTrigger = useRef<HTMLButtonElement>(null);
@@ -114,7 +102,6 @@ export function NoticeShell({ app }: { app: AppController }) {
     document.title = app.gated ? `로그인 - ${APP_NAME}` : app.authReady && app.view === 'settings' ? `${settingsTitle()} - ${APP_NAME}` : APP_NAME;
   });
 
-  if (app.peekShown() && app.pushPeek) return <PushPeek title={app.pushPeek.title} body={app.pushPeek.body} onBack={app.closePeek} />;
   if (!app.authReady) return <LoginStatus />;
   if (app.gated) return app.deepId ? <NoticePreview app={app} /> : <LoginScreen app={app} />;
   if (app.awaitingProfile() && app.view !== 'settings') return <LoginStatus />;

@@ -143,8 +143,40 @@ self.addEventListener('push', (event) => {
     ? digestEntries(payload.items)
     : [{ tag, title, body, noticeId, url: target }];
   const kept = rememberInbox(entries, payload.to);
-  event.waitUntil(Promise.all([shown, kept]));
+  event.waitUntil(Promise.all([shown, kept, prefetchNotice(noticeId).catch(() => undefined)]));
 });
+
+// 알림을 누르기 전에 공지 한 건을 미리 받아 둔다(공개 함수 get_public_notice, 앱이 적어 둔 공개 주소·키 사용). 실패해도 알림에는 영향이 없다.
+const PREFETCH_KEY = 'notice-prefetch:v1';
+const PREFETCH_MAX = 20;
+async function prefetchNotice(noticeId) {
+  if (!noticeId || typeof indexedDB === 'undefined') return;
+  const db = await openKeyval();
+  try {
+    const read = (key) => new Promise((resolve, reject) => { const r = db.transaction('keyval').objectStore('keyval').get(key); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+    const config = await read('sw-public-config:v1');
+    if (!config || typeof config.url !== 'string' || typeof config.key !== 'string' || !/^https:\/\//.test(config.url)) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    let row;
+    try {
+      const response = await fetch(config.url.replace(/\/$/, '') + '/rest/v1/rpc/get_public_notice', {
+        method: 'POST', signal: controller.signal,
+        headers: { apikey: config.key, Authorization: 'Bearer ' + config.key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_id: noticeId }),
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      row = Array.isArray(data) ? data[0] : data;
+    } finally { clearTimeout(timer); }
+    if (!row || row.id !== noticeId) return;
+    const now = Date.now();
+    const old = await read(PREFETCH_KEY);
+    const items = { ...(old && old.items && typeof old.items === 'object' ? old.items : {}), [noticeId]: { at: now, row } };
+    const keep = Object.entries(items).filter(([, v]) => v && now - v.at <= 24 * 60 * 60 * 1000).sort((a, b) => b[1].at - a[1].at).slice(0, PREFETCH_MAX);
+    await new Promise((resolve, reject) => { const tx = db.transaction('keyval', 'readwrite'); tx.objectStore('keyval').put({ items: Object.fromEntries(keep) }, PREFETCH_KEY); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
+  } finally { db.close(); }
+}
 
 let latestNoticeClick = 0;
 self.addEventListener('notificationclick', (event) => {

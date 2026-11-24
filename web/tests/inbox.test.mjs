@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { peekPushItem, changeInbox, clearInbox, inboxTime, loadInbox, pruneInbox, pruneStoredInbox, releaseInbox, safeInboxUrl, setInboxOwner, unreadCount, visibleInbox, noticeIdOfItem, listenInboxChanged, INBOX_KEY } from '../src/inbox.ts';
+import { changeInbox, clearInbox, inboxTime, loadInbox, pruneInbox, pruneStoredInbox, releaseInbox, safeInboxUrl, setInboxOwner, unreadCount, visibleInbox, noticeIdOfItem, listenInboxChanged, INBOX_KEY } from '../src/inbox.ts';
 
 function fakeStore(initial = []) {
   const data = new Map(initial);
@@ -181,12 +181,3 @@ test('unread count, notice id check and short time labels', () => {
   assert.match(inboxTime(NOW - 20 * DAY, NOW), /월 \d+일$/);
 });
 
-test('peekPushItem returns only a recent notification for that notice', async () => {
-  const store = fakeStore([[INBOX_KEY, record([
-    make('1', 'a', NOW - 20 * 60000, { noticeId: 'skku-notice01/1', title: '오래된' }),
-    make('2', 'a', NOW - 60000, { noticeId: 'skku-notice01/1', title: '최근', body: '게시판\n마감 11.30' }),
-    make('3', 'a', NOW - 1000, { noticeId: 'skku-notice01/2', title: '다른 공지' }),
-  ])]]);
-  assert.deepEqual(await peekPushItem('skku-notice01/1', store, NOW), { title: '최근', body: '게시판\n마감 11.30', owner: 'a' });
-  assert.equal(await peekPushItem('skku-notice01/9', store, NOW), null);
-});

@@ -3,6 +3,8 @@ import './styles.css';
 import './notice-app';
 import { registerSW } from 'virtual:pwa-register';
 import { startScrollMemory } from './scroll-memory';
+import { authClient } from './auth';
+import { saveWorkerConfig } from './notice-prefetch';
 import { markUpdateReady, safeToSwapSilently } from './app-update';
 
 const root = document.getElementById('app');
@@ -10,6 +12,7 @@ if (!root) throw new Error('Application root is missing');
 root.append(document.createElement('notice-app'));
 
 startScrollMemory();
+if (authClient) saveWorkerConfig(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 
 // 처음 열고 아무것도 만지지 않은 동안만 새 버전을 조용히 바꾼다. 그 뒤에는 알림 줄로 묻고, 사용자가 누를 때만 바꾼다.
 let interacted = false;

@@ -213,3 +213,21 @@ test('a brand-new account finishes first setup before the shared notice opens (n
   await expect.poll(async () => (await state()).deep).toBeNull();
   await expect(page.getByRole('heading', { name: /배워서 남 주는 프로젝트 성과공유회/ }).first()).toBeVisible();
 });
+
+test('a push link opens a notice the worker already prefetched, without waiting for the server', async ({ page }) => {
+  await mockAuth(page, 'a');
+  await open(page, '');
+  await page.evaluate(() => new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open('keyval-store');
+    request.onupgradeneeded = () => request.result.createObjectStore('keyval');
+    request.onsuccess = () => {
+      const tx = request.result.transaction('keyval', 'readwrite');
+      tx.objectStore('keyval').put({ items: { 'skku-notice01/777': { at: Date.now(), row: {
+        id: 'skku-notice01/777', source_id: 'skku-notice01', source_name: '성대 공지', external: false, title: '미리 받아 둔 공지', category: '장학',
+        url: 'https://www.skku.edu/a', posted_on: '2026-11-18', deadline: null, body: '미리 받은 본문', body_html: '<p>미리 받은 본문</p>' } } } }, 'notice-prefetch:v1');
+      tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error);
+    };
+  }));
+  await open(page, '&notice=skku-notice01%2F777&push=1');
+  await expect(page.getByRole('heading', { name: '미리 받아 둔 공지' }).first()).toBeVisible();
+});
