@@ -420,12 +420,20 @@ function ListBody({ app, list }: { app: AppController; list: Notice[] }) {
   const today = todayKst();
   const groups = new Map<string, Notice[]>();
   const savedDay = new Map(app.saved.map((item) => [item.id, kstDateOf(item.saved_at)]));
+  // 저장 탭의 마감 규칙: 마감이 지난 공지는 어느 정렬이든 맨 아래 '마감 지난 글'로 모은다(다른 탭의 마감순과 같은 이름).
+  // 다만 지원함·결과 나옴은 마감 뒤에도 이어지는 일이라 그대로 둔다(마감순에서는 '지원 진행 중').
+  const saved = app.view === 'saved';
+  const tracking = (notice: Notice) => saved && notice.deadline != null && deadlinePassed(notice.deadline) && ['applied', 'result'].includes(app.statusOf(notice) ?? '');
   for (const notice of list) {
-    const key = app.sortFor(app.tab()) === 'deadline'
-      ? !notice.deadline ? '마감일 미정' : deadlinePassed(notice.deadline) ? '마감 지난 글' : deadlineGroup(notice.deadline, today)
-      : app.view === 'saved' ? (app.sortFor('saved') === 'latest' ? postedGroup(savedDay.get(notice.id) ?? notice.posted_on, today) : '저장한 공지') : postedGroup(notice.posted_on, today);
+    const closed = notice.deadline != null && deadlinePassed(notice.deadline) && !tracking(notice);
+    const key = saved && closed ? '마감 지난 글'
+      : app.sortFor(app.tab()) === 'deadline'
+      ? !notice.deadline ? '마감일 미정' : tracking(notice) ? '지원 진행 중' : deadlinePassed(notice.deadline) ? '마감 지난 글' : deadlineGroup(notice.deadline, today)
+      : saved ? (app.sortFor('saved') === 'latest' ? postedGroup(savedDay.get(notice.id) ?? notice.posted_on, today) : '저장한 공지') : postedGroup(notice.posted_on, today);
     groups.set(key, [...(groups.get(key) ?? []), notice]);
   }
+  const closedGroup = groups.get('마감 지난 글');
+  if (closedGroup) { groups.delete('마감 지난 글'); groups.set('마감 지난 글', closedGroup); }
   return <>{[...groups].map(([heading, items], index) => <section className={`group ${index > 0 ? 'mt-[20px] min-[720px]:mt-[8px]' : ''}`} aria-label={heading} key={heading}>
     <div className={`group-head [&>.board-picker]:ml-auto mx-[var(--gutter)] mt-[4px] mb-0 flex min-h-[44px] items-center justify-between min-[720px]:m-0 min-[720px]:min-h-0 min-[720px]:px-[24px] min-[720px]:py-[6px] ${app.view === 'saved' && heading === '저장한 공지' ? 'max-[719px]:hidden!' : ''}`}><h2 className={`text-[13px] leading-[18px] font-semibold text-ink-3 min-[720px]:text-[12px] min-[720px]:leading-[16px] ${app.view === 'saved' && heading === '저장한 공지' ? 'visually-hidden' : ''}`}>{heading}</h2>{index === 0 && !app.selecting && app.view !== 'saved' ? <BoardSelect app={app} /> : null}</div>
     {index === 0 && app.view === 'saved' && app.savedNotices().length >= 2 && app.savedFilterOn() ? <p id="reorder-why" className={`${NOTE_TEXT} mx-[var(--gutter)] mb-[8px] min-[720px]:mx-0 min-[720px]:px-[24px]`}>전체 보기에서 순서를 바꿀 수 있어요</p> : null}

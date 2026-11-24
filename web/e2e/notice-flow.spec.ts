@@ -3180,3 +3180,27 @@ test('on a tablet the sidebar stays hidden until the menu button is pressed', as
   await expect(side).toBeVisible();
   await expect(page.getByRole('button', { name: '메뉴 열기' })).toBeHidden();
 });
+
+test('saved tab moves closed notices to a last group, but keeps applied ones where they are', async ({ page }) => {
+  await page.goto('/?api=sample/api/v1');
+  await expect(page.locator('notice-rows-screen a.row').first()).toBeVisible();
+  await page.evaluate(() => {
+    const app = document.querySelector('notice-app') as any;
+    const past = new Date(Date.now() - 3 * 86400000).toISOString(), future = new Date(Date.now() + 5 * 86400000).toISOString();
+    const make = (n: number, title: string, deadline: string | null) => ({ ...app.notices[0], id: `${app.notices[0].source_id}/90${n}`, title, deadline });
+    const items = [make(1, '마감된 저장 공지', past), make(2, '진행 중 지원 공지', past), make(3, '열려 있는 저장 공지', future)];
+    app.notices = [...app.notices, ...items];
+    app.saved = items.map((item, i) => ({ ...item, saved_at: new Date(Date.now() - i * 1000).toISOString() }));
+    app.opportunities = new Map([[items[1].id, { notice_id: items[1].id, status: 'applied', note: '', title: '', url: null, board: null, deadline: null, created_at: '', updated_at: '' }]]);
+    app.opportunitiesStatus = 'ready';
+    app.authUserId = 'account-a'; app.profileStatus = 'unavailable';
+    app.subscriptionsLoading = false;
+  });
+  await page.getByRole('navigation', { name: '보기' }).getByRole('button', { name: /저장/ }).click();
+  const closed = page.locator('section.group[aria-label="마감 지난 글"]');
+  await expect(closed).toContainText('마감된 저장 공지');
+  await expect(closed).not.toContainText('진행 중 지원 공지');
+  await expect(closed).not.toContainText('열려 있는 저장 공지');
+  await expect(page.locator('section.group').last()).toHaveAttribute('aria-label', '마감 지난 글');
+  await expect(page.locator('section.group:not([aria-label="마감 지난 글"])').first()).toContainText('진행 중 지원 공지');
+});
