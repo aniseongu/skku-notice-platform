@@ -30,10 +30,21 @@ async function swapNow(): Promise<void> {
   await updateSW(true);
 }
 
+function claimSilentSwap(): boolean {
+  const key = 'silent-swap-at';
+  try {
+    const last = Number(localStorage.getItem(key) ?? 0);
+    if (Date.now() - last < 10 * 60_000) return false;
+    localStorage.setItem(key, String(Date.now()));
+  } catch { /* 저장소를 못 쓰면 막지 않는다 */ }
+  return true;
+}
+
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    if (safeToSwapSilently(performance.now(), interacted)) void swapNow();
+    // 조용한 교체는 10분에 한 번만 한다. 새 워커가 계속 대기 상태로 남는 기기(태블릿)에서 열 때마다 다시 열리는 반복을 막는다.
+    if (safeToSwapSilently(performance.now(), interacted) && claimSilentSwap()) void swapNow();
     else markUpdateReady(() => { void swapNow(); });
   },
   // 새 배포를 열자마자 한 번, 그 뒤로는 화면에 돌아올 때와 한 시간마다 새 버전을 확인한다(찾으면 바꿔 끼우고 다시 연다).
