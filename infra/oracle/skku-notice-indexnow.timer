@@ -1,0 +1,11 @@
+[Unit]
+Description=Check public notice changes hourly for IndexNow
+
+[Timer]
+OnCalendar=*-*-* *:15:00
+Persistent=true
+RandomizedDelaySec=60
+Unit=skku-notice-indexnow.service
+
+[Install]
+WantedBy=timers.target

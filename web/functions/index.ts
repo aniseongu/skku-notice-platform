@@ -1,26 +1,48 @@
-// 루트 주소(`/?notice=<id>`)만 처리한다. 공유 미리보기 봇이 공지 제목·게시판을 보게 메타를 넣는다.
-// 런타임 환경변수 SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY(공개 키)가 Pages 프로젝트에 있어야 한다. 없거나 실패하면 원본 HTML 그대로.
-import { fetchNotice, injectMeta, isNoticeId } from './share-meta.ts';
+import { fetchNotice, isNoticeId } from './share-meta.ts';
+import { cacheFor, publicCache, renderPublicContent, type PublicEnv, type CacheContext } from './seo.ts';
 
-interface Env { ASSETS: { fetch(req: Request): Promise<Response> }; SUPABASE_URL?: string; SUPABASE_PUBLISHABLE_KEY?: string }
+interface Env extends PublicEnv { ASSETS: { fetch(req: Request): Promise<Response> } }
+type Context = CacheContext & { env: Env };
 
-export const onRequestGet = async (context: { request: Request; env: Env }): Promise<Response> => {
+export async function onRequestGet(context: Context): Promise<Response> {
   const { request, env } = context;
+  const url = new URL(request.url);
   const original = await env.ASSETS.fetch(request);
-  try {
-    const url = new URL(request.url);
-    const id = url.searchParams.get('notice');
-    const type = original.headers.get('content-type') ?? '';
-    if (url.searchParams.get('push') === '1' || !isNoticeId(id) || !env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY || !original.ok || !type.includes('text/html')) return original;
-    const notice = await fetchNotice(id, env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY);
-    if (!notice) return original;
-    const html = injectMeta(await original.clone().text(), notice, `${url.origin}/?notice=${encodeURIComponent(id)}`);
+  if (!original.ok || !original.headers.get('content-type')?.includes('text/html')) return original;
+  const id = url.searchParams.get('notice');
+  const isPrivate = [...url.searchParams.keys()].some(k => /^(view|section|code|access_token|refresh_token|error|error_description)$/.test(k)) || url.searchParams.get('tab') === 'saved';
+  if (isPrivate || url.searchParams.get('push') === '1') {
     const headers = new Headers(original.headers);
-    headers.delete('content-length');
-    headers.delete('etag');
-    headers.set('cache-control', 'public, max-age=300');
-    return new Response(html, { status: 200, headers });
-  } catch {
-    return original;
+    headers.set('x-robots-tag', 'noindex, follow'); headers.set('cache-control', 'private, no-store');
+    return new Response(original.body, { status: original.status, headers });
   }
-};
+  const respond = async (): Promise<Response> => {
+    const headers = new Headers(original.headers);
+    headers.delete('content-length'); headers.delete('content-encoding'); headers.delete('etag'); headers.delete('set-cookie');
+    headers.set('x-robots-tag', cacheFor(request));
+    headers.set('cache-control', 'public, max-age=300');
+    try {
+      if (!url.searchParams.has('notice')) return new Response(renderPublicContent(await original.clone().text()), { headers });
+      if (!isNoticeId(id)) { headers.set('x-robots-tag', 'noindex'); headers.set('cache-control', 'no-store'); return new Response(original.body, { status: 404, headers }); }
+      // Development without a configured public backend keeps the existing app flow.
+      if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY) return original;
+      const notice = await fetchNotice(id, env.SUPABASE_URL, env.SUPABASE_PUBLISHABLE_KEY);
+      if (!notice) { headers.set('x-robots-tag', 'noindex'); headers.set('cache-control', 'no-store'); return new Response(original.body, { status: 404, headers }); }
+      return new Response(renderPublicContent(await original.clone().text(), notice, id), { headers });
+    } catch {
+      headers.set('cache-control', 'no-store'); headers.set('retry-after', '60'); headers.set('x-robots-tag', 'noindex');
+      return new Response(original.body, { status: 503, headers });
+    }
+  };
+  // Only public responses enter this cache. Tracking values are dropped from the normalized key.
+  const keyUrl = new URL(`${url.origin}/`);
+  if (isNoticeId(id)) keyUrl.searchParams.set('notice', id);
+  keyUrl.searchParams.set('__public_html', original.headers.get('etag') ?? 'seo-20261127');
+  if (url.searchParams.has('notice') && !isNoticeId(id)) return respond();
+  return publicCache(context, keyUrl.href, respond);
+}
+
+export async function onRequestHead(context: Context): Promise<Response> {
+  const response = await onRequestGet(context);
+  return new Response(null, { status: response.status, headers: response.headers });
+}

@@ -1,7 +1,10 @@
 // 공유 링크 미리보기용 메타 삽입. Pages Functions(functions/index.ts)가 쓴다. 규칙은 스킬 share-deeplink-preview.
 // 이 파일은 onRequest*를 내보내지 않으므로 라우트가 되지 않는다.
 
-export interface ShareNotice { title: string; source_name: string; deadline: string | null }
+export interface ShareNotice {
+  title: string; source_name: string; deadline: string | null;
+  body?: string; url?: string; posted_on?: string;
+}
 
 export function isNoticeId(value: unknown): value is string {
   return typeof value === 'string' && value.length <= 200 && /^[a-z0-9-]+\/[0-9]+$/.test(value);
@@ -57,9 +60,14 @@ export async function fetchNotice(id: string, supabaseUrl: string, key: string, 
     body: JSON.stringify({ p_id: id }),
     signal: AbortSignal.timeout(3000),
   });
-  if (!res.ok) return null;
+  if (!res.ok) throw new Error('Public notice is unavailable');
   const data = await res.json() as unknown;
   const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
   if (!row || typeof row.title !== 'string' || typeof row.source_name !== 'string') return null;
-  return { title: row.title, source_name: row.source_name, deadline: typeof row.deadline === 'string' ? row.deadline : null };
+  return {
+    title: row.title, source_name: row.source_name, deadline: typeof row.deadline === 'string' ? row.deadline : null,
+    body: typeof row.body === 'string' ? row.body : undefined,
+    url: typeof row.url === 'string' && /^https?:\/\//i.test(row.url) ? row.url : undefined,
+    posted_on: typeof row.posted_on === 'string' ? row.posted_on : undefined,
+  };
 }

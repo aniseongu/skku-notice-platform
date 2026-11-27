@@ -1,0 +1,20 @@
+[Unit]
+Description=Notify search engines of changed public notice URLs
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=skku
+WorkingDirectory=/opt/skku-notice-platform
+Environment=PYTHONPATH=/opt/skku-notice-platform/src
+EnvironmentFile=/etc/skku-notice/indexnow.env
+StateDirectory=skku-indexnow
+StateDirectoryMode=0700
+ExecStart=/opt/skku-notice-platform/.venv/bin/python -m skku_notice.indexnow
+TimeoutStartSec=300
+MemoryMax=128M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

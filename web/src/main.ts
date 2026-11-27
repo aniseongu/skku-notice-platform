@@ -9,7 +9,8 @@ import { markUpdateReady, safeToSwapSilently } from './app-update';
 
 const root = document.getElementById('app');
 if (!root) throw new Error('Application root is missing');
-root.append(document.createElement('notice-app'));
+// Pages may already have rendered the public notice. Its custom element upgrades into the same React app.
+if (!root.querySelector('notice-app')) root.append(document.createElement('notice-app'));
 
 startScrollMemory();
 if (authClient) saveWorkerConfig(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);

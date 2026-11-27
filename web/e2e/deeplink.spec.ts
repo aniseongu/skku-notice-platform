@@ -40,6 +40,23 @@ const open = (page: Page, search: string) => page.goto(`/?api=sample/api/v1${sea
 const login = (page: Page) => page.getByRole('button', { name: 'Google로 계속하기' });
 const signIn = login;
 
+test('server-rendered public notice upgrades into exactly one app and the existing preview', async ({ page }) => {
+  await mockAuth(page, null);
+  await page.route('**/*', async route => {
+    if (!route.request().isNavigationRequest()) return route.fallback();
+    const response = await route.fetch();
+    const html = (await response.text()).replace('<div id="app"></div>',
+      '<div id="app"><notice-app><main data-server-preview><h1>공유받은 장학 안내</h1><p>공유 본문입니다</p></main></notice-app></div>');
+    await route.fulfill({ response, body: html });
+  });
+  await open(page, '&notice=skku-notice01%2F777');
+  await expect(page.locator('notice-app')).toHaveCount(1);
+  await expect(page.locator('[data-server-preview]')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '공유받은 장학 안내' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '로그인 안내' })).toBeVisible();
+  await expect(page.getByText('공유 본문입니다')).toBeVisible();
+});
+
 test('without ?notice= a signed-out visitor sees the login screen and the preview code never runs', async ({ page }) => {
   await mockAuth(page, null);
   await open(page, '');
