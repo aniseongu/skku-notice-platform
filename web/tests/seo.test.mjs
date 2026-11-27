@@ -22,11 +22,15 @@ test('public notice is rendered before JavaScript with one canonical and safe ma
   assert.equal(json.headline,notice.title); assert.equal(json.datePublished,notice.posted_on);
   assert.ok(html.includes('<notice-app>')); assert.ok(html.includes('원문 보기'));
   assert.ok(html.includes('content="keep"'));
+  assert.ok(html.includes('<title>공지 &lt;/script&gt;&lt;script&gt;bad()&lt;/script&gt; · 성공</title>'));
+  assert.ok(!html.includes('<title>성공</title>'));
 });
 test('homepage has website schema and no fictional dates; unsafe original URLs cannot be rendered through fetch',()=>{
   const html=renderPublicContent(HTML);
   assert.ok(html.includes('"@type":"WebSite"')); assert.ok(!html.includes('dateModified'));
   assert.ok(html.includes(SITE_URL+'/rss.xml'));
+  assert.ok(html.includes('<title>성공 · 성균관대 공지와 인턴 알림</title>'));
+  assert.ok(html.includes('"alternateName":["성균관대 공지 알림"'));
 });
 test('sitemap index/parts encode public URLs and retain source modification dates',()=>{
   assert.ok(sitemapXml(data,true,0).includes('<sitemapindex'));

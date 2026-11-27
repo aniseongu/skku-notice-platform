@@ -98,8 +98,10 @@ export function NoticeShell({ app }: { app: AppController }) {
   }, [drawerOpen]);
   // 화면이 반영된 뒤에 포커스 이동 같은 후속 작업이 풀리게 알린다.
   useEffect(() => { app.commit(); app.resumeDeepLink(); });
+  // 로그인 전 화면은 서버가 넣은 검색용 제목(첫 화면·공지 제목)을 그대로 둔다.
   useEffect(() => {
-    document.title = app.gated ? `로그인 - ${APP_NAME}` : app.authReady && app.view === 'settings' ? `${settingsTitle()} - ${APP_NAME}` : APP_NAME;
+    if (!app.authReady || app.gated) return;
+    document.title = app.view === 'settings' ? `${settingsTitle()} - ${APP_NAME}` : APP_NAME;
   });
 
   if (!app.authReady) return <LoginStatus />;

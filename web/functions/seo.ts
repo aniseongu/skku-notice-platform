@@ -3,6 +3,8 @@ import { SOLID_BUTTON, NOTE_TEXT } from '../src/cls.ts';
 
 export const SITE_URL = 'https://skku-notice-platform.pages.dev';
 export const SITE_DESCRIPTION = '성균관대 공지와 인턴 공고를 한곳에서 보고 새 소식과 마감 알림을 받아요';
+export const SITE_TITLE = '성공 · 성균관대 공지와 인턴 알림';
+const SITE_ALT_NAMES = ['성균관대 공지 알림', '성대 공지 알림', 'SKKU 공지 알림'];
 export interface PublicEnv { SUPABASE_URL?: string; SUPABASE_PUBLISHABLE_KEY?: string }
 export interface CacheContext { request: Request; waitUntil?: (promise: Promise<unknown>) => void }
 
@@ -69,14 +71,17 @@ export function renderPublicContent(html: string, notice?: ShareNotice, id?: str
     '@context': 'https://schema.org', '@type': 'Article', headline: notice.title,
     description: notice.source_name, url: pageUrl, mainEntityOfPage: pageUrl, inLanguage: 'ko',
     ...(notice.posted_on && /^\d{4}-\d{2}-\d{2}$/.test(notice.posted_on) ? { datePublished: notice.posted_on } : {}),
-  } : { '@context': 'https://schema.org', '@type': 'WebSite', name: '성공', url: pageUrl, description: SITE_DESCRIPTION, inLanguage: 'ko' };
+  } : { '@context': 'https://schema.org', '@type': 'WebSite', name: '성공', alternateName: SITE_ALT_NAMES, url: pageUrl, description: SITE_DESCRIPTION, inLanguage: 'ko' };
   const tags = `<!-- public-seo -->
   <link rel="canonical" href="${escapeHtml(pageUrl)}">
   <link rel="alternate" type="application/rss+xml" title="성공 새 공지" href="${SITE_URL}/rss.xml">
-  ${notice ? '' : `<meta property="og:type" content="website"><meta property="og:title" content="성공 · 성균관대 공지와 인턴 알림"><meta property="og:description" content="${SITE_DESCRIPTION}"><meta property="og:url" content="${pageUrl}"><meta property="og:site_name" content="성공">`}
+  ${notice ? '' : `<meta property="og:type" content="website"><meta property="og:title" content="${SITE_TITLE}"><meta property="og:description" content="${SITE_DESCRIPTION}"><meta property="og:url" content="${pageUrl}"><meta property="og:site_name" content="성공">`}
   <script type="application/ld+json">${jsonLd(structured)}</script>
   <!-- /public-seo -->`;
   let out = withHead(notice ? injectMeta(html, notice, pageUrl) : html, tags);
+  // 검색 결과 제목: 첫 화면은 서비스 설명을, 공지는 끝에 사이트 이름을 붙인다(og:title은 공지 제목 그대로).
+  const docTitle = notice ? `${escapeHtml(notice.title.length > 80 ? `${notice.title.slice(0, 79)}…` : notice.title)} · 성공` : SITE_TITLE;
+  out = out.replace(/<title>[^<]*<\/title>/, () => `<title>${docTitle}</title>`);
   const title = notice?.title ?? '성균관대 공지와 인턴 알림, 성공';
   const text = notice?.body ?? (notice ? '' : SITE_DESCRIPTION);
   const source = notice ? `<p class="${NOTE_TEXT}">${escapeHtml(notice.source_name)}${notice.posted_on ? ` · ${escapeHtml(notice.posted_on)}` : ''}</p>` : '';
