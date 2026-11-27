@@ -145,13 +145,19 @@ test('click budget: saved tab -> map is 1 click, back is 1 click and lands on th
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
 
-test('saved list groups by saved date (today, yesterday) in latest order and has no date groups in custom order', async ({ page }) => {
+for (const [clockLabel, now] of [
+  ['KST noon', '2026-11-27T03:00:00Z'],
+  ['KST just after midnight', '2026-11-27T15:30:00Z'],
+]) test(`saved list groups by saved date (today, yesterday) in latest order and has no date groups in custom order (${clockLabel})`, async ({ page }) => {
+  await page.clock.setFixedTime(new Date(now));
   await setup(page, []);
   await page.evaluate(() => {
     const app = document.querySelector('notice-app') as unknown as App;
     const picked = app.notices.filter((n: { deadline: string | null }) => !n.deadline).slice(0, 2);
     const iso = (ms: number) => new Date(Date.now() - ms).toISOString();
-    app.saved = picked.map((n: Record<string, unknown>, i: number) => { const { first_seen: _f, ...rest } = n; return { ...rest, saved_at: iso(i * 26 * 3600_000) }; });
+    // KST has no DST: the same clock time 24 hours earlier is always yesterday.
+    // 26 hours earlier becomes two calendar days ago between midnight and 02:00 KST.
+    app.saved = picked.map((n: Record<string, unknown>, i: number) => { const { first_seen: _f, ...rest } = n; return { ...rest, saved_at: iso(i * 24 * 3600_000) }; });
     app.savedSort = 'latest'; app.savedOrder = [];
   });
   await expect(page.locator('section.group[aria-label="오늘"]')).toHaveCount(1);
