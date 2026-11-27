@@ -9,6 +9,8 @@
 
 성균관대 공지, 인턴 공고, 현장실습을 한곳에 모아 보고 나에게 맞는 소식만 알림으로 받는 웹 앱
 
+**성대 공지 알림 · 성균관대 인턴 알림 · SKKU 공지 앱** — https://skku-notice-platform.pages.dev
+
 ![version](https://img.shields.io/badge/version-0.1.0-16543c)
 ![PWA](https://img.shields.io/badge/PWA-installable-16543c)
 [![Cloudflare Pages](https://img.shields.io/badge/Cloudflare%20Pages-F38020?logo=cloudflarepages&logoColor=white)](https://skku-notice-platform.pages.dev/)
