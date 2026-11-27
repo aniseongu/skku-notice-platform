@@ -81,7 +81,7 @@ export function renderPublicContent(html: string, notice?: ShareNotice, id?: str
   const text = notice?.body ?? (notice ? '' : SITE_DESCRIPTION);
   const source = notice ? `<p class="${NOTE_TEXT}">${escapeHtml(notice.source_name)}${notice.posted_on ? ` · ${escapeHtml(notice.posted_on)}` : ''}</p>` : '';
   const link = notice?.url ? `<a class="${SOLID_BUTTON} inline-flex items-center justify-center no-underline" href="${escapeHtml(notice.url)}" rel="noopener noreferrer">원문 보기</a>` : '';
-  const content = `<notice-app><main class="mx-auto min-h-dvh max-w-[760px] px-[20px] py-[32px] text-ink"><article class="space-y-[20px]">${source}<h1 class="m-0 whitespace-normal text-[22px] leading-[32px] [overflow-wrap:anywhere]">${escapeHtml(title)}</h1><div class="whitespace-pre-wrap text-[15px] leading-[26px] [overflow-wrap:anywhere]">${escapeHtml(text)}</div>${link}<noscript><p class="${NOTE_TEXT}">로그인과 알림 설정은 자바스크립트를 켜면 이용할 수 있어요</p></noscript></article></main></notice-app>`;
+  const content = `<notice-app><main class="mx-auto min-h-dvh max-w-[760px] px-[20px] py-[32px] text-ink"><article class="flex flex-col items-start gap-[16px]">${source}<h1 class="m-0 w-full whitespace-normal text-[22px] leading-[32px] [overflow-wrap:anywhere]">${escapeHtml(title)}</h1><div class="w-full whitespace-pre-wrap text-[15px] leading-[26px] [overflow-wrap:anywhere]">${escapeHtml(text)}</div>${link}<noscript><p class="${NOTE_TEXT}">로그인과 알림 설정은 자바스크립트를 켜면 이용할 수 있어요</p></noscript></article></main></notice-app>`;
   out = out.replace('<div id="app"></div>', () => `<div id="app">${content}</div>`);
   return out;
 }
