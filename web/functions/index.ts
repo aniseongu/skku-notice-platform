@@ -7,7 +7,11 @@ type Context = CacheContext & { env: Env };
 export async function onRequestGet(context: Context): Promise<Response> {
   const { request, env } = context;
   const url = new URL(request.url);
-  const original = await env.ASSETS.fetch(request);
+  // The underlying index.html's validators describe the JS bundle, not the changing notice.
+  // Always build from a complete document, regardless of a crawler's conditional/range headers.
+  const assetRequest = new Request(request);
+  for (const header of ['if-none-match', 'if-modified-since', 'range', 'if-range']) assetRequest.headers.delete(header);
+  const original = await env.ASSETS.fetch(assetRequest);
   if (!original.ok || !original.headers.get('content-type')?.includes('text/html')) return original;
   const id = url.searchParams.get('notice');
   const isPrivate = [...url.searchParams.keys()].some(k => /^(view|section|code|access_token|refresh_token|error|error_description)$/.test(k)) || url.searchParams.get('tab') === 'saved';
@@ -18,7 +22,7 @@ export async function onRequestGet(context: Context): Promise<Response> {
   }
   const respond = async (): Promise<Response> => {
     const headers = new Headers(original.headers);
-    headers.delete('content-length'); headers.delete('content-encoding'); headers.delete('etag'); headers.delete('set-cookie');
+    headers.delete('content-length'); headers.delete('content-encoding'); headers.delete('etag'); headers.delete('last-modified'); headers.delete('set-cookie');
     headers.set('x-robots-tag', cacheFor(request));
     headers.set('cache-control', 'public, max-age=300');
     try {

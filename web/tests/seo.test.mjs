@@ -105,3 +105,17 @@ test('a HEAD request cannot cache an empty page for subsequent GET requests',asy
     assert.ok((await get.text()).includes('<notice-app>'));
   } finally {globalThis.caches=saved;}
 });
+
+test('static-asset conditional and range requests cannot bypass or poison dynamic HTML',async()=>{
+  const backend={...env,ASSETS:{fetch:async request=>{
+    if(request.headers.has('if-modified-since')||request.headers.has('if-none-match')) return new Response(null,{status:304});
+    if(request.headers.has('range')) return new Response(HTML.slice(0,20),{status:206,headers:{'content-type':'text/html'}});
+    return new Response(HTML,{headers:{'content-type':'text/html','last-modified':'Fri, 27 Nov 2026 00:00:00 GMT'}});
+  }}};
+  for(const headers of [{'if-modified-since':'Fri, 27 Nov 2026 00:00:00 GMT'},{'if-none-match':'asset-etag'},{range:'bytes=0-20'}]){
+    const response=await home({request:new Request(SITE_URL+'/',{headers}),env:backend});
+    assert.equal(response.status,200);
+    assert.ok((await response.text()).includes('<notice-app>'));
+    assert.equal(response.headers.get('last-modified'),null);
+  }
+});
