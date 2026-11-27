@@ -37,12 +37,13 @@ export async function onRequestGet(context: Context): Promise<Response> {
   // Only public responses enter this cache. Tracking values are dropped from the normalized key.
   const keyUrl = new URL(`${url.origin}/`);
   if (isNoticeId(id)) keyUrl.searchParams.set('notice', id);
-  keyUrl.searchParams.set('__public_html', original.headers.get('etag') ?? 'seo-20261127');
+  keyUrl.searchParams.set('__public_html', `head-safe-1:${original.headers.get('etag') ?? 'seo-20261127'}`);
   if (url.searchParams.has('notice') && !isNoticeId(id)) return respond();
   return publicCache(context, keyUrl.href, respond);
 }
 
 export async function onRequestHead(context: Context): Promise<Response> {
-  const response = await onRequestGet(context);
+  // ASSETS has no body for HEAD. Render/cache a GET representation, then omit its body.
+  const response = await onRequestGet({ ...context, request: new Request(context.request, { method: 'GET' }) });
   return new Response(null, { status: response.status, headers: response.headers });
 }

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { renderPublicContent, SITE_URL, parseSitemapPage, sitemapXml, publicCache } from '../functions/seo.ts';
 import { onRequestGet as sitemap, onRequestHead } from '../functions/sitemap.xml.ts';
 import { onRequestGet as rss, feedXml } from '../functions/rss.xml.ts';
-import { onRequestGet as home } from '../functions/index.ts';
+import { onRequestGet as home, onRequestHead as homeHead } from '../functions/index.ts';
 
 const HTML='<html><head><title>성공</title><meta name="description" content="기본"><meta name="google-site-verification" content="keep"></head><body><div id="app"></div></body></html>';
 const env={SUPABASE_URL:'https://public.supabase.co',SUPABASE_PUBLISHABLE_KEY:'public',ASSETS:{fetch:async()=>new Response(HTML,{headers:{'content-type':'text/html',etag:'build-1'}})}};
@@ -91,4 +91,17 @@ test('ownership verification files remain byte-identical to their public tokens'
     const provider=name.startsWith('google')?'google':'naver';
     assert.equal(await readFile(new URL('../public/'+name+'.html',import.meta.url),'utf8'),`${provider}-site-verification: ${name}.html`);
   }
+});
+
+test('a HEAD request cannot cache an empty page for subsequent GET requests',async()=>{
+  const saved=globalThis.caches;
+  const map=new Map();
+  globalThis.caches={default:{match:async r=>map.get(r.url)?.clone(),put:async(r,res)=>map.set(r.url,res)}};
+  const backend={...env,ASSETS:{fetch:async request=>new Response(request.method==='HEAD'?null:HTML,{headers:{'content-type':'text/html',etag:'head-build'}})}};
+  try {
+    const response=await homeHead({request:new Request(SITE_URL+'/',{method:'HEAD'}),env:backend});
+    assert.equal(await response.text(),'');
+    const get=await home({request:new Request(SITE_URL+'/'),env:backend});
+    assert.ok((await get.text()).includes('<notice-app>'));
+  } finally {globalThis.caches=saved;}
 });
