@@ -1,4 +1,4 @@
-"""Notify Naver IndexNow of changed public URLs using the canonical sitemap only."""
+"""Notify participating IndexNow engines using the canonical sitemap only."""
 
 import json
 import os
@@ -10,7 +10,9 @@ from xml.etree import ElementTree as ET
 import httpx
 
 SITE = "https://skku-notice-platform.pages.dev"
-ENDPOINT = "https://searchadvisor.naver.com/indexnow"
+# The shared endpoint accepts pages.dev URLs and distributes them to participating engines.
+# Naver's direct endpoint rejected this host with HTTP 422 despite a valid ownership proof.
+ENDPOINT = "https://api.indexnow.org/indexnow"
 NS = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
 MAX_PAGES = 100
 MAX_URLS = 10000
