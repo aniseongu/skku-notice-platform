@@ -1914,7 +1914,8 @@ for (const width of [412, 1440]) {
     });
     const screen = page.locator('platform-settings-screen');
     const right = async (locator: import('@playwright/test').Locator) => { const box = await locator.boundingBox(); expect(box).not.toBeNull(); return box!.x + box!.width; };
-    const card = await right(screen.locator('.order-list li').first());
+    const card = screen.locator('.order-list li').first();
+    await expect(card).toBeVisible();
     // 설명 아래 첫 게시판 칸 사이 간격은 다른 구역의 구분선과 첫 줄 사이 간격(위 여백)과 같다.
     const gaps = await screen.evaluate((root) => {
       const top = (el: Element | null) => el!.getBoundingClientRect().top;
@@ -1927,14 +1928,17 @@ for (const width of [412, 1440]) {
     });
     console.log(`board lead gap ${width}: gap=${gaps.gap}, reference=${gaps.refGap}`);
     expect(gaps.gap).toBeGreaterThanOrEqual(gaps.refGap - 2);
-    await expect.poll(async () => Math.abs(await right(screen.locator('.board-more-list summary svg')) - card)).toBeLessThanOrEqual(1);
-    const chevron = await right(screen.locator('.board-more-list summary svg'));
-    const reorder = await right(screen.getByRole('button', { name: '순서 바꾸기' }));
-    const request = await right(screen.getByRole('button', { name: '추가 요청', exact: true }));
+    const controls = [screen.locator('.board-more-list summary svg'), screen.getByRole('button', { name: '순서 바꾸기' })];
+    // On desktop request actions align right; on phones they follow the other left-aligned settings actions.
+    if (width >= 720) controls.push(screen.getByRole('button', { name: '추가 요청', exact: true }));
+    // Read live geometry together, rather than retaining a frame from the chevron's rotation.
+    await expect.poll(async () => {
+      const edge = await right(card);
+      const measured = await Promise.all(controls.map(right));
+      return Math.max(...measured.map(value => Math.abs(value - edge)));
+    }).toBeLessThanOrEqual(1);
     await screen.getByRole('button', { name: '추가 요청', exact: true }).click();
-    const close = await right(screen.getByRole('button', { name: '요청 보내기' }));
-    console.log(`board edges ${width}: card=${card}, chevron=${chevron}, reorder=${reorder}, request=${request}, close=${close}`);
-    for (const edge of width >= 720 ? [chevron, reorder, request, close] : [chevron, reorder]) expect(Math.abs(edge - card)).toBeLessThanOrEqual(1);   // 추가 요청·요청 보내기는 설정 줄의 단추라 PC에서만 오른쪽 끝(휴대폰은 다른 설정 줄 단추처럼 왼쪽)
+    if (width >= 720) await expect.poll(async () => Math.abs(await right(screen.getByRole('button', { name: '요청 보내기' })) - await right(card))).toBeLessThanOrEqual(1);
     if (!(await screen.locator('.board-more-list').evaluate((el: HTMLDetailsElement) => el.open))) await screen.locator('.board-more-list summary').click();
     const expanded = screen.locator('.board-more-list > div');
     await expect(expanded).toBeVisible();
